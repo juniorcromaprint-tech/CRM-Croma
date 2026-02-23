@@ -5,7 +5,6 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 
 export default function Index() {
-  // Dados simulados
   const stats = [
     { title: "Pendentes Hoje", value: "4", icon: Clock, color: "text-amber-500", bg: "bg-amber-100" },
     { title: "Concluídas", value: "12", icon: CheckCircle2, color: "text-emerald-500", bg: "bg-emerald-100" },
@@ -25,12 +24,11 @@ export default function Index() {
           <h1 className="text-2xl md:text-3xl font-bold text-slate-800">Olá, Equipe! 👋</h1>
           <p className="text-slate-500 mt-1">Aqui está o resumo das instalações de hoje.</p>
         </div>
-        <Button asChild className="bg-indigo-600 hover:bg-indigo-700 text-white rounded-xl shadow-sm">
+        <Button asChild className="bg-blue-600 hover:bg-blue-700 text-white rounded-xl shadow-sm">
           <Link to="/jobs/new">Nova Instalação</Link>
         </Button>
       </div>
 
-      {/* Stats Grid */}
       <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
         {stats.map((stat) => {
           const Icon = stat.icon;
@@ -50,11 +48,10 @@ export default function Index() {
         })}
       </div>
 
-      {/* Recent Jobs */}
       <Card className="border-none shadow-sm rounded-2xl">
         <CardHeader className="flex flex-row items-center justify-between pb-2">
           <CardTitle className="text-lg font-bold text-slate-800">Agenda de Hoje</CardTitle>
-          <Button variant="ghost" size="sm" className="text-indigo-600" asChild>
+          <Button variant="ghost" size="sm" className="text-blue-600" asChild>
             <Link to="/jobs">Ver todas <ArrowRight size={16} className="ml-1" /></Link>
           </Button>
         </CardHeader>
@@ -64,7 +61,7 @@ export default function Index() {
               <Link 
                 key={job.id} 
                 to={`/jobs/${job.id}`}
-                className="flex items-center justify-between p-4 rounded-2xl border border-slate-100 hover:border-indigo-100 hover:bg-indigo-50/50 transition-colors group"
+                className="flex items-center justify-between p-4 rounded-2xl border border-slate-100 hover:border-blue-100 hover:bg-blue-50/50 transition-colors group"
               >
                 <div className="flex items-center gap-4">
                   <div className={`w-2 h-12 rounded-full ${job.status === 'completed' ? 'bg-emerald-500' : 'bg-amber-500'}`} />

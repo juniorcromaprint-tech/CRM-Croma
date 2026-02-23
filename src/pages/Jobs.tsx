@@ -29,7 +29,7 @@ export default function Jobs() {
           <h1 className="text-2xl md:text-3xl font-bold text-slate-800">Instalações</h1>
           <p className="text-slate-500 mt-1">Gerencie todas as ordens de serviço.</p>
         </div>
-        <Button className="bg-indigo-600 hover:bg-indigo-700 text-white rounded-xl shadow-sm">
+        <Button className="bg-blue-600 hover:bg-blue-700 text-white rounded-xl shadow-sm">
           <Plus size={20} className="mr-2" /> Nova OS
         </Button>
       </div>
@@ -52,11 +52,11 @@ export default function Jobs() {
           <Link 
             key={job.id} 
             to={`/jobs/${job.id}`}
-            className="bg-white p-5 rounded-2xl border border-slate-100 shadow-sm hover:shadow-md hover:border-indigo-100 transition-all group"
+            className="bg-white p-5 rounded-2xl border border-slate-100 shadow-sm hover:shadow-md hover:border-blue-100 transition-all group"
           >
             <div className="flex justify-between items-start mb-3">
               <div className="flex items-center gap-2">
-                <span className="text-sm font-bold text-indigo-600 bg-indigo-50 px-2 py-1 rounded-md">
+                <span className="text-sm font-bold text-blue-600 bg-blue-50 px-2 py-1 rounded-md">
                   {job.id}
                 </span>
                 <Badge variant="secondary" className={getStatusColor(job.status)}>

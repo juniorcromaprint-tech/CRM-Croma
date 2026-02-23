@@ -30,7 +30,7 @@ export default function Stores() {
           <Card key={store.id} className="border-none shadow-sm rounded-2xl hover:shadow-md transition-shadow cursor-pointer group">
             <CardContent className="p-5 flex items-center justify-between">
               <div className="flex items-start gap-4">
-                <div className="w-12 h-12 bg-indigo-50 rounded-xl flex items-center justify-center text-indigo-600 flex-shrink-0">
+                <div className="w-12 h-12 bg-blue-50 rounded-xl flex items-center justify-center text-blue-600 flex-shrink-0">
                   <Store size={24} />
                 </div>
                 <div>
@@ -50,7 +50,7 @@ export default function Stores() {
                   )}
                 </div>
               </div>
-              <ChevronRight className="text-slate-300 group-hover:text-indigo-600 transition-colors" />
+              <ChevronRight className="text-slate-300 group-hover:text-blue-600 transition-colors" />
             </CardContent>
           </Card>
         ))}

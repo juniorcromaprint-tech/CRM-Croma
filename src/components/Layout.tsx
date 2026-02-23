@@ -11,6 +11,17 @@ const navItems = [
   { name: "Clientes", path: "/clients", icon: Users },
 ];
 
+export const CromaLogo = ({ className = "" }: { className?: string }) => (
+  <div className={`flex items-center gap-1.5 ${className}`}>
+    <div className="flex -space-x-1.5">
+      <div className="w-4 h-4 rounded-full bg-cyan-500 mix-blend-multiply opacity-90"></div>
+      <div className="w-4 h-4 rounded-full bg-fuchsia-500 mix-blend-multiply opacity-90"></div>
+      <div className="w-4 h-4 rounded-full bg-yellow-400 mix-blend-multiply opacity-90"></div>
+    </div>
+    <span className="font-black text-slate-800 tracking-tight text-xl">Cromaprint</span>
+  </div>
+);
+
 export default function Layout() {
   const location = useLocation();
 
@@ -25,11 +36,11 @@ export default function Layout() {
             to={item.path}
             className={`flex items-center gap-3 px-4 py-3 rounded-2xl transition-all duration-200 ${
               isActive
-                ? "bg-indigo-600 text-white shadow-md"
-                : "text-gray-600 hover:bg-indigo-50 hover:text-indigo-600"
+                ? "bg-blue-600 text-white shadow-md"
+                : "text-slate-600 hover:bg-blue-50 hover:text-blue-600"
             }`}
           >
-            <Icon size={20} className={isActive ? "text-white" : "text-gray-500"} />
+            <Icon size={20} className={isActive ? "text-white" : "text-slate-400"} />
             <span className="font-medium">{item.name}</span>
           </Link>
         );
@@ -41,20 +52,15 @@ export default function Layout() {
     <div className="min-h-screen bg-slate-50 flex flex-col md:flex-row font-sans">
       {/* Desktop Sidebar */}
       <aside className="hidden md:flex flex-col w-64 bg-white border-r border-slate-200 p-4 print:hidden">
-        <div className="flex items-center gap-3 px-2 py-4 mb-6">
-          <div className="w-10 h-10 bg-indigo-600 rounded-xl flex items-center justify-center shadow-sm">
-            <span className="text-white font-bold text-xl">G</span>
-          </div>
-          <div>
-            <h1 className="font-bold text-lg text-slate-800 leading-tight">GráficaApp</h1>
-            <p className="text-xs text-slate-500">Gestão de Instalações</p>
-          </div>
+        <div className="px-2 py-4 mb-6">
+          <CromaLogo />
+          <p className="text-xs text-slate-500 mt-1 ml-1">Gestão de Instalações</p>
         </div>
         <nav className="flex-1 space-y-2">
           <NavLinks />
         </nav>
         <div className="mt-auto pt-4 border-t border-slate-100">
-          <button className="flex items-center gap-3 px-4 py-3 w-full rounded-2xl text-gray-600 hover:bg-slate-100 transition-colors">
+          <button className="flex items-center gap-3 px-4 py-3 w-full rounded-2xl text-slate-600 hover:bg-slate-100 transition-colors">
             <Settings size={20} />
             <span className="font-medium">Configurações</span>
           </button>
@@ -63,12 +69,7 @@ export default function Layout() {
 
       {/* Mobile Header */}
       <header className="md:hidden bg-white border-b border-slate-200 p-4 flex items-center justify-between sticky top-0 z-10 print:hidden">
-        <div className="flex items-center gap-2">
-          <div className="w-8 h-8 bg-indigo-600 rounded-lg flex items-center justify-center">
-            <span className="text-white font-bold">G</span>
-          </div>
-          <h1 className="font-bold text-slate-800">GráficaApp</h1>
-        </div>
+        <CromaLogo />
         <Sheet>
           <SheetTrigger asChild>
             <Button variant="ghost" size="icon" className="text-slate-600">
@@ -84,13 +85,13 @@ export default function Layout() {
       </header>
 
       {/* Main Content */}
-      <main className="flex-1 overflow-y-auto p-4 md:p-8 pb-24 md:pb-8">
-        <div className="max-w-5xl mx-auto">
+      <main className="flex-1 overflow-y-auto p-4 md:p-8 pb-24 md:pb-8 print:p-0 print:overflow-visible">
+        <div className="max-w-5xl mx-auto print:max-w-none">
           <Outlet />
         </div>
       </main>
 
-      {/* Mobile Bottom Nav (Quick Access for Field Team) */}
+      {/* Mobile Bottom Nav */}
       <nav className="md:hidden fixed bottom-0 left-0 right-0 bg-white border-t border-slate-200 flex justify-around p-2 pb-safe z-10 print:hidden">
         {navItems.slice(0, 3).map((item) => {
           const Icon = item.icon;
@@ -100,7 +101,7 @@ export default function Layout() {
               key={item.name}
               to={item.path}
               className={`flex flex-col items-center p-2 rounded-xl min-w-[4rem] ${
-                isActive ? "text-indigo-600" : "text-slate-500"
+                isActive ? "text-blue-600" : "text-slate-400"
               }`}
             >
               <Icon size={24} className="mb-1" />
