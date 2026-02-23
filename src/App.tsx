@@ -8,6 +8,7 @@ import Jobs from "./pages/Jobs";
 import Stores from "./pages/Stores";
 import JobDetail from "./pages/JobDetail";
 import NewJob from "./pages/NewJob";
+import Settings from "./pages/Settings";
 
 const queryClient = new QueryClient();
 
@@ -16,13 +17,13 @@ function App() {
     <QueryClientProvider client={queryClient}>
       <Router>
         <Routes>
-          {/* O Layout agora envolve as rotas corretamente para o <Outlet /> funcionar */}
           <Route element={<Layout />}>
             <Route path="/" element={<Index />} />
             <Route path="/jobs" element={<Jobs />} />
             <Route path="/jobs/new" element={<NewJob />} />
             <Route path="/jobs/:id" element={<JobDetail />} />
             <Route path="/stores" element={<Stores />} />
+            <Route path="/settings" element={<Settings />} />
           </Route>
         </Routes>
       </Router>

@@ -1,6 +1,6 @@
 import React from "react";
 import { Link, useLocation, Outlet } from "react-router-dom";
-import { Home, ClipboardList, Store, Users, Settings, Menu } from "lucide-react";
+import { Home, ClipboardList, Store, Users, Settings as SettingsIcon, Menu } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Sheet, SheetContent, SheetTrigger } from "@/components/ui/sheet";
 
@@ -17,7 +17,6 @@ export const CromaLogo = ({ className = "" }: { className?: string }) => (
     alt="Cromaprint Logo" 
     className={`h-10 object-contain ${className}`}
     onError={(e) => {
-      // Fallback caso a imagem ainda não esteja na pasta public
       e.currentTarget.style.display = 'none';
       e.currentTarget.nextElementSibling?.classList.remove('hidden');
     }}
@@ -74,10 +73,17 @@ export default function Layout() {
           <NavLinks />
         </nav>
         <div className="mt-auto pt-4 border-t border-slate-100">
-          <button className="flex items-center gap-3 px-4 py-3 w-full rounded-2xl text-slate-600 hover:bg-slate-100 transition-colors">
-            <Settings size={20} />
+          <Link 
+            to="/settings" 
+            className={`flex items-center gap-3 px-4 py-3 w-full rounded-2xl transition-colors ${
+              location.pathname === "/settings" 
+                ? "bg-blue-50 text-blue-600" 
+                : "text-slate-600 hover:bg-slate-100"
+            }`}
+          >
+            <SettingsIcon size={20} />
             <span className="font-medium">Configurações</span>
-          </button>
+          </Link>
         </div>
       </aside>
 
@@ -93,10 +99,23 @@ export default function Layout() {
               <Menu size={24} />
             </Button>
           </SheetTrigger>
-          <SheetContent side="right" className="w-64 p-4">
-            <nav className="flex flex-col space-y-2 mt-8">
+          <SheetContent side="right" className="w-64 p-4 flex flex-col">
+            <nav className="flex flex-col space-y-2 mt-8 flex-1">
               <NavLinks />
             </nav>
+            <div className="mt-auto pt-4 border-t border-slate-100">
+              <Link 
+                to="/settings" 
+                className={`flex items-center gap-3 px-4 py-3 w-full rounded-2xl transition-colors ${
+                  location.pathname === "/settings" 
+                    ? "bg-blue-50 text-blue-600" 
+                    : "text-slate-600 hover:bg-slate-100"
+                }`}
+              >
+                <SettingsIcon size={20} />
+                <span className="font-medium">Configurações</span>
+              </Link>
+            </div>
           </SheetContent>
         </Sheet>
       </header>
@@ -126,6 +145,15 @@ export default function Layout() {
             </Link>
           );
         })}
+        <Link
+          to="/settings"
+          className={`flex flex-col items-center p-2 rounded-xl min-w-[4rem] ${
+            location.pathname === "/settings" ? "text-blue-600" : "text-slate-400"
+          }`}
+        >
+          <SettingsIcon size={24} className="mb-1" />
+          <span className="text-[10px] font-medium">Ajustes</span>
+        </Link>
       </nav>
     </div>
   );
