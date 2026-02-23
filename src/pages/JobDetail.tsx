@@ -1,6 +1,6 @@
 import React, { useState, useRef } from "react";
 import { useParams, useNavigate } from "react-router-dom";
-import { ArrowLeft, Camera, Upload, FileText, AlertTriangle, CheckCircle2, Printer, MapPin, Calendar, Navigation, Loader2 } from "lucide-react";
+import { ArrowLeft, Camera, Upload, FileText, AlertTriangle, CheckCircle2, Printer, MapPin, Calendar, Navigation, Loader2, Plus, Trash2 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
@@ -42,7 +42,8 @@ export default function JobDetail() {
       const { data, error } = await supabase
         .from('job_photos')
         .select('*')
-        .eq('job_id', id);
+        .eq('job_id', id)
+        .order('created_at', { ascending: true });
       if (error) throw error;
       return data;
     },
@@ -59,6 +60,25 @@ export default function JobDetail() {
       queryClient.invalidateQueries({ queryKey: ['job', id] });
       queryClient.invalidateQueries({ queryKey: ['all-jobs'] });
       queryClient.invalidateQueries({ queryKey: ['recent-jobs'] });
+    }
+  });
+
+  // Excluir Foto
+  const deletePhotoMutation = useMutation({
+    mutationFn: async (photoId: string) => {
+      const photo = photos?.find(p => p.id === photoId);
+      if (photo) {
+        // Tenta extrair o nome do arquivo da URL para deletar do storage também
+        const urlParts = photo.photo_url.split('/');
+        const fileName = urlParts[urlParts.length - 1];
+        await supabase.storage.from('job_photos').remove([fileName]);
+      }
+      const { error } = await supabase.from('job_photos').delete().eq('id', photoId);
+      if (error) throw error;
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['job-photos', id] });
+      showSuccess("Foto removida com sucesso!");
     }
   });
 
@@ -89,40 +109,47 @@ export default function JobDetail() {
   };
 
   const handleFileUpload = async (event: React.ChangeEvent<HTMLInputElement>, type: 'before' | 'after') => {
-    const file = event.target.files?.[0];
-    if (!file || !id) return;
+    const files = event.target.files;
+    if (!files || files.length === 0 || !id) return;
 
     setUploadingType(type);
     try {
-      const fileExt = file.name.split('.').pop();
-      const fileName = `${id}-${type}-${Math.random()}.${fileExt}`;
-      
-      // 1. Upload para o Storage
-      const { error: uploadError } = await supabase.storage
-        .from('job_photos')
-        .upload(fileName, file);
+      // Loop para fazer upload de múltiplas fotos
+      for (let i = 0; i < files.length; i++) {
+        const file = files[i];
+        const fileExt = file.name.split('.').pop();
+        const fileName = `${id}-${type}-${Math.random()}.${fileExt}`;
+        
+        // 1. Upload para o Storage
+        const { error: uploadError } = await supabase.storage
+          .from('job_photos')
+          .upload(fileName, file);
 
-      if (uploadError) throw uploadError;
+        if (uploadError) throw uploadError;
 
-      // 2. Pegar URL pública
-      const { data: { publicUrl } } = supabase.storage
-        .from('job_photos')
-        .getPublicUrl(fileName);
+        // 2. Pegar URL pública
+        const { data: { publicUrl } } = supabase.storage
+          .from('job_photos')
+          .getPublicUrl(fileName);
 
-      // 3. Salvar no banco de dados
-      const { error: dbError } = await supabase
-        .from('job_photos')
-        .insert({ job_id: id, photo_type: type, photo_url: publicUrl });
+        // 3. Salvar no banco de dados
+        const { error: dbError } = await supabase
+          .from('job_photos')
+          .insert({ job_id: id, photo_type: type, photo_url: publicUrl });
 
-      if (dbError) throw dbError;
+        if (dbError) throw dbError;
+      }
 
-      showSuccess(`Foto salva com sucesso!`);
+      showSuccess(`${files.length > 1 ? 'Fotos salvas' : 'Foto salva'} com sucesso!`);
       queryClient.invalidateQueries({ queryKey: ['job-photos', id] });
     } catch (error) {
       showError("Erro ao fazer upload da foto.");
       console.error(error);
     } finally {
       setUploadingType(null);
+      // Limpa o input para permitir selecionar a mesma foto novamente se necessário
+      if (type === 'before' && fileInputBeforeRef.current) fileInputBeforeRef.current.value = '';
+      if (type === 'after' && fileInputAfterRef.current) fileInputAfterRef.current.value = '';
     }
   };
 
@@ -139,8 +166,8 @@ export default function JobDetail() {
   if (isLoading) return <div className="p-10 text-center text-slate-500">Carregando OS...</div>;
   if (!job) return <div className="p-10 text-center text-slate-500">OS não encontrada.</div>;
 
-  const beforePhoto = photos?.find(p => p.photo_type === 'before');
-  const afterPhoto = photos?.find(p => p.photo_type === 'after');
+  const beforePhotos = photos?.filter(p => p.photo_type === 'before') || [];
+  const afterPhotos = photos?.filter(p => p.photo_type === 'after') || [];
 
   return (
     <div className="space-y-6 animate-in fade-in duration-500 pb-10 print:space-y-8 print:pb-0 print:bg-white">
@@ -249,73 +276,123 @@ export default function JobDetail() {
           <TabsTrigger value="notes" className="rounded-lg font-medium">Relatório & Medidas</TabsTrigger>
         </TabsList>
         
-        <TabsContent value="photos" className="space-y-6 print:block print:mt-8">
+        <TabsContent value="photos" className="space-y-8 print:block print:mt-8">
           <h3 className="hidden print:block text-xl font-bold text-slate-800 border-b border-slate-200 pb-2 mb-6">
             Registro Fotográfico
           </h3>
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-6 print:gap-8">
-            
-            {/* Foto Antes */}
-            <div className="print:break-inside-avoid">
-              <h3 className="text-lg font-bold text-slate-800 mb-3 flex items-center gap-2 print:text-base print:uppercase print:tracking-wider">
+          
+          {/* Seção: Antes da Instalação */}
+          <div className="print:break-inside-avoid bg-white p-5 rounded-2xl border border-slate-100 shadow-sm print:border-none print:shadow-none print:p-0">
+            <div className="flex items-center justify-between mb-4">
+              <h3 className="text-lg font-bold text-slate-800 flex items-center gap-2 print:text-base print:uppercase print:tracking-wider">
                 <Camera size={20} className="text-slate-400 print:hidden" /> Antes da Instalação
               </h3>
-              <input type="file" accept="image/*" capture="environment" className="hidden" ref={fileInputBeforeRef} onChange={(e) => handleFileUpload(e, 'before')} />
-              
-              {beforePhoto ? (
-                <div className="rounded-2xl overflow-hidden border border-slate-200 relative group">
-                  <img src={beforePhoto.photo_url} alt="Antes" className="w-full h-64 object-cover" />
-                  <Button variant="secondary" size="sm" className="absolute bottom-2 right-2 opacity-0 group-hover:opacity-100 transition-opacity print:hidden" onClick={() => fileInputBeforeRef.current?.click()}>
-                    Trocar Foto
-                  </Button>
-                </div>
-              ) : (
-                <div onClick={() => fileInputBeforeRef.current?.click()} className="border-2 border-dashed border-slate-200 rounded-2xl p-6 flex flex-col items-center justify-center text-center bg-slate-50 hover:bg-slate-100 transition-colors cursor-pointer min-h-[256px] print:border-solid print:border-slate-300 print:bg-white">
-                  {uploadingType === 'before' ? (
-                    <Loader2 className="animate-spin text-blue-600 mb-2" size={32} />
-                  ) : (
-                    <>
-                      <div className="w-16 h-16 bg-white rounded-full shadow-sm flex items-center justify-center mb-4 text-blue-600 print:hidden"><Camera size={32} /></div>
-                      <h4 className="font-bold text-slate-700 mb-1 print:hidden">Adicionar foto do local antes</h4>
-                      <Button variant="outline" size="sm" className="rounded-xl bg-white print:hidden"><Upload size={16} className="mr-2" /> Câmera / Galeria</Button>
-                      <div className="hidden print:flex flex-col items-center justify-center text-slate-300"><Camera size={48} className="mb-2 opacity-20" /><span className="text-sm font-medium uppercase tracking-widest">Espaço para Foto (Antes)</span></div>
-                    </>
-                  )}
-                </div>
-              )}
+              <span className="text-sm text-slate-500 font-medium bg-slate-100 px-2 py-1 rounded-md print:hidden">
+                {beforePhotos.length} {beforePhotos.length === 1 ? 'foto' : 'fotos'}
+              </span>
             </div>
+            
+            <input type="file" accept="image/*" multiple capture="environment" className="hidden" ref={fileInputBeforeRef} onChange={(e) => handleFileUpload(e, 'before')} />
+            
+            <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 gap-3 print:grid-cols-3">
+              {beforePhotos.map(photo => (
+                <div key={photo.id} className="relative group rounded-xl overflow-hidden border border-slate-200 aspect-square bg-slate-50">
+                  <img src={photo.photo_url} alt="Antes" className="w-full h-full object-cover" />
+                  <div className="absolute inset-0 bg-black/40 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center print:hidden">
+                    <Button 
+                      variant="destructive" 
+                      size="icon" 
+                      className="rounded-full h-10 w-10"
+                      onClick={() => deletePhotoMutation.mutate(photo.id)}
+                    >
+                      <Trash2 size={18} />
+                    </Button>
+                  </div>
+                </div>
+              ))}
+              
+              {/* Botão Adicionar Mais (Antes) */}
+              <div 
+                onClick={() => fileInputBeforeRef.current?.click()} 
+                className="border-2 border-dashed border-slate-200 rounded-xl flex flex-col items-center justify-center text-center bg-slate-50 hover:bg-slate-100 hover:border-blue-300 transition-colors cursor-pointer aspect-square print:hidden"
+              >
+                {uploadingType === 'before' ? (
+                  <Loader2 className="animate-spin text-blue-600" size={24} />
+                ) : (
+                  <>
+                    <div className="w-10 h-10 bg-white rounded-full shadow-sm flex items-center justify-center mb-2 text-blue-600">
+                      <Plus size={20} />
+                    </div>
+                    <span className="text-sm font-bold text-slate-600">Adicionar</span>
+                  </>
+                )}
+              </div>
+            </div>
+            
+            {beforePhotos.length === 0 && (
+              <div className="hidden print:flex flex-col items-center justify-center text-slate-300 border-2 border-dashed border-slate-300 rounded-xl p-8 mt-2">
+                <Camera size={48} className="mb-2 opacity-20" />
+                <span className="text-sm font-medium uppercase tracking-widest">Espaço para Fotos (Antes)</span>
+              </div>
+            )}
+          </div>
 
-            {/* Foto Depois */}
-            <div className="print:break-inside-avoid">
-              <h3 className="text-lg font-bold text-slate-800 mb-3 flex items-center gap-2 print:text-base print:uppercase print:tracking-wider">
+          {/* Seção: Depois da Instalação */}
+          <div className="print:break-inside-avoid bg-white p-5 rounded-2xl border border-slate-100 shadow-sm print:border-none print:shadow-none print:p-0">
+            <div className="flex items-center justify-between mb-4">
+              <h3 className="text-lg font-bold text-slate-800 flex items-center gap-2 print:text-base print:uppercase print:tracking-wider">
                 <CheckCircle2 size={20} className="text-emerald-500 print:hidden" /> Depois da Instalação
               </h3>
-              <input type="file" accept="image/*" capture="environment" className="hidden" ref={fileInputAfterRef} onChange={(e) => handleFileUpload(e, 'after')} />
+              <span className="text-sm text-slate-500 font-medium bg-slate-100 px-2 py-1 rounded-md print:hidden">
+                {afterPhotos.length} {afterPhotos.length === 1 ? 'foto' : 'fotos'}
+              </span>
+            </div>
+            
+            <input type="file" accept="image/*" multiple capture="environment" className="hidden" ref={fileInputAfterRef} onChange={(e) => handleFileUpload(e, 'after')} />
+            
+            <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 gap-3 print:grid-cols-3">
+              {afterPhotos.map(photo => (
+                <div key={photo.id} className="relative group rounded-xl overflow-hidden border border-slate-200 aspect-square bg-slate-50">
+                  <img src={photo.photo_url} alt="Depois" className="w-full h-full object-cover" />
+                  <div className="absolute inset-0 bg-black/40 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center print:hidden">
+                    <Button 
+                      variant="destructive" 
+                      size="icon" 
+                      className="rounded-full h-10 w-10"
+                      onClick={() => deletePhotoMutation.mutate(photo.id)}
+                    >
+                      <Trash2 size={18} />
+                    </Button>
+                  </div>
+                </div>
+              ))}
               
-              {afterPhoto ? (
-                <div className="rounded-2xl overflow-hidden border border-slate-200 relative group">
-                  <img src={afterPhoto.photo_url} alt="Depois" className="w-full h-64 object-cover" />
-                  <Button variant="secondary" size="sm" className="absolute bottom-2 right-2 opacity-0 group-hover:opacity-100 transition-opacity print:hidden" onClick={() => fileInputAfterRef.current?.click()}>
-                    Trocar Foto
-                  </Button>
-                </div>
-              ) : (
-                <div onClick={() => fileInputAfterRef.current?.click()} className="border-2 border-dashed border-slate-200 rounded-2xl p-6 flex flex-col items-center justify-center text-center bg-slate-50 hover:bg-slate-100 transition-colors cursor-pointer min-h-[256px] print:border-solid print:border-slate-300 print:bg-white">
-                  {uploadingType === 'after' ? (
-                    <Loader2 className="animate-spin text-blue-600 mb-2" size={32} />
-                  ) : (
-                    <>
-                      <div className="w-16 h-16 bg-white rounded-full shadow-sm flex items-center justify-center mb-4 text-blue-600 print:hidden"><Camera size={32} /></div>
-                      <h4 className="font-bold text-slate-700 mb-1 print:hidden">Adicionar foto do serviço finalizado</h4>
-                      <Button variant="outline" size="sm" className="rounded-xl bg-white print:hidden"><Upload size={16} className="mr-2" /> Câmera / Galeria</Button>
-                      <div className="hidden print:flex flex-col items-center justify-center text-slate-300"><Camera size={48} className="mb-2 opacity-20" /><span className="text-sm font-medium uppercase tracking-widest">Espaço para Foto (Depois)</span></div>
-                    </>
-                  )}
-                </div>
-              )}
+              {/* Botão Adicionar Mais (Depois) */}
+              <div 
+                onClick={() => fileInputAfterRef.current?.click()} 
+                className="border-2 border-dashed border-slate-200 rounded-xl flex flex-col items-center justify-center text-center bg-slate-50 hover:bg-slate-100 hover:border-emerald-300 transition-colors cursor-pointer aspect-square print:hidden"
+              >
+                {uploadingType === 'after' ? (
+                  <Loader2 className="animate-spin text-emerald-600" size={24} />
+                ) : (
+                  <>
+                    <div className="w-10 h-10 bg-white rounded-full shadow-sm flex items-center justify-center mb-2 text-emerald-600">
+                      <Plus size={20} />
+                    </div>
+                    <span className="text-sm font-bold text-slate-600">Adicionar</span>
+                  </>
+                )}
+              </div>
             </div>
 
+            {afterPhotos.length === 0 && (
+              <div className="hidden print:flex flex-col items-center justify-center text-slate-300 border-2 border-dashed border-slate-300 rounded-xl p-8 mt-2">
+                <Camera size={48} className="mb-2 opacity-20" />
+                <span className="text-sm font-medium uppercase tracking-widest">Espaço para Fotos (Depois)</span>
+              </div>
+            )}
           </div>
+
         </TabsContent>
         
         <TabsContent value="notes" className="space-y-6 print:block print:mt-8">
