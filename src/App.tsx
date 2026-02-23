@@ -15,15 +15,16 @@ function App() {
   return (
     <QueryClientProvider client={queryClient}>
       <Router>
-        <Layout>
-          <Routes>
+        <Routes>
+          {/* O Layout agora envolve as rotas corretamente para o <Outlet /> funcionar */}
+          <Route element={<Layout />}>
             <Route path="/" element={<Index />} />
             <Route path="/jobs" element={<Jobs />} />
             <Route path="/jobs/new" element={<NewJob />} />
             <Route path="/jobs/:id" element={<JobDetail />} />
             <Route path="/stores" element={<Stores />} />
-          </Routes>
-        </Layout>
+          </Route>
+        </Routes>
       </Router>
       <Toaster position="top-center" richColors />
     </QueryClientProvider>
