@@ -1,5 +1,5 @@
 import React, { useState, useMemo } from "react";
-import { Search, Store, MapPin, ChevronRight, Filter } from "lucide-react";
+import { Search, Store, MapPin, ChevronRight, Filter, Building2 } from "lucide-react";
 import { Input } from "@/components/ui/input";
 import { Card, CardContent } from "@/components/ui/card";
 import { useQuery } from "@tanstack/react-query";
@@ -36,14 +36,17 @@ export default function Stores() {
     if (!stores) return [];
     
     return stores.filter(store => {
-      const searchLower = searchTerm.toLowerCase();
+      // Remove espaços em branco no início e fim para evitar erros de digitação
+      const searchLower = searchTerm.toLowerCase().trim();
       
-      // Verifica se o termo de busca bate com nome, código, marca ou endereço
+      // Converte tudo para string com segurança e verifica se inclui o termo buscado
       const matchesSearch = 
-        (store.name?.toLowerCase() || "").includes(searchLower) ||
-        (store.code?.toLowerCase() || "").includes(searchLower) ||
-        (store.brand?.toLowerCase() || "").includes(searchLower) ||
-        (store.address?.toLowerCase() || "").includes(searchLower);
+        (String(store.name || "").toLowerCase()).includes(searchLower) ||
+        (String(store.corporate_name || "").toLowerCase()).includes(searchLower) ||
+        (String(store.code || "").toLowerCase()).includes(searchLower) ||
+        (String(store.cnpj || "").toLowerCase()).includes(searchLower) ||
+        (String(store.brand || "").toLowerCase()).includes(searchLower) ||
+        (String(store.address || "").toLowerCase()).includes(searchLower);
 
       // Verifica se a marca bate com o filtro selecionado
       const matchesBrand = selectedBrand === "all" || store.brand === selectedBrand;
@@ -63,7 +66,7 @@ export default function Stores() {
         <div className="relative flex-1">
           <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" size={20} />
           <Input 
-            placeholder="Buscar por nome, código, marca ou endereço..." 
+            placeholder="Buscar por nome, razão social, código, CNPJ ou endereço..." 
             value={searchTerm}
             onChange={(e) => setSearchTerm(e.target.value)}
             className="pl-10 rounded-xl border-slate-200 bg-white h-12 shadow-sm w-full"
@@ -113,8 +116,16 @@ export default function Stores() {
                   <div className="w-12 h-12 bg-blue-50 rounded-xl flex items-center justify-center text-blue-600 flex-shrink-0">
                     <Store size={24} />
                   </div>
-                  <div>
+                  <div className="flex-1">
                     <h3 className="font-bold text-slate-800 text-lg leading-tight group-hover:text-blue-700 transition-colors">{store.name}</h3>
+                    
+                    {/* Mostra a Razão Social se existir */}
+                    {store.corporate_name && store.corporate_name !== store.name && (
+                      <p className="text-xs text-slate-500 flex items-center gap-1 mt-1">
+                        <Building2 size={12} /> {store.corporate_name}
+                      </p>
+                    )}
+
                     <div className="flex flex-wrap items-center gap-2 mt-2">
                       {store.code && (
                         <span className="text-xs font-bold text-slate-600 bg-slate-100 px-2 py-1 rounded-md border border-slate-200">
