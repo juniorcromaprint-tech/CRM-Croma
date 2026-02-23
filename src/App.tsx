@@ -1,7 +1,7 @@
 import React from "react";
 import { BrowserRouter as Router, Routes, Route } from "react-router-dom";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
-import { Toaster } from "react-hot-toast";
+import { Toaster } from "sonner";
 import Layout from "./components/Layout";
 import Index from "./pages/Index";
 import Jobs from "./pages/Jobs";
@@ -25,7 +25,7 @@ function App() {
           </Routes>
         </Layout>
       </Router>
-      <Toaster position="top-center" />
+      <Toaster position="top-center" richColors />
     </QueryClientProvider>
   );
 }
