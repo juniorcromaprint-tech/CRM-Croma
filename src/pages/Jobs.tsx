@@ -34,11 +34,13 @@ export default function Jobs() {
     <div className="space-y-6 animate-in fade-in duration-500">
       <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
         <div>
-          <h1 className="text-2xl md:text-3xl font-bold text-slate-800">Instalações</h1>
+          <h1 className="text-2xl md:text-3xl font-bold text-slate-800">Instalações & Merchandising</h1>
           <p className="text-slate-500 mt-1">Gerencie todas as ordens de serviço.</p>
         </div>
-        <Button className="bg-blue-600 hover:bg-blue-700 text-white rounded-xl shadow-sm">
-          <Plus size={20} className="mr-2" /> Nova OS
+        <Button asChild className="bg-blue-600 hover:bg-blue-700 text-white rounded-xl shadow-sm">
+          <Link to="/jobs/new">
+            <Plus size={20} className="mr-2" /> Nova OS
+          </Link>
         </Button>
       </div>
 
