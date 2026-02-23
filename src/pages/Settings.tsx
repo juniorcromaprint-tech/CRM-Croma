@@ -13,40 +13,28 @@ export default function Settings() {
   const [progress, setProgress] = useState(0);
   const fileInputRef = useRef<HTMLInputElement>(null);
 
-  // Normaliza as chaves (remove acentos, espaços extras e deixa minúsculo)
   const normalizeKey = (key: string) => {
     return key.toLowerCase().normalize("NFD").replace(/[\u0300-\u036f]/g, "").trim();
   };
 
-  // Busca inteligente: procura se alguma coluna contém as palavras-chave
   const findValue = (row: Record<string, string>, possibleMatches: string[]) => {
     const keys = Object.keys(row);
-    
-    // 1. Busca exata primeiro
     for (const match of possibleMatches) {
       const exactKey = keys.find(k => k === match);
-      if (exactKey && row[exactKey] !== undefined && row[exactKey] !== "") {
-        return String(row[exactKey]).trim();
-      }
+      if (exactKey && row[exactKey] !== undefined && row[exactKey] !== "") return String(row[exactKey]).trim();
     }
-    
-    // 2. Busca parcial (contém a palavra)
     for (const match of possibleMatches) {
       const partialKey = keys.find(k => k.includes(match));
-      if (partialKey && row[partialKey] !== undefined && row[partialKey] !== "") {
-        return String(row[partialKey]).trim();
-      }
+      if (partialKey && row[partialKey] !== undefined && row[partialKey] !== "") return String(row[partialKey]).trim();
     }
-    
     return null;
   };
 
-  // Novo motor de processamento indestrutível com Anti-Duplicação Inteligente (Filiais)
+  // Motor de Processamento Raio-X (Lê direto do ERP)
   const process2DArray = async (rawRows: any[][]) => {
     try {
       setProgress(10);
       
-      // Correção para CSVs brasileiros que usam ponto e vírgula
       const normalizedRows = rawRows.map(row => {
         if (row.length === 1 && typeof row[0] === 'string' && row[0].includes(';')) {
           return row[0].split(';');
@@ -54,120 +42,124 @@ export default function Settings() {
         return row;
       });
       
-      // 1. Encontrar a linha do cabeçalho
-      let headerRowIndex = -1;
-      let bestMatchCount = 0;
-      
-      for (let i = 0; i < Math.min(50, normalizedRows.length); i++) {
-        const row = normalizedRows[i];
-        if (!row || !Array.isArray(row)) continue;
-        
-        const rowString = row.join(" ").toLowerCase().normalize("NFD").replace(/[\u0300-\u036f]/g, "");
-        let matchCount = 0;
-        
-        if (rowString.includes("nome") || rowString.includes("fantasia")) matchCount++;
-        if (rowString.includes("razao") || rowString.includes("social")) matchCount++;
-        if (rowString.includes("cnpj") || rowString.includes("documento")) matchCount++;
-        if (rowString.includes("codigo") || rowString.includes("cod")) matchCount++;
-        if (rowString.includes("endereco") || rowString.includes("rua")) matchCount++;
-        
-        if (matchCount > bestMatchCount) {
-          bestMatchCount = matchCount;
-          headerRowIndex = i;
-        }
-      }
-
-      if (headerRowIndex === -1 || bestMatchCount === 0) {
-        showError("Não conseguimos identificar o cabeçalho da planilha.");
-        setIsUploading(false);
-        setProgress(0);
-        return;
-      }
-
       setProgress(20);
 
-      // 2. Buscar clientes existentes para evitar duplicatas EXATAS (permitindo filiais)
-      const { data: existingStores } = await supabase.from('stores').select('id, code, cnpj, name, address');
+      // Busca clientes existentes para evitar duplicatas
+      const { data: existingStores } = await supabase.from('stores').select('id, code, cnpj, name');
       const existingMap = new Map();
       
       if (existingStores) {
         existingStores.forEach(store => {
           const safeName = (store.name || "").toLowerCase().trim();
-          const safeAddress = (store.address || "").toLowerCase().trim();
-          
-          // Cria chaves combinadas para garantir que filiais com mesmo CNPJ não se sobrescrevam
           if (store.code && safeName) existingMap.set(`code_name:${store.code}_${safeName}`, store.id);
           if (store.cnpj && safeName) existingMap.set(`cnpj_name:${store.cnpj}_${safeName}`, store.id);
-          if (safeName && safeAddress) existingMap.set(`name_address:${safeName}_${safeAddress}`, store.id);
         });
       }
 
       setProgress(30);
 
-      // 3. Extrair os nomes das colunas
-      const headers = normalizedRows[headerRowIndex].map(h => normalizeKey(String(h || "")));
       const storesToUpsert = [];
+      const seenInFile = new Set();
       
-      // 4. Mapear os dados
-      for (let i = headerRowIndex + 1; i < normalizedRows.length; i++) {
+      // Tenta achar cabeçalho caso não seja o formato padrão do ERP
+      let headerRowIndex = -1;
+      let headers: string[] = [];
+      
+      for (let i = 0; i < Math.min(50, normalizedRows.length); i++) {
+        const row = normalizedRows[i];
+        if (!row || !Array.isArray(row)) continue;
+        const rowString = row.join(" ").toLowerCase().normalize("NFD").replace(/[\u0300-\u036f]/g, "");
+        if (rowString.includes("nome") || rowString.includes("fantasia") || rowString.includes("cnpj")) {
+          headerRowIndex = i;
+          headers = row.map(h => normalizeKey(String(h || "")));
+          break;
+        }
+      }
+
+      // Processa linha por linha
+      for (let i = 0; i < normalizedRows.length; i++) {
+        if (i === headerRowIndex) continue; // Pula o cabeçalho se existir
+
         const rowArray = normalizedRows[i];
         if (!rowArray || rowArray.every(cell => cell === null || cell === undefined || cell === "")) continue;
-        
-        const rowObj: Record<string, string> = {};
-        headers.forEach((header, index) => {
-          if (header) {
-            rowObj[header] = String(rowArray[index] || "").trim();
+
+        const col0 = String(rowArray[0] || "").trim();
+        const col3 = String(rowArray[3] || "").trim();
+        const cleanCnpj = col3.replace(/\D/g, '');
+
+        // FINGERPRINT DO SEU ERP: Se a coluna 0 tem algo e a coluna 3 é um CNPJ (14 números), é uma loja!
+        const isErpFormat = (col0.length > 0) && (cleanCnpj.length === 14);
+
+        let storeData: any = null;
+
+        if (isErpFormat) {
+          // Mapeamento Direto (Ignora cabeçalhos e pega pela posição exata do seu print)
+          storeData = {
+            code: col0,
+            corporate_name: String(rowArray[1] || "").trim(),
+            name: String(rowArray[2] || "").trim() || String(rowArray[1] || "").trim(),
+            cnpj: col3,
+            address: String(rowArray[4] || "").trim(),
+            state: String(rowArray[5] || "").trim(),
+            neighborhood: String(rowArray[6] || "").trim(),
+            zip_code: String(rowArray[7] || "").trim(),
+            brand: String(rowArray[8] || "").trim() || 'Sem Grupo',
+            email: String(rowArray[9] || "").trim(),
+            phone: String(rowArray[10] || "").trim(),
+          };
+        } else if (headerRowIndex !== -1) {
+          // Fallback: Se não for o formato do ERP, tenta ler pelo cabeçalho
+          const rowObj: Record<string, string> = {};
+          headers.forEach((header, index) => {
+            if (header) rowObj[header] = String(rowArray[index] || "").trim();
+          });
+
+          const name = findValue(rowObj, ['nome fantasia', 'fantasia', 'nome', 'loja', 'cliente']);
+          const corporateName = findValue(rowObj, ['razao', 'social', 'empresa']);
+          const code = findValue(rowObj, ['codigo', 'cod', 'id', 'numero']);
+          const cnpj = findValue(rowObj, ['cnpj', 'documento', 'cgc']);
+          
+          let storeName = name || corporateName;
+          if (!storeName && (code || cnpj)) storeName = `Cliente sem nome (${code || cnpj})`;
+
+          if (storeName) {
+            storeData = {
+              code: code,
+              corporate_name: corporateName,
+              name: storeName,
+              cnpj: cnpj,
+              address: findValue(rowObj, ['endereco', 'rua', 'logradouro', 'local']),
+              state: findValue(rowObj, ['uf', 'estado', 'cidade', 'municipio']),
+              neighborhood: findValue(rowObj, ['bairro', 'distrito']),
+              zip_code: findValue(rowObj, ['cep']),
+              brand: findValue(rowObj, ['grupo', 'marca', 'rede', 'bandeira', 'franquia']) || 'Sem Grupo',
+              email: findValue(rowObj, ['email', 'e-mail', 'correio']),
+              phone: findValue(rowObj, ['fone', 'telefone', 'celular', 'contato', 'whatsapp']),
+            };
           }
-        });
+        }
 
-        const name = findValue(rowObj, ['nome fantasia', 'fantasia', 'nome', 'loja', 'cliente']);
-        const corporateName = findValue(rowObj, ['razao', 'social', 'empresa']);
-        const code = findValue(rowObj, ['codigo', 'cod', 'id', 'numero']);
-        const cnpj = findValue(rowObj, ['cnpj', 'documento', 'cgc']);
-        
-        let storeName = name || corporateName;
-        
-        if (!storeName) {
-          if (code || cnpj) {
-            storeName = `Cliente sem nome (${code || cnpj})`;
-          } else {
-            continue;
+        // Se conseguiu montar os dados da loja, prepara para salvar
+        if (storeData && storeData.name) {
+          const safeName = storeData.name.toLowerCase().trim();
+          let existingId = null;
+          
+          // Verifica se já existe no banco
+          if (storeData.code && existingMap.has(`code_name:${storeData.code}_${safeName}`)) {
+            existingId = existingMap.get(`code_name:${storeData.code}_${safeName}`);
+          } else if (storeData.cnpj && existingMap.has(`cnpj_name:${storeData.cnpj}_${safeName}`)) {
+            existingId = existingMap.get(`cnpj_name:${storeData.cnpj}_${safeName}`);
+          }
+
+          if (existingId) storeData.id = existingId;
+
+          // Evita duplicatas dentro da própria planilha
+          const fileKey = `${storeData.code}_${storeData.cnpj}_${safeName}`;
+          if (!seenInFile.has(fileKey)) {
+            seenInFile.add(fileKey);
+            storesToUpsert.push(storeData);
           }
         }
-
-        const storeData: any = {
-          code: code,
-          corporate_name: corporateName,
-          name: storeName,
-          cnpj: cnpj,
-          address: findValue(rowObj, ['endereco', 'rua', 'logradouro', 'local']),
-          state: findValue(rowObj, ['uf', 'estado', 'cidade', 'municipio']),
-          neighborhood: findValue(rowObj, ['bairro', 'distrito']),
-          zip_code: findValue(rowObj, ['cep']),
-          brand: findValue(rowObj, ['grupo', 'marca', 'rede', 'bandeira', 'franquia']) || 'Sem Grupo',
-          email: findValue(rowObj, ['email', 'e-mail', 'correio']),
-          phone: findValue(rowObj, ['fone', 'telefone', 'celular', 'contato', 'whatsapp']),
-        };
-
-        // Verifica se a loja EXATA já existe (Chave Combinada)
-        const safeName = storeName.toLowerCase().trim();
-        const safeAddress = (storeData.address || "").toLowerCase().trim();
-        let existingId = null;
-        
-        if (code && existingMap.has(`code_name:${code}_${safeName}`)) {
-          existingId = existingMap.get(`code_name:${code}_${safeName}`);
-        } else if (cnpj && existingMap.has(`cnpj_name:${cnpj}_${safeName}`)) {
-          existingId = existingMap.get(`cnpj_name:${cnpj}_${safeName}`);
-        } else if (safeName && safeAddress && existingMap.has(`name_address:${safeName}_${safeAddress}`)) {
-          existingId = existingMap.get(`name_address:${safeName}_${safeAddress}`);
-        }
-
-        // Se já existe a loja exata, atualiza. Se não, cria uma nova (mesmo que o CNPJ seja igual a outra)
-        if (existingId) {
-          storeData.id = existingId;
-        }
-
-        storesToUpsert.push(storeData);
       }
 
       if (storesToUpsert.length === 0) {
@@ -179,14 +171,12 @@ export default function Settings() {
 
       setProgress(50);
 
-      // 5. Inserir/Atualizar no banco de dados em lotes de 100
+      // Salva no banco em lotes
       const batchSize = 100;
       for (let i = 0; i < storesToUpsert.length; i += batchSize) {
         const batch = storesToUpsert.slice(i, i + batchSize);
         const { error } = await supabase.from('stores').upsert(batch);
-        
         if (error) throw error;
-        
         const currentProgress = 50 + Math.floor(((i + batchSize) / storesToUpsert.length) * 50);
         setProgress(Math.min(currentProgress, 99));
       }
@@ -323,8 +313,8 @@ export default function Settings() {
             <div className="bg-blue-50 border border-blue-100 rounded-xl p-4 mb-6 flex gap-3">
               <AlertCircle className="text-blue-600 shrink-0 mt-0.5" size={20} />
               <div className="text-sm text-blue-800">
-                <p className="font-bold mb-1">Sistema Anti-Duplicação Inteligente Ativado!</p>
-                <p className="mb-2">O sistema agora entende que <strong>redes e franquias podem ter o mesmo CNPJ</strong>. Ele só vai considerar uma loja como duplicada se ela tiver o mesmo CNPJ <strong>E</strong> o mesmo Nome. Assim, todas as filiais serão cadastradas corretamente!</p>
+                <p className="font-bold mb-1">Leitor Direto de ERP Ativado!</p>
+                <p className="mb-2">O sistema agora reconhece o formato exato da sua exportação. Ele não precisa mais de cabeçalhos. Se ele ver um Código na primeira coluna e um CNPJ na quarta coluna, ele já sabe o que fazer!</p>
               </div>
             </div>
 
@@ -342,7 +332,7 @@ export default function Settings() {
                 <div className="flex flex-col items-center text-center">
                   <Loader2 className="w-12 h-12 text-blue-600 animate-spin mb-4" />
                   <h3 className="text-lg font-bold text-slate-800 mb-1">Processando dados...</h3>
-                  <p className="text-sm text-slate-500 mb-4">Verificando filiais e salvando. Não feche a página.</p>
+                  <p className="text-sm text-slate-500 mb-4">Lendo dados diretamente das colunas. Não feche a página.</p>
                   <div className="w-64 h-2 bg-slate-200 rounded-full overflow-hidden">
                     <div 
                       className="h-full bg-blue-600 transition-all duration-300 ease-out"
