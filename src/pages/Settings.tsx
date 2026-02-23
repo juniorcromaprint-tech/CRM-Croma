@@ -41,12 +41,12 @@ export default function Settings() {
     return null;
   };
 
-  // Novo motor de processamento indestrutível (Lê como Matriz 2D)
+  // Novo motor de processamento indestrutível com Anti-Duplicação
   const process2DArray = async (rawRows: any[][]) => {
     try {
-      setProgress(20);
+      setProgress(10);
       
-      // Correção para CSVs brasileiros que usam ponto e vírgula e o leitor não separou
+      // Correção para CSVs brasileiros que usam ponto e vírgula
       const normalizedRows = rawRows.map(row => {
         if (row.length === 1 && typeof row[0] === 'string' && row[0].includes(';')) {
           return row[0].split(';');
@@ -54,7 +54,7 @@ export default function Settings() {
         return row;
       });
       
-      // 1. Encontrar a linha do cabeçalho (procura nas primeiras 50 linhas)
+      // 1. Encontrar a linha do cabeçalho
       let headerRowIndex = -1;
       let bestMatchCount = 0;
       
@@ -78,22 +78,34 @@ export default function Settings() {
       }
 
       if (headerRowIndex === -1 || bestMatchCount === 0) {
-        showError("Não conseguimos identificar o cabeçalho da planilha. Verifique se as colunas têm nomes como 'Nome', 'CNPJ', etc.");
+        showError("Não conseguimos identificar o cabeçalho da planilha.");
         setIsUploading(false);
         setProgress(0);
         return;
       }
 
+      setProgress(20);
+
+      // 2. Buscar clientes existentes para evitar duplicatas
+      const { data: existingStores } = await supabase.from('stores').select('id, code, cnpj');
+      const existingMap = new Map();
+      
+      if (existingStores) {
+        existingStores.forEach(store => {
+          if (store.code) existingMap.set(`code:${store.code}`, store.id);
+          if (store.cnpj) existingMap.set(`cnpj:${store.cnpj}`, store.id);
+        });
+      }
+
       setProgress(30);
 
-      // 2. Extrair os nomes das colunas
+      // 3. Extrair os nomes das colunas
       const headers = normalizedRows[headerRowIndex].map(h => normalizeKey(String(h || "")));
-      const storesToInsert = [];
+      const storesToUpsert = [];
       
-      // 3. Mapear os dados (começando da linha abaixo do cabeçalho)
+      // 4. Mapear os dados
       for (let i = headerRowIndex + 1; i < normalizedRows.length; i++) {
         const rowArray = normalizedRows[i];
-        // Pula linhas completamente vazias
         if (!rowArray || rowArray.every(cell => cell === null || cell === undefined || cell === "")) continue;
         
         const rowObj: Record<string, string> = {};
@@ -110,16 +122,23 @@ export default function Settings() {
         
         let storeName = name || corporateName;
         
-        // Se não tiver nome, mas tiver código ou CNPJ, a gente salva mesmo assim para não perder o dado
         if (!storeName) {
           if (code || cnpj) {
             storeName = `Cliente sem nome (${code || cnpj})`;
           } else {
-            continue; // Pula apenas se a linha for realmente lixo sem identificação
+            continue;
           }
         }
 
-        storesToInsert.push({
+        // Verifica se já existe no banco para atualizar em vez de duplicar
+        let existingId = null;
+        if (code && existingMap.has(`code:${code}`)) {
+          existingId = existingMap.get(`code:${code}`);
+        } else if (cnpj && existingMap.has(`cnpj:${cnpj}`)) {
+          existingId = existingMap.get(`cnpj:${cnpj}`);
+        }
+
+        const storeData: any = {
           code: code,
           corporate_name: corporateName,
           name: storeName,
@@ -131,10 +150,17 @@ export default function Settings() {
           brand: findValue(rowObj, ['grupo', 'marca', 'rede', 'bandeira', 'franquia']) || 'Sem Grupo',
           email: findValue(rowObj, ['email', 'e-mail', 'correio']),
           phone: findValue(rowObj, ['fone', 'telefone', 'celular', 'contato', 'whatsapp']),
-        });
+        };
+
+        // Se já existe, adicionamos o ID para o Supabase saber que é uma atualização (Upsert)
+        if (existingId) {
+          storeData.id = existingId;
+        }
+
+        storesToUpsert.push(storeData);
       }
 
-      if (storesToInsert.length === 0) {
+      if (storesToUpsert.length === 0) {
         showError("Nenhum cliente válido encontrado na planilha.");
         setIsUploading(false);
         setProgress(0);
@@ -143,20 +169,21 @@ export default function Settings() {
 
       setProgress(50);
 
-      // 4. Inserir no banco de dados em lotes de 100
+      // 5. Inserir/Atualizar no banco de dados em lotes de 100
       const batchSize = 100;
-      for (let i = 0; i < storesToInsert.length; i += batchSize) {
-        const batch = storesToInsert.slice(i, i + batchSize);
-        const { error } = await supabase.from('stores').insert(batch);
+      for (let i = 0; i < storesToUpsert.length; i += batchSize) {
+        const batch = storesToUpsert.slice(i, i + batchSize);
+        // Usamos UPSERT: Se tiver ID ele atualiza, se não tiver ele cria novo
+        const { error } = await supabase.from('stores').upsert(batch);
         
         if (error) throw error;
         
-        const currentProgress = 50 + Math.floor(((i + batchSize) / storesToInsert.length) * 50);
+        const currentProgress = 50 + Math.floor(((i + batchSize) / storesToUpsert.length) * 50);
         setProgress(Math.min(currentProgress, 99));
       }
 
       setProgress(100);
-      showSuccess(`${storesToInsert.length} clientes importados com sucesso!`);
+      showSuccess(`${storesToUpsert.length} clientes processados com sucesso (sem duplicatas)!`);
       
     } catch (error) {
       console.error("Erro na importação:", error);
@@ -173,7 +200,7 @@ export default function Settings() {
     if (!file) return;
 
     setIsUploading(true);
-    setProgress(10);
+    setProgress(5);
 
     const fileExt = file.name.split('.').pop()?.toLowerCase();
 
@@ -197,7 +224,6 @@ export default function Settings() {
           
           let rawRows: any[][] = [];
           
-          // Procura a primeira aba que tenha dados reais (mais de 1 linha)
           for (const sheetName of workbook.SheetNames) {
             const worksheet = workbook.Sheets[sheetName];
             const rows = XLSX.utils.sheet_to_json(worksheet, { header: 1, defval: "" }) as any[][];
@@ -275,7 +301,7 @@ export default function Settings() {
                 </div>
                 <div>
                   <CardTitle className="text-lg font-bold text-slate-800">Importar Clientes / Lojas</CardTitle>
-                  <CardDescription className="text-slate-500">Faça upload de uma planilha para cadastrar múltiplos clientes de uma vez.</CardDescription>
+                  <CardDescription className="text-slate-500">Faça upload de uma planilha para cadastrar ou atualizar clientes.</CardDescription>
                 </div>
               </div>
               <Button variant="outline" onClick={downloadTemplate} className="hidden md:flex rounded-xl border-slate-200 text-slate-600 hover:text-blue-600 hover:bg-blue-50">
@@ -288,9 +314,8 @@ export default function Settings() {
             <div className="bg-blue-50 border border-blue-100 rounded-xl p-4 mb-6 flex gap-3">
               <AlertCircle className="text-blue-600 shrink-0 mt-0.5" size={20} />
               <div className="text-sm text-blue-800">
-                <p className="font-bold mb-1">Novo Motor de Leitura Inteligente Ativado!</p>
-                <p className="mb-2">Agora o sistema consegue ler sua planilha mesmo que ela tenha linhas em branco no topo ou formatações estranhas. Ele vai procurar automaticamente pelas colunas: <strong>Código, Razão Social, Nome, CNPJ, etc.</strong></p>
-                <p className="font-bold text-rose-600 mt-2">Dica: Se você importou errado antes, use o botão vermelho abaixo para limpar a base antes de subir a planilha novamente.</p>
+                <p className="font-bold mb-1">Sistema Anti-Duplicação Ativado!</p>
+                <p className="mb-2">Agora você pode subir a mesma planilha várias vezes. O sistema vai verificar o <strong>Código</strong> ou <strong>CNPJ</strong>. Se o cliente já existir, ele apenas atualiza os dados. Se não existir, ele cria um novo.</p>
               </div>
             </div>
 
@@ -307,8 +332,8 @@ export default function Settings() {
               {isUploading ? (
                 <div className="flex flex-col items-center text-center">
                   <Loader2 className="w-12 h-12 text-blue-600 animate-spin mb-4" />
-                  <h3 className="text-lg font-bold text-slate-800 mb-1">Importando dados...</h3>
-                  <p className="text-sm text-slate-500 mb-4">Por favor, não feche esta página.</p>
+                  <h3 className="text-lg font-bold text-slate-800 mb-1">Processando dados...</h3>
+                  <p className="text-sm text-slate-500 mb-4">Verificando duplicatas e salvando. Não feche a página.</p>
                   <div className="w-64 h-2 bg-slate-200 rounded-full overflow-hidden">
                     <div 
                       className="h-full bg-blue-600 transition-all duration-300 ease-out"
