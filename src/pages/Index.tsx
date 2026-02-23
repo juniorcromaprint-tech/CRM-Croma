@@ -1,6 +1,6 @@
 import React from "react";
 import { Link } from "react-router-dom";
-import { CheckCircle2, Clock, AlertCircle, ArrowRight, MapPin } from "lucide-react";
+import { CheckCircle2, Clock, AlertCircle, ArrowRight, MapPin, Plus } from "lucide-react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { useQuery } from "@tanstack/react-query";
@@ -21,9 +21,10 @@ export default function Index() {
     }
   });
 
-  const pendentes = jobs?.filter(j => j.status === 'Pendente').length || 0;
-  const concluidas = jobs?.filter(j => j.status === 'Concluído').length || 0;
-  const divergencias = jobs?.filter(j => j.issues && j.issues.length > 0).length || 0;
+  // Correção: Verifica se 'jobs' existe antes de tentar filtrar e contar
+  const pendentes = jobs ? jobs.filter(j => j.status === 'Pendente').length : 0;
+  const concluidas = jobs ? jobs.filter(j => j.status === 'Concluído').length : 0;
+  const divergencias = jobs ? jobs.filter(j => j.issues && j.issues.length > 0).length : 0;
 
   const stats = [
     { title: "Pendentes Hoje", value: pendentes, icon: Clock, color: "text-amber-500", bg: "bg-amber-100" },
@@ -36,10 +37,12 @@ export default function Index() {
       <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
         <div>
           <h1 className="text-2xl md:text-3xl font-bold text-slate-800">Olá, Equipe! 👋</h1>
-          <p className="text-slate-500 mt-1">Aqui está o resumo das instalações de hoje.</p>
+          <p className="text-slate-500 mt-1">Aqui está o resumo das instalações e merchandising.</p>
         </div>
         <Button asChild className="bg-blue-600 hover:bg-blue-700 text-white rounded-xl shadow-sm">
-          <Link to="/jobs/new">Nova Instalação</Link>
+          <Link to="/jobs/new">
+            <Plus size={20} className="mr-2" /> Nova OS / Merchandising
+          </Link>
         </Button>
       </div>
 
@@ -72,16 +75,16 @@ export default function Index() {
         <CardContent>
           {isLoading ? (
             <p className="text-slate-500 py-4">Carregando instalações...</p>
-          ) : (
+          ) : jobs && jobs.length > 0 ? (
             <div className="space-y-4 mt-4">
-              {jobs?.map((job) => (
+              {jobs.map((job) => (
                 <Link 
                   key={job.id} 
                   to={`/jobs/${job.id}`}
                   className="flex items-center justify-between p-4 rounded-2xl border border-slate-100 hover:border-blue-100 hover:bg-blue-50/50 transition-colors group"
                 >
                   <div className="flex items-center gap-4">
-                    <div className={`w-2 h-12 rounded-full ${job.status === 'Concluído' ? 'bg-emerald-500' : 'bg-amber-500'}`} />
+                    <div className={`w-2 h-12 rounded-full ${job.status === 'Concluído' ? 'bg-emerald-500' : job.status === 'Divergência' ? 'bg-rose-500' : 'bg-amber-500'}`} />
                     <div>
                       <div className="flex items-center gap-2">
                         <h4 className="font-bold text-slate-800">{job.stores?.brand}</h4>
@@ -92,17 +95,21 @@ export default function Index() {
                       <div className="flex items-center gap-1 text-sm text-slate-500 mt-1">
                         <MapPin size={14} />
                         <span>{job.stores?.name}</span>
+                        <span className="mx-1">•</span>
+                        <span className="font-medium text-slate-600">{job.type}</span>
                       </div>
                     </div>
                   </div>
                   <div className="text-right">
-                    <div className={`text-xs font-bold px-3 py-1 rounded-lg mt-1 ${job.status === 'Concluído' ? 'bg-emerald-100 text-emerald-700' : 'bg-amber-100 text-amber-700'}`}>
+                    <div className={`text-xs font-bold px-3 py-1 rounded-lg mt-1 ${job.status === 'Concluído' ? 'bg-emerald-100 text-emerald-700' : job.status === 'Divergência' ? 'bg-rose-100 text-rose-700' : 'bg-amber-100 text-amber-700'}`}>
                       {job.status}
                     </div>
                   </div>
                 </Link>
               ))}
             </div>
+          ) : (
+            <p className="text-slate-500 py-4">Nenhuma OS encontrada.</p>
           )}
         </CardContent>
       </Card>
