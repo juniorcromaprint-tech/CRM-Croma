@@ -1,17 +1,42 @@
 import React, { useState } from "react";
 import { useParams, useNavigate } from "react-router-dom";
-import { ArrowLeft, Camera, Upload, FileText, AlertTriangle, CheckCircle2, Printer, MapPin, Calendar, User } from "lucide-react";
+import { ArrowLeft, Camera, Upload, FileText, AlertTriangle, CheckCircle2, Printer, MapPin, Calendar, Navigation } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Textarea } from "@/components/ui/textarea";
-import { showSuccess } from "@/utils/toast";
-import { CromaLogo } from "@/components/Layout";
+import { showSuccess, showError } from "@/utils/toast";
+import { CromaLogo, CromaLogoFallback } from "@/components/Layout";
 
 export default function JobDetail() {
   const { id } = useParams();
   const navigate = useNavigate();
   const [status, setStatus] = useState("pending");
+  const [geoLoc, setGeoLoc] = useState<{lat: number, lng: number} | null>(null);
+  const [isLocating, setIsLocating] = useState(false);
+
+  const captureLocation = () => {
+    setIsLocating(true);
+    if ("geolocation" in navigator) {
+      navigator.geolocation.getCurrentPosition(
+        (position) => {
+          setGeoLoc({
+            lat: position.coords.latitude,
+            lng: position.coords.longitude
+          });
+          setIsLocating(false);
+          showSuccess("Localização capturada com sucesso!");
+        },
+        (error) => {
+          setIsLocating(false);
+          showError("Não foi possível capturar a localização. Verifique as permissões do navegador.");
+        }
+      );
+    } else {
+      setIsLocating(false);
+      showError("Geolocalização não suportada pelo seu dispositivo.");
+    }
+  };
 
   const PhotoUpload = ({ label, type }: { label: string, type: 'before' | 'after' }) => (
     <div className="border-2 border-dashed border-slate-200 rounded-2xl p-6 flex flex-col items-center justify-center text-center bg-slate-50 hover:bg-slate-100 transition-colors cursor-pointer min-h-[240px] print:border-solid print:border-slate-300 print:bg-white">
@@ -63,7 +88,8 @@ export default function JobDetail() {
       {/* Print Header (Only visible when printing) */}
       <div className="hidden print:flex items-center justify-between border-b-2 border-slate-800 pb-6 mb-8">
         <div>
-          <CromaLogo className="scale-125 origin-left mb-2" />
+          <CromaLogo className="h-16 mb-2" />
+          <CromaLogoFallback />
           <p className="text-sm text-slate-500">Comunicação Visual & Impressão Digital</p>
         </div>
         <div className="text-right">
@@ -105,10 +131,41 @@ export default function JobDetail() {
               </div>
             </div>
           </div>
+
+          {/* Geolocation Section */}
+          <div className="mt-4 pt-4 border-t border-slate-100 print:border-slate-200">
+            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+              <div className="flex items-center gap-3 text-slate-700">
+                <Navigation size={20} className={geoLoc ? "text-emerald-500" : "text-slate-400"} />
+                <div>
+                  <p className="text-xs text-slate-500 font-medium uppercase">Coordenadas GPS</p>
+                  {geoLoc ? (
+                    <p className="font-bold text-sm font-mono">
+                      Lat: {geoLoc.lat.toFixed(6)} <br className="sm:hidden" />
+                      Lng: {geoLoc.lng.toFixed(6)}
+                    </p>
+                  ) : (
+                    <p className="text-sm text-slate-400 italic">Localização não capturada</p>
+                  )}
+                </div>
+              </div>
+              {!geoLoc && (
+                <Button 
+                  variant="outline" 
+                  size="sm" 
+                  onClick={captureLocation} 
+                  disabled={isLocating}
+                  className="rounded-xl print:hidden"
+                >
+                  {isLocating ? "Buscando..." : "Capturar Localização"}
+                </Button>
+              )}
+            </div>
+          </div>
         </CardContent>
       </Card>
 
-      {/* Tabs for Field Work - We hide the tab list on print and just show content */}
+      {/* Tabs for Field Work */}
       <Tabs defaultValue="photos" className="w-full">
         <TabsList className="grid w-full grid-cols-2 mb-6 rounded-xl p-1 bg-slate-200/50 print:hidden">
           <TabsTrigger value="photos" className="rounded-lg font-medium">Fotos da Instalação</TabsTrigger>

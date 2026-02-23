@@ -12,7 +12,20 @@ const navItems = [
 ];
 
 export const CromaLogo = ({ className = "" }: { className?: string }) => (
-  <div className={`flex items-center gap-1.5 ${className}`}>
+  <img 
+    src="/logo_croma.png" 
+    alt="Cromaprint Logo" 
+    className={`h-10 object-contain ${className}`}
+    onError={(e) => {
+      // Fallback caso a imagem ainda não esteja na pasta public
+      e.currentTarget.style.display = 'none';
+      e.currentTarget.nextElementSibling?.classList.remove('hidden');
+    }}
+  />
+);
+
+export const CromaLogoFallback = ({ className = "" }: { className?: string }) => (
+  <div className={`hidden flex items-center gap-1.5 ${className}`}>
     <div className="flex -space-x-1.5">
       <div className="w-4 h-4 rounded-full bg-cyan-500 mix-blend-multiply opacity-90"></div>
       <div className="w-4 h-4 rounded-full bg-fuchsia-500 mix-blend-multiply opacity-90"></div>
@@ -54,7 +67,8 @@ export default function Layout() {
       <aside className="hidden md:flex flex-col w-64 bg-white border-r border-slate-200 p-4 print:hidden">
         <div className="px-2 py-4 mb-6">
           <CromaLogo />
-          <p className="text-xs text-slate-500 mt-1 ml-1">Gestão de Instalações</p>
+          <CromaLogoFallback />
+          <p className="text-xs text-slate-500 mt-2 ml-1">Gestão de Instalações</p>
         </div>
         <nav className="flex-1 space-y-2">
           <NavLinks />
@@ -69,7 +83,10 @@ export default function Layout() {
 
       {/* Mobile Header */}
       <header className="md:hidden bg-white border-b border-slate-200 p-4 flex items-center justify-between sticky top-0 z-10 print:hidden">
-        <CromaLogo />
+        <div>
+          <CromaLogo className="h-8" />
+          <CromaLogoFallback />
+        </div>
         <Sheet>
           <SheetTrigger asChild>
             <Button variant="ghost" size="icon" className="text-slate-600">
