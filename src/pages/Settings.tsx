@@ -1,5 +1,5 @@
 import React, { useState, useRef } from "react";
-import { Upload, FileSpreadsheet, AlertCircle, Loader2, Database, FileType2 } from "lucide-react";
+import { Upload, FileSpreadsheet, AlertCircle, Loader2, Database, FileType2, Download, Trash2 } from "lucide-react";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { supabase } from "@/integrations/supabase/client";
@@ -9,6 +9,7 @@ import * as XLSX from "xlsx";
 
 export default function Settings() {
   const [isUploading, setIsUploading] = useState(false);
+  const [isDeleting, setIsDeleting] = useState(false);
   const [progress, setProgress] = useState(0);
   const fileInputRef = useRef<HTMLInputElement>(null);
 
@@ -40,23 +41,32 @@ export default function Settings() {
         });
 
         // Mapeamento super flexível
-        const name = findValue(normalizedRow, ['nome fantasia', 'fantasia', 'nome', 'loja']);
-        const corporateName = findValue(normalizedRow, ['razao', 'social', 'empresa']);
+        const name = findValue(normalizedRow, ['nome fantasia', 'fantasia', 'nome', 'loja', 'cliente', 'descricao']);
+        const corporateName = findValue(normalizedRow, ['razao', 'social', 'empresa', 'sacado']);
         
         return {
-          code: findValue(normalizedRow, ['codigo', 'cod', 'cliente', 'id']),
+          code: findValue(normalizedRow, ['codigo', 'cod', 'id', 'numero']),
           corporate_name: corporateName,
-          name: name || corporateName || 'Loja Sem Nome', // Se não tiver nome fantasia, usa a razão social
-          cnpj: findValue(normalizedRow, ['cnpj', 'documento']),
-          address: findValue(normalizedRow, ['endereco', 'rua', 'logradouro']),
+          name: name || corporateName || 'Loja Sem Nome',
+          cnpj: findValue(normalizedRow, ['cnpj', 'documento', 'cgc']),
+          address: findValue(normalizedRow, ['endereco', 'rua', 'logradouro', 'local']),
           state: findValue(normalizedRow, ['uf', 'estado', 'cidade', 'municipio']),
-          neighborhood: findValue(normalizedRow, ['bairro']),
+          neighborhood: findValue(normalizedRow, ['bairro', 'distrito']),
           zip_code: findValue(normalizedRow, ['cep']),
-          brand: findValue(normalizedRow, ['grupo', 'marca', 'rede', 'bandeira']) || 'Sem Grupo',
-          email: findValue(normalizedRow, ['email', 'e-mail']),
-          phone: findValue(normalizedRow, ['fone', 'telefone', 'celular', 'contato']),
+          brand: findValue(normalizedRow, ['grupo', 'marca', 'rede', 'bandeira', 'franquia']) || 'Sem Grupo',
+          email: findValue(normalizedRow, ['email', 'e-mail', 'correio']),
+          phone: findValue(normalizedRow, ['fone', 'telefone', 'celular', 'contato', 'whatsapp']),
         };
       });
+
+      // Trava de Segurança: Se a maioria ficou "Loja Sem Nome", a planilha não tem cabeçalho
+      const validStores = storesToInsert.filter(s => s.name !== 'Loja Sem Nome');
+      if (validStores.length === 0 && storesToInsert.length > 0) {
+        showError("Erro: Não encontramos as colunas de Nome. Sua planilha tem uma linha de cabeçalho?");
+        setIsUploading(false);
+        setProgress(0);
+        return;
+      }
 
       setProgress(50);
 
@@ -128,24 +138,60 @@ export default function Settings() {
     }
   };
 
+  const downloadTemplate = () => {
+    const csvContent = "data:text/csv;charset=utf-8," + 
+      "Codigo,Razao Social,Nome Fantasia,CNPJ,Endereco,Cidade,Bairro,CEP,Marca,Email,Telefone\n" +
+      "218750-1,VICCI MAGAZINE LTDA,VICCI MAGAZINE,43.514.370/0001-50,\"DOS EXPEDICIONARIOS, 1236\",ARUJA-SP,VILA FLORA REGINA,07400-490,KELIS STORE,VICCIMAGAZINE@GMAIL.COM,(0) 46533061";
+    
+    const encodedUri = encodeURI(csvContent);
+    const link = document.createElement("a");
+    link.setAttribute("href", encodedUri);
+    link.setAttribute("download", "modelo_importacao_clientes.csv");
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
+  };
+
+  const handleDeleteAllStores = async () => {
+    if (!window.confirm("ATENÇÃO: Isso vai apagar TODOS os clientes cadastrados. Tem certeza?")) return;
+    
+    setIsDeleting(true);
+    try {
+      const { error } = await supabase.from('stores').delete().not('id', 'is', null);
+      if (error) throw error;
+      showSuccess("Todos os clientes foram apagados com sucesso.");
+    } catch (error) {
+      console.error(error);
+      showError("Erro ao apagar clientes.");
+    } finally {
+      setIsDeleting(false);
+    }
+  };
+
   return (
-    <div className="space-y-6 animate-in fade-in duration-500 max-w-4xl mx-auto">
+    <div className="space-y-6 animate-in fade-in duration-500 max-w-4xl mx-auto pb-10">
       <div>
         <h1 className="text-2xl md:text-3xl font-bold text-slate-800">Configurações</h1>
         <p className="text-slate-500 mt-1">Gerencie as preferências e dados do sistema.</p>
       </div>
 
       <div className="grid gap-6">
+        {/* Card de Importação */}
         <Card className="border-none shadow-sm rounded-2xl bg-white overflow-hidden">
           <CardHeader className="border-b border-slate-100 bg-slate-50/50 pb-4">
-            <div className="flex items-center gap-3">
-              <div className="w-10 h-10 rounded-xl bg-blue-100 text-blue-600 flex items-center justify-center">
-                <Database size={20} />
+            <div className="flex items-center justify-between">
+              <div className="flex items-center gap-3">
+                <div className="w-10 h-10 rounded-xl bg-blue-100 text-blue-600 flex items-center justify-center">
+                  <Database size={20} />
+                </div>
+                <div>
+                  <CardTitle className="text-lg font-bold text-slate-800">Importar Clientes / Lojas</CardTitle>
+                  <CardDescription className="text-slate-500">Faça upload de uma planilha para cadastrar múltiplos clientes de uma vez.</CardDescription>
+                </div>
               </div>
-              <div>
-                <CardTitle className="text-lg font-bold text-slate-800">Importar Clientes / Lojas</CardTitle>
-                <CardDescription className="text-slate-500">Faça upload de uma planilha para cadastrar múltiplos clientes de uma vez.</CardDescription>
-              </div>
+              <Button variant="outline" onClick={downloadTemplate} className="hidden md:flex rounded-xl border-slate-200 text-slate-600 hover:text-blue-600 hover:bg-blue-50">
+                <Download size={16} className="mr-2" /> Baixar Modelo
+              </Button>
             </div>
           </CardHeader>
           <CardContent className="p-6">
@@ -153,9 +199,11 @@ export default function Settings() {
             <div className="bg-blue-50 border border-blue-100 rounded-xl p-4 mb-6 flex gap-3">
               <AlertCircle className="text-blue-600 shrink-0 mt-0.5" size={20} />
               <div className="text-sm text-blue-800">
-                <p className="font-bold mb-1">Como preparar sua planilha:</p>
-                <p className="mb-2">Você pode enviar arquivos <strong>Excel (.xlsx, .xls)</strong> ou <strong>CSV</strong>. O sistema é inteligente e tentará encontrar as colunas automaticamente, mesmo que os nomes estejam um pouco diferentes.</p>
-                <p className="text-xs opacity-80 mt-2">Exemplos de colunas reconhecidas: Código, Razão Social, Nome Fantasia, CNPJ, Endereço, Cidade, UF, Bairro, CEP, Grupo/Marca, Email, Telefone.</p>
+                <p className="font-bold mb-1">Atenção à primeira linha (Cabeçalho):</p>
+                <p className="mb-2">A primeira linha da sua planilha <strong>DEVE</strong> conter os nomes das colunas (ex: Código, Razão Social, Nome Fantasia, CNPJ, etc). Se a primeira linha já for um cliente, o sistema não vai conseguir ler os dados corretamente.</p>
+                <Button variant="link" onClick={downloadTemplate} className="p-0 h-auto text-blue-700 font-bold md:hidden">
+                  Baixar planilha modelo
+                </Button>
               </div>
             </div>
 
@@ -193,7 +241,7 @@ export default function Settings() {
                   </div>
                   <h3 className="text-lg font-bold text-slate-800 mb-1">Selecione o arquivo Excel ou CSV</h3>
                   <p className="text-sm text-slate-500 mb-6 max-w-md">
-                    O arquivo deve conter o cabeçalho na primeira linha. O sistema fará a leitura e importação automática.
+                    Lembre-se de verificar se a primeira linha contém os títulos das colunas.
                   </p>
                   <Button 
                     onClick={() => fileInputRef.current?.click()}
@@ -205,6 +253,38 @@ export default function Settings() {
               )}
             </div>
 
+          </CardContent>
+        </Card>
+
+        {/* Card de Zona de Perigo */}
+        <Card className="border-none shadow-sm rounded-2xl bg-white overflow-hidden border border-rose-100">
+          <CardHeader className="border-b border-rose-50 bg-rose-50/30 pb-4">
+            <div className="flex items-center gap-3">
+              <div className="w-10 h-10 rounded-xl bg-rose-100 text-rose-600 flex items-center justify-center">
+                <AlertCircle size={20} />
+              </div>
+              <div>
+                <CardTitle className="text-lg font-bold text-rose-800">Zona de Perigo</CardTitle>
+                <CardDescription className="text-rose-600/80">Ações destrutivas para o banco de dados.</CardDescription>
+              </div>
+            </div>
+          </CardHeader>
+          <CardContent className="p-6">
+            <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
+              <div>
+                <h4 className="font-bold text-slate-800">Limpar Base de Clientes</h4>
+                <p className="text-sm text-slate-500">Apaga todas as lojas cadastradas. Útil se você importou uma planilha errada.</p>
+              </div>
+              <Button 
+                variant="destructive" 
+                onClick={handleDeleteAllStores}
+                disabled={isDeleting}
+                className="rounded-xl"
+              >
+                {isDeleting ? <Loader2 className="animate-spin mr-2" size={16} /> : <Trash2 className="mr-2" size={16} />}
+                Apagar Todos os Clientes
+              </Button>
+            </div>
           </CardContent>
         </Card>
       </div>
