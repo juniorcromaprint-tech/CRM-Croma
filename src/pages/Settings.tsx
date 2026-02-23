@@ -30,14 +30,18 @@ export default function Settings() {
     return null;
   };
 
-  // Motor de Processamento Raio-X (Lê direto do ERP)
+  // Motor de Processamento com Âncora de CNPJ
   const process2DArray = async (rawRows: any[][]) => {
     try {
       setProgress(10);
       
+      // Correção CRÍTICA: Lida com arquivos separados por TAB (espaçamentos grandes) ou Ponto e Vírgula
       const normalizedRows = rawRows.map(row => {
-        if (row.length === 1 && typeof row[0] === 'string' && row[0].includes(';')) {
-          return row[0].split(';');
+        if (row.length === 1 && typeof row[0] === 'string') {
+          const str = row[0];
+          if (str.includes('\t')) return str.split('\t');
+          if (str.includes(';')) return str.split(';');
+          if (str.includes('|')) return str.split('|');
         }
         return row;
       });
@@ -45,14 +49,16 @@ export default function Settings() {
       setProgress(20);
 
       // Busca clientes existentes para evitar duplicatas
-      const { data: existingStores } = await supabase.from('stores').select('id, code, cnpj, name');
+      const { data: existingStores } = await supabase.from('stores').select('id, code, cnpj, name, address');
       const existingMap = new Map();
       
       if (existingStores) {
         existingStores.forEach(store => {
           const safeName = (store.name || "").toLowerCase().trim();
+          const safeAddress = (store.address || "").toLowerCase().trim();
           if (store.code && safeName) existingMap.set(`code_name:${store.code}_${safeName}`, store.id);
           if (store.cnpj && safeName) existingMap.set(`cnpj_name:${store.cnpj}_${safeName}`, store.id);
+          if (safeName && safeAddress) existingMap.set(`name_address:${safeName}_${safeAddress}`, store.id);
         });
       }
 
@@ -61,7 +67,7 @@ export default function Settings() {
       const storesToUpsert = [];
       const seenInFile = new Set();
       
-      // Tenta achar cabeçalho caso não seja o formato padrão do ERP
+      // Tenta achar cabeçalho (Fallback)
       let headerRowIndex = -1;
       let headers: string[] = [];
       
@@ -78,37 +84,49 @@ export default function Settings() {
 
       // Processa linha por linha
       for (let i = 0; i < normalizedRows.length; i++) {
-        if (i === headerRowIndex) continue; // Pula o cabeçalho se existir
+        if (i === headerRowIndex) continue;
 
         const rowArray = normalizedRows[i];
         if (!rowArray || rowArray.every(cell => cell === null || cell === undefined || cell === "")) continue;
 
-        const col0 = String(rowArray[0] || "").trim();
-        const col3 = String(rowArray[3] || "").trim();
-        const cleanCnpj = col3.replace(/\D/g, '');
-
-        // FINGERPRINT DO SEU ERP: Se a coluna 0 tem algo e a coluna 3 é um CNPJ (14 números), é uma loja!
-        const isErpFormat = (col0.length > 0) && (cleanCnpj.length === 14);
-
         let storeData: any = null;
 
-        if (isErpFormat) {
-          // Mapeamento Direto (Ignora cabeçalhos e pega pela posição exata do seu print)
+        // SISTEMA DE ÂNCORA DE CNPJ (À prova de falhas)
+        // Procura o CNPJ nas primeiras 6 colunas
+        let cnpjIndex = -1;
+        let cleanCnpj = "";
+        
+        for (let j = 0; j < Math.min(6, rowArray.length); j++) {
+          const cellStr = String(rowArray[j] || "").trim();
+          const digits = cellStr.replace(/\D/g, '');
+          // Se tem 14 números e tem barra ou traço, é o CNPJ!
+          if (digits.length === 14 && (cellStr.includes('/') || cellStr.includes('-') || cellStr.includes('.'))) {
+            cnpjIndex = j;
+            cleanCnpj = digits;
+            break;
+          }
+        }
+
+        if (cnpjIndex !== -1) {
+          // Achou o CNPJ! Agora mapeia tudo em volta dele
+          const nameVal = cnpjIndex >= 1 ? String(rowArray[cnpjIndex - 1] || "").trim() : "";
+          const corpNameVal = cnpjIndex >= 2 ? String(rowArray[cnpjIndex - 2] || "").trim() : "";
+          
           storeData = {
-            code: col0,
-            corporate_name: String(rowArray[1] || "").trim(),
-            name: String(rowArray[2] || "").trim() || String(rowArray[1] || "").trim(),
-            cnpj: col3,
-            address: String(rowArray[4] || "").trim(),
-            state: String(rowArray[5] || "").trim(),
-            neighborhood: String(rowArray[6] || "").trim(),
-            zip_code: String(rowArray[7] || "").trim(),
-            brand: String(rowArray[8] || "").trim() || 'Sem Grupo',
-            email: String(rowArray[9] || "").trim(),
-            phone: String(rowArray[10] || "").trim(),
+            code: cnpjIndex >= 3 ? String(rowArray[cnpjIndex - 3] || "").trim() : "",
+            corporate_name: corpNameVal,
+            name: nameVal || corpNameVal || `Loja ${cleanCnpj}`,
+            cnpj: String(rowArray[cnpjIndex] || "").trim(),
+            address: String(rowArray[cnpjIndex + 1] || "").trim(),
+            state: String(rowArray[cnpjIndex + 2] || "").trim(),
+            neighborhood: String(rowArray[cnpjIndex + 3] || "").trim(),
+            zip_code: String(rowArray[cnpjIndex + 4] || "").trim(),
+            brand: String(rowArray[cnpjIndex + 5] || "").trim() || 'Sem Grupo',
+            email: String(rowArray[cnpjIndex + 6] || "").trim(),
+            phone: String(rowArray[cnpjIndex + 7] || "").trim(),
           };
         } else if (headerRowIndex !== -1) {
-          // Fallback: Se não for o formato do ERP, tenta ler pelo cabeçalho
+          // Fallback: Se não achou CNPJ claro, tenta ler pelo cabeçalho
           const rowObj: Record<string, string> = {};
           headers.forEach((header, index) => {
             if (header) rowObj[header] = String(rowArray[index] || "").trim();
@@ -142,13 +160,16 @@ export default function Settings() {
         // Se conseguiu montar os dados da loja, prepara para salvar
         if (storeData && storeData.name) {
           const safeName = storeData.name.toLowerCase().trim();
+          const safeAddress = (storeData.address || "").toLowerCase().trim();
           let existingId = null;
           
-          // Verifica se já existe no banco
+          // Verifica se já existe no banco (Anti-Duplicação de Filiais)
           if (storeData.code && existingMap.has(`code_name:${storeData.code}_${safeName}`)) {
             existingId = existingMap.get(`code_name:${storeData.code}_${safeName}`);
           } else if (storeData.cnpj && existingMap.has(`cnpj_name:${storeData.cnpj}_${safeName}`)) {
             existingId = existingMap.get(`cnpj_name:${storeData.cnpj}_${safeName}`);
+          } else if (safeName && safeAddress && existingMap.has(`name_address:${safeName}_${safeAddress}`)) {
+            existingId = existingMap.get(`name_address:${safeName}_${safeAddress}`);
           }
 
           if (existingId) storeData.id = existingId;
@@ -313,8 +334,8 @@ export default function Settings() {
             <div className="bg-blue-50 border border-blue-100 rounded-xl p-4 mb-6 flex gap-3">
               <AlertCircle className="text-blue-600 shrink-0 mt-0.5" size={20} />
               <div className="text-sm text-blue-800">
-                <p className="font-bold mb-1">Leitor Direto de ERP Ativado!</p>
-                <p className="mb-2">O sistema agora reconhece o formato exato da sua exportação. Ele não precisa mais de cabeçalhos. Se ele ver um Código na primeira coluna e um CNPJ na quarta coluna, ele já sabe o que fazer!</p>
+                <p className="font-bold mb-1">Leitor com Âncora de CNPJ Ativado!</p>
+                <p className="mb-2">O sistema agora procura o CNPJ em qualquer lugar da linha e usa ele como âncora para puxar o Nome, Código e Endereço. Isso resolve problemas com planilhas separadas por "Tabs" (espaços grandes).</p>
               </div>
             </div>
 
