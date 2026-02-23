@@ -21,17 +21,23 @@ export default function Settings() {
   // Busca inteligente: procura se alguma coluna contém as palavras-chave
   const findValue = (row: Record<string, string>, possibleMatches: string[]) => {
     const keys = Object.keys(row);
+    
+    // 1. Busca exata primeiro
     for (const match of possibleMatches) {
-      // Tenta achar a coluna exata primeiro
-      let foundKey = keys.find(k => k === match);
-      // Se não achar exata, tenta achar uma que contenha a palavra
-      if (!foundKey) {
-        foundKey = keys.find(k => k.includes(match));
-      }
-      if (foundKey && row[foundKey] !== undefined && row[foundKey] !== "") {
-        return String(row[foundKey]).trim();
+      const exactKey = keys.find(k => k === match);
+      if (exactKey && row[exactKey] !== undefined && row[exactKey] !== "") {
+        return String(row[exactKey]).trim();
       }
     }
+    
+    // 2. Busca parcial (contém a palavra)
+    for (const match of possibleMatches) {
+      const partialKey = keys.find(k => k.includes(match));
+      if (partialKey && row[partialKey] !== undefined && row[partialKey] !== "") {
+        return String(row[partialKey]).trim();
+      }
+    }
+    
     return null;
   };
 
@@ -40,12 +46,20 @@ export default function Settings() {
     try {
       setProgress(20);
       
-      // 1. Encontrar a linha do cabeçalho (procura nas primeiras 20 linhas)
+      // Correção para CSVs brasileiros que usam ponto e vírgula e o leitor não separou
+      const normalizedRows = rawRows.map(row => {
+        if (row.length === 1 && typeof row[0] === 'string' && row[0].includes(';')) {
+          return row[0].split(';');
+        }
+        return row;
+      });
+      
+      // 1. Encontrar a linha do cabeçalho (procura nas primeiras 50 linhas)
       let headerRowIndex = -1;
       let bestMatchCount = 0;
       
-      for (let i = 0; i < Math.min(20, rawRows.length); i++) {
-        const row = rawRows[i];
+      for (let i = 0; i < Math.min(50, normalizedRows.length); i++) {
+        const row = normalizedRows[i];
         if (!row || !Array.isArray(row)) continue;
         
         const rowString = row.join(" ").toLowerCase().normalize("NFD").replace(/[\u0300-\u036f]/g, "");
@@ -55,6 +69,7 @@ export default function Settings() {
         if (rowString.includes("razao") || rowString.includes("social")) matchCount++;
         if (rowString.includes("cnpj") || rowString.includes("documento")) matchCount++;
         if (rowString.includes("codigo") || rowString.includes("cod")) matchCount++;
+        if (rowString.includes("endereco") || rowString.includes("rua")) matchCount++;
         
         if (matchCount > bestMatchCount) {
           bestMatchCount = matchCount;
@@ -72,12 +87,12 @@ export default function Settings() {
       setProgress(30);
 
       // 2. Extrair os nomes das colunas
-      const headers = rawRows[headerRowIndex].map(h => normalizeKey(String(h || "")));
+      const headers = normalizedRows[headerRowIndex].map(h => normalizeKey(String(h || "")));
       const storesToInsert = [];
       
       // 3. Mapear os dados (começando da linha abaixo do cabeçalho)
-      for (let i = headerRowIndex + 1; i < rawRows.length; i++) {
-        const rowArray = rawRows[i];
+      for (let i = headerRowIndex + 1; i < normalizedRows.length; i++) {
+        const rowArray = normalizedRows[i];
         // Pula linhas completamente vazias
         if (!rowArray || rowArray.every(cell => cell === null || cell === undefined || cell === "")) continue;
         
@@ -90,17 +105,25 @@ export default function Settings() {
 
         const name = findValue(rowObj, ['nome fantasia', 'fantasia', 'nome', 'loja', 'cliente']);
         const corporateName = findValue(rowObj, ['razao', 'social', 'empresa']);
+        const code = findValue(rowObj, ['codigo', 'cod', 'id', 'numero']);
+        const cnpj = findValue(rowObj, ['cnpj', 'documento', 'cgc']);
         
-        const storeName = name || corporateName;
+        let storeName = name || corporateName;
         
-        // Se não tiver nem nome nem razão social, pula a linha (provavelmente é lixo do Excel)
-        if (!storeName) continue; 
+        // Se não tiver nome, mas tiver código ou CNPJ, a gente salva mesmo assim para não perder o dado
+        if (!storeName) {
+          if (code || cnpj) {
+            storeName = `Cliente sem nome (${code || cnpj})`;
+          } else {
+            continue; // Pula apenas se a linha for realmente lixo sem identificação
+          }
+        }
 
         storesToInsert.push({
-          code: findValue(rowObj, ['codigo', 'cod', 'id', 'numero']),
+          code: code,
           corporate_name: corporateName,
           name: storeName,
-          cnpj: findValue(rowObj, ['cnpj', 'documento', 'cgc']),
+          cnpj: cnpj,
           address: findValue(rowObj, ['endereco', 'rua', 'logradouro', 'local']),
           state: findValue(rowObj, ['uf', 'estado', 'cidade', 'municipio']),
           neighborhood: findValue(rowObj, ['bairro', 'distrito']),
@@ -156,7 +179,7 @@ export default function Settings() {
 
     if (fileExt === 'csv') {
       Papa.parse(file, {
-        header: false, // Agora lemos como matriz 2D para ser indestrutível
+        header: false, 
         skipEmptyLines: true,
         complete: (results) => process2DArray(results.data as any[][]),
         error: (error) => {
@@ -171,10 +194,25 @@ export default function Settings() {
         try {
           const data = new Uint8Array(e.target?.result as ArrayBuffer);
           const workbook = XLSX.read(data, { type: 'array' });
-          const worksheetName = workbook.SheetNames[0];
-          const worksheet = workbook.Sheets[worksheetName];
-          // Lê como matriz 2D (array de arrays)
-          const rawRows = XLSX.utils.sheet_to_json(worksheet, { header: 1, defval: "" }) as any[][];
+          
+          let rawRows: any[][] = [];
+          
+          // Procura a primeira aba que tenha dados reais (mais de 1 linha)
+          for (const sheetName of workbook.SheetNames) {
+            const worksheet = workbook.Sheets[sheetName];
+            const rows = XLSX.utils.sheet_to_json(worksheet, { header: 1, defval: "" }) as any[][];
+            if (rows.length > 1) {
+              rawRows = rows;
+              break;
+            }
+          }
+          
+          if (rawRows.length === 0) {
+            showError("O arquivo Excel parece estar vazio ou sem dados válidos.");
+            setIsUploading(false);
+            return;
+          }
+          
           process2DArray(rawRows);
         } catch (error) {
           console.error("Erro ao ler Excel:", error);
