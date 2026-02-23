@@ -4,14 +4,22 @@ import { Search, Filter, Plus, MapPin, Calendar } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Badge } from "@/components/ui/badge";
+import { useQuery } from "@tanstack/react-query";
+import { supabase } from "@/integrations/supabase/client";
 
 export default function Jobs() {
-  const jobs = [
-    { id: "OS-1042", client: "Beira Rio", store: "Shopping Morumbi", date: "Hoje", status: "Pendente", type: "Adesivagem Vitrine" },
-    { id: "OS-1041", client: "Vizzano", store: "Rua Oscar Freire, 120", date: "Hoje", status: "Concluído", type: "Placa Fachada" },
-    { id: "OS-1040", client: "Moleca", store: "Shopping Tatuapé", date: "Ontem", status: "Concluído", type: "Adesivo Interno" },
-    { id: "OS-1039", client: "Beira Rio", store: "Shopping Ibirapuera", date: "Ontem", status: "Divergência", type: "Adesivagem Vitrine" },
-  ];
+  const { data: jobs, isLoading } = useQuery({
+    queryKey: ['all-jobs'],
+    queryFn: async () => {
+      const { data, error } = await supabase
+        .from('jobs')
+        .select('*, stores(name, brand, address)')
+        .order('created_at', { ascending: false });
+      
+      if (error) throw error;
+      return data;
+    }
+  });
 
   const getStatusColor = (status: string) => {
     switch (status) {
@@ -47,36 +55,40 @@ export default function Jobs() {
         </Button>
       </div>
 
-      <div className="grid gap-4">
-        {jobs.map((job) => (
-          <Link 
-            key={job.id} 
-            to={`/jobs/${job.id}`}
-            className="bg-white p-5 rounded-2xl border border-slate-100 shadow-sm hover:shadow-md hover:border-blue-100 transition-all group"
-          >
-            <div className="flex justify-between items-start mb-3">
-              <div className="flex items-center gap-2">
-                <span className="text-sm font-bold text-blue-600 bg-blue-50 px-2 py-1 rounded-md">
-                  {job.id}
+      {isLoading ? (
+        <p className="text-center text-slate-500 py-10">Carregando instalações...</p>
+      ) : (
+        <div className="grid gap-4">
+          {jobs?.map((job) => (
+            <Link 
+              key={job.id} 
+              to={`/jobs/${job.id}`}
+              className="bg-white p-5 rounded-2xl border border-slate-100 shadow-sm hover:shadow-md hover:border-blue-100 transition-all group"
+            >
+              <div className="flex justify-between items-start mb-3">
+                <div className="flex items-center gap-2">
+                  <span className="text-sm font-bold text-blue-600 bg-blue-50 px-2 py-1 rounded-md">
+                    {job.os_number}
+                  </span>
+                  <Badge variant="secondary" className={getStatusColor(job.status)}>
+                    {job.status}
+                  </Badge>
+                </div>
+                <span className="text-sm text-slate-500 flex items-center gap-1">
+                  <Calendar size={14} /> {new Date(job.scheduled_date).toLocaleDateString('pt-BR')}
                 </span>
-                <Badge variant="secondary" className={getStatusColor(job.status)}>
-                  {job.status}
-                </Badge>
               </div>
-              <span className="text-sm text-slate-500 flex items-center gap-1">
-                <Calendar size={14} /> {job.date}
-              </span>
-            </div>
-            
-            <h3 className="text-lg font-bold text-slate-800 mb-1">{job.client} - {job.type}</h3>
-            
-            <div className="flex items-center gap-1 text-slate-500 text-sm">
-              <MapPin size={16} className="text-slate-400" />
-              <span>{job.store}</span>
-            </div>
-          </Link>
-        ))}
-      </div>
+              
+              <h3 className="text-lg font-bold text-slate-800 mb-1">{job.stores?.brand} - {job.type}</h3>
+              
+              <div className="flex items-center gap-1 text-slate-500 text-sm">
+                <MapPin size={16} className="text-slate-400" />
+                <span>{job.stores?.name}</span>
+              </div>
+            </Link>
+          ))}
+        </div>
+      )}
     </div>
   );
 }
