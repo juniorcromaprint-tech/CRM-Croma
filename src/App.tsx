@@ -6,6 +6,7 @@ import Layout from "./components/Layout";
 import Index from "./pages/Index";
 import Jobs from "./pages/Jobs";
 import Stores from "./pages/Stores";
+import StoreDetail from "./pages/StoreDetail";
 import JobDetail from "./pages/JobDetail";
 import NewJob from "./pages/NewJob";
 import Settings from "./pages/Settings";
@@ -23,6 +24,7 @@ function App() {
             <Route path="/jobs/new" element={<NewJob />} />
             <Route path="/jobs/:id" element={<JobDetail />} />
             <Route path="/stores" element={<Stores />} />
+            <Route path="/stores/:id" element={<StoreDetail />} />
             <Route path="/settings" element={<Settings />} />
           </Route>
         </Routes>

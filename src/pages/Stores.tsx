@@ -4,10 +4,12 @@ import { Input } from "@/components/ui/input";
 import { Card, CardContent } from "@/components/ui/card";
 import { useQuery } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
+import { useNavigate } from "react-router-dom";
 
 export default function Stores() {
   const [searchTerm, setSearchTerm] = useState("");
   const [selectedBrand, setSelectedBrand] = useState("all");
+  const navigate = useNavigate();
 
   const { data: stores, isLoading } = useQuery({
     queryKey: ['all-stores'],
@@ -101,14 +103,18 @@ export default function Stores() {
       ) : (
         <div className="grid gap-4">
           {filteredStores.map((store) => (
-            <Card key={store.id} className="border-none shadow-sm rounded-2xl hover:shadow-md transition-shadow cursor-pointer group bg-white">
+            <Card 
+              key={store.id} 
+              onClick={() => navigate(`/stores/${store.id}`)}
+              className="border-none shadow-sm rounded-2xl hover:shadow-md transition-all hover:-translate-y-0.5 cursor-pointer group bg-white"
+            >
               <CardContent className="p-5 flex items-center justify-between">
                 <div className="flex items-start gap-4">
                   <div className="w-12 h-12 bg-blue-50 rounded-xl flex items-center justify-center text-blue-600 flex-shrink-0">
                     <Store size={24} />
                   </div>
                   <div>
-                    <h3 className="font-bold text-slate-800 text-lg leading-tight">{store.name}</h3>
+                    <h3 className="font-bold text-slate-800 text-lg leading-tight group-hover:text-blue-700 transition-colors">{store.name}</h3>
                     <div className="flex flex-wrap items-center gap-2 mt-2">
                       {store.code && (
                         <span className="text-xs font-bold text-slate-600 bg-slate-100 px-2 py-1 rounded-md border border-slate-200">
