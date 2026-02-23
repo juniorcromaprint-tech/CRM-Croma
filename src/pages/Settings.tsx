@@ -13,29 +13,12 @@ export default function Settings() {
   const [progress, setProgress] = useState(0);
   const fileInputRef = useRef<HTMLInputElement>(null);
 
-  const normalizeKey = (key: string) => {
-    return key.toLowerCase().normalize("NFD").replace(/[\u0300-\u036f]/g, "").trim();
-  };
-
-  const findValue = (row: Record<string, string>, possibleMatches: string[]) => {
-    const keys = Object.keys(row);
-    for (const match of possibleMatches) {
-      const exactKey = keys.find(k => k === match);
-      if (exactKey && row[exactKey] !== undefined && row[exactKey] !== "") return String(row[exactKey]).trim();
-    }
-    for (const match of possibleMatches) {
-      const partialKey = keys.find(k => k.includes(match));
-      if (partialKey && row[partialKey] !== undefined && row[partialKey] !== "") return String(row[partialKey]).trim();
-    }
-    return null;
-  };
-
-  // Motor de Processamento com Âncora de CNPJ
+  // Motor de Processamento "Modo Trator" (Varre tudo em busca de CNPJ)
   const process2DArray = async (rawRows: any[][]) => {
     try {
       setProgress(10);
       
-      // Correção CRÍTICA: Lida com arquivos separados por TAB (espaçamentos grandes) ou Ponto e Vírgula
+      // Normaliza separadores (Tabs, Ponto e Vírgula, etc)
       const normalizedRows = rawRows.map(row => {
         if (row.length === 1 && typeof row[0] === 'string') {
           const str = row[0];
@@ -49,16 +32,14 @@ export default function Settings() {
       setProgress(20);
 
       // Busca clientes existentes para evitar duplicatas
-      const { data: existingStores } = await supabase.from('stores').select('id, code, cnpj, name, address');
+      const { data: existingStores } = await supabase.from('stores').select('id, code, cnpj, name');
       const existingMap = new Map();
       
       if (existingStores) {
         existingStores.forEach(store => {
           const safeName = (store.name || "").toLowerCase().trim();
-          const safeAddress = (store.address || "").toLowerCase().trim();
           if (store.code && safeName) existingMap.set(`code_name:${store.code}_${safeName}`, store.id);
           if (store.cnpj && safeName) existingMap.set(`cnpj_name:${store.cnpj}_${safeName}`, store.id);
-          if (safeName && safeAddress) existingMap.set(`name_address:${safeName}_${safeAddress}`, store.id);
         });
       }
 
@@ -67,55 +48,33 @@ export default function Settings() {
       const storesToUpsert = [];
       const seenInFile = new Set();
       
-      // Tenta achar cabeçalho (Fallback)
-      let headerRowIndex = -1;
-      let headers: string[] = [];
-      
-      for (let i = 0; i < Math.min(50, normalizedRows.length); i++) {
-        const row = normalizedRows[i];
-        if (!row || !Array.isArray(row)) continue;
-        const rowString = row.join(" ").toLowerCase().normalize("NFD").replace(/[\u0300-\u036f]/g, "");
-        if (rowString.includes("nome") || rowString.includes("fantasia") || rowString.includes("cnpj")) {
-          headerRowIndex = i;
-          headers = row.map(h => normalizeKey(String(h || "")));
-          break;
-        }
-      }
-
-      // Processa linha por linha
+      // Varre TODAS as linhas, ignorando cabeçalhos ou linhas vazias
       for (let i = 0; i < normalizedRows.length; i++) {
-        if (i === headerRowIndex) continue;
-
         const rowArray = normalizedRows[i];
-        if (!rowArray || rowArray.every(cell => cell === null || cell === undefined || cell === "")) continue;
+        if (!rowArray || !Array.isArray(rowArray)) continue;
 
-        let storeData: any = null;
-
-        // SISTEMA DE ÂNCORA DE CNPJ (À prova de falhas)
-        // Procura o CNPJ nas primeiras 6 colunas
         let cnpjIndex = -1;
         let cleanCnpj = "";
-        
-        for (let j = 0; j < Math.min(6, rowArray.length); j++) {
+
+        // Procura um CNPJ em qualquer coluna desta linha
+        for (let j = 0; j < rowArray.length; j++) {
           const cellStr = String(rowArray[j] || "").trim();
           const digits = cellStr.replace(/\D/g, '');
-          // Se tem 14 números e tem barra ou traço, é o CNPJ!
-          if (digits.length === 14 && (cellStr.includes('/') || cellStr.includes('-') || cellStr.includes('.'))) {
+          
+          // Se tem 14 números e formatação de CNPJ, achamos a âncora!
+          if (digits.length === 14 && (cellStr.includes('/') || cellStr.includes('-'))) {
             cnpjIndex = j;
             cleanCnpj = digits;
             break;
           }
         }
 
+        // Se achou um CNPJ, é uma linha de loja válida!
         if (cnpjIndex !== -1) {
-          // Achou o CNPJ! Agora mapeia tudo em volta dele
-          const nameVal = cnpjIndex >= 1 ? String(rowArray[cnpjIndex - 1] || "").trim() : "";
-          const corpNameVal = cnpjIndex >= 2 ? String(rowArray[cnpjIndex - 2] || "").trim() : "";
-          
-          storeData = {
+          const storeData: any = {
             code: cnpjIndex >= 3 ? String(rowArray[cnpjIndex - 3] || "").trim() : "",
-            corporate_name: corpNameVal,
-            name: nameVal || corpNameVal || `Loja ${cleanCnpj}`,
+            corporate_name: cnpjIndex >= 2 ? String(rowArray[cnpjIndex - 2] || "").trim() : "",
+            name: cnpjIndex >= 1 ? String(rowArray[cnpjIndex - 1] || "").trim() : "",
             cnpj: String(rowArray[cnpjIndex] || "").trim(),
             address: String(rowArray[cnpjIndex + 1] || "").trim(),
             state: String(rowArray[cnpjIndex + 2] || "").trim(),
@@ -125,56 +84,25 @@ export default function Settings() {
             email: String(rowArray[cnpjIndex + 6] || "").trim(),
             phone: String(rowArray[cnpjIndex + 7] || "").trim(),
           };
-        } else if (headerRowIndex !== -1) {
-          // Fallback: Se não achou CNPJ claro, tenta ler pelo cabeçalho
-          const rowObj: Record<string, string> = {};
-          headers.forEach((header, index) => {
-            if (header) rowObj[header] = String(rowArray[index] || "").trim();
-          });
 
-          const name = findValue(rowObj, ['nome fantasia', 'fantasia', 'nome', 'loja', 'cliente']);
-          const corporateName = findValue(rowObj, ['razao', 'social', 'empresa']);
-          const code = findValue(rowObj, ['codigo', 'cod', 'id', 'numero']);
-          const cnpj = findValue(rowObj, ['cnpj', 'documento', 'cgc']);
-          
-          let storeName = name || corporateName;
-          if (!storeName && (code || cnpj)) storeName = `Cliente sem nome (${code || cnpj})`;
-
-          if (storeName) {
-            storeData = {
-              code: code,
-              corporate_name: corporateName,
-              name: storeName,
-              cnpj: cnpj,
-              address: findValue(rowObj, ['endereco', 'rua', 'logradouro', 'local']),
-              state: findValue(rowObj, ['uf', 'estado', 'cidade', 'municipio']),
-              neighborhood: findValue(rowObj, ['bairro', 'distrito']),
-              zip_code: findValue(rowObj, ['cep']),
-              brand: findValue(rowObj, ['grupo', 'marca', 'rede', 'bandeira', 'franquia']) || 'Sem Grupo',
-              email: findValue(rowObj, ['email', 'e-mail', 'correio']),
-              phone: findValue(rowObj, ['fone', 'telefone', 'celular', 'contato', 'whatsapp']),
-            };
+          // Fallback caso o nome fantasia esteja vazio
+          if (!storeData.name) {
+            storeData.name = storeData.corporate_name || `Loja ${cleanCnpj}`;
           }
-        }
 
-        // Se conseguiu montar os dados da loja, prepara para salvar
-        if (storeData && storeData.name) {
           const safeName = storeData.name.toLowerCase().trim();
-          const safeAddress = (storeData.address || "").toLowerCase().trim();
           let existingId = null;
           
-          // Verifica se já existe no banco (Anti-Duplicação de Filiais)
+          // Verifica se já existe no banco (Anti-Duplicação Inteligente)
           if (storeData.code && existingMap.has(`code_name:${storeData.code}_${safeName}`)) {
             existingId = existingMap.get(`code_name:${storeData.code}_${safeName}`);
           } else if (storeData.cnpj && existingMap.has(`cnpj_name:${storeData.cnpj}_${safeName}`)) {
             existingId = existingMap.get(`cnpj_name:${storeData.cnpj}_${safeName}`);
-          } else if (safeName && safeAddress && existingMap.has(`name_address:${safeName}_${safeAddress}`)) {
-            existingId = existingMap.get(`name_address:${safeName}_${safeAddress}`);
           }
 
           if (existingId) storeData.id = existingId;
 
-          // Evita duplicatas dentro da própria planilha
+          // Evita duplicatas idênticas dentro da própria planilha
           const fileKey = `${storeData.code}_${storeData.cnpj}_${safeName}`;
           if (!seenInFile.has(fileKey)) {
             seenInFile.add(fileKey);
@@ -334,8 +262,8 @@ export default function Settings() {
             <div className="bg-blue-50 border border-blue-100 rounded-xl p-4 mb-6 flex gap-3">
               <AlertCircle className="text-blue-600 shrink-0 mt-0.5" size={20} />
               <div className="text-sm text-blue-800">
-                <p className="font-bold mb-1">Leitor com Âncora de CNPJ Ativado!</p>
-                <p className="mb-2">O sistema agora procura o CNPJ em qualquer lugar da linha e usa ele como âncora para puxar o Nome, Código e Endereço. Isso resolve problemas com planilhas separadas por "Tabs" (espaços grandes).</p>
+                <p className="font-bold mb-1">Leitor "Modo Trator" Ativado! 🚜</p>
+                <p className="mb-2">O sistema agora ignora cabeçalhos e linhas em branco. Ele varre a planilha inteira e, sempre que encontra um CNPJ, ele puxa a loja. Não importa se a loja está antes ou depois do cabeçalho!</p>
               </div>
             </div>
 
@@ -353,7 +281,7 @@ export default function Settings() {
                 <div className="flex flex-col items-center text-center">
                   <Loader2 className="w-12 h-12 text-blue-600 animate-spin mb-4" />
                   <h3 className="text-lg font-bold text-slate-800 mb-1">Processando dados...</h3>
-                  <p className="text-sm text-slate-500 mb-4">Lendo dados diretamente das colunas. Não feche a página.</p>
+                  <p className="text-sm text-slate-500 mb-4">Varrendo todas as linhas da planilha. Não feche a página.</p>
                   <div className="w-64 h-2 bg-slate-200 rounded-full overflow-hidden">
                     <div 
                       className="h-full bg-blue-600 transition-all duration-300 ease-out"
