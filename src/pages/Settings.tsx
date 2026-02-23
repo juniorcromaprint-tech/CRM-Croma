@@ -22,7 +22,12 @@ export default function Settings() {
   const findValue = (row: Record<string, string>, possibleMatches: string[]) => {
     const keys = Object.keys(row);
     for (const match of possibleMatches) {
-      const foundKey = keys.find(k => k.includes(match));
+      // Tenta achar a coluna exata primeiro
+      let foundKey = keys.find(k => k === match);
+      // Se não achar exata, tenta achar uma que contenha a palavra
+      if (!foundKey) {
+        foundKey = keys.find(k => k.includes(match));
+      }
       if (foundKey && row[foundKey] !== undefined && row[foundKey] !== "") {
         return String(row[foundKey]).trim();
       }
@@ -30,39 +35,84 @@ export default function Settings() {
     return null;
   };
 
-  const processData = async (rows: any[]) => {
+  // Novo motor de processamento indestrutível (Lê como Matriz 2D)
+  const process2DArray = async (rawRows: any[][]) => {
     try {
-      setProgress(30);
+      setProgress(20);
       
-      const storesToInsert = rows.map(row => {
-        const normalizedRow: Record<string, string> = {};
-        Object.keys(row).forEach(key => {
-          normalizedRow[normalizeKey(key)] = row[key];
+      // 1. Encontrar a linha do cabeçalho (procura nas primeiras 20 linhas)
+      let headerRowIndex = -1;
+      let bestMatchCount = 0;
+      
+      for (let i = 0; i < Math.min(20, rawRows.length); i++) {
+        const row = rawRows[i];
+        if (!row || !Array.isArray(row)) continue;
+        
+        const rowString = row.join(" ").toLowerCase().normalize("NFD").replace(/[\u0300-\u036f]/g, "");
+        let matchCount = 0;
+        
+        if (rowString.includes("nome") || rowString.includes("fantasia")) matchCount++;
+        if (rowString.includes("razao") || rowString.includes("social")) matchCount++;
+        if (rowString.includes("cnpj") || rowString.includes("documento")) matchCount++;
+        if (rowString.includes("codigo") || rowString.includes("cod")) matchCount++;
+        
+        if (matchCount > bestMatchCount) {
+          bestMatchCount = matchCount;
+          headerRowIndex = i;
+        }
+      }
+
+      if (headerRowIndex === -1 || bestMatchCount === 0) {
+        showError("Não conseguimos identificar o cabeçalho da planilha. Verifique se as colunas têm nomes como 'Nome', 'CNPJ', etc.");
+        setIsUploading(false);
+        setProgress(0);
+        return;
+      }
+
+      setProgress(30);
+
+      // 2. Extrair os nomes das colunas
+      const headers = rawRows[headerRowIndex].map(h => normalizeKey(String(h || "")));
+      const storesToInsert = [];
+      
+      // 3. Mapear os dados (começando da linha abaixo do cabeçalho)
+      for (let i = headerRowIndex + 1; i < rawRows.length; i++) {
+        const rowArray = rawRows[i];
+        // Pula linhas completamente vazias
+        if (!rowArray || rowArray.every(cell => cell === null || cell === undefined || cell === "")) continue;
+        
+        const rowObj: Record<string, string> = {};
+        headers.forEach((header, index) => {
+          if (header) {
+            rowObj[header] = String(rowArray[index] || "").trim();
+          }
         });
 
-        // Mapeamento super flexível
-        const name = findValue(normalizedRow, ['nome fantasia', 'fantasia', 'nome', 'loja', 'cliente', 'descricao']);
-        const corporateName = findValue(normalizedRow, ['razao', 'social', 'empresa', 'sacado']);
+        const name = findValue(rowObj, ['nome fantasia', 'fantasia', 'nome', 'loja', 'cliente']);
+        const corporateName = findValue(rowObj, ['razao', 'social', 'empresa']);
         
-        return {
-          code: findValue(normalizedRow, ['codigo', 'cod', 'id', 'numero']),
-          corporate_name: corporateName,
-          name: name || corporateName || 'Loja Sem Nome',
-          cnpj: findValue(normalizedRow, ['cnpj', 'documento', 'cgc']),
-          address: findValue(normalizedRow, ['endereco', 'rua', 'logradouro', 'local']),
-          state: findValue(normalizedRow, ['uf', 'estado', 'cidade', 'municipio']),
-          neighborhood: findValue(normalizedRow, ['bairro', 'distrito']),
-          zip_code: findValue(normalizedRow, ['cep']),
-          brand: findValue(normalizedRow, ['grupo', 'marca', 'rede', 'bandeira', 'franquia']) || 'Sem Grupo',
-          email: findValue(normalizedRow, ['email', 'e-mail', 'correio']),
-          phone: findValue(normalizedRow, ['fone', 'telefone', 'celular', 'contato', 'whatsapp']),
-        };
-      });
+        const storeName = name || corporateName;
+        
+        // Se não tiver nem nome nem razão social, pula a linha (provavelmente é lixo do Excel)
+        if (!storeName) continue; 
 
-      // Trava de Segurança: Se a maioria ficou "Loja Sem Nome", a planilha não tem cabeçalho
-      const validStores = storesToInsert.filter(s => s.name !== 'Loja Sem Nome');
-      if (validStores.length === 0 && storesToInsert.length > 0) {
-        showError("Erro: Não encontramos as colunas de Nome. Sua planilha tem uma linha de cabeçalho?");
+        storesToInsert.push({
+          code: findValue(rowObj, ['codigo', 'cod', 'id', 'numero']),
+          corporate_name: corporateName,
+          name: storeName,
+          cnpj: findValue(rowObj, ['cnpj', 'documento', 'cgc']),
+          address: findValue(rowObj, ['endereco', 'rua', 'logradouro', 'local']),
+          state: findValue(rowObj, ['uf', 'estado', 'cidade', 'municipio']),
+          neighborhood: findValue(rowObj, ['bairro', 'distrito']),
+          zip_code: findValue(rowObj, ['cep']),
+          brand: findValue(rowObj, ['grupo', 'marca', 'rede', 'bandeira', 'franquia']) || 'Sem Grupo',
+          email: findValue(rowObj, ['email', 'e-mail', 'correio']),
+          phone: findValue(rowObj, ['fone', 'telefone', 'celular', 'contato', 'whatsapp']),
+        });
+      }
+
+      if (storesToInsert.length === 0) {
+        showError("Nenhum cliente válido encontrado na planilha.");
         setIsUploading(false);
         setProgress(0);
         return;
@@ -70,7 +120,7 @@ export default function Settings() {
 
       setProgress(50);
 
-      // Inserindo no Supabase em lotes de 100
+      // 4. Inserir no banco de dados em lotes de 100
       const batchSize = 100;
       for (let i = 0; i < storesToInsert.length; i += batchSize) {
         const batch = storesToInsert.slice(i, i + batchSize);
@@ -106,9 +156,9 @@ export default function Settings() {
 
     if (fileExt === 'csv') {
       Papa.parse(file, {
-        header: true,
+        header: false, // Agora lemos como matriz 2D para ser indestrutível
         skipEmptyLines: true,
-        complete: (results) => processData(results.data),
+        complete: (results) => process2DArray(results.data as any[][]),
         error: (error) => {
           console.error("Erro ao ler CSV:", error);
           showError("Erro ao ler o arquivo CSV.");
@@ -123,8 +173,9 @@ export default function Settings() {
           const workbook = XLSX.read(data, { type: 'array' });
           const worksheetName = workbook.SheetNames[0];
           const worksheet = workbook.Sheets[worksheetName];
-          const rows = XLSX.utils.sheet_to_json(worksheet, { defval: "" });
-          processData(rows);
+          // Lê como matriz 2D (array de arrays)
+          const rawRows = XLSX.utils.sheet_to_json(worksheet, { header: 1, defval: "" }) as any[][];
+          process2DArray(rawRows);
         } catch (error) {
           console.error("Erro ao ler Excel:", error);
           showError("Erro ao ler o arquivo Excel. Verifique se não está corrompido.");
@@ -199,11 +250,9 @@ export default function Settings() {
             <div className="bg-blue-50 border border-blue-100 rounded-xl p-4 mb-6 flex gap-3">
               <AlertCircle className="text-blue-600 shrink-0 mt-0.5" size={20} />
               <div className="text-sm text-blue-800">
-                <p className="font-bold mb-1">Atenção à primeira linha (Cabeçalho):</p>
-                <p className="mb-2">A primeira linha da sua planilha <strong>DEVE</strong> conter os nomes das colunas (ex: Código, Razão Social, Nome Fantasia, CNPJ, etc). Se a primeira linha já for um cliente, o sistema não vai conseguir ler os dados corretamente.</p>
-                <Button variant="link" onClick={downloadTemplate} className="p-0 h-auto text-blue-700 font-bold md:hidden">
-                  Baixar planilha modelo
-                </Button>
+                <p className="font-bold mb-1">Novo Motor de Leitura Inteligente Ativado!</p>
+                <p className="mb-2">Agora o sistema consegue ler sua planilha mesmo que ela tenha linhas em branco no topo ou formatações estranhas. Ele vai procurar automaticamente pelas colunas: <strong>Código, Razão Social, Nome, CNPJ, etc.</strong></p>
+                <p className="font-bold text-rose-600 mt-2">Dica: Se você importou errado antes, use o botão vermelho abaixo para limpar a base antes de subir a planilha novamente.</p>
               </div>
             </div>
 
@@ -241,7 +290,7 @@ export default function Settings() {
                   </div>
                   <h3 className="text-lg font-bold text-slate-800 mb-1">Selecione o arquivo Excel ou CSV</h3>
                   <p className="text-sm text-slate-500 mb-6 max-w-md">
-                    Lembre-se de verificar se a primeira linha contém os títulos das colunas.
+                    O sistema fará a leitura e importação automática.
                   </p>
                   <Button 
                     onClick={() => fileInputRef.current?.click()}
