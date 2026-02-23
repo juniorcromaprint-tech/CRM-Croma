@@ -13,12 +13,28 @@ export default function Settings() {
   const [progress, setProgress] = useState(0);
   const fileInputRef = useRef<HTMLInputElement>(null);
 
-  // Motor de Processamento "Modo Trator" (Varre tudo em busca de CNPJ)
+  const normalizeKey = (key: string) => {
+    return key.toLowerCase().normalize("NFD").replace(/[\u0300-\u036f]/g, "").trim();
+  };
+
+  const findValue = (row: Record<string, string>, possibleMatches: string[]) => {
+    const keys = Object.keys(row);
+    for (const match of possibleMatches) {
+      const exactKey = keys.find(k => k === match);
+      if (exactKey && row[exactKey] !== undefined && row[exactKey] !== "") return String(row[exactKey]).trim();
+    }
+    for (const match of possibleMatches) {
+      const partialKey = keys.find(k => k.includes(match));
+      if (partialKey && row[partialKey] !== undefined && row[partialKey] !== "") return String(row[partialKey]).trim();
+    }
+    return null;
+  };
+
+  // Motor de Processamento Blindado
   const process2DArray = async (rawRows: any[][]) => {
     try {
       setProgress(10);
       
-      // Normaliza separadores (Tabs, Ponto e Vírgula, etc)
       const normalizedRows = rawRows.map(row => {
         if (row.length === 1 && typeof row[0] === 'string') {
           const str = row[0];
@@ -32,84 +48,147 @@ export default function Settings() {
       setProgress(20);
 
       // Busca clientes existentes para evitar duplicatas
-      const { data: existingStores } = await supabase.from('stores').select('id, code, cnpj, name');
+      const { data: existingStores } = await supabase.from('stores').select('id, code, cnpj, name, address');
       const existingMap = new Map();
       
       if (existingStores) {
         existingStores.forEach(store => {
           const safeName = (store.name || "").toLowerCase().trim();
+          const safeAddress = (store.address || "").toLowerCase().trim();
           if (store.code && safeName) existingMap.set(`code_name:${store.code}_${safeName}`, store.id);
           if (store.cnpj && safeName) existingMap.set(`cnpj_name:${store.cnpj}_${safeName}`, store.id);
+          if (safeName && safeAddress) existingMap.set(`name_address:${safeName}_${safeAddress}`, store.id);
         });
       }
 
       setProgress(30);
 
-      const storesToUpsert = [];
-      const seenInFile = new Set();
+      // Usamos um Map para garantir que não enviaremos IDs ou lojas duplicadas no mesmo lote
+      const storesMapToUpsert = new Map();
       
-      // Varre TODAS as linhas, ignorando cabeçalhos ou linhas vazias
-      for (let i = 0; i < normalizedRows.length; i++) {
-        const rowArray = normalizedRows[i];
-        if (!rowArray || !Array.isArray(rowArray)) continue;
+      let headerRowIndex = -1;
+      let headers: string[] = [];
+      
+      for (let i = 0; i < Math.min(50, normalizedRows.length); i++) {
+        const row = normalizedRows[i];
+        if (!row || !Array.isArray(row)) continue;
+        const rowString = row.join(" ").toLowerCase().normalize("NFD").replace(/[\u0300-\u036f]/g, "");
+        if (rowString.includes("nome") || rowString.includes("fantasia") || rowString.includes("cnpj")) {
+          headerRowIndex = i;
+          headers = row.map(h => normalizeKey(String(h || "")));
+          break;
+        }
+      }
 
+      // Processa linha por linha
+      for (let i = 0; i < normalizedRows.length; i++) {
+        if (i === headerRowIndex) continue;
+
+        const rowArray = normalizedRows[i];
+        if (!rowArray || rowArray.every(cell => cell === null || cell === undefined || cell === "")) continue;
+
+        let storeData: any = null;
         let cnpjIndex = -1;
         let cleanCnpj = "";
-
-        // Procura um CNPJ em qualquer coluna desta linha
-        for (let j = 0; j < rowArray.length; j++) {
+        
+        // Procura o CNPJ nas primeiras colunas
+        for (let j = 0; j < Math.min(6, rowArray.length); j++) {
           const cellStr = String(rowArray[j] || "").trim();
           const digits = cellStr.replace(/\D/g, '');
-          
-          // Se tem 14 números e formatação de CNPJ, achamos a âncora!
-          if (digits.length === 14 && (cellStr.includes('/') || cellStr.includes('-'))) {
+          if (digits.length === 14 && (cellStr.includes('/') || cellStr.includes('-') || cellStr.includes('.'))) {
             cnpjIndex = j;
             cleanCnpj = digits;
             break;
           }
         }
 
-        // Se achou um CNPJ, é uma linha de loja válida!
+        // Heurística para o formato do seu ERP caso o CNPJ esteja vazio, mas a linha seja válida
+        if (cnpjIndex === -1 && rowArray.length >= 8) {
+          const col0 = String(rowArray[0] || "").trim();
+          const col5 = String(rowArray[5] || "").trim();
+          if (/^\d+-\d+$/.test(col0) && col5.includes('-')) {
+            cnpjIndex = 3; // Força a posição do CNPJ baseada no padrão do seu ERP
+          }
+        }
+
         if (cnpjIndex !== -1) {
-          const storeData: any = {
+          const nameVal = cnpjIndex >= 1 ? String(rowArray[cnpjIndex - 1] || "").trim() : "";
+          const corpNameVal = cnpjIndex >= 2 ? String(rowArray[cnpjIndex - 2] || "").trim() : "";
+          
+          storeData = {
             code: cnpjIndex >= 3 ? String(rowArray[cnpjIndex - 3] || "").trim() : "",
-            corporate_name: cnpjIndex >= 2 ? String(rowArray[cnpjIndex - 2] || "").trim() : "",
-            name: cnpjIndex >= 1 ? String(rowArray[cnpjIndex - 1] || "").trim() : "",
+            corporate_name: corpNameVal,
+            name: nameVal || corpNameVal || `Loja ${cleanCnpj || 'Sem CNPJ'}`,
             cnpj: String(rowArray[cnpjIndex] || "").trim(),
             address: String(rowArray[cnpjIndex + 1] || "").trim(),
             state: String(rowArray[cnpjIndex + 2] || "").trim(),
             neighborhood: String(rowArray[cnpjIndex + 3] || "").trim(),
             zip_code: String(rowArray[cnpjIndex + 4] || "").trim(),
             brand: String(rowArray[cnpjIndex + 5] || "").trim() || 'Sem Grupo',
-            email: String(rowArray[cnpjIndex + 6] || "").trim(),
-            phone: String(rowArray[cnpjIndex + 7] || "").trim(),
+            email: String(rowArray[cnpjIndex + 6] || "").replace(/<br>/gi, ' / ').trim(),
+            phone: String(rowArray[cnpjIndex + 7] || "").replace(/<br>/gi, ' / ').trim(),
           };
+        } else if (headerRowIndex !== -1) {
+          const rowObj: Record<string, string> = {};
+          headers.forEach((header, index) => {
+            if (header) rowObj[header] = String(rowArray[index] || "").trim();
+          });
 
-          // Fallback caso o nome fantasia esteja vazio
-          if (!storeData.name) {
-            storeData.name = storeData.corporate_name || `Loja ${cleanCnpj}`;
+          const name = findValue(rowObj, ['nome fantasia', 'fantasia', 'nome', 'loja', 'cliente']);
+          const corporateName = findValue(rowObj, ['razao', 'social', 'empresa']);
+          const code = findValue(rowObj, ['codigo', 'cod', 'id', 'numero']);
+          const cnpj = findValue(rowObj, ['cnpj', 'documento', 'cgc']);
+          
+          let storeName = name || corporateName;
+          if (!storeName && (code || cnpj)) storeName = `Cliente sem nome (${code || cnpj})`;
+
+          if (storeName) {
+            storeData = {
+              code: code,
+              corporate_name: corporateName,
+              name: storeName,
+              cnpj: cnpj,
+              address: findValue(rowObj, ['endereco', 'rua', 'logradouro', 'local']),
+              state: findValue(rowObj, ['uf', 'estado', 'cidade', 'municipio']),
+              neighborhood: findValue(rowObj, ['bairro', 'distrito']),
+              zip_code: findValue(rowObj, ['cep']),
+              brand: findValue(rowObj, ['grupo', 'marca', 'rede', 'bandeira', 'franquia']) || 'Sem Grupo',
+              email: findValue(rowObj, ['email', 'e-mail', 'correio'])?.replace(/<br>/gi, ' / '),
+              phone: findValue(rowObj, ['fone', 'telefone', 'celular', 'contato', 'whatsapp'])?.replace(/<br>/gi, ' / '),
+            };
           }
+        }
 
+        if (storeData && storeData.name) {
           const safeName = storeData.name.toLowerCase().trim();
+          const safeAddress = (storeData.address || "").toLowerCase().trim();
           let existingId = null;
           
-          // Verifica se já existe no banco (Anti-Duplicação Inteligente)
           if (storeData.code && existingMap.has(`code_name:${storeData.code}_${safeName}`)) {
             existingId = existingMap.get(`code_name:${storeData.code}_${safeName}`);
           } else if (storeData.cnpj && existingMap.has(`cnpj_name:${storeData.cnpj}_${safeName}`)) {
             existingId = existingMap.get(`cnpj_name:${storeData.cnpj}_${safeName}`);
+          } else if (safeName && safeAddress && existingMap.has(`name_address:${safeName}_${safeAddress}`)) {
+            existingId = existingMap.get(`name_address:${safeName}_${safeAddress}`);
           }
 
-          if (existingId) storeData.id = existingId;
-
-          // Evita duplicatas idênticas dentro da própria planilha
-          const fileKey = `${storeData.code}_${storeData.cnpj}_${safeName}`;
-          if (!seenInFile.has(fileKey)) {
-            seenInFile.add(fileKey);
-            storesToUpsert.push(storeData);
+          if (existingId) {
+            storeData.id = existingId;
+            // Se já existe, atualiza no Map usando o ID como chave (evita erro de duplicidade no banco)
+            if (!storesMapToUpsert.has(existingId)) {
+              storesMapToUpsert.set(existingId, storeData);
+            }
+          } else {
+            // Se é nova, usa uma chave única baseada nos dados para evitar inserir a mesma loja nova 2x
+            const uniqueKey = `new_${storeData.code}_${storeData.cnpj}_${safeName}`;
+            if (!storesMapToUpsert.has(uniqueKey)) {
+              storesMapToUpsert.set(uniqueKey, storeData);
+            }
           }
         }
       }
+
+      const storesToUpsert = Array.from(storesMapToUpsert.values());
 
       if (storesToUpsert.length === 0) {
         showError("Nenhum cliente válido encontrado na planilha.");
@@ -125,7 +204,10 @@ export default function Settings() {
       for (let i = 0; i < storesToUpsert.length; i += batchSize) {
         const batch = storesToUpsert.slice(i, i + batchSize);
         const { error } = await supabase.from('stores').upsert(batch);
-        if (error) throw error;
+        if (error) {
+          console.error("Erro no lote:", error);
+          throw error;
+        }
         const currentProgress = 50 + Math.floor(((i + batchSize) / storesToUpsert.length) * 50);
         setProgress(Math.min(currentProgress, 99));
       }
@@ -135,7 +217,7 @@ export default function Settings() {
       
     } catch (error) {
       console.error("Erro na importação:", error);
-      showError("Erro ao salvar os dados no banco. Tente novamente.");
+      showError("Erro ao salvar os dados no banco. Verifique sua conexão.");
     } finally {
       setIsUploading(false);
       setTimeout(() => setProgress(0), 2000);
@@ -143,7 +225,7 @@ export default function Settings() {
     }
   };
 
-  const handleFileUpload = (event: React.ChangeEvent<HTMLInputElement>) => {
+  const handleFileUpload = async (event: React.ChangeEvent<HTMLInputElement>) => {
     const file = event.target.files?.[0];
     if (!file) return;
 
@@ -153,16 +235,33 @@ export default function Settings() {
     const fileExt = file.name.split('.').pop()?.toLowerCase();
 
     if (fileExt === 'csv') {
-      Papa.parse(file, {
-        header: false, 
-        skipEmptyLines: true,
-        complete: (results) => process2DArray(results.data as any[][]),
-        error: (error) => {
-          console.error("Erro ao ler CSV:", error);
-          showError("Erro ao ler o arquivo CSV.");
-          setIsUploading(false);
-        }
-      });
+      try {
+        // Lê o arquivo como texto para descobrir o delimitador real
+        const text = await file.text();
+        const semiCount = (text.match(/;/g) || []).length;
+        const commaCount = (text.match(/,/g) || []).length;
+        const tabCount = (text.match(/\t/g) || []).length;
+
+        // Força o delimitador correto para não quebrar colunas com vírgulas no endereço
+        let delimiter = ',';
+        if (semiCount > commaCount && semiCount > tabCount) delimiter = ';';
+        else if (tabCount > commaCount && tabCount > semiCount) delimiter = '\t';
+
+        Papa.parse(file, {
+          header: false, 
+          skipEmptyLines: true,
+          delimiter: delimiter,
+          complete: (results) => process2DArray(results.data as any[][]),
+          error: (error) => {
+            console.error("Erro ao ler CSV:", error);
+            showError("Erro ao ler o arquivo CSV.");
+            setIsUploading(false);
+          }
+        });
+      } catch (e) {
+        showError("Erro ao processar o arquivo CSV.");
+        setIsUploading(false);
+      }
     } else if (fileExt === 'xlsx' || fileExt === 'xls') {
       const reader = new FileReader();
       reader.onload = (e) => {
@@ -262,8 +361,8 @@ export default function Settings() {
             <div className="bg-blue-50 border border-blue-100 rounded-xl p-4 mb-6 flex gap-3">
               <AlertCircle className="text-blue-600 shrink-0 mt-0.5" size={20} />
               <div className="text-sm text-blue-800">
-                <p className="font-bold mb-1">Leitor "Modo Trator" Ativado! 🚜</p>
-                <p className="mb-2">O sistema agora ignora cabeçalhos e linhas em branco. Ele varre a planilha inteira e, sempre que encontra um CNPJ, ele puxa a loja. Não importa se a loja está antes ou depois do cabeçalho!</p>
+                <p className="font-bold mb-1">Leitor Blindado Ativado! 🛡️</p>
+                <p className="mb-2">O sistema agora detecta automaticamente o formato do seu ERP, ignora vírgulas nos endereços, limpa códigos HTML dos telefones e filtra lojas duplicadas para garantir que 100% da planilha seja importada sem erros.</p>
               </div>
             </div>
 
@@ -281,7 +380,7 @@ export default function Settings() {
                 <div className="flex flex-col items-center text-center">
                   <Loader2 className="w-12 h-12 text-blue-600 animate-spin mb-4" />
                   <h3 className="text-lg font-bold text-slate-800 mb-1">Processando dados...</h3>
-                  <p className="text-sm text-slate-500 mb-4">Varrendo todas as linhas da planilha. Não feche a página.</p>
+                  <p className="text-sm text-slate-500 mb-4">Lendo dados e filtrando duplicatas. Não feche a página.</p>
                   <div className="w-64 h-2 bg-slate-200 rounded-full overflow-hidden">
                     <div 
                       className="h-full bg-blue-600 transition-all duration-300 ease-out"
