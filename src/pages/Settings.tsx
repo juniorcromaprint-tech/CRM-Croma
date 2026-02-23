@@ -41,7 +41,7 @@ export default function Settings() {
     return null;
   };
 
-  // Novo motor de processamento indestrutível com Anti-Duplicação
+  // Novo motor de processamento indestrutível com Anti-Duplicação Inteligente (Filiais)
   const process2DArray = async (rawRows: any[][]) => {
     try {
       setProgress(10);
@@ -86,14 +86,19 @@ export default function Settings() {
 
       setProgress(20);
 
-      // 2. Buscar clientes existentes para evitar duplicatas
-      const { data: existingStores } = await supabase.from('stores').select('id, code, cnpj');
+      // 2. Buscar clientes existentes para evitar duplicatas EXATAS (permitindo filiais)
+      const { data: existingStores } = await supabase.from('stores').select('id, code, cnpj, name, address');
       const existingMap = new Map();
       
       if (existingStores) {
         existingStores.forEach(store => {
-          if (store.code) existingMap.set(`code:${store.code}`, store.id);
-          if (store.cnpj) existingMap.set(`cnpj:${store.cnpj}`, store.id);
+          const safeName = (store.name || "").toLowerCase().trim();
+          const safeAddress = (store.address || "").toLowerCase().trim();
+          
+          // Cria chaves combinadas para garantir que filiais com mesmo CNPJ não se sobrescrevam
+          if (store.code && safeName) existingMap.set(`code_name:${store.code}_${safeName}`, store.id);
+          if (store.cnpj && safeName) existingMap.set(`cnpj_name:${store.cnpj}_${safeName}`, store.id);
+          if (safeName && safeAddress) existingMap.set(`name_address:${safeName}_${safeAddress}`, store.id);
         });
       }
 
@@ -130,14 +135,6 @@ export default function Settings() {
           }
         }
 
-        // Verifica se já existe no banco para atualizar em vez de duplicar
-        let existingId = null;
-        if (code && existingMap.has(`code:${code}`)) {
-          existingId = existingMap.get(`code:${code}`);
-        } else if (cnpj && existingMap.has(`cnpj:${cnpj}`)) {
-          existingId = existingMap.get(`cnpj:${cnpj}`);
-        }
-
         const storeData: any = {
           code: code,
           corporate_name: corporateName,
@@ -152,7 +149,20 @@ export default function Settings() {
           phone: findValue(rowObj, ['fone', 'telefone', 'celular', 'contato', 'whatsapp']),
         };
 
-        // Se já existe, adicionamos o ID para o Supabase saber que é uma atualização (Upsert)
+        // Verifica se a loja EXATA já existe (Chave Combinada)
+        const safeName = storeName.toLowerCase().trim();
+        const safeAddress = (storeData.address || "").toLowerCase().trim();
+        let existingId = null;
+        
+        if (code && existingMap.has(`code_name:${code}_${safeName}`)) {
+          existingId = existingMap.get(`code_name:${code}_${safeName}`);
+        } else if (cnpj && existingMap.has(`cnpj_name:${cnpj}_${safeName}`)) {
+          existingId = existingMap.get(`cnpj_name:${cnpj}_${safeName}`);
+        } else if (safeName && safeAddress && existingMap.has(`name_address:${safeName}_${safeAddress}`)) {
+          existingId = existingMap.get(`name_address:${safeName}_${safeAddress}`);
+        }
+
+        // Se já existe a loja exata, atualiza. Se não, cria uma nova (mesmo que o CNPJ seja igual a outra)
         if (existingId) {
           storeData.id = existingId;
         }
@@ -173,7 +183,6 @@ export default function Settings() {
       const batchSize = 100;
       for (let i = 0; i < storesToUpsert.length; i += batchSize) {
         const batch = storesToUpsert.slice(i, i + batchSize);
-        // Usamos UPSERT: Se tiver ID ele atualiza, se não tiver ele cria novo
         const { error } = await supabase.from('stores').upsert(batch);
         
         if (error) throw error;
@@ -183,7 +192,7 @@ export default function Settings() {
       }
 
       setProgress(100);
-      showSuccess(`${storesToUpsert.length} clientes processados com sucesso (sem duplicatas)!`);
+      showSuccess(`${storesToUpsert.length} lojas processadas com sucesso!`);
       
     } catch (error) {
       console.error("Erro na importação:", error);
@@ -314,8 +323,8 @@ export default function Settings() {
             <div className="bg-blue-50 border border-blue-100 rounded-xl p-4 mb-6 flex gap-3">
               <AlertCircle className="text-blue-600 shrink-0 mt-0.5" size={20} />
               <div className="text-sm text-blue-800">
-                <p className="font-bold mb-1">Sistema Anti-Duplicação Ativado!</p>
-                <p className="mb-2">Agora você pode subir a mesma planilha várias vezes. O sistema vai verificar o <strong>Código</strong> ou <strong>CNPJ</strong>. Se o cliente já existir, ele apenas atualiza os dados. Se não existir, ele cria um novo.</p>
+                <p className="font-bold mb-1">Sistema Anti-Duplicação Inteligente Ativado!</p>
+                <p className="mb-2">O sistema agora entende que <strong>redes e franquias podem ter o mesmo CNPJ</strong>. Ele só vai considerar uma loja como duplicada se ela tiver o mesmo CNPJ <strong>E</strong> o mesmo Nome. Assim, todas as filiais serão cadastradas corretamente!</p>
               </div>
             </div>
 
@@ -333,7 +342,7 @@ export default function Settings() {
                 <div className="flex flex-col items-center text-center">
                   <Loader2 className="w-12 h-12 text-blue-600 animate-spin mb-4" />
                   <h3 className="text-lg font-bold text-slate-800 mb-1">Processando dados...</h3>
-                  <p className="text-sm text-slate-500 mb-4">Verificando duplicatas e salvando. Não feche a página.</p>
+                  <p className="text-sm text-slate-500 mb-4">Verificando filiais e salvando. Não feche a página.</p>
                   <div className="w-64 h-2 bg-slate-200 rounded-full overflow-hidden">
                     <div 
                       className="h-full bg-blue-600 transition-all duration-300 ease-out"
