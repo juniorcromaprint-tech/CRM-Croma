@@ -5,16 +5,18 @@ import { supabase } from "@/integrations/supabase/client";
 import { 
   ArrowLeft, Store, MapPin, Phone, Mail, Building2, 
   Briefcase, Calendar, AlertTriangle, FileText, Image as ImageIcon,
-  CheckCircle2, Clock, XCircle, Edit, ExternalLink
+  CheckCircle2, Clock, XCircle, Edit, ExternalLink, Plus
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import StoreFormSheet from "@/components/StoreFormSheet";
+import JobFormSheet from "@/components/JobFormSheet";
 
 export default function StoreDetail() {
   const { id } = useParams();
   const navigate = useNavigate();
-  const [isSheetOpen, setIsSheetOpen] = useState(false);
+  const [isStoreSheetOpen, setIsStoreSheetOpen] = useState(false);
+  const [isJobSheetOpen, setIsJobSheetOpen] = useState(false);
 
   // Busca os dados da loja
   const { data: store, isLoading: isLoadingStore } = useQuery({
@@ -96,7 +98,6 @@ export default function StoreDetail() {
     .filter(Boolean)
     .join(', ');
   
-  // Link universal do Google Maps (funciona bem no celular e costuma sugerir abrir no Waze/Maps)
   const mapsUrl = `https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(fullAddress)}`;
 
   return (
@@ -123,13 +124,21 @@ export default function StoreDetail() {
           </div>
         </div>
         
-        <Button 
-          onClick={() => setIsSheetOpen(true)}
-          variant="outline"
-          className="bg-white border-slate-200 text-slate-700 hover:bg-slate-50 rounded-xl h-11 shadow-sm w-full md:w-auto"
-        >
-          <Edit size={18} className="mr-2" /> Editar Loja
-        </Button>
+        <div className="flex items-center gap-2 w-full md:w-auto">
+          <Button 
+            onClick={() => setIsStoreSheetOpen(true)}
+            variant="outline"
+            className="bg-white border-slate-200 text-slate-700 hover:bg-slate-50 rounded-xl h-11 shadow-sm flex-1 md:flex-none"
+          >
+            <Edit size={18} className="mr-2" /> Editar
+          </Button>
+          <Button 
+            onClick={() => setIsJobSheetOpen(true)}
+            className="bg-blue-600 hover:bg-blue-700 text-white rounded-xl h-11 shadow-sm flex-1 md:flex-none"
+          >
+            <Plus size={18} className="mr-2" /> Nova OS
+          </Button>
+        </div>
       </div>
 
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
@@ -234,9 +243,15 @@ export default function StoreDetail() {
                   <Briefcase size={32} className="text-slate-300" />
                 </div>
                 <h3 className="text-lg font-bold text-slate-800">Nenhum serviço registrado</h3>
-                <p className="text-slate-500 mt-1 max-w-sm">
+                <p className="text-slate-500 mt-1 max-w-sm mb-6">
                   Ainda não há histórico de instalações ou manutenções para este cliente.
                 </p>
+                <Button 
+                  onClick={() => setIsJobSheetOpen(true)}
+                  className="bg-blue-600 hover:bg-blue-700 text-white rounded-xl shadow-sm"
+                >
+                  <Plus size={18} className="mr-2" /> Criar Primeira OS
+                </Button>
               </CardContent>
             </Card>
           ) : (
@@ -269,7 +284,7 @@ export default function StoreDetail() {
                     
                     <CardContent className="p-4 space-y-4">
                       
-                      {/* Dificuldades / Problemas (Destaque para o próximo instalador) */}
+                      {/* Dificuldades / Problemas */}
                       {job.issues && (
                         <div className="bg-red-50 border border-red-100 rounded-xl p-3">
                           <p className="text-xs font-bold text-red-800 flex items-center gap-1.5 mb-1 uppercase tracking-wider">
@@ -319,11 +334,17 @@ export default function StoreDetail() {
 
       </div>
 
-      {/* Painel Lateral de Edição */}
+      {/* Painéis Laterais */}
       <StoreFormSheet 
-        isOpen={isSheetOpen} 
-        onClose={() => setIsSheetOpen(false)} 
+        isOpen={isStoreSheetOpen} 
+        onClose={() => setIsStoreSheetOpen(false)} 
         storeToEdit={store} 
+      />
+
+      <JobFormSheet 
+        isOpen={isJobSheetOpen} 
+        onClose={() => setIsJobSheetOpen(false)} 
+        initialStoreId={store.id} 
       />
     </div>
   );
