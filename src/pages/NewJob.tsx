@@ -21,17 +21,30 @@ export default function NewJob() {
   const [scheduledDate, setScheduledDate] = useState(new Date().toISOString().split('T')[0]);
   const [notes, setNotes] = useState("");
 
-  // Buscar lojas para o select
+  // Buscar lojas para o select (com loop para burlar limite de 1000)
   const { data: stores, isLoading: isLoadingStores } = useQuery({
     queryKey: ['all-stores'],
     queryFn: async () => {
-      const { data, error } = await supabase
-        .from('stores')
-        .select('*')
-        .limit(10000) // <-- Aumentando o limite padrão de 1000 para 10000
-        .order('name');
-      if (error) throw error;
-      return data;
+      let allData: any[] = [];
+      let page = 0;
+      const pageSize = 1000;
+      
+      while (true) {
+        const { data, error } = await supabase
+          .from('stores')
+          .select('*')
+          .order('name')
+          .range(page * pageSize, (page + 1) * pageSize - 1);
+        
+        if (error) throw error;
+        if (!data || data.length === 0) break;
+        
+        allData = [...allData, ...data];
+        if (data.length < pageSize) break;
+        page++;
+      }
+      
+      return allData;
     }
   });
 

@@ -17,14 +17,29 @@ export default function Stores() {
   const { data: stores, isLoading } = useQuery({
     queryKey: ['all-stores'],
     queryFn: async () => {
-      const { data, error } = await supabase
-        .from('stores')
-        .select('*')
-        .limit(10000) // <-- Aumentando o limite padrão de 1000 para 10000
-        .order('name');
+      let allData: any[] = [];
+      let page = 0;
+      const pageSize = 1000;
       
-      if (error) throw error;
-      return data;
+      // Loop para buscar de 1000 em 1000 e burlar o limite do banco
+      while (true) {
+        const { data, error } = await supabase
+          .from('stores')
+          .select('*')
+          .order('name')
+          .range(page * pageSize, (page + 1) * pageSize - 1);
+        
+        if (error) throw error;
+        if (!data || data.length === 0) break;
+        
+        allData = [...allData, ...data];
+        
+        // Se vieram menos de 1000, significa que acabaram os registros
+        if (data.length < pageSize) break;
+        page++;
+      }
+      
+      return allData;
     }
   });
 
