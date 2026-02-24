@@ -1,20 +1,69 @@
-import { useEffect } from 'react';
+import { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { Auth } from '@supabase/auth-ui-react';
-import { ThemeSupa } from '@supabase/auth-ui-shared';
 import { supabase } from '@/integrations/supabase/client';
 import { useAuth } from '@/contexts/AuthContext';
 import { CromaLogo } from '@/components/Layout';
+import { Button } from '@/components/ui/button';
+import { Input } from '@/components/ui/input';
+import { showSuccess, showError } from '@/utils/toast';
+import { Loader2 } from 'lucide-react';
 
 export default function Login() {
   const { session, isLoading } = useAuth();
   const navigate = useNavigate();
+  const [isLogin, setIsLogin] = useState(true);
+  const [loading, setLoading] = useState(false);
+  
+  const [email, setEmail] = useState('');
+  const [password, setPassword] = useState('');
+  const [firstName, setFirstName] = useState('');
+  const [lastName, setLastName] = useState('');
 
   useEffect(() => {
     if (session) {
       navigate('/');
     }
   }, [session, navigate]);
+
+  const handleAuth = async (e: React.FormEvent) => {
+    e.preventDefault();
+    setLoading(true);
+
+    try {
+      if (isLogin) {
+        const { error } = await supabase.auth.signInWithPassword({
+          email,
+          password,
+        });
+        if (error) throw error;
+        showSuccess('Login realizado com sucesso!');
+      } else {
+        if (!firstName || !lastName) {
+          showError('Por favor, preencha seu nome e sobrenome.');
+          setLoading(false);
+          return;
+        }
+        const { error } = await supabase.auth.signUp({
+          email,
+          password,
+          options: {
+            data: {
+              first_name: firstName,
+              last_name: lastName,
+            }
+          }
+        });
+        if (error) throw error;
+        showSuccess('Cadastro realizado! Você já pode entrar.');
+        setIsLogin(true);
+      }
+    } catch (error: any) {
+      console.error(error);
+      showError(error.message === 'Invalid login credentials' ? 'E-mail ou senha incorretos.' : 'Ocorreu um erro na autenticação.');
+    } finally {
+      setLoading(false);
+    }
+  };
 
   if (isLoading) {
     return (
@@ -30,52 +79,83 @@ export default function Login() {
       <div className="w-full max-w-md bg-white rounded-3xl shadow-xl p-8 border border-slate-100 animate-in fade-in slide-in-from-bottom-4 duration-500">
         <div className="flex flex-col items-center mb-8">
           <CromaLogo className="h-12 mb-6" />
-          <h1 className="text-2xl font-black text-slate-800">Acesso ao Sistema</h1>
-          <p className="text-slate-500 text-sm mt-1 text-center">Faça login para gerenciar instalações e clientes.</p>
+          <h1 className="text-2xl font-black text-slate-800">
+            {isLogin ? 'Acesso ao Sistema' : 'Criar Conta'}
+          </h1>
+          <p className="text-slate-500 text-sm mt-1 text-center">
+            {isLogin ? 'Faça login para gerenciar instalações e clientes.' : 'Cadastre-se para acessar o painel.'}
+          </p>
         </div>
         
-        <Auth
-          supabaseClient={supabase}
-          appearance={{
-            theme: ThemeSupa,
-            variables: {
-              default: {
-                colors: {
-                  brand: '#2563eb',
-                  brandAccent: '#1d4ed8',
-                }
-              }
-            },
-            className: {
-              button: 'rounded-xl h-12 font-bold text-base',
-              input: 'rounded-xl h-12 bg-slate-50 border-slate-200',
-              label: 'font-bold text-slate-700',
-            }
-          }}
-          providers={[]}
-          localization={{
-            variables: {
-              sign_in: {
-                email_label: 'E-mail',
-                password_label: 'Senha',
-                button_label: 'Entrar no Sistema',
-                loading_button_label: 'Entrando...',
-                email_input_placeholder: 'Seu e-mail',
-                password_input_placeholder: 'Sua senha',
-                link_text: 'Já tem uma conta? Entre'
-              },
-              sign_up: {
-                email_label: 'E-mail',
-                password_label: 'Senha',
-                button_label: 'Cadastrar',
-                loading_button_label: 'Cadastrando...',
-                email_input_placeholder: 'Seu e-mail',
-                password_input_placeholder: 'Sua senha',
-                link_text: 'Não tem uma conta? Cadastre-se'
-              }
-            }
-          }}
-        />
+        <form onSubmit={handleAuth} className="space-y-4">
+          {!isLogin && (
+            <div className="grid grid-cols-2 gap-3 animate-in fade-in slide-in-from-top-2">
+              <div className="space-y-1.5">
+                <label className="text-sm font-bold text-slate-700">Nome</label>
+                <Input 
+                  required 
+                  value={firstName}
+                  onChange={(e) => setFirstName(e.target.value)}
+                  placeholder="Seu nome" 
+                  className="h-12 rounded-xl bg-slate-50 border-slate-200" 
+                />
+              </div>
+              <div className="space-y-1.5">
+                <label className="text-sm font-bold text-slate-700">Sobrenome</label>
+                <Input 
+                  required 
+                  value={lastName}
+                  onChange={(e) => setLastName(e.target.value)}
+                  placeholder="Seu sobrenome" 
+                  className="h-12 rounded-xl bg-slate-50 border-slate-200" 
+                />
+              </div>
+            </div>
+          )}
+          
+          <div className="space-y-1.5">
+            <label className="text-sm font-bold text-slate-700">E-mail</label>
+            <Input 
+              required 
+              type="email" 
+              value={email}
+              onChange={(e) => setEmail(e.target.value)}
+              placeholder="seu@email.com" 
+              className="h-12 rounded-xl bg-slate-50 border-slate-200" 
+            />
+          </div>
+          
+          <div className="space-y-1.5">
+            <label className="text-sm font-bold text-slate-700">Senha</label>
+            <Input 
+              required 
+              type="password" 
+              value={password}
+              onChange={(e) => setPassword(e.target.value)}
+              placeholder="••••••••" 
+              className="h-12 rounded-xl bg-slate-50 border-slate-200" 
+            />
+          </div>
+
+          <Button 
+            type="submit" 
+            disabled={loading}
+            className="w-full h-12 rounded-xl bg-blue-600 hover:bg-blue-700 text-white font-bold text-base mt-2 shadow-sm"
+          >
+            {loading ? <Loader2 className="animate-spin mr-2" size={20} /> : null}
+            {isLogin ? 'Entrar no Sistema' : 'Cadastrar'}
+          </Button>
+        </form>
+
+        <div className="mt-6 text-center">
+          <button 
+            type="button"
+            onClick={() => setIsLogin(!isLogin)}
+            className="text-sm font-bold text-blue-600 hover:text-blue-800 transition-colors"
+          >
+            {isLogin ? 'Não tem uma conta? Cadastre-se' : 'Já tem uma conta? Entre'}
+          </button>
+        </div>
       </div>
     </div>
   );
