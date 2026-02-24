@@ -5,7 +5,7 @@ import { supabase } from "@/integrations/supabase/client";
 import { MapContainer, TileLayer, Marker, Popup, useMap } from "react-leaflet";
 import "leaflet/dist/leaflet.css";
 import L from "leaflet";
-import { MapPin, Navigation, Store, Loader2, ExternalLink } from "lucide-react";
+import { MapPin, Navigation, Store, Loader2, ExternalLink, Maximize } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
 
@@ -17,27 +17,44 @@ L.Icon.Default.mergeOptions({
   shadowUrl: "https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.7.1/images/marker-shadow.png",
 });
 
-// Componente para centralizar o mapa na localização do usuário
-function LocationMarker({ position }: { position: [number, number] | null }) {
+// Componente interno para controlar a câmera do mapa
+function MapController({ 
+  stores, 
+  userLocation, 
+  viewMode 
+}: { 
+  stores: any[], 
+  userLocation: [number, number] | null,
+  viewMode: 'all' | 'user'
+}) {
   const map = useMap();
   
   useEffect(() => {
-    if (position) {
-      map.flyTo(position, 14, { animate: true });
+    // Se o modo for 'all' e tivermos lojas, ajusta o zoom para mostrar todas
+    if (viewMode === 'all' && stores && stores.length > 0) {
+      const bounds = L.latLngBounds(stores.map(s => [s.lat, s.lng]));
+      // Adiciona um padding (margem) para os pinos não ficarem colados na borda
+      map.fitBounds(bounds, { padding: [50, 50], maxZoom: 15 });
+    } 
+    // Se o modo for 'user' e tivermos a localização, voa até o usuário
+    else if (viewMode === 'user' && userLocation) {
+      map.flyTo(userLocation, 14, { animate: true });
     }
-  }, [position, map]);
+  }, [stores, userLocation, viewMode, map]);
 
-  return position === null ? null : (
-    <Marker position={position}>
+  // Renderiza o pino do usuário se ele existir
+  return userLocation ? (
+    <Marker position={userLocation}>
       <Popup>Você está aqui</Popup>
     </Marker>
-  );
+  ) : null;
 }
 
 export default function StoreMap() {
   const navigate = useNavigate();
   const [userLocation, setUserLocation] = useState<[number, number] | null>(null);
   const [isLocating, setIsLocating] = useState(false);
+  const [viewMode, setViewMode] = useState<'all' | 'user'>('all');
 
   // Busca todas as lojas que possuem latitude e longitude
   const { data: stores, isLoading } = useQuery({
@@ -60,6 +77,7 @@ export default function StoreMap() {
       navigator.geolocation.getCurrentPosition(
         (position) => {
           setUserLocation([position.coords.latitude, position.coords.longitude]);
+          setViewMode('user');
           setIsLocating(false);
         },
         (error) => {
@@ -70,15 +88,12 @@ export default function StoreMap() {
     }
   };
 
-  // Pede a localização assim que a tela abre
-  useEffect(() => {
-    locateUser();
-  }, []);
+  const showAllStores = () => {
+    setViewMode('all');
+  };
 
-  // Centro padrão (Brasil) se não tiver localização do usuário
+  // Centro padrão (Brasil)
   const defaultCenter: [number, number] = [-14.2350, -51.9253];
-  const center = userLocation || defaultCenter;
-  const zoom = userLocation ? 14 : 4;
 
   return (
     <div className="space-y-4 animate-in fade-in duration-500 h-[calc(100vh-120px)] md:h-[calc(100vh-80px)] flex flex-col">
@@ -87,14 +102,24 @@ export default function StoreMap() {
           <h1 className="text-2xl md:text-3xl font-bold text-slate-800">Mapa de Lojas</h1>
           <p className="text-slate-500 mt-1">Veja as lojas próximas a você.</p>
         </div>
-        <Button 
-          onClick={locateUser} 
-          disabled={isLocating}
-          className="bg-white border border-slate-200 text-blue-600 hover:bg-blue-50 shadow-sm rounded-xl"
-        >
-          {isLocating ? <Loader2 className="animate-spin mr-2" size={18} /> : <Navigation size={18} className="mr-2" />}
-          Minha Localização
-        </Button>
+        <div className="flex gap-2">
+          <Button 
+            onClick={showAllStores} 
+            variant="outline"
+            className="bg-white border-slate-200 text-slate-700 hover:bg-slate-50 shadow-sm rounded-xl"
+          >
+            <Maximize size={18} className="mr-2" />
+            Ver Todas
+          </Button>
+          <Button 
+            onClick={locateUser} 
+            disabled={isLocating}
+            className="bg-white border border-slate-200 text-blue-600 hover:bg-blue-50 shadow-sm rounded-xl"
+          >
+            {isLocating ? <Loader2 className="animate-spin mr-2" size={18} /> : <Navigation size={18} className="mr-2" />}
+            Minha Localização
+          </Button>
+        </div>
       </div>
 
       <Card className="flex-1 border-none shadow-sm rounded-2xl overflow-hidden relative z-0">
@@ -106,17 +131,21 @@ export default function StoreMap() {
         ) : null}
 
         <MapContainer 
-          center={center} 
-          zoom={zoom} 
+          center={defaultCenter} 
+          zoom={4} 
           className="w-full h-full"
-          zoomControl={false}
+          zoomControl={true}
         >
           <TileLayer
             attribution='&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors'
             url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png"
           />
           
-          <LocationMarker position={userLocation} />
+          <MapController 
+            stores={stores || []} 
+            userLocation={userLocation} 
+            viewMode={viewMode} 
+          />
 
           {stores?.map((store) => (
             <Marker 
@@ -165,8 +194,7 @@ export default function StoreMap() {
 
         {/* Legenda flutuante */}
         <div className="absolute bottom-4 left-4 z-[400] bg-white/90 backdrop-blur-sm p-3 rounded-xl shadow-lg border border-slate-100 text-xs font-medium text-slate-600">
-          <p>Mostrando {stores?.length || 0} lojas com coordenadas.</p>
-          <p className="text-slate-400 mt-1 max-w-[200px]">Para aparecer aqui, edite a loja e clique em "Buscar Coordenadas".</p>
+          <p>Mostrando <strong className="text-blue-600 text-sm">{stores?.length || 0}</strong> lojas no mapa.</p>
         </div>
       </Card>
     </div>
