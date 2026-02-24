@@ -8,6 +8,7 @@ import Jobs from "./pages/Jobs";
 import JobDetail from "./pages/JobDetail";
 import Stores from "./pages/Stores";
 import StoreDetail from "./pages/StoreDetail";
+import StoreMap from "./pages/StoreMap";
 import Clients from "./pages/Clients";
 import Settings from "./pages/Settings";
 import Login from "./pages/Login";
@@ -53,6 +54,7 @@ function App() {
               <Route path="jobs/:id" element={<JobDetail />} />
               <Route path="stores" element={<Stores />} />
               <Route path="stores/:id" element={<StoreDetail />} />
+              <Route path="map" element={<StoreMap />} />
               <Route path="clients" element={<Clients />} />
               <Route path="team" element={<Team />} />
               <Route path="settings" element={<Settings />} />

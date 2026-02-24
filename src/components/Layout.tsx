@@ -1,6 +1,6 @@
 import React from "react";
 import { Link, useLocation, Outlet } from "react-router-dom";
-import { Home, ClipboardList, Store, Users, Settings as SettingsIcon, Menu, ShieldCheck } from "lucide-react";
+import { Home, ClipboardList, Store, Users, Settings as SettingsIcon, Menu, ShieldCheck, Map as MapIcon } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Sheet, SheetContent, SheetTrigger } from "@/components/ui/sheet";
 import { useAuth } from "@/contexts/AuthContext";
@@ -36,10 +36,10 @@ export default function Layout() {
     { name: "Início", path: "/", icon: Home },
     { name: "Instalações", path: "/jobs", icon: ClipboardList },
     { name: "Lojas", path: "/stores", icon: Store },
+    { name: "Mapa", path: "/map", icon: MapIcon },
     { name: "Clientes", path: "/clients", icon: Users },
   ];
 
-  // Adiciona o menu de equipe apenas se for admin
   if (profile?.role === 'admin') {
     navItems.push({ name: "Equipe", path: "/team", icon: ShieldCheck });
   }
@@ -129,14 +129,14 @@ export default function Layout() {
 
       {/* Main Content */}
       <main className="flex-1 overflow-y-auto p-4 md:p-8 pb-24 md:pb-8 print:p-0 print:overflow-visible relative">
-        <div className="max-w-5xl mx-auto print:max-w-none">
+        <div className="max-w-5xl mx-auto print:max-w-none h-full">
           <Outlet />
         </div>
       </main>
 
       {/* Mobile Bottom Nav */}
       <nav className="md:hidden fixed bottom-0 left-0 right-0 bg-white border-t border-slate-200 flex justify-around p-2 pb-safe z-20 print:hidden">
-        {navItems.slice(0, 3).map((item) => {
+        {navItems.slice(0, 4).map((item) => {
           const Icon = item.icon;
           const isActive = location.pathname === item.path || (item.path !== "/" && location.pathname.startsWith(item.path));
           return (

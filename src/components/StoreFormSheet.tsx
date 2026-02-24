@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from "react";
-import { Save, Loader2, Store, MapPin, Phone } from "lucide-react";
+import { Save, Loader2, Store, MapPin, Phone, Navigation, Search } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Sheet, SheetContent, SheetHeader, SheetTitle, SheetDescription } from "@/components/ui/sheet";
@@ -16,6 +16,7 @@ interface StoreFormSheetProps {
 export default function StoreFormSheet({ isOpen, onClose, storeToEdit }: StoreFormSheetProps) {
   const queryClient = useQueryClient();
   const [isSubmitting, setIsSubmitting] = useState(false);
+  const [isLocating, setIsLocating] = useState(false);
 
   const [formData, setFormData] = useState({
     name: "",
@@ -28,10 +29,11 @@ export default function StoreFormSheet({ isOpen, onClose, storeToEdit }: StoreFo
     state: "",
     zip_code: "",
     email: "",
-    phone: ""
+    phone: "",
+    lat: null as number | null,
+    lng: null as number | null
   });
 
-  // Preenche o formulário se estiver editando, ou limpa se for nova loja
   useEffect(() => {
     if (storeToEdit) {
       setFormData({
@@ -45,18 +47,76 @@ export default function StoreFormSheet({ isOpen, onClose, storeToEdit }: StoreFo
         state: storeToEdit.state || "",
         zip_code: storeToEdit.zip_code || "",
         email: storeToEdit.email || "",
-        phone: storeToEdit.phone || ""
+        phone: storeToEdit.phone || "",
+        lat: storeToEdit.lat || null,
+        lng: storeToEdit.lng || null
       });
     } else {
       setFormData({
         name: "", brand: "", corporate_name: "", cnpj: "", code: "",
-        address: "", neighborhood: "", state: "", zip_code: "", email: "", phone: ""
+        address: "", neighborhood: "", state: "", zip_code: "", email: "", phone: "",
+        lat: null, lng: null
       });
     }
   }, [storeToEdit, isOpen]);
 
   const handleChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     setFormData(prev => ({ ...prev, [e.target.name]: e.target.value }));
+  };
+
+  // Busca coordenadas pelo endereço digitado usando API gratuita do OpenStreetMap
+  const geocodeAddress = async () => {
+    const fullAddress = `${formData.address}, ${formData.neighborhood}, ${formData.state}, Brasil`;
+    if (!formData.address || !formData.state) {
+      showError("Preencha pelo menos o Endereço e o Estado para buscar no mapa.");
+      return;
+    }
+
+    setIsLocating(true);
+    try {
+      const response = await fetch(`https://nominatim.openstreetmap.org/search?format=json&q=${encodeURIComponent(fullAddress)}`);
+      const data = await response.json();
+      
+      if (data && data.length > 0) {
+        setFormData(prev => ({
+          ...prev,
+          lat: parseFloat(data[0].lat),
+          lng: parseFloat(data[0].lon)
+        }));
+        showSuccess("Coordenadas encontradas com sucesso!");
+      } else {
+        showError("Endereço não encontrado no mapa. Tente detalhar mais.");
+      }
+    } catch (error) {
+      showError("Erro ao buscar coordenadas.");
+    } finally {
+      setIsLocating(false);
+    }
+  };
+
+  // Pega a localização atual do GPS do celular
+  const captureCurrentLocation = () => {
+    setIsLocating(true);
+    if ("geolocation" in navigator) {
+      navigator.geolocation.getCurrentPosition(
+        (position) => {
+          setFormData(prev => ({
+            ...prev,
+            lat: position.coords.latitude,
+            lng: position.coords.longitude
+          }));
+          setIsLocating(false);
+          showSuccess("Localização atual capturada!");
+        },
+        (error) => {
+          setIsLocating(false);
+          showError("Não foi possível capturar o GPS. Verifique as permissões.");
+        }
+      );
+    } else {
+      setIsLocating(false);
+      showError("Geolocalização não suportada neste dispositivo.");
+    }
   };
 
   const handleSubmit = async (e: React.FormEvent) => {
@@ -69,20 +129,16 @@ export default function StoreFormSheet({ isOpen, onClose, storeToEdit }: StoreFo
     setIsSubmitting(true);
     try {
       if (storeToEdit) {
-        // Atualizar loja existente
         const { error } = await supabase.from('stores').update(formData).eq('id', storeToEdit.id);
         if (error) throw error;
         showSuccess("Loja atualizada com sucesso!");
-        // Atualiza a query específica desta loja para refletir na tela de detalhes
         queryClient.invalidateQueries({ queryKey: ['store', storeToEdit.id] });
       } else {
-        // Criar nova loja
         const { error } = await supabase.from('stores').insert([formData]);
         if (error) throw error;
         showSuccess("Loja cadastrada com sucesso!");
       }
       
-      // Atualiza a lista geral de lojas
       queryClient.invalidateQueries({ queryKey: ['all-stores'] });
       onClose();
     } catch (error) {
@@ -139,10 +195,10 @@ export default function StoreFormSheet({ isOpen, onClose, storeToEdit }: StoreFo
             </div>
           </div>
 
-          {/* Endereço */}
+          {/* Endereço e Mapa */}
           <div className="space-y-4">
             <h3 className="text-sm font-bold text-slate-800 uppercase tracking-wider flex items-center gap-2">
-              <MapPin className="text-blue-600" size={16} /> Endereço
+              <MapPin className="text-blue-600" size={16} /> Endereço & Mapa
             </h3>
             <div className="space-y-3">
               <div>
@@ -162,6 +218,46 @@ export default function StoreFormSheet({ isOpen, onClose, storeToEdit }: StoreFo
               <div>
                 <label className="text-xs font-bold text-slate-500 mb-1 block">Estado (UF)</label>
                 <Input name="state" value={formData.state} onChange={handleChange} placeholder="Ex: SP" className="h-11 rounded-xl bg-slate-50 border-slate-200" maxLength={2} />
+              </div>
+
+              {/* Coordenadas GPS */}
+              <div className="bg-blue-50 p-4 rounded-xl border border-blue-100 mt-4">
+                <label className="text-xs font-bold text-blue-800 mb-2 block uppercase tracking-wider">Coordenadas para o Mapa</label>
+                
+                {formData.lat && formData.lng ? (
+                  <div className="flex items-center justify-between bg-white p-3 rounded-lg border border-blue-200 mb-3">
+                    <div className="flex items-center gap-2 text-emerald-600">
+                      <MapPin size={16} />
+                      <span className="text-sm font-bold">Localização Salva</span>
+                    </div>
+                    <span className="text-xs text-slate-400 font-mono">{formData.lat.toFixed(4)}, {formData.lng.toFixed(4)}</span>
+                  </div>
+                ) : (
+                  <p className="text-sm text-blue-600 mb-3">Nenhuma coordenada salva. A loja não aparecerá no mapa.</p>
+                )}
+
+                <div className="flex flex-col gap-2">
+                  <Button 
+                    type="button" 
+                    variant="outline" 
+                    onClick={geocodeAddress}
+                    disabled={isLocating}
+                    className="w-full bg-white border-blue-200 text-blue-700 hover:bg-blue-100"
+                  >
+                    {isLocating ? <Loader2 className="animate-spin mr-2" size={16} /> : <Search size={16} className="mr-2" />}
+                    Buscar pelo Endereço Digitado
+                  </Button>
+                  <Button 
+                    type="button" 
+                    variant="outline" 
+                    onClick={captureCurrentLocation}
+                    disabled={isLocating}
+                    className="w-full bg-white border-blue-200 text-blue-700 hover:bg-blue-100"
+                  >
+                    {isLocating ? <Loader2 className="animate-spin mr-2" size={16} /> : <Navigation size={16} className="mr-2" />}
+                    Usar meu GPS Atual (Estou na loja)
+                  </Button>
+                </div>
               </div>
             </div>
           </div>
