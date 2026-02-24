@@ -13,7 +13,7 @@ export default function Settings() {
   const [progress, setProgress] = useState(0);
   const fileInputRef = useRef<HTMLInputElement>(null);
 
-  // Motor de Processamento com Mapeamento Dinâmico
+  // Motor de Processamento com Mapeamento Absoluto
   const process2DArray = async (rawRows: any[][]) => {
     try {
       setProgress(10);
@@ -37,11 +37,7 @@ export default function Settings() {
       const storesMapToUpsert = new Map();
       
       let headerRowIndex = -1;
-      let colMap = {
-        code: -1, corporate_name: -1, name: -1, cnpj: -1,
-        address: -1, state: -1, neighborhood: -1, zip_code: -1,
-        brand: -1, email: -1, phone: -1
-      };
+      let colMap: Record<string, number> = {};
 
       // 1. Encontrar o cabeçalho e mapear as colunas exatas
       for (let i = 0; i < Math.min(50, rawRows.length); i++) {
@@ -49,27 +45,28 @@ export default function Settings() {
         if (!Array.isArray(row)) continue;
         const rowStr = row.join(" ").toLowerCase().normalize("NFD").replace(/[\u0300-\u036f]/g, "");
         
+        // Detecta a linha de cabeçalho
         if (rowStr.includes("cnpj") && (rowStr.includes("razao") || rowStr.includes("nome") || rowStr.includes("fantasia"))) {
           headerRowIndex = i;
           row.forEach((cell, index) => {
             const val = String(cell || "").toLowerCase().normalize("NFD").replace(/[\u0300-\u036f]/g, "").trim();
             if (val === "codigo" || val === "cod" || val === "id") colMap.code = index;
             else if (val.includes("razao") || val.includes("social")) colMap.corporate_name = index;
-            else if (val.includes("fantasia") || val === "nome" || val === "loja") colMap.name = index;
-            else if (val === "cnpj" || val.includes("documento")) colMap.cnpj = index;
+            else if (val.includes("fantasia") || val === "nome" || val === "loja" || val === "cliente") colMap.name = index;
+            else if (val === "cnpj" || val.includes("documento") || val === "cgc") colMap.cnpj = index;
             else if (val.includes("endereco") || val.includes("rua") || val.includes("logradouro")) colMap.address = index;
             else if (val === "uf" || val.includes("estado") || val.includes("cidade")) colMap.state = index;
             else if (val.includes("bairro") || val.includes("distrito")) colMap.neighborhood = index;
             else if (val.includes("cep")) colMap.zip_code = index;
             else if (val.includes("grupo") || val.includes("marca") || val.includes("rede")) colMap.brand = index;
             else if (val.includes("email") || val.includes("e-mail")) colMap.email = index;
-            else if (val.includes("fone") || val.includes("telefone") || val.includes("celular")) colMap.phone = index;
+            else if (val.includes("fone") || val.includes("telefone") || val.includes("celular") || val.includes("contato")) colMap.phone = index;
           });
           break;
         }
       }
 
-      // 2. Processar TODAS as linhas usando o mapa de colunas
+      // 2. Processar TODAS as linhas
       for (let i = 0; i < rawRows.length; i++) {
         if (i === headerRowIndex) continue;
         const rowArray = rawRows[i];
@@ -79,34 +76,34 @@ export default function Settings() {
         if (rowArray.every(cell => cell === null || cell === undefined || cell === "")) continue;
 
         let storeData: any = null;
-        const getVal = (idx: number) => idx !== -1 && rowArray[idx] !== undefined ? String(rowArray[idx]).trim() : "";
 
-        // Tenta usar o mapeamento de colunas primeiro (Mais seguro para XLSX)
-        if (headerRowIndex !== -1 && (colMap.name !== -1 || colMap.corporate_name !== -1 || colMap.cnpj !== -1)) {
-          const nameVal = getVal(colMap.name);
-          const corpVal = getVal(colMap.corporate_name);
-          const cnpjVal = getVal(colMap.cnpj);
+        // PRIORIDADE 1: Se achou o cabeçalho, usa o mapa de colunas para TODAS as linhas
+        if (headerRowIndex !== -1 && Object.keys(colMap).length > 0) {
+          const getVal = (key: string) => colMap[key] !== undefined && rowArray[colMap[key]] !== undefined ? String(rowArray[colMap[key]]).trim() : "";
+          
+          const cnpjVal = getVal('cnpj');
+          const nameVal = getVal('name');
+          const corpVal = getVal('corporate_name');
 
-          // Se tem pelo menos o nome ou CNPJ, é uma loja válida
-          if (nameVal || corpVal || cnpjVal) {
+          // Só aceita se tiver pelo menos o CNPJ, Nome ou Razão Social
+          if (cnpjVal || nameVal || corpVal) {
             storeData = {
-              code: getVal(colMap.code),
+              code: getVal('code'),
               corporate_name: corpVal,
-              name: nameVal || corpVal || `Loja ${cnpjVal}`,
+              name: nameVal || corpVal || (cnpjVal ? `Loja ${cnpjVal}` : 'Loja Sem Nome'),
               cnpj: cnpjVal,
-              address: getVal(colMap.address),
-              state: getVal(colMap.state),
-              neighborhood: getVal(colMap.neighborhood),
-              zip_code: getVal(colMap.zip_code),
-              brand: getVal(colMap.brand) || 'Sem Grupo',
-              email: getVal(colMap.email).replace(/<br>/gi, ' / '),
-              phone: getVal(colMap.phone).replace(/<br>/gi, ' / '),
+              address: getVal('address'),
+              state: getVal('state'),
+              neighborhood: getVal('neighborhood'),
+              zip_code: getVal('zip_code'),
+              brand: getVal('brand') || 'Sem Grupo',
+              email: getVal('email').replace(/<br>/gi, ' / '),
+              phone: getVal('phone').replace(/<br>/gi, ' / '),
             };
           }
-        }
-
-        // Fallback: Âncora de CNPJ se o mapeamento falhar
-        if (!storeData || (!storeData.name && !storeData.cnpj)) {
+        } 
+        // PRIORIDADE 2: Fallback de âncora (Só roda se a planilha não tiver cabeçalho nenhum)
+        else {
           let cnpjIndex = -1;
           let cleanCnpj = "";
           for (let j = 0; j < rowArray.length; j++) {
@@ -154,14 +151,10 @@ export default function Settings() {
 
           if (existingId) {
             storeData.id = existingId;
-            if (!storesMapToUpsert.has(existingId)) {
-              storesMapToUpsert.set(existingId, storeData);
-            }
+            storesMapToUpsert.set(existingId, storeData);
           } else {
             const uniqueKey = `new_${storeData.code}_${storeData.cnpj}_${safeName}`;
-            if (!storesMapToUpsert.has(uniqueKey)) {
-              storesMapToUpsert.set(uniqueKey, storeData);
-            }
+            storesMapToUpsert.set(uniqueKey, storeData);
           }
         }
       }
@@ -334,8 +327,8 @@ export default function Settings() {
             <div className="bg-blue-50 border border-blue-100 rounded-xl p-4 mb-6 flex gap-3">
               <AlertCircle className="text-blue-600 shrink-0 mt-0.5" size={20} />
               <div className="text-sm text-blue-800">
-                <p className="font-bold mb-1">Mapeamento Dinâmico Ativado! 🎯</p>
-                <p className="mb-2">O sistema agora lê o seu arquivo XLSX, encontra onde está o cabeçalho e mapeia a posição exata de cada coluna. Isso garante que as lojas que estão nas linhas acima do cabeçalho sejam lidas perfeitamente!</p>
+                <p className="font-bold mb-1">Mapeamento Absoluto Ativado! 🎯</p>
+                <p className="mb-2">O sistema agora decora a posição exata de cada coluna do seu Excel e aplica essa regra para todas as linhas. A VICCI MAGAZINE e todas as outras lojas acima do cabeçalho agora serão lidas perfeitamente!</p>
               </div>
             </div>
 
