@@ -1,5 +1,5 @@
 import React, { useState, useMemo, useEffect } from "react";
-import { Search, Store, MapPin, ChevronRight, Filter, Building2, ChevronLeft, Plus, Edit } from "lucide-react";
+import { Search, Store, MapPin, ChevronRight, Filter, Building2, ChevronLeft, Plus, Edit, Map } from "lucide-react";
 import { Input } from "@/components/ui/input";
 import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -11,6 +11,8 @@ import StoreFormSheet from "@/components/StoreFormSheet";
 export default function Stores() {
   const [searchTerm, setSearchTerm] = useState("");
   const [selectedBrand, setSelectedBrand] = useState("all");
+  const [selectedState, setSelectedState] = useState("all");
+  const [selectedNeighborhood, setSelectedNeighborhood] = useState("all");
   const [currentPage, setCurrentPage] = useState(1);
   const itemsPerPage = 50;
   const navigate = useNavigate();
@@ -45,15 +47,40 @@ export default function Stores() {
     }
   });
 
+  // Extrai as marcas únicas
   const brands = useMemo(() => {
     if (!stores) return [];
     const uniqueBrands = new Set(stores.map(s => s.brand).filter(Boolean));
     return Array.from(uniqueBrands).sort();
   }, [stores]);
 
+  // Extrai os estados (UF) únicos
+  const states = useMemo(() => {
+    if (!stores) return [];
+    const uniqueStates = new Set(stores.map(s => s.state?.trim().toUpperCase()).filter(Boolean));
+    return Array.from(uniqueStates).sort();
+  }, [stores]);
+
+  // Extrai os bairros/regiões únicos (filtrando pelo estado selecionado, se houver)
+  const neighborhoods = useMemo(() => {
+    if (!stores) return [];
+    let filtered = stores;
+    if (selectedState !== "all") {
+      filtered = stores.filter(s => s.state?.trim().toUpperCase() === selectedState);
+    }
+    const uniqueNeigh = new Set(filtered.map(s => s.neighborhood?.trim()).filter(Boolean));
+    return Array.from(uniqueNeigh).sort();
+  }, [stores, selectedState]);
+
+  // Reseta a página ao mudar qualquer filtro
   useEffect(() => {
     setCurrentPage(1);
-  }, [searchTerm, selectedBrand]);
+  }, [searchTerm, selectedBrand, selectedState, selectedNeighborhood]);
+
+  // Reseta o bairro se o estado mudar
+  useEffect(() => {
+    setSelectedNeighborhood("all");
+  }, [selectedState]);
 
   const filteredStores = useMemo(() => {
     if (!stores) return [];
@@ -70,10 +97,12 @@ export default function Stores() {
         (String(store.address || "").toLowerCase()).includes(searchLower);
 
       const matchesBrand = selectedBrand === "all" || store.brand === selectedBrand;
+      const matchesState = selectedState === "all" || store.state?.trim().toUpperCase() === selectedState;
+      const matchesNeighborhood = selectedNeighborhood === "all" || store.neighborhood?.trim() === selectedNeighborhood;
 
-      return matchesSearch && matchesBrand;
+      return matchesSearch && matchesBrand && matchesState && matchesNeighborhood;
     });
-  }, [stores, searchTerm, selectedBrand]);
+  }, [stores, searchTerm, selectedBrand, selectedState, selectedNeighborhood]);
 
   const totalPages = Math.ceil(filteredStores.length / itemsPerPage);
   const paginatedStores = filteredStores.slice(
@@ -87,7 +116,7 @@ export default function Stores() {
   };
 
   const handleEditStore = (e: React.MouseEvent, store: any) => {
-    e.stopPropagation(); // Evita que o clique abra a página de detalhes da loja
+    e.stopPropagation();
     setStoreToEdit(store);
     setIsSheetOpen(true);
   };
@@ -107,8 +136,9 @@ export default function Stores() {
         </Button>
       </div>
 
-      <div className="flex flex-col md:flex-row gap-3">
-        <div className="relative flex-1">
+      <div className="flex flex-col gap-3">
+        {/* Barra de Busca */}
+        <div className="relative w-full">
           <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" size={20} />
           <Input 
             placeholder="Buscar por nome, razão social, código, CNPJ ou endereço..." 
@@ -118,20 +148,60 @@ export default function Stores() {
           />
         </div>
         
-        <div className="relative min-w-[200px]">
-          <Filter className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" size={18} />
-          <select
-            value={selectedBrand}
-            onChange={(e) => setSelectedBrand(e.target.value)}
-            className="w-full h-12 pl-10 pr-10 rounded-xl border border-slate-200 bg-white shadow-sm text-sm focus:ring-2 focus:ring-blue-600 focus:border-transparent appearance-none outline-none text-slate-700"
-          >
-            <option value="all">Todas as Marcas</option>
-            {brands.map(brand => (
-              <option key={brand} value={brand}>{brand}</option>
-            ))}
-          </select>
-          <div className="absolute right-3 top-1/2 -translate-y-1/2 pointer-events-none text-slate-400">
-            <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="m6 9 6 6 6-6"/></svg>
+        {/* Filtros */}
+        <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
+          {/* Filtro de Marca */}
+          <div className="relative">
+            <Filter className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" size={18} />
+            <select
+              value={selectedBrand}
+              onChange={(e) => setSelectedBrand(e.target.value)}
+              className="w-full h-12 pl-10 pr-10 rounded-xl border border-slate-200 bg-white shadow-sm text-sm focus:ring-2 focus:ring-blue-600 focus:border-transparent appearance-none outline-none text-slate-700"
+            >
+              <option value="all">Todas as Marcas</option>
+              {brands.map(brand => (
+                <option key={brand} value={brand}>{brand}</option>
+              ))}
+            </select>
+            <div className="absolute right-3 top-1/2 -translate-y-1/2 pointer-events-none text-slate-400">
+              <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="m6 9 6 6 6-6"/></svg>
+            </div>
+          </div>
+
+          {/* Filtro de Estado (UF) */}
+          <div className="relative">
+            <Map className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" size={18} />
+            <select
+              value={selectedState}
+              onChange={(e) => setSelectedState(e.target.value)}
+              className="w-full h-12 pl-10 pr-10 rounded-xl border border-slate-200 bg-white shadow-sm text-sm focus:ring-2 focus:ring-blue-600 focus:border-transparent appearance-none outline-none text-slate-700"
+            >
+              <option value="all">Todos os Estados (UF)</option>
+              {states.map(state => (
+                <option key={state} value={state}>{state}</option>
+              ))}
+            </select>
+            <div className="absolute right-3 top-1/2 -translate-y-1/2 pointer-events-none text-slate-400">
+              <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="m6 9 6 6 6-6"/></svg>
+            </div>
+          </div>
+
+          {/* Filtro de Bairro / Região */}
+          <div className="relative">
+            <MapPin className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" size={18} />
+            <select
+              value={selectedNeighborhood}
+              onChange={(e) => setSelectedNeighborhood(e.target.value)}
+              className="w-full h-12 pl-10 pr-10 rounded-xl border border-slate-200 bg-white shadow-sm text-sm focus:ring-2 focus:ring-blue-600 focus:border-transparent appearance-none outline-none text-slate-700"
+            >
+              <option value="all">Todos os Bairros / Regiões</option>
+              {neighborhoods.map(neigh => (
+                <option key={neigh} value={neigh}>{neigh}</option>
+              ))}
+            </select>
+            <div className="absolute right-3 top-1/2 -translate-y-1/2 pointer-events-none text-slate-400">
+              <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="m6 9 6 6 6-6"/></svg>
+            </div>
           </div>
         </div>
       </div>
@@ -183,10 +253,17 @@ export default function Stores() {
                         <span className="text-xs font-bold text-blue-700 bg-blue-50 px-2 py-1 rounded-md border border-blue-100">
                           {store.brand}
                         </span>
+                        {store.state && (
+                          <span className="text-xs font-bold text-emerald-700 bg-emerald-50 px-2 py-1 rounded-md border border-emerald-100">
+                            {store.state}
+                          </span>
+                        )}
                         {store.address && (
                           <span className="text-sm text-slate-500 flex items-center gap-1 ml-1">
                             <MapPin size={14} /> 
-                            <span className="truncate max-w-[200px] md:max-w-md">{store.address}</span>
+                            <span className="truncate max-w-[200px] md:max-w-md">
+                              {store.neighborhood ? `${store.neighborhood} - ` : ''}{store.address}
+                            </span>
                           </span>
                         )}
                       </div>
