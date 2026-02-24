@@ -1,8 +1,8 @@
-import React, { useState } from "react";
+import React, { useState, useMemo, useEffect } from "react";
 import { 
   User, Bell, Building, LogOut, Shield, 
   Smartphone, Image as ImageIcon, Save, ChevronRight, ShieldCheck,
-  Wrench, MapPin, Play, Loader2, AlertTriangle
+  Wrench, MapPin, Play, Loader2, AlertTriangle, Filter
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
@@ -11,9 +11,11 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { showSuccess, showError } from "@/utils/toast";
 import { useAuth } from "@/contexts/AuthContext";
 import { supabase } from "@/integrations/supabase/client";
+import { useQuery, useQueryClient } from "@tanstack/react-query";
 
 export default function Settings() {
   const { user, profile, signOut } = useAuth();
+  const queryClient = useQueryClient();
   const [isSaving, setIsSaving] = useState(false);
 
   const [notifications, setNotifications] = useState(true);
@@ -25,6 +27,70 @@ export default function Settings() {
   const [syncTotal, setSyncTotal] = useState(0);
   const [syncSuccess, setSyncSuccess] = useState(0);
 
+  // Filtros de Região
+  const [selectedState, setSelectedState] = useState("");
+  const [selectedNeighborhood, setSelectedNeighborhood] = useState("");
+
+  // Busca todas as lojas que AINDA NÃO TÊM coordenadas
+  const { data: pendingStores, isLoading: isLoadingPending } = useQuery({
+    queryKey: ['pending-sync-stores'],
+    queryFn: async () => {
+      let allData: any[] = [];
+      let page = 0;
+      const pageSize = 1000;
+      
+      while (true) {
+        const { data, error } = await supabase
+          .from('stores')
+          .select('id, state, neighborhood, zip_code, address')
+          .or('lat.is.null,lng.is.null')
+          .range(page * pageSize, (page + 1) * pageSize - 1);
+        
+        if (error) throw error;
+        if (!data || data.length === 0) break;
+        
+        allData = [...allData, ...data];
+        if (data.length < pageSize) break;
+        page++;
+      }
+      
+      return allData;
+    }
+  });
+
+  // Extrai os Estados únicos das lojas pendentes
+  const states = useMemo(() => {
+    if (!pendingStores) return [];
+    const unique = new Set(pendingStores.map(s => s.state?.trim().toUpperCase()).filter(Boolean));
+    return Array.from(unique).sort();
+  }, [pendingStores]);
+
+  // Extrai os Bairros únicos (baseado no estado selecionado)
+  const neighborhoods = useMemo(() => {
+    if (!pendingStores) return [];
+    let filtered = pendingStores;
+    if (selectedState) {
+      filtered = pendingStores.filter(s => s.state?.trim().toUpperCase() === selectedState);
+    }
+    const unique = new Set(filtered.map(s => s.neighborhood?.trim()).filter(Boolean));
+    return Array.from(unique).sort();
+  }, [pendingStores, selectedState]);
+
+  // Limpa o bairro se o estado mudar
+  useEffect(() => {
+    setSelectedNeighborhood("");
+  }, [selectedState]);
+
+  // Lojas filtradas prontas para sincronizar
+  const storesToSyncFiltered = useMemo(() => {
+    if (!pendingStores) return [];
+    return pendingStores.filter(s => {
+      const matchState = !selectedState || s.state?.trim().toUpperCase() === selectedState;
+      const matchNeigh = !selectedNeighborhood || s.neighborhood?.trim() === selectedNeighborhood;
+      return matchState && matchNeigh;
+    });
+  }, [pendingStores, selectedState, selectedNeighborhood]);
+
   const handleSave = () => {
     setIsSaving(true);
     setTimeout(() => {
@@ -33,39 +99,25 @@ export default function Settings() {
     }, 800);
   };
 
-  // Função de delay para respeitar o limite da API do mapa (1 requisição por segundo)
   const delay = (ms: number) => new Promise(resolve => setTimeout(resolve, ms));
 
   const startMassSync = async () => {
-    if (!confirm("Isso vai buscar as coordenadas de todas as lojas que ainda não estão no mapa. O processo pode demorar alguns minutos. Deseja continuar?")) {
+    if (storesToSyncFiltered.length === 0) return;
+
+    if (!confirm(`Você está prestes a buscar as coordenadas de ${storesToSyncFiltered.length} lojas. Deseja continuar?`)) {
       return;
     }
 
     setIsSyncing(true);
     setSyncProgress(0);
     setSyncSuccess(0);
+    setSyncTotal(storesToSyncFiltered.length);
 
     try {
-      // 1. Busca todas as lojas que NÃO têm latitude ou longitude
-      const { data: storesToSync, error } = await supabase
-        .from('stores')
-        .select('*')
-        .or('lat.is.null,lng.is.null');
-
-      if (error) throw error;
-
-      if (!storesToSync || storesToSync.length === 0) {
-        showSuccess("Todas as suas lojas já possuem coordenadas no mapa!");
-        setIsSyncing(false);
-        return;
-      }
-
-      setSyncTotal(storesToSync.length);
       let successCount = 0;
 
-      // 2. Loop passando por cada loja
-      for (let i = 0; i < storesToSync.length; i++) {
-        const store = storesToSync[i];
+      for (let i = 0; i < storesToSyncFiltered.length; i++) {
+        const store = storesToSyncFiltered[i];
         setSyncProgress(i + 1);
 
         try {
@@ -121,6 +173,9 @@ export default function Settings() {
       }
 
       showSuccess(`Sincronização concluída! ${successCount} lojas foram adicionadas ao mapa.`);
+      // Atualiza a lista de lojas pendentes
+      queryClient.invalidateQueries({ queryKey: ['pending-sync-stores'] });
+      queryClient.invalidateQueries({ queryKey: ['stores-map'] });
     } catch (error) {
       console.error(error);
       showError("Ocorreu um erro ao iniciar a sincronização.");
@@ -129,7 +184,6 @@ export default function Settings() {
     }
   };
 
-  // Pega as iniciais do email para o avatar
   const initials = user?.email ? user.email.substring(0, 2).toUpperCase() : "US";
   const roleDisplay = profile?.role === 'admin' ? 'Administrador' : 'Instalador';
 
@@ -314,57 +368,105 @@ export default function Settings() {
               <CardTitle className="text-lg flex items-center gap-2 text-slate-800">
                 <MapPin size={20} className="text-blue-600" /> Sincronização de Mapa
               </CardTitle>
-              <CardDescription>Busca automática de coordenadas para lojas antigas.</CardDescription>
+              <CardDescription>Busca automática de coordenadas para lojas que ainda não estão no mapa.</CardDescription>
             </CardHeader>
             <CardContent className="p-6">
               
-              <div className="bg-amber-50 border border-amber-200 rounded-xl p-4 mb-6">
-                <div className="flex gap-3">
-                  <AlertTriangle className="text-amber-600 shrink-0 mt-0.5" size={20} />
-                  <div>
-                    <h4 className="font-bold text-amber-800">Como funciona?</h4>
-                    <p className="text-sm text-amber-700 mt-1">
-                      O sistema vai procurar todas as lojas que ainda não aparecem no mapa e tentar descobrir a localização delas usando o CEP e o Endereço cadastrados.
-                    </p>
-                    <p className="text-sm font-bold text-amber-800 mt-2">
-                      Atenção: Deixe esta página aberta até o processo terminar.
-                    </p>
-                  </div>
+              {isLoadingPending ? (
+                <div className="flex items-center justify-center py-8 text-slate-500">
+                  <Loader2 className="animate-spin mr-2" size={20} /> Carregando lojas pendentes...
                 </div>
-              </div>
-
-              {isSyncing ? (
-                <div className="space-y-4 bg-slate-50 p-6 rounded-xl border border-slate-200">
-                  <div className="flex justify-between items-end mb-2">
-                    <div>
-                      <p className="font-bold text-slate-800">Sincronizando lojas...</p>
-                      <p className="text-sm text-slate-500">Processando {syncProgress} de {syncTotal}</p>
-                    </div>
-                    <div className="text-right">
-                      <p className="text-sm font-bold text-emerald-600">{syncSuccess} encontradas</p>
-                    </div>
+              ) : pendingStores?.length === 0 ? (
+                <div className="bg-emerald-50 border border-emerald-200 rounded-xl p-6 text-center">
+                  <div className="w-12 h-12 bg-emerald-100 text-emerald-600 rounded-full flex items-center justify-center mx-auto mb-3">
+                    <MapPin size={24} />
                   </div>
-                  
-                  {/* Barra de Progresso Customizada */}
-                  <div className="w-full h-3 bg-slate-200 rounded-full overflow-hidden">
-                    <div 
-                      className="h-full bg-blue-600 transition-all duration-300 ease-out"
-                      style={{ width: `${syncTotal > 0 ? (syncProgress / syncTotal) * 100 : 0}%` }}
-                    ></div>
-                  </div>
-                  
-                  <div className="flex items-center justify-center gap-2 text-sm text-slate-500 mt-4">
-                    <Loader2 className="animate-spin" size={16} />
-                    Buscando coordenadas no servidor...
-                  </div>
+                  <h4 className="font-bold text-emerald-800 text-lg">Tudo Sincronizado!</h4>
+                  <p className="text-emerald-700 mt-1">Todas as suas lojas já possuem coordenadas e estão aparecendo no mapa.</p>
                 </div>
               ) : (
-                <Button 
-                  onClick={startMassSync} 
-                  className="w-full h-12 bg-blue-600 hover:bg-blue-700 text-white rounded-xl font-bold text-base shadow-sm"
-                >
-                  <Play size={20} className="mr-2" /> Iniciar Sincronização em Massa
-                </Button>
+                <>
+                  <div className="bg-blue-50 border border-blue-100 rounded-xl p-5 mb-6">
+                    <h4 className="font-bold text-blue-800 flex items-center gap-2 mb-4">
+                      <Filter size={18} /> Filtrar Lojas para Sincronizar
+                    </h4>
+                    
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                      <div>
+                        <label className="text-xs font-bold text-blue-700 mb-1 block uppercase tracking-wider">Estado (UF)</label>
+                        <select 
+                          className="w-full h-11 px-3 rounded-xl border border-blue-200 bg-white text-slate-700 focus:outline-none focus:ring-2 focus:ring-blue-500"
+                          value={selectedState}
+                          onChange={(e) => setSelectedState(e.target.value)}
+                          disabled={isSyncing}
+                        >
+                          <option value="">Todos os Estados</option>
+                          {states.map(state => (
+                            <option key={state} value={state}>{state}</option>
+                          ))}
+                        </select>
+                      </div>
+                      
+                      <div>
+                        <label className="text-xs font-bold text-blue-700 mb-1 block uppercase tracking-wider">Bairro / Região</label>
+                        <select 
+                          className="w-full h-11 px-3 rounded-xl border border-blue-200 bg-white text-slate-700 focus:outline-none focus:ring-2 focus:ring-blue-500 disabled:opacity-50"
+                          value={selectedNeighborhood}
+                          onChange={(e) => setSelectedNeighborhood(e.target.value)}
+                          disabled={isSyncing || neighborhoods.length === 0}
+                        >
+                          <option value="">Todos os Bairros</option>
+                          {neighborhoods.map(neigh => (
+                            <option key={neigh} value={neigh}>{neigh}</option>
+                          ))}
+                        </select>
+                      </div>
+                    </div>
+
+                    <div className="mt-4 pt-4 border-t border-blue-200/50 flex items-center justify-between">
+                      <span className="text-sm font-medium text-blue-800">
+                        Lojas prontas para sincronizar:
+                      </span>
+                      <span className="text-lg font-black text-blue-700 bg-white px-3 py-1 rounded-lg shadow-sm">
+                        {storesToSyncFiltered.length}
+                      </span>
+                    </div>
+                  </div>
+
+                  {isSyncing ? (
+                    <div className="space-y-4 bg-slate-50 p-6 rounded-xl border border-slate-200">
+                      <div className="flex justify-between items-end mb-2">
+                        <div>
+                          <p className="font-bold text-slate-800">Sincronizando lojas...</p>
+                          <p className="text-sm text-slate-500">Processando {syncProgress} de {syncTotal}</p>
+                        </div>
+                        <div className="text-right">
+                          <p className="text-sm font-bold text-emerald-600">{syncSuccess} encontradas</p>
+                        </div>
+                      </div>
+                      
+                      <div className="w-full h-3 bg-slate-200 rounded-full overflow-hidden">
+                        <div 
+                          className="h-full bg-blue-600 transition-all duration-300 ease-out"
+                          style={{ width: `${syncTotal > 0 ? (syncProgress / syncTotal) * 100 : 0}%` }}
+                        ></div>
+                      </div>
+                      
+                      <div className="flex items-center justify-center gap-2 text-sm text-slate-500 mt-4">
+                        <Loader2 className="animate-spin" size={16} />
+                        Buscando coordenadas no servidor...
+                      </div>
+                    </div>
+                  ) : (
+                    <Button 
+                      onClick={startMassSync} 
+                      disabled={storesToSyncFiltered.length === 0}
+                      className="w-full h-12 bg-blue-600 hover:bg-blue-700 text-white rounded-xl font-bold text-base shadow-sm disabled:opacity-50"
+                    >
+                      <Play size={20} className="mr-2" /> Iniciar Sincronização
+                    </Button>
+                  )}
+                </>
               )}
 
             </CardContent>
