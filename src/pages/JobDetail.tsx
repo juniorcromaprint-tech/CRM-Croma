@@ -60,15 +60,47 @@ export default function JobDetail() {
       queryClient.invalidateQueries({ queryKey: ['job', id] });
       queryClient.invalidateQueries({ queryKey: ['all-jobs'] });
       queryClient.invalidateQueries({ queryKey: ['recent-jobs'] });
+      if (job?.store_id) {
+        queryClient.invalidateQueries({ queryKey: ['store-jobs', job.store_id] });
+      }
     }
   });
 
-  // Excluir Foto
+  // Excluir OS Inteira
+  const deleteJobMutation = useMutation({
+    mutationFn: async () => {
+      // 1. Deletar fotos do storage primeiro para não deixar lixo
+      if (photos && photos.length > 0) {
+        const fileNames = photos.map(p => {
+          const urlParts = p.photo_url.split('/');
+          return urlParts[urlParts.length - 1];
+        });
+        await supabase.storage.from('job_photos').remove(fileNames);
+      }
+      
+      // 2. Deletar a OS (as fotos no banco de dados serão deletadas em cascata se configurado, ou deletamos manualmente)
+      const { error } = await supabase.from('jobs').delete().eq('id', id);
+      if (error) throw error;
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['all-jobs'] });
+      queryClient.invalidateQueries({ queryKey: ['recent-jobs'] });
+      if (job?.store_id) {
+        queryClient.invalidateQueries({ queryKey: ['store-jobs', job.store_id] });
+      }
+      showSuccess("OS excluída com sucesso!");
+      navigate(-1); // Volta para a tela anterior
+    },
+    onError: () => {
+      showError("Erro ao excluir a OS.");
+    }
+  });
+
+  // Excluir Foto Individual
   const deletePhotoMutation = useMutation({
     mutationFn: async (photoId: string) => {
       const photo = photos?.find(p => p.id === photoId);
       if (photo) {
-        // Tenta extrair o nome do arquivo da URL para deletar do storage também
         const urlParts = photo.photo_url.split('/');
         const fileName = urlParts[urlParts.length - 1];
         await supabase.storage.from('job_photos').remove([fileName]);
@@ -114,25 +146,21 @@ export default function JobDetail() {
 
     setUploadingType(type);
     try {
-      // Loop para fazer upload de múltiplas fotos
       for (let i = 0; i < files.length; i++) {
         const file = files[i];
         const fileExt = file.name.split('.').pop();
         const fileName = `${id}-${type}-${Math.random()}.${fileExt}`;
         
-        // 1. Upload para o Storage
         const { error: uploadError } = await supabase.storage
           .from('job_photos')
           .upload(fileName, file);
 
         if (uploadError) throw uploadError;
 
-        // 2. Pegar URL pública
         const { data: { publicUrl } } = supabase.storage
           .from('job_photos')
           .getPublicUrl(fileName);
 
-        // 3. Salvar no banco de dados
         const { error: dbError } = await supabase
           .from('job_photos')
           .insert({ job_id: id, photo_type: type, photo_url: publicUrl });
@@ -147,7 +175,6 @@ export default function JobDetail() {
       console.error(error);
     } finally {
       setUploadingType(null);
-      // Limpa o input para permitir selecionar a mesma foto novamente se necessário
       if (type === 'before' && fileInputBeforeRef.current) fileInputBeforeRef.current.value = '';
       if (type === 'after' && fileInputAfterRef.current) fileInputAfterRef.current.value = '';
     }
@@ -157,6 +184,19 @@ export default function JobDetail() {
     updateJobMutation.mutate({ status: 'Concluído' }, {
       onSuccess: () => showSuccess("Instalação finalizada com sucesso!")
     });
+  };
+
+  const handleStatusChange = (e: React.ChangeEvent<HTMLSelectElement>) => {
+    const newStatus = e.target.value;
+    updateJobMutation.mutate({ status: newStatus }, {
+      onSuccess: () => showSuccess(`Status alterado para ${newStatus}`)
+    });
+  };
+
+  const handleDeleteJob = () => {
+    if (window.confirm("Tem certeza que deseja excluir esta OS? Esta ação não pode ser desfeita e apagará todas as fotos vinculadas.")) {
+      deleteJobMutation.mutate();
+    }
   };
 
   const handleNotesChange = (e: React.ChangeEvent<HTMLTextAreaElement>, field: 'notes' | 'issues') => {
@@ -172,16 +212,25 @@ export default function JobDetail() {
   return (
     <div className="space-y-6 animate-in fade-in duration-500 pb-10 print:space-y-8 print:pb-0 print:bg-white">
       {/* Header - Hidden on Print */}
-      <div className="flex items-center justify-between print:hidden">
-        <Button variant="ghost" size="icon" onClick={() => navigate(-1)} className="text-slate-600">
-          <ArrowLeft size={24} />
+      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 print:hidden">
+        <Button variant="ghost" size="icon" onClick={() => navigate(-1)} className="text-slate-600 bg-white border border-slate-200 shadow-sm hover:bg-slate-50">
+          <ArrowLeft size={20} />
         </Button>
-        <div className="flex gap-2">
-          <Button variant="outline" onClick={() => window.print()} className="rounded-xl border-slate-200 text-blue-600 hover:text-blue-700 hover:bg-blue-50">
+        <div className="flex flex-wrap gap-2">
+          <Button 
+            variant="outline" 
+            onClick={handleDeleteJob} 
+            disabled={deleteJobMutation.isPending}
+            className="rounded-xl border-red-200 text-red-600 hover:text-red-700 hover:bg-red-50 bg-white shadow-sm"
+          >
+            {deleteJobMutation.isPending ? <Loader2 className="animate-spin mr-2" size={18} /> : <Trash2 size={18} className="mr-2" />}
+            Excluir
+          </Button>
+          <Button variant="outline" onClick={() => window.print()} className="rounded-xl border-slate-200 text-blue-600 hover:text-blue-700 hover:bg-blue-50 bg-white shadow-sm">
             <Printer size={18} className="mr-2" /> Gerar PDF
           </Button>
           {job.status !== "Concluído" && (
-            <Button onClick={handleComplete} className="rounded-xl bg-emerald-600 hover:bg-emerald-700 text-white">
+            <Button onClick={handleComplete} className="rounded-xl bg-emerald-600 hover:bg-emerald-700 text-white shadow-sm">
               <CheckCircle2 size={18} className="mr-2" /> Finalizar OS
             </Button>
           )}
@@ -204,7 +253,7 @@ export default function JobDetail() {
       <Card className="border-none shadow-sm rounded-2xl overflow-hidden bg-white print:shadow-none print:border print:border-slate-200 print:rounded-lg">
         <div className="h-2 w-full bg-blue-600 print:hidden" />
         <CardContent className="p-6 print:p-6">
-          <div className="flex justify-between items-start mb-6">
+          <div className="flex flex-col sm:flex-row justify-between items-start gap-4 mb-6">
             <div>
               <span className="text-sm font-bold text-blue-600 bg-blue-50 px-3 py-1 rounded-lg inline-block mb-3 print:bg-transparent print:p-0 print:text-slate-500 print:text-base">
                 OS: {job.os_number}
@@ -212,7 +261,36 @@ export default function JobDetail() {
               <h2 className="text-3xl font-black text-slate-800 tracking-tight">{job.stores?.brand}</h2>
               <p className="text-slate-500 font-medium text-lg mt-1">{job.type}</p>
             </div>
-            <div className={`px-4 py-2 rounded-xl text-sm font-bold print:border print:border-slate-300 print:bg-transparent print:text-slate-800 ${job.status === 'Concluído' ? 'bg-emerald-100 text-emerald-700' : 'bg-amber-100 text-amber-700'}`}>
+            
+            {/* Dropdown de Status */}
+            <div className="relative print:hidden">
+              <select
+                value={job.status}
+                onChange={handleStatusChange}
+                className={`appearance-none pl-4 pr-10 py-2 rounded-xl text-sm font-bold outline-none cursor-pointer transition-colors shadow-sm border ${
+                  job.status === 'Concluído' ? 'bg-emerald-50 text-emerald-700 border-emerald-200 hover:bg-emerald-100' :
+                  job.status === 'Cancelado' ? 'bg-red-50 text-red-700 border-red-200 hover:bg-red-100' :
+                  job.status === 'Em andamento' ? 'bg-blue-50 text-blue-700 border-blue-200 hover:bg-blue-100' :
+                  'bg-amber-50 text-amber-700 border-amber-200 hover:bg-amber-100'
+                }`}
+              >
+                <option value="Pendente">Pendente</option>
+                <option value="Em andamento">Em andamento</option>
+                <option value="Concluído">Concluído</option>
+                <option value="Cancelado">Cancelado</option>
+              </select>
+              <div className="absolute right-3 top-1/2 -translate-y-1/2 pointer-events-none">
+                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className={
+                  job.status === 'Concluído' ? 'text-emerald-700' :
+                  job.status === 'Cancelado' ? 'text-red-700' :
+                  job.status === 'Em andamento' ? 'text-blue-700' :
+                  'text-amber-700'
+                }><path d="m6 9 6 6 6-6"/></svg>
+              </div>
+            </div>
+
+            {/* Status para Impressão */}
+            <div className="hidden print:block px-4 py-2 rounded-xl text-sm font-bold border border-slate-300 text-slate-800">
               Status: {job.status}
             </div>
           </div>
