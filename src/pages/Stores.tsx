@@ -1,11 +1,12 @@
 import React, { useState, useMemo, useEffect } from "react";
-import { Search, Store, MapPin, ChevronRight, Filter, Building2, ChevronLeft } from "lucide-react";
+import { Search, Store, MapPin, ChevronRight, Filter, Building2, ChevronLeft, Plus, Edit } from "lucide-react";
 import { Input } from "@/components/ui/input";
 import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { useQuery } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import { useNavigate } from "react-router-dom";
+import StoreFormSheet from "@/components/StoreFormSheet";
 
 export default function Stores() {
   const [searchTerm, setSearchTerm] = useState("");
@@ -14,6 +15,10 @@ export default function Stores() {
   const itemsPerPage = 50;
   const navigate = useNavigate();
 
+  // Estado para o painel lateral de formulário
+  const [isSheetOpen, setIsSheetOpen] = useState(false);
+  const [storeToEdit, setStoreToEdit] = useState<any>(null);
+
   const { data: stores, isLoading } = useQuery({
     queryKey: ['all-stores'],
     queryFn: async () => {
@@ -21,7 +26,6 @@ export default function Stores() {
       let page = 0;
       const pageSize = 1000;
       
-      // Loop para buscar de 1000 em 1000 e burlar o limite do banco
       while (true) {
         const { data, error } = await supabase
           .from('stores')
@@ -33,8 +37,6 @@ export default function Stores() {
         if (!data || data.length === 0) break;
         
         allData = [...allData, ...data];
-        
-        // Se vieram menos de 1000, significa que acabaram os registros
         if (data.length < pageSize) break;
         page++;
       }
@@ -43,19 +45,16 @@ export default function Stores() {
     }
   });
 
-  // Extrai todas as marcas únicas para o filtro
   const brands = useMemo(() => {
     if (!stores) return [];
     const uniqueBrands = new Set(stores.map(s => s.brand).filter(Boolean));
     return Array.from(uniqueBrands).sort();
   }, [stores]);
 
-  // Reseta a página para 1 sempre que o usuário digitar algo na busca ou mudar o filtro
   useEffect(() => {
     setCurrentPage(1);
   }, [searchTerm, selectedBrand]);
 
-  // Filtra as lojas com base na busca e na marca selecionada
   const filteredStores = useMemo(() => {
     if (!stores) return [];
     
@@ -76,18 +75,36 @@ export default function Stores() {
     });
   }, [stores, searchTerm, selectedBrand]);
 
-  // Paginação
   const totalPages = Math.ceil(filteredStores.length / itemsPerPage);
   const paginatedStores = filteredStores.slice(
     (currentPage - 1) * itemsPerPage,
     currentPage * itemsPerPage
   );
 
+  const handleNewStore = () => {
+    setStoreToEdit(null);
+    setIsSheetOpen(true);
+  };
+
+  const handleEditStore = (e: React.MouseEvent, store: any) => {
+    e.stopPropagation(); // Evita que o clique abra a página de detalhes da loja
+    setStoreToEdit(store);
+    setIsSheetOpen(true);
+  };
+
   return (
     <div className="space-y-6 animate-in fade-in duration-500">
-      <div>
-        <h1 className="text-2xl md:text-3xl font-bold text-slate-800">Lojas & Clientes</h1>
-        <p className="text-slate-500 mt-1">Consulte sua base de clientes e histórico de locais.</p>
+      <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
+        <div>
+          <h1 className="text-2xl md:text-3xl font-bold text-slate-800">Lojas & Clientes</h1>
+          <p className="text-slate-500 mt-1">Consulte sua base de clientes e histórico de locais.</p>
+        </div>
+        <Button 
+          onClick={handleNewStore}
+          className="bg-blue-600 hover:bg-blue-700 text-white rounded-xl h-11 px-5 shadow-sm w-full md:w-auto"
+        >
+          <Plus size={20} className="mr-2" /> Nova Loja
+        </Button>
       </div>
 
       <div className="flex flex-col md:flex-row gap-3">
@@ -175,7 +192,19 @@ export default function Stores() {
                       </div>
                     </div>
                   </div>
-                  <ChevronRight className="text-slate-300 group-hover:text-blue-600 transition-colors flex-shrink-0 ml-4" />
+                  
+                  <div className="flex items-center gap-1 ml-4">
+                    <Button 
+                      variant="ghost" 
+                      size="icon" 
+                      className="text-slate-400 hover:text-blue-600 hover:bg-blue-50 rounded-lg h-9 w-9"
+                      onClick={(e) => handleEditStore(e, store)}
+                      title="Editar Loja"
+                    >
+                      <Edit size={18} />
+                    </Button>
+                    <ChevronRight className="text-slate-300 group-hover:text-blue-600 transition-colors flex-shrink-0 ml-1" />
+                  </div>
                 </CardContent>
               </Card>
             ))}
@@ -215,6 +244,13 @@ export default function Stores() {
           )}
         </div>
       )}
+
+      {/* Painel Lateral de Formulário */}
+      <StoreFormSheet 
+        isOpen={isSheetOpen} 
+        onClose={() => setIsSheetOpen(false)} 
+        storeToEdit={storeToEdit} 
+      />
     </div>
   );
 }
