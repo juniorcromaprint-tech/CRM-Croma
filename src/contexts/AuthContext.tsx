@@ -28,6 +28,24 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
   useEffect(() => {
     let mounted = true;
 
+    const fetchProfile = async (userId: string) => {
+      try {
+        const { data, error } = await supabase
+          .from('profiles')
+          .select('*')
+          .eq('id', userId)
+          .single();
+        
+        if (!error && data && mounted) {
+          setProfile(data);
+        }
+      } catch (error) {
+        console.error('Erro ao buscar perfil:', error);
+      } finally {
+        if (mounted) setIsLoading(false);
+      }
+    };
+
     const initializeAuth = async () => {
       try {
         const { data: { session }, error } = await supabase.auth.getSession();
@@ -69,24 +87,6 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
       subscription.unsubscribe();
     };
   }, []);
-
-  const fetchProfile = async (userId: string) => {
-    try {
-      const { data, error } = await supabase
-        .from('profiles')
-        .select('*')
-        .eq('id', userId)
-        .single();
-      
-      if (!error && data) {
-        setProfile(data);
-      }
-    } catch (error) {
-      console.error('Erro ao buscar perfil:', error);
-    } finally {
-      setIsLoading(false);
-    }
-  };
 
   const signOut = async () => {
     await supabase.auth.signOut();
