@@ -11,6 +11,7 @@ import StoreDetail from "./pages/StoreDetail";
 import Clients from "./pages/Clients";
 import Settings from "./pages/Settings";
 import Login from "./pages/Login";
+import Team from "./pages/Team";
 
 const queryClient = new QueryClient();
 
@@ -53,6 +54,7 @@ function App() {
               <Route path="stores" element={<Stores />} />
               <Route path="stores/:id" element={<StoreDetail />} />
               <Route path="clients" element={<Clients />} />
+              <Route path="team" element={<Team />} />
               <Route path="settings" element={<Settings />} />
             </Route>
           </Routes>

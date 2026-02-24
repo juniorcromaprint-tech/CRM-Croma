@@ -1,15 +1,9 @@
 import React from "react";
 import { Link, useLocation, Outlet } from "react-router-dom";
-import { Home, ClipboardList, Store, Users, Settings as SettingsIcon, Menu } from "lucide-react";
+import { Home, ClipboardList, Store, Users, Settings as SettingsIcon, Menu, ShieldCheck } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Sheet, SheetContent, SheetTrigger } from "@/components/ui/sheet";
-
-const navItems = [
-  { name: "Início", path: "/", icon: Home },
-  { name: "Instalações", path: "/jobs", icon: ClipboardList },
-  { name: "Lojas", path: "/stores", icon: Store },
-  { name: "Clientes", path: "/clients", icon: Users },
-];
+import { useAuth } from "@/contexts/AuthContext";
 
 export const CromaLogo = ({ className = "" }: { className?: string }) => (
   <img 
@@ -36,6 +30,19 @@ export const CromaLogoFallback = ({ className = "" }: { className?: string }) =>
 
 export default function Layout() {
   const location = useLocation();
+  const { profile } = useAuth();
+
+  const navItems = [
+    { name: "Início", path: "/", icon: Home },
+    { name: "Instalações", path: "/jobs", icon: ClipboardList },
+    { name: "Lojas", path: "/stores", icon: Store },
+    { name: "Clientes", path: "/clients", icon: Users },
+  ];
+
+  // Adiciona o menu de equipe apenas se for admin
+  if (profile?.role === 'admin') {
+    navItems.push({ name: "Equipe", path: "/team", icon: ShieldCheck });
+  }
 
   const NavLinks = () => (
     <>
