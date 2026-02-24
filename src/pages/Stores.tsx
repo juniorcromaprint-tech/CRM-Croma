@@ -1,5 +1,5 @@
-import React, { useState, useMemo, useEffect } from "react";
-import { Search, Store, MapPin, ChevronRight, Filter, Building2, ChevronLeft, Plus, Edit, Map } from "lucide-react";
+import React, { useState, useMemo, useEffect, useRef } from "react";
+import { Search, Store, MapPin, ChevronRight, Filter, Building2, ChevronLeft, Plus, Edit, Map, Check } from "lucide-react";
 import { Input } from "@/components/ui/input";
 import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -8,16 +8,105 @@ import { supabase } from "@/integrations/supabase/client";
 import { useNavigate } from "react-router-dom";
 import StoreFormSheet from "@/components/StoreFormSheet";
 
+// Componente customizado para Múltipla Seleção
+interface MultiSelectProps {
+  options: string[];
+  selected: string[];
+  onChange: (selected: string[]) => void;
+  placeholder: string;
+  icon: React.ElementType;
+}
+
+const MultiSelect = ({ options, selected, onChange, placeholder, icon: Icon }: MultiSelectProps) => {
+  const [isOpen, setIsOpen] = useState(false);
+  const dropdownRef = useRef<HTMLDivElement>(null);
+
+  useEffect(() => {
+    const handleClickOutside = (event: MouseEvent) => {
+      if (dropdownRef.current && !dropdownRef.current.contains(event.target as Node)) {
+        setIsOpen(false);
+      }
+    };
+    document.addEventListener("mousedown", handleClickOutside);
+    return () => document.removeEventListener("mousedown", handleClickOutside);
+  }, []);
+
+  const toggleOption = (option: string) => {
+    if (selected.includes(option)) {
+      onChange(selected.filter((item) => item !== option));
+    } else {
+      onChange([...selected, option]);
+    }
+  };
+
+  const displayText = selected.length === 0 
+    ? placeholder 
+    : selected.length === 1 
+      ? selected[0] 
+      : `${selected.length} selecionados`;
+
+  return (
+    <div className="relative" ref={dropdownRef}>
+      <button
+        type="button"
+        onClick={() => setIsOpen(!isOpen)}
+        className="w-full h-12 pl-10 pr-10 rounded-xl border border-slate-200 bg-white shadow-sm text-sm focus:ring-2 focus:ring-blue-600 focus:border-transparent outline-none text-slate-700 flex items-center justify-between text-left transition-all"
+      >
+        <div className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400">
+          <Icon size={18} />
+        </div>
+        <span className="truncate font-medium">{displayText}</span>
+        <div className="absolute right-3 top-1/2 -translate-y-1/2 text-slate-400">
+          <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className={`transition-transform duration-200 ${isOpen ? 'rotate-180' : ''}`}><path d="m6 9 6 6 6-6"/></svg>
+        </div>
+      </button>
+
+      {isOpen && (
+        <div className="absolute z-50 w-full mt-2 bg-white border border-slate-200 rounded-xl shadow-xl max-h-64 overflow-y-auto py-1 animate-in fade-in slide-in-from-top-2">
+          {options.length === 0 ? (
+            <div className="px-4 py-3 text-sm text-slate-500 text-center">Nenhuma opção</div>
+          ) : (
+            <>
+              {selected.length > 0 && (
+                <div 
+                  className="px-4 py-2.5 text-sm text-blue-600 font-bold hover:bg-blue-50 cursor-pointer border-b border-slate-100 flex items-center justify-center transition-colors"
+                  onClick={() => { onChange([]); setIsOpen(false); }}
+                >
+                  Limpar seleção
+                </div>
+              )}
+              {options.map((option) => (
+                <div 
+                  key={option}
+                  className="flex items-center px-4 py-2.5 hover:bg-slate-50 cursor-pointer text-sm text-slate-700 transition-colors"
+                  onClick={() => toggleOption(option)}
+                >
+                  <div className={`w-4 h-4 rounded border mr-3 flex items-center justify-center transition-colors ${selected.includes(option) ? 'bg-blue-600 border-blue-600' : 'border-slate-300'}`}>
+                    {selected.includes(option) && <Check size={12} className="text-white" />}
+                  </div>
+                  <span className="truncate">{option}</span>
+                </div>
+              ))}
+            </>
+          )}
+        </div>
+      )}
+    </div>
+  );
+};
+
 export default function Stores() {
   const [searchTerm, setSearchTerm] = useState("");
-  const [selectedBrand, setSelectedBrand] = useState("all");
-  const [selectedState, setSelectedState] = useState("all");
-  const [selectedNeighborhood, setSelectedNeighborhood] = useState("all");
+  
+  // Agora os filtros são arrays para permitir múltipla escolha
+  const [selectedBrands, setSelectedBrands] = useState<string[]>([]);
+  const [selectedStates, setSelectedStates] = useState<string[]>([]);
+  const [selectedNeighborhoods, setSelectedNeighborhoods] = useState<string[]>([]);
+  
   const [currentPage, setCurrentPage] = useState(1);
   const itemsPerPage = 50;
   const navigate = useNavigate();
 
-  // Estado para o painel lateral de formulário
   const [isSheetOpen, setIsSheetOpen] = useState(false);
   const [storeToEdit, setStoreToEdit] = useState<any>(null);
 
@@ -47,40 +136,38 @@ export default function Stores() {
     }
   });
 
-  // Extrai as marcas únicas
   const brands = useMemo(() => {
     if (!stores) return [];
     const uniqueBrands = new Set(stores.map(s => s.brand).filter(Boolean));
     return Array.from(uniqueBrands).sort();
   }, [stores]);
 
-  // Extrai os estados (UF) únicos
   const states = useMemo(() => {
     if (!stores) return [];
     const uniqueStates = new Set(stores.map(s => s.state?.trim().toUpperCase()).filter(Boolean));
     return Array.from(uniqueStates).sort();
   }, [stores]);
 
-  // Extrai os bairros/regiões únicos (filtrando pelo estado selecionado, se houver)
   const neighborhoods = useMemo(() => {
     if (!stores) return [];
     let filtered = stores;
-    if (selectedState !== "all") {
-      filtered = stores.filter(s => s.state?.trim().toUpperCase() === selectedState);
+    // Se houver estados selecionados, filtra os bairros apenas desses estados
+    if (selectedStates.length > 0) {
+      filtered = stores.filter(s => s.state && selectedStates.includes(s.state.trim().toUpperCase()));
     }
     const uniqueNeigh = new Set(filtered.map(s => s.neighborhood?.trim()).filter(Boolean));
     return Array.from(uniqueNeigh).sort();
-  }, [stores, selectedState]);
+  }, [stores, selectedStates]);
 
   // Reseta a página ao mudar qualquer filtro
   useEffect(() => {
     setCurrentPage(1);
-  }, [searchTerm, selectedBrand, selectedState, selectedNeighborhood]);
+  }, [searchTerm, selectedBrands, selectedStates, selectedNeighborhoods]);
 
-  // Reseta o bairro se o estado mudar
+  // Limpa os bairros selecionados se o estado mudar (para não ficar com bairro de outro estado selecionado)
   useEffect(() => {
-    setSelectedNeighborhood("all");
-  }, [selectedState]);
+    setSelectedNeighborhoods([]);
+  }, [selectedStates]);
 
   const filteredStores = useMemo(() => {
     if (!stores) return [];
@@ -96,13 +183,13 @@ export default function Stores() {
         (String(store.brand || "").toLowerCase()).includes(searchLower) ||
         (String(store.address || "").toLowerCase()).includes(searchLower);
 
-      const matchesBrand = selectedBrand === "all" || store.brand === selectedBrand;
-      const matchesState = selectedState === "all" || store.state?.trim().toUpperCase() === selectedState;
-      const matchesNeighborhood = selectedNeighborhood === "all" || store.neighborhood?.trim() === selectedNeighborhood;
+      const matchesBrand = selectedBrands.length === 0 || selectedBrands.includes(store.brand);
+      const matchesState = selectedStates.length === 0 || (store.state && selectedStates.includes(store.state.trim().toUpperCase()));
+      const matchesNeighborhood = selectedNeighborhoods.length === 0 || (store.neighborhood && selectedNeighborhoods.includes(store.neighborhood.trim()));
 
       return matchesSearch && matchesBrand && matchesState && matchesNeighborhood;
     });
-  }, [stores, searchTerm, selectedBrand, selectedState, selectedNeighborhood]);
+  }, [stores, searchTerm, selectedBrands, selectedStates, selectedNeighborhoods]);
 
   const totalPages = Math.ceil(filteredStores.length / itemsPerPage);
   const paginatedStores = filteredStores.slice(
@@ -148,61 +235,31 @@ export default function Stores() {
           />
         </div>
         
-        {/* Filtros */}
+        {/* Filtros Multi-select */}
         <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
-          {/* Filtro de Marca */}
-          <div className="relative">
-            <Filter className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" size={18} />
-            <select
-              value={selectedBrand}
-              onChange={(e) => setSelectedBrand(e.target.value)}
-              className="w-full h-12 pl-10 pr-10 rounded-xl border border-slate-200 bg-white shadow-sm text-sm focus:ring-2 focus:ring-blue-600 focus:border-transparent appearance-none outline-none text-slate-700"
-            >
-              <option value="all">Todas as Marcas</option>
-              {brands.map(brand => (
-                <option key={brand} value={brand}>{brand}</option>
-              ))}
-            </select>
-            <div className="absolute right-3 top-1/2 -translate-y-1/2 pointer-events-none text-slate-400">
-              <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="m6 9 6 6 6-6"/></svg>
-            </div>
-          </div>
+          <MultiSelect 
+            options={brands}
+            selected={selectedBrands}
+            onChange={setSelectedBrands}
+            placeholder="Todas as Marcas"
+            icon={Filter}
+          />
 
-          {/* Filtro de Estado (UF) */}
-          <div className="relative">
-            <Map className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" size={18} />
-            <select
-              value={selectedState}
-              onChange={(e) => setSelectedState(e.target.value)}
-              className="w-full h-12 pl-10 pr-10 rounded-xl border border-slate-200 bg-white shadow-sm text-sm focus:ring-2 focus:ring-blue-600 focus:border-transparent appearance-none outline-none text-slate-700"
-            >
-              <option value="all">Todos os Estados (UF)</option>
-              {states.map(state => (
-                <option key={state} value={state}>{state}</option>
-              ))}
-            </select>
-            <div className="absolute right-3 top-1/2 -translate-y-1/2 pointer-events-none text-slate-400">
-              <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="m6 9 6 6 6-6"/></svg>
-            </div>
-          </div>
+          <MultiSelect 
+            options={states}
+            selected={selectedStates}
+            onChange={setSelectedStates}
+            placeholder="Todos os Estados (UF)"
+            icon={Map}
+          />
 
-          {/* Filtro de Bairro / Região */}
-          <div className="relative">
-            <MapPin className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" size={18} />
-            <select
-              value={selectedNeighborhood}
-              onChange={(e) => setSelectedNeighborhood(e.target.value)}
-              className="w-full h-12 pl-10 pr-10 rounded-xl border border-slate-200 bg-white shadow-sm text-sm focus:ring-2 focus:ring-blue-600 focus:border-transparent appearance-none outline-none text-slate-700"
-            >
-              <option value="all">Todos os Bairros / Regiões</option>
-              {neighborhoods.map(neigh => (
-                <option key={neigh} value={neigh}>{neigh}</option>
-              ))}
-            </select>
-            <div className="absolute right-3 top-1/2 -translate-y-1/2 pointer-events-none text-slate-400">
-              <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="m6 9 6 6 6-6"/></svg>
-            </div>
-          </div>
+          <MultiSelect 
+            options={neighborhoods}
+            selected={selectedNeighborhoods}
+            onChange={setSelectedNeighborhoods}
+            placeholder="Todos os Bairros / Regiões"
+            icon={MapPin}
+          />
         </div>
       </div>
 
