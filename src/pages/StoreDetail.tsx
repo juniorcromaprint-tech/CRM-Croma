@@ -1,18 +1,20 @@
-import React from "react";
+import React, { useState } from "react";
 import { useParams, useNavigate } from "react-router-dom";
 import { useQuery } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import { 
   ArrowLeft, Store, MapPin, Phone, Mail, Building2, 
   Briefcase, Calendar, AlertTriangle, FileText, Image as ImageIcon,
-  CheckCircle2, Clock, XCircle
+  CheckCircle2, Clock, XCircle, Edit, ExternalLink
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import StoreFormSheet from "@/components/StoreFormSheet";
 
 export default function StoreDetail() {
   const { id } = useParams();
   const navigate = useNavigate();
+  const [isSheetOpen, setIsSheetOpen] = useState(false);
 
   // Busca os dados da loja
   const { data: store, isLoading: isLoadingStore } = useQuery({
@@ -89,27 +91,45 @@ export default function StoreDetail() {
     );
   }
 
+  // Monta o endereço completo para a busca no mapa
+  const fullAddress = [store.address, store.neighborhood, store.state, store.zip_code]
+    .filter(Boolean)
+    .join(', ');
+  
+  // Link universal do Google Maps (funciona bem no celular e costuma sugerir abrir no Waze/Maps)
+  const mapsUrl = `https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(fullAddress)}`;
+
   return (
     <div className="space-y-6 animate-in fade-in duration-500 pb-10">
       {/* Header */}
-      <div className="flex items-center gap-4">
-        <Button 
-          variant="ghost" 
-          size="icon" 
-          onClick={() => navigate('/stores')}
-          className="bg-white shadow-sm border border-slate-200 rounded-xl hover:bg-slate-50 text-slate-600"
-        >
-          <ArrowLeft size={20} />
-        </Button>
-        <div>
-          <div className="flex items-center gap-3">
-            <h1 className="text-2xl md:text-3xl font-bold text-slate-800">{store.name}</h1>
-            <span className="px-3 py-1 bg-blue-100 text-blue-700 text-sm font-bold rounded-lg border border-blue-200">
-              {store.brand}
-            </span>
+      <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
+        <div className="flex items-center gap-4">
+          <Button 
+            variant="ghost" 
+            size="icon" 
+            onClick={() => navigate('/stores')}
+            className="bg-white shadow-sm border border-slate-200 rounded-xl hover:bg-slate-50 text-slate-600 shrink-0"
+          >
+            <ArrowLeft size={20} />
+          </Button>
+          <div>
+            <div className="flex items-center gap-3 flex-wrap">
+              <h1 className="text-2xl md:text-3xl font-bold text-slate-800">{store.name}</h1>
+              <span className="px-3 py-1 bg-blue-100 text-blue-700 text-sm font-bold rounded-lg border border-blue-200">
+                {store.brand}
+              </span>
+            </div>
+            {store.code && <p className="text-slate-500 mt-1 font-medium">Código do Cliente: {store.code}</p>}
           </div>
-          {store.code && <p className="text-slate-500 mt-1 font-medium">Código do Cliente: {store.code}</p>}
         </div>
+        
+        <Button 
+          onClick={() => setIsSheetOpen(true)}
+          variant="outline"
+          className="bg-white border-slate-200 text-slate-700 hover:bg-slate-50 rounded-xl h-11 shadow-sm w-full md:w-auto"
+        >
+          <Edit size={18} className="mr-2" /> Editar Loja
+        </Button>
       </div>
 
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
@@ -139,35 +159,51 @@ export default function StoreDetail() {
                 </div>
               )}
 
-              {(store.address || store.neighborhood || store.state) && (
+              {fullAddress && (
                 <div>
                   <p className="text-xs font-bold text-slate-400 uppercase tracking-wider mb-1 flex items-center gap-1">
                     <MapPin size={12} /> Endereço
                   </p>
-                  <p className="text-slate-800 font-medium">
-                    {store.address}
-                    {store.neighborhood && `, ${store.neighborhood}`}
-                    {store.state && ` - ${store.state}`}
-                    {store.zip_code && ` (${store.zip_code})`}
-                  </p>
+                  <a 
+                    href={mapsUrl} 
+                    target="_blank" 
+                    rel="noopener noreferrer"
+                    className="group flex items-start gap-2 p-3 -mx-3 rounded-xl hover:bg-blue-50 transition-colors"
+                  >
+                    <div className="bg-blue-100 text-blue-600 p-2 rounded-lg shrink-0 group-hover:bg-blue-600 group-hover:text-white transition-colors">
+                      <MapPin size={18} />
+                    </div>
+                    <div>
+                      <p className="text-slate-800 font-medium group-hover:text-blue-700 transition-colors line-clamp-3">
+                        {fullAddress}
+                      </p>
+                      <p className="text-xs text-blue-600 font-bold mt-1 flex items-center gap-1 opacity-80 group-hover:opacity-100">
+                        Abrir no Mapa <ExternalLink size={10} />
+                      </p>
+                    </div>
+                  </a>
                 </div>
               )}
 
               {(store.phone || store.email) && (
                 <div className="pt-4 border-t border-slate-100">
                   <p className="text-xs font-bold text-slate-400 uppercase tracking-wider mb-3">Contato</p>
-                  <div className="space-y-2">
+                  <div className="space-y-3">
                     {store.phone && (
-                      <div className="flex items-center gap-2 text-slate-700">
-                        <Phone size={16} className="text-slate-400" />
+                      <a href={`tel:${store.phone.replace(/\D/g, '')}`} className="flex items-center gap-3 text-slate-700 hover:text-blue-600 transition-colors p-2 -mx-2 rounded-lg hover:bg-slate-50">
+                        <div className="bg-slate-100 p-2 rounded-lg text-slate-500">
+                          <Phone size={16} />
+                        </div>
                         <span className="font-medium">{store.phone}</span>
-                      </div>
+                      </a>
                     )}
                     {store.email && (
-                      <div className="flex items-center gap-2 text-slate-700">
-                        <Mail size={16} className="text-slate-400" />
-                        <span className="font-medium">{store.email}</span>
-                      </div>
+                      <a href={`mailto:${store.email}`} className="flex items-center gap-3 text-slate-700 hover:text-blue-600 transition-colors p-2 -mx-2 rounded-lg hover:bg-slate-50">
+                        <div className="bg-slate-100 p-2 rounded-lg text-slate-500">
+                          <Mail size={16} />
+                        </div>
+                        <span className="font-medium break-all">{store.email}</span>
+                      </a>
                     )}
                   </div>
                 </div>
@@ -282,6 +318,13 @@ export default function StoreDetail() {
         </div>
 
       </div>
+
+      {/* Painel Lateral de Edição */}
+      <StoreFormSheet 
+        isOpen={isSheetOpen} 
+        onClose={() => setIsSheetOpen(false)} 
+        storeToEdit={store} 
+      />
     </div>
   );
 }

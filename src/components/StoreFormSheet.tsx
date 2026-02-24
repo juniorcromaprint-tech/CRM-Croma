@@ -73,6 +73,8 @@ export default function StoreFormSheet({ isOpen, onClose, storeToEdit }: StoreFo
         const { error } = await supabase.from('stores').update(formData).eq('id', storeToEdit.id);
         if (error) throw error;
         showSuccess("Loja atualizada com sucesso!");
+        // Atualiza a query específica desta loja para refletir na tela de detalhes
+        queryClient.invalidateQueries({ queryKey: ['store', storeToEdit.id] });
       } else {
         // Criar nova loja
         const { error } = await supabase.from('stores').insert([formData]);
@@ -80,7 +82,7 @@ export default function StoreFormSheet({ isOpen, onClose, storeToEdit }: StoreFo
         showSuccess("Loja cadastrada com sucesso!");
       }
       
-      // Atualiza a lista de lojas em segundo plano
+      // Atualiza a lista geral de lojas
       queryClient.invalidateQueries({ queryKey: ['all-stores'] });
       onClose();
     } catch (error) {
