@@ -64,19 +64,74 @@ export default function StoreFormSheet({ isOpen, onClose, storeToEdit }: StoreFo
     setFormData(prev => ({ ...prev, [e.target.name]: e.target.value }));
   };
 
-  // Busca coordenadas pelo endereço digitado usando API gratuita do OpenStreetMap
+  // Busca coordenadas de forma inteligente usando ViaCEP + OpenStreetMap
   const geocodeAddress = async () => {
-    const fullAddress = `${formData.address}, ${formData.neighborhood}, ${formData.state}, Brasil`;
-    if (!formData.address || !formData.state) {
-      showError("Preencha pelo menos o Endereço e o Estado para buscar no mapa.");
+    if (!formData.address && !formData.zip_code) {
+      showError("Preencha o CEP ou o Endereço para buscar no mapa.");
       return;
     }
 
     setIsLocating(true);
     try {
-      const response = await fetch(`https://nominatim.openstreetmap.org/search?format=json&q=${encodeURIComponent(fullAddress)}`);
-      const data = await response.json();
-      
+      let data = null;
+
+      // 1. Tenta usar o CEP primeiro (ViaCEP) para descobrir a cidade exata
+      if (formData.zip_code) {
+        const cleanCep = formData.zip_code.replace(/\D/g, '');
+        if (cleanCep.length === 8) {
+          try {
+            const viaCepRes = await fetch(`https://viacep.com.br/ws/${cleanCep}/json/`);
+            const viaCepData = await viaCepRes.json();
+
+            if (!viaCepData.erro) {
+              // Atualiza os campos do formulário automaticamente se estiverem vazios
+              setFormData(prev => ({
+                ...prev,
+                address: prev.address || viaCepData.logradouro,
+                neighborhood: prev.neighborhood || viaCepData.bairro,
+                state: prev.state || viaCepData.uf,
+              }));
+
+              // Extrai o número do endereço digitado (se houver) para maior precisão
+              const numeroMatch = formData.address.match(/\d+/);
+              const numero = numeroMatch ? numeroMatch[0] : '';
+              const ruaComNumero = numero ? `${viaCepData.logradouro}, ${numero}` : viaCepData.logradouro;
+
+              // Busca no mapa com a cidade exata que o ViaCEP retornou
+              const query = `${ruaComNumero}, ${viaCepData.localidade}, ${viaCepData.uf}, Brasil`;
+              const res = await fetch(`https://nominatim.openstreetmap.org/search?format=json&q=${encodeURIComponent(query)}&limit=1`);
+              const nominatimData = await res.json();
+              
+              if (nominatimData && nominatimData.length > 0) {
+                data = nominatimData;
+              }
+            }
+          } catch (e) {
+            console.error("Erro ao consultar ViaCEP", e);
+          }
+        }
+      }
+
+      // 2. Se não achou pelo CEP, tenta pelo endereço digitado
+      if (!data && formData.address && formData.state) {
+        // Limpa o endereço (remove "Loja 1", "Térreo", etc que confundem o mapa)
+        const cleanAddress = formData.address.split(',')[0].split('-')[0].trim();
+        
+        const queries = [
+          `${cleanAddress}, ${formData.neighborhood ? formData.neighborhood + ',' : ''} ${formData.state}, Brasil`,
+          `${cleanAddress}, ${formData.state}, Brasil`
+        ];
+
+        for (const query of queries) {
+          if (data) break;
+          const res = await fetch(`https://nominatim.openstreetmap.org/search?format=json&q=${encodeURIComponent(query)}&limit=1`);
+          const nominatimData = await res.json();
+          if (nominatimData && nominatimData.length > 0) {
+            data = nominatimData;
+          }
+        }
+      }
+
       if (data && data.length > 0) {
         setFormData(prev => ({
           ...prev,
@@ -85,7 +140,7 @@ export default function StoreFormSheet({ isOpen, onClose, storeToEdit }: StoreFo
         }));
         showSuccess("Coordenadas encontradas com sucesso!");
       } else {
-        showError("Endereço não encontrado no mapa. Tente detalhar mais.");
+        showError("Endereço não encontrado. Dica: Preencha o CEP corretamente ou simplifique o nome da rua.");
       }
     } catch (error) {
       showError("Erro ao buscar coordenadas.");
@@ -201,6 +256,15 @@ export default function StoreFormSheet({ isOpen, onClose, storeToEdit }: StoreFo
               <MapPin className="text-blue-600" size={16} /> Endereço & Mapa
             </h3>
             <div className="space-y-3">
+              <div className="grid grid-cols-2 gap-3">
+                <div className="col-span-2 sm:col-span-1">
+                  <label className="text-xs font-bold text-slate-500 mb-1 block">CEP</label>
+                  <Input name="zip_code" value={formData.zip_code} onChange={handleChange} placeholder="00000-000" className="h-11 rounded-xl bg-slate-50 border-slate-200" />
+                </div>
+                <div className="col-span-2 sm:col-span-1 flex items-end">
+                  <p className="text-xs text-slate-400 mb-3">Dica: Digite o CEP e clique em buscar abaixo para preencher.</p>
+                </div>
+              </div>
               <div>
                 <label className="text-xs font-bold text-slate-500 mb-1 block">Endereço Completo</label>
                 <Input name="address" value={formData.address} onChange={handleChange} placeholder="Rua, Avenida, Número..." className="h-11 rounded-xl bg-slate-50 border-slate-200" />
@@ -211,13 +275,9 @@ export default function StoreFormSheet({ isOpen, onClose, storeToEdit }: StoreFo
                   <Input name="neighborhood" value={formData.neighborhood} onChange={handleChange} placeholder="Ex: Centro" className="h-11 rounded-xl bg-slate-50 border-slate-200" />
                 </div>
                 <div>
-                  <label className="text-xs font-bold text-slate-500 mb-1 block">CEP</label>
-                  <Input name="zip_code" value={formData.zip_code} onChange={handleChange} placeholder="00000-000" className="h-11 rounded-xl bg-slate-50 border-slate-200" />
+                  <label className="text-xs font-bold text-slate-500 mb-1 block">Estado (UF)</label>
+                  <Input name="state" value={formData.state} onChange={handleChange} placeholder="Ex: SP" className="h-11 rounded-xl bg-slate-50 border-slate-200" maxLength={2} />
                 </div>
-              </div>
-              <div>
-                <label className="text-xs font-bold text-slate-500 mb-1 block">Estado (UF)</label>
-                <Input name="state" value={formData.state} onChange={handleChange} placeholder="Ex: SP" className="h-11 rounded-xl bg-slate-50 border-slate-200" maxLength={2} />
               </div>
 
               {/* Coordenadas GPS */}
@@ -245,7 +305,7 @@ export default function StoreFormSheet({ isOpen, onClose, storeToEdit }: StoreFo
                     className="w-full bg-white border-blue-200 text-blue-700 hover:bg-blue-100"
                   >
                     {isLocating ? <Loader2 className="animate-spin mr-2" size={16} /> : <Search size={16} className="mr-2" />}
-                    Buscar pelo Endereço Digitado
+                    Buscar pelo CEP ou Endereço
                   </Button>
                   <Button 
                     type="button" 
