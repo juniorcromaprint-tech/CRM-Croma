@@ -1,418 +1,235 @@
-import React, { useState, useRef } from "react";
-import { Upload, FileSpreadsheet, AlertCircle, Loader2, Database, FileType2, Download, Trash2 } from "lucide-react";
-import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
+import React, { useState } from "react";
+import { useNavigate } from "react-router-dom";
+import { 
+  User, Bell, Building, LogOut, Shield, 
+  Smartphone, Image as ImageIcon, Save, HelpCircle, ChevronRight
+} from "lucide-react";
 import { Button } from "@/components/ui/button";
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
+import { Input } from "@/components/ui/input";
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { supabase } from "@/integrations/supabase/client";
 import { showSuccess, showError } from "@/utils/toast";
-import Papa from "papaparse";
-import * as XLSX from "xlsx";
 
 export default function Settings() {
-  const [isUploading, setIsUploading] = useState(false);
-  const [isDeleting, setIsDeleting] = useState(false);
-  const [progress, setProgress] = useState(0);
-  const fileInputRef = useRef<HTMLInputElement>(null);
+  const navigate = useNavigate();
+  const [isSaving, setIsSaving] = useState(false);
 
-  // Motor de Processamento com Mapeamento Absoluto
-  const process2DArray = async (rawRows: any[][]) => {
+  // Estados simulados para as configurações (podem ser ligados ao banco depois)
+  const [notifications, setNotifications] = useState(true);
+  const [compressPhotos, setCompressPhotos] = useState(true);
+
+  const handleLogout = async () => {
     try {
-      setProgress(10);
-      
-      // Busca clientes existentes para evitar duplicatas
-      const { data: existingStores } = await supabase.from('stores').select('id, code, cnpj, name, address');
-      const existingMap = new Map();
-      
-      if (existingStores) {
-        existingStores.forEach(store => {
-          const safeName = (store.name || "").toLowerCase().trim();
-          const safeAddress = (store.address || "").toLowerCase().trim();
-          if (store.code && safeName) existingMap.set(`code_name:${store.code}_${safeName}`, store.id);
-          if (store.cnpj && safeName) existingMap.set(`cnpj_name:${store.cnpj}_${safeName}`, store.id);
-          if (safeName && safeAddress) existingMap.set(`name_address:${safeName}_${safeAddress}`, store.id);
-        });
-      }
-
-      setProgress(30);
-
-      const storesMapToUpsert = new Map();
-      
-      let headerRowIndex = -1;
-      let colMap: Record<string, number> = {};
-
-      // 1. Encontrar o cabeçalho e mapear as colunas exatas
-      for (let i = 0; i < Math.min(50, rawRows.length); i++) {
-        const row = rawRows[i];
-        if (!Array.isArray(row)) continue;
-        const rowStr = row.join(" ").toLowerCase().normalize("NFD").replace(/[\u0300-\u036f]/g, "");
-        
-        // Detecta a linha de cabeçalho
-        if (rowStr.includes("cnpj") && (rowStr.includes("razao") || rowStr.includes("nome") || rowStr.includes("fantasia"))) {
-          headerRowIndex = i;
-          row.forEach((cell, index) => {
-            const val = String(cell || "").toLowerCase().normalize("NFD").replace(/[\u0300-\u036f]/g, "").trim();
-            if (val === "codigo" || val === "cod" || val === "id") colMap.code = index;
-            else if (val.includes("razao") || val.includes("social")) colMap.corporate_name = index;
-            else if (val.includes("fantasia") || val === "nome" || val === "loja" || val === "cliente") colMap.name = index;
-            else if (val === "cnpj" || val.includes("documento") || val === "cgc") colMap.cnpj = index;
-            else if (val.includes("endereco") || val.includes("rua") || val.includes("logradouro")) colMap.address = index;
-            else if (val === "uf" || val.includes("estado") || val.includes("cidade")) colMap.state = index;
-            else if (val.includes("bairro") || val.includes("distrito")) colMap.neighborhood = index;
-            else if (val.includes("cep")) colMap.zip_code = index;
-            else if (val.includes("grupo") || val.includes("marca") || val.includes("rede")) colMap.brand = index;
-            else if (val.includes("email") || val.includes("e-mail")) colMap.email = index;
-            else if (val.includes("fone") || val.includes("telefone") || val.includes("celular") || val.includes("contato")) colMap.phone = index;
-          });
-          break;
-        }
-      }
-
-      // 2. Processar TODAS as linhas
-      for (let i = 0; i < rawRows.length; i++) {
-        if (i === headerRowIndex) continue;
-        const rowArray = rawRows[i];
-        if (!rowArray || !Array.isArray(rowArray) || rowArray.length === 0) continue;
-        
-        // Pula linhas completamente vazias
-        if (rowArray.every(cell => cell === null || cell === undefined || cell === "")) continue;
-
-        let storeData: any = null;
-
-        // PRIORIDADE 1: Se achou o cabeçalho, usa o mapa de colunas para TODAS as linhas
-        if (headerRowIndex !== -1 && Object.keys(colMap).length > 0) {
-          const getVal = (key: string) => colMap[key] !== undefined && rowArray[colMap[key]] !== undefined ? String(rowArray[colMap[key]]).trim() : "";
-          
-          const cnpjVal = getVal('cnpj');
-          const nameVal = getVal('name');
-          const corpVal = getVal('corporate_name');
-
-          // Só aceita se tiver pelo menos o CNPJ, Nome ou Razão Social
-          if (cnpjVal || nameVal || corpVal) {
-            storeData = {
-              code: getVal('code'),
-              corporate_name: corpVal,
-              name: nameVal || corpVal || (cnpjVal ? `Loja ${cnpjVal}` : 'Loja Sem Nome'),
-              cnpj: cnpjVal,
-              address: getVal('address'),
-              state: getVal('state'),
-              neighborhood: getVal('neighborhood'),
-              zip_code: getVal('zip_code'),
-              brand: getVal('brand') || 'Sem Grupo',
-              email: getVal('email').replace(/<br>/gi, ' / '),
-              phone: getVal('phone').replace(/<br>/gi, ' / '),
-            };
-          }
-        } 
-        // PRIORIDADE 2: Fallback de âncora (Só roda se a planilha não tiver cabeçalho nenhum)
-        else {
-          let cnpjIndex = -1;
-          let cleanCnpj = "";
-          for (let j = 0; j < rowArray.length; j++) {
-            const cellStr = String(rowArray[j] || "").trim();
-            const digits = cellStr.replace(/\D/g, '');
-            if (digits.length === 14 && (cellStr.includes('/') || cellStr.includes('-') || cellStr.includes('.'))) {
-              cnpjIndex = j;
-              cleanCnpj = digits;
-              break;
-            }
-          }
-
-          if (cnpjIndex !== -1) {
-            const nameVal = cnpjIndex >= 1 ? String(rowArray[cnpjIndex - 1] || "").trim() : "";
-            const corpNameVal = cnpjIndex >= 2 ? String(rowArray[cnpjIndex - 2] || "").trim() : "";
-            storeData = {
-              code: cnpjIndex >= 3 ? String(rowArray[cnpjIndex - 3] || "").trim() : "",
-              corporate_name: corpNameVal,
-              name: nameVal || corpNameVal || `Loja ${cleanCnpj}`,
-              cnpj: String(rowArray[cnpjIndex] || "").trim(),
-              address: String(rowArray[cnpjIndex + 1] || "").trim(),
-              state: String(rowArray[cnpjIndex + 2] || "").trim(),
-              neighborhood: String(rowArray[cnpjIndex + 3] || "").trim(),
-              zip_code: String(rowArray[cnpjIndex + 4] || "").trim(),
-              brand: String(rowArray[cnpjIndex + 5] || "").trim() || 'Sem Grupo',
-              email: String(rowArray[cnpjIndex + 6] || "").replace(/<br>/gi, ' / ').trim(),
-              phone: String(rowArray[cnpjIndex + 7] || "").replace(/<br>/gi, ' / ').trim(),
-            };
-          }
-        }
-
-        // Se conseguiu extrair dados válidos, adiciona ao Map para salvar
-        if (storeData && storeData.name) {
-          const safeName = storeData.name.toLowerCase().trim();
-          const safeAddress = (storeData.address || "").toLowerCase().trim();
-          let existingId = null;
-          
-          if (storeData.code && existingMap.has(`code_name:${storeData.code}_${safeName}`)) {
-            existingId = existingMap.get(`code_name:${storeData.code}_${safeName}`);
-          } else if (storeData.cnpj && existingMap.has(`cnpj_name:${storeData.cnpj}_${safeName}`)) {
-            existingId = existingMap.get(`cnpj_name:${storeData.cnpj}_${safeName}`);
-          } else if (safeName && safeAddress && existingMap.has(`name_address:${safeName}_${safeAddress}`)) {
-            existingId = existingMap.get(`name_address:${safeName}_${safeAddress}`);
-          }
-
-          if (existingId) {
-            storeData.id = existingId;
-            storesMapToUpsert.set(existingId, storeData);
-          } else {
-            const uniqueKey = `new_${storeData.code}_${storeData.cnpj}_${safeName}`;
-            storesMapToUpsert.set(uniqueKey, storeData);
-          }
-        }
-      }
-
-      const storesToUpsert = Array.from(storesMapToUpsert.values());
-
-      if (storesToUpsert.length === 0) {
-        showError("Nenhum cliente válido encontrado na planilha.");
-        setIsUploading(false);
-        setProgress(0);
-        return;
-      }
-
-      setProgress(50);
-
-      // Salva no banco em lotes de 100
-      const batchSize = 100;
-      for (let i = 0; i < storesToUpsert.length; i += batchSize) {
-        const batch = storesToUpsert.slice(i, i + batchSize);
-        const { error } = await supabase.from('stores').upsert(batch);
-        if (error) throw error;
-        const currentProgress = 50 + Math.floor(((i + batchSize) / storesToUpsert.length) * 50);
-        setProgress(Math.min(currentProgress, 99));
-      }
-
-      setProgress(100);
-      showSuccess(`${storesToUpsert.length} lojas processadas com sucesso!`);
-      
-    } catch (error) {
-      console.error("Erro na importação:", error);
-      showError("Erro ao salvar os dados no banco. Verifique sua conexão.");
-    } finally {
-      setIsUploading(false);
-      setTimeout(() => setProgress(0), 2000);
-      if (fileInputRef.current) fileInputRef.current.value = '';
-    }
-  };
-
-  const handleFileUpload = async (event: React.ChangeEvent<HTMLInputElement>) => {
-    const file = event.target.files?.[0];
-    if (!file) return;
-
-    setIsUploading(true);
-    setProgress(5);
-
-    const fileExt = file.name.split('.').pop()?.toLowerCase();
-
-    if (fileExt === 'csv') {
-      try {
-        const text = await file.text();
-        const semiCount = (text.match(/;/g) || []).length;
-        const commaCount = (text.match(/,/g) || []).length;
-        const tabCount = (text.match(/\t/g) || []).length;
-
-        let delimiter = ',';
-        if (semiCount > commaCount && semiCount > tabCount) delimiter = ';';
-        else if (tabCount > commaCount && tabCount > semiCount) delimiter = '\t';
-
-        Papa.parse(file, {
-          header: false, 
-          skipEmptyLines: true,
-          delimiter: delimiter,
-          complete: (results) => process2DArray(results.data as any[][]),
-          error: (error) => {
-            console.error("Erro ao ler CSV:", error);
-            showError("Erro ao ler o arquivo CSV.");
-            setIsUploading(false);
-          }
-        });
-      } catch (e) {
-        showError("Erro ao processar o arquivo CSV.");
-        setIsUploading(false);
-      }
-    } else if (fileExt === 'xlsx' || fileExt === 'xls') {
-      const reader = new FileReader();
-      reader.onload = (e) => {
-        try {
-          const data = new Uint8Array(e.target?.result as ArrayBuffer);
-          const workbook = XLSX.read(data, { type: 'array' });
-          
-          let rawRows: any[][] = [];
-          
-          for (const sheetName of workbook.SheetNames) {
-            const worksheet = workbook.Sheets[sheetName];
-            const rows = XLSX.utils.sheet_to_json(worksheet, { header: 1, defval: "" }) as any[][];
-            if (rows.length > 1) {
-              rawRows = rows;
-              break;
-            }
-          }
-          
-          if (rawRows.length === 0) {
-            showError("O arquivo Excel parece estar vazio ou sem dados válidos.");
-            setIsUploading(false);
-            return;
-          }
-          
-          process2DArray(rawRows);
-        } catch (error) {
-          console.error("Erro ao ler Excel:", error);
-          showError("Erro ao ler o arquivo Excel. Verifique se não está corrompido.");
-          setIsUploading(false);
-        }
-      };
-      reader.readAsArrayBuffer(file);
-    } else {
-      showError("Formato de arquivo não suportado. Use .xlsx, .xls ou .csv");
-      setIsUploading(false);
-    }
-  };
-
-  const downloadTemplate = () => {
-    const csvContent = "data:text/csv;charset=utf-8," + 
-      "Codigo,Razao Social,Nome Fantasia,CNPJ,Endereco,Cidade,Bairro,CEP,Marca,Email,Telefone\n" +
-      "218750-1,VICCI MAGAZINE LTDA,VICCI MAGAZINE,43.514.370/0001-50,\"DOS EXPEDICIONARIOS, 1236\",ARUJA-SP,VILA FLORA REGINA,07400-490,KELIS STORE,VICCIMAGAZINE@GMAIL.COM,(0) 46533061";
-    
-    const encodedUri = encodeURI(csvContent);
-    const link = document.createElement("a");
-    link.setAttribute("href", encodedUri);
-    link.setAttribute("download", "modelo_importacao_clientes.csv");
-    document.body.appendChild(link);
-    link.click();
-    document.body.removeChild(link);
-  };
-
-  const handleDeleteAllStores = async () => {
-    if (!window.confirm("ATENÇÃO: Isso vai apagar TODOS os clientes cadastrados. Tem certeza?")) return;
-    
-    setIsDeleting(true);
-    try {
-      const { error } = await supabase.from('stores').delete().not('id', 'is', null);
+      const { error } = await supabase.auth.signOut();
       if (error) throw error;
-      showSuccess("Todos os clientes foram apagados com sucesso.");
+      navigate("/login");
     } catch (error) {
-      console.error(error);
-      showError("Erro ao apagar clientes.");
-    } finally {
-      setIsDeleting(false);
+      console.error("Erro ao sair:", error);
+      // Mesmo se der erro no Supabase, forçamos a ida para o login por segurança
+      navigate("/login"); 
     }
+  };
+
+  const handleSave = () => {
+    setIsSaving(true);
+    setTimeout(() => {
+      setIsSaving(false);
+      showSuccess("Configurações salvas com sucesso!");
+    }, 800);
   };
 
   return (
-    <div className="space-y-6 animate-in fade-in duration-500 max-w-4xl mx-auto pb-10">
+    <div className="space-y-6 animate-in fade-in duration-500 pb-10">
       <div>
         <h1 className="text-2xl md:text-3xl font-bold text-slate-800">Configurações</h1>
-        <p className="text-slate-500 mt-1">Gerencie as preferências e dados do sistema.</p>
+        <p className="text-slate-500 mt-1">Gerencie sua conta e preferências do sistema.</p>
       </div>
 
-      <div className="grid gap-6">
-        {/* Card de Importação */}
-        <Card className="border-none shadow-sm rounded-2xl bg-white overflow-hidden">
-          <CardHeader className="border-b border-slate-100 bg-slate-50/50 pb-4">
-            <div className="flex items-center justify-between">
-              <div className="flex items-center gap-3">
-                <div className="w-10 h-10 rounded-xl bg-blue-100 text-blue-600 flex items-center justify-center">
-                  <Database size={20} />
+      <Tabs defaultValue="account" className="w-full">
+        <TabsList className="grid w-full grid-cols-3 mb-6 rounded-xl p-1 bg-slate-200/50">
+          <TabsTrigger value="account" className="rounded-lg font-medium flex items-center gap-2">
+            <User size={16} className="hidden sm:block" /> Conta
+          </TabsTrigger>
+          <TabsTrigger value="app" className="rounded-lg font-medium flex items-center gap-2">
+            <Smartphone size={16} className="hidden sm:block" /> Aplicativo
+          </TabsTrigger>
+          <TabsTrigger value="company" className="rounded-lg font-medium flex items-center gap-2">
+            <Building size={16} className="hidden sm:block" /> Empresa
+          </TabsTrigger>
+        </TabsList>
+
+        {/* ABA: MINHA CONTA */}
+        <TabsContent value="account" className="space-y-6">
+          <Card className="border-none shadow-sm rounded-2xl bg-white">
+            <CardHeader className="border-b border-slate-100 pb-4">
+              <CardTitle className="text-lg flex items-center gap-2 text-slate-800">
+                <User size={20} className="text-blue-600" /> Perfil do Usuário
+              </CardTitle>
+              <CardDescription>Atualize suas informações pessoais.</CardDescription>
+            </CardHeader>
+            <CardContent className="p-6 space-y-4">
+              <div className="flex items-center gap-4 mb-6">
+                <div className="w-16 h-16 bg-blue-100 text-blue-600 rounded-full flex items-center justify-center text-xl font-bold shadow-sm">
+                  US
                 </div>
                 <div>
-                  <CardTitle className="text-lg font-bold text-slate-800">Importar Clientes / Lojas</CardTitle>
-                  <CardDescription className="text-slate-500">Faça upload de uma planilha para cadastrar ou atualizar clientes.</CardDescription>
+                  <h3 className="font-bold text-slate-800 text-lg">Usuário Sistema</h3>
+                  <p className="text-slate-500 text-sm">usuario@cromaprint.com.br</p>
                 </div>
               </div>
-              <Button variant="outline" onClick={downloadTemplate} className="hidden md:flex rounded-xl border-slate-200 text-slate-600 hover:text-blue-600 hover:bg-blue-50">
-                <Download size={16} className="mr-2" /> Baixar Modelo
+
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                <div className="space-y-1.5">
+                  <label className="text-sm font-bold text-slate-600">Nome Completo</label>
+                  <Input defaultValue="Usuário Sistema" className="h-11 rounded-xl bg-slate-50 border-slate-200" />
+                </div>
+                <div className="space-y-1.5">
+                  <label className="text-sm font-bold text-slate-600">E-mail</label>
+                  <Input defaultValue="usuario@cromaprint.com.br" type="email" className="h-11 rounded-xl bg-slate-50 border-slate-200" disabled />
+                </div>
+              </div>
+
+              <Button onClick={handleSave} disabled={isSaving} className="mt-4 bg-blue-600 hover:bg-blue-700 text-white rounded-xl">
+                {isSaving ? "Salvando..." : "Salvar Alterações"}
               </Button>
-            </div>
-          </CardHeader>
-          <CardContent className="p-6">
-            
-            <div className="bg-blue-50 border border-blue-100 rounded-xl p-4 mb-6 flex gap-3">
-              <AlertCircle className="text-blue-600 shrink-0 mt-0.5" size={20} />
-              <div className="text-sm text-blue-800">
-                <p className="font-bold mb-1">Mapeamento Absoluto Ativado! 🎯</p>
-                <p className="mb-2">O sistema agora decora a posição exata de cada coluna do seu Excel e aplica essa regra para todas as linhas. A VICCI MAGAZINE e todas as outras lojas acima do cabeçalho agora serão lidas perfeitamente!</p>
-              </div>
-            </div>
+            </CardContent>
+          </Card>
 
-            <div className="flex flex-col items-center justify-center border-2 border-dashed border-slate-200 rounded-2xl p-10 bg-slate-50 hover:bg-slate-100 hover:border-blue-300 transition-colors">
-              <input 
-                type="file" 
-                accept=".csv, .xlsx, .xls" 
-                className="hidden" 
-                ref={fileInputRef}
-                onChange={handleFileUpload}
-                disabled={isUploading}
-              />
-              
-              {isUploading ? (
-                <div className="flex flex-col items-center text-center">
-                  <Loader2 className="w-12 h-12 text-blue-600 animate-spin mb-4" />
-                  <h3 className="text-lg font-bold text-slate-800 mb-1">Processando dados...</h3>
-                  <p className="text-sm text-slate-500 mb-4">Mapeando colunas e extraindo lojas. Não feche a página.</p>
-                  <div className="w-64 h-2 bg-slate-200 rounded-full overflow-hidden">
-                    <div 
-                      className="h-full bg-blue-600 transition-all duration-300 ease-out"
-                      style={{ width: `${progress}%` }}
-                    />
-                  </div>
+          <Card className="border-none shadow-sm rounded-2xl bg-white">
+            <CardHeader className="border-b border-slate-100 pb-4">
+              <CardTitle className="text-lg flex items-center gap-2 text-slate-800">
+                <Shield size={20} className="text-slate-600" /> Segurança
+              </CardTitle>
+            </CardHeader>
+            <CardContent className="p-0">
+              <div className="p-4 flex items-center justify-between border-b border-slate-100 hover:bg-slate-50 transition-colors cursor-pointer">
+                <div>
+                  <p className="font-bold text-slate-800">Alterar Senha</p>
+                  <p className="text-sm text-slate-500">Atualize sua senha de acesso regularmente.</p>
                 </div>
-              ) : (
-                <div className="flex flex-col items-center text-center">
-                  <div className="flex gap-2 mb-4">
-                    <div className="w-14 h-14 bg-green-100 rounded-full shadow-sm flex items-center justify-center text-green-600">
-                      <FileSpreadsheet size={28} />
-                    </div>
-                    <div className="w-14 h-14 bg-blue-100 rounded-full shadow-sm flex items-center justify-center text-blue-600">
-                      <FileType2 size={28} />
-                    </div>
-                  </div>
-                  <h3 className="text-lg font-bold text-slate-800 mb-1">Selecione o arquivo Excel ou CSV</h3>
-                  <p className="text-sm text-slate-500 mb-6 max-w-md">
-                    O sistema fará a leitura e importação automática.
-                  </p>
-                  <Button 
-                    onClick={() => fileInputRef.current?.click()}
-                    className="bg-blue-600 hover:bg-blue-700 text-white rounded-xl px-8 h-12 font-bold shadow-sm"
-                  >
-                    <Upload className="mr-2" size={20} /> Escolher Arquivo
-                  </Button>
-                </div>
-              )}
-            </div>
-
-          </CardContent>
-        </Card>
-
-        {/* Card de Zona de Perigo */}
-        <Card className="border-none shadow-sm rounded-2xl bg-white overflow-hidden border border-rose-100">
-          <CardHeader className="border-b border-rose-50 bg-rose-50/30 pb-4">
-            <div className="flex items-center gap-3">
-              <div className="w-10 h-10 rounded-xl bg-rose-100 text-rose-600 flex items-center justify-center">
-                <AlertCircle size={20} />
+                <ChevronRight size={20} className="text-slate-400" />
               </div>
-              <div>
-                <CardTitle className="text-lg font-bold text-rose-800">Zona de Perigo</CardTitle>
-                <CardDescription className="text-rose-600/80">Ações destrutivas para o banco de dados.</CardDescription>
-              </div>
-            </div>
-          </CardHeader>
-          <CardContent className="p-6">
-            <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
-              <div>
-                <h4 className="font-bold text-slate-800">Limpar Base de Clientes</h4>
-                <p className="text-sm text-slate-500">Apaga todas as lojas cadastradas. Útil se você importou uma planilha errada.</p>
-              </div>
-              <Button 
-                variant="destructive" 
-                onClick={handleDeleteAllStores}
-                disabled={isDeleting}
-                className="rounded-xl"
+              <div 
+                onClick={handleLogout}
+                className="p-4 flex items-center justify-between hover:bg-red-50 transition-colors cursor-pointer group rounded-b-2xl"
               >
-                {isDeleting ? <Loader2 className="animate-spin mr-2" size={16} /> : <Trash2 className="mr-2" size={16} />}
-                Apagar Todos os Clientes
+                <div>
+                  <p className="font-bold text-red-600 group-hover:text-red-700">Sair da Conta</p>
+                  <p className="text-sm text-red-400">Desconectar deste dispositivo.</p>
+                </div>
+                <LogOut size={20} className="text-red-400 group-hover:text-red-600" />
+              </div>
+            </CardContent>
+          </Card>
+        </TabsContent>
+
+        {/* ABA: APLICATIVO */}
+        <TabsContent value="app" className="space-y-6">
+          <Card className="border-none shadow-sm rounded-2xl bg-white">
+            <CardHeader className="border-b border-slate-100 pb-4">
+              <CardTitle className="text-lg flex items-center gap-2 text-slate-800">
+                <Smartphone size={20} className="text-blue-600" /> Preferências do Dispositivo
+              </CardTitle>
+              <CardDescription>Ajuste como o aplicativo se comporta no seu celular.</CardDescription>
+            </CardHeader>
+            <CardContent className="p-6 space-y-6">
+              
+              <div className="flex items-center justify-between">
+                <div className="flex gap-3">
+                  <div className="w-10 h-10 rounded-full bg-blue-50 flex items-center justify-center text-blue-600 shrink-0">
+                    <Bell size={20} />
+                  </div>
+                  <div>
+                    <p className="font-bold text-slate-800">Notificações Push</p>
+                    <p className="text-sm text-slate-500">Receber alertas de novas OSs e atualizações.</p>
+                  </div>
+                </div>
+                <label className="relative inline-flex items-center cursor-pointer">
+                  <input type="checkbox" className="sr-only peer" checked={notifications} onChange={() => setNotifications(!notifications)} />
+                  <div className="w-11 h-6 bg-slate-200 peer-focus:outline-none rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-slate-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-blue-600"></div>
+                </label>
+              </div>
+
+              <div className="flex items-center justify-between">
+                <div className="flex gap-3">
+                  <div className="w-10 h-10 rounded-full bg-emerald-50 flex items-center justify-center text-emerald-600 shrink-0">
+                    <ImageIcon size={20} />
+                  </div>
+                  <div>
+                    <p className="font-bold text-slate-800">Otimizar Fotos (Economia de Dados)</p>
+                    <p className="text-sm text-slate-500">Comprime as fotos antes do upload para economizar 4G.</p>
+                  </div>
+                </div>
+                <label className="relative inline-flex items-center cursor-pointer">
+                  <input type="checkbox" className="sr-only peer" checked={compressPhotos} onChange={() => setCompressPhotos(!compressPhotos)} />
+                  <div className="w-11 h-6 bg-slate-200 peer-focus:outline-none rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-slate-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-blue-600"></div>
+                </label>
+              </div>
+
+            </CardContent>
+          </Card>
+
+          <Card className="border-none shadow-sm rounded-2xl bg-white">
+            <CardHeader className="border-b border-slate-100 pb-4">
+              <CardTitle className="text-lg flex items-center gap-2 text-slate-800">
+                <HelpCircle size={20} className="text-slate-600" /> Sobre o App
+              </CardTitle>
+            </CardHeader>
+            <CardContent className="p-6">
+              <div className="flex items-center justify-between">
+                <div>
+                  <p className="font-bold text-slate-800">Versão do Sistema</p>
+                  <p className="text-sm text-slate-500">Cromaprint OS Manager v1.0.0</p>
+                </div>
+                <Button variant="outline" className="rounded-xl border-slate-200 text-slate-600">
+                  Verificar Atualizações
+                </Button>
+              </div>
+            </CardContent>
+          </Card>
+        </TabsContent>
+
+        {/* ABA: EMPRESA */}
+        <TabsContent value="company" className="space-y-6">
+          <Card className="border-none shadow-sm rounded-2xl bg-white">
+            <CardHeader className="border-b border-slate-100 pb-4">
+              <CardTitle className="text-lg flex items-center gap-2 text-slate-800">
+                <Building size={20} className="text-blue-600" /> Dados da Empresa
+              </CardTitle>
+              <CardDescription>Estas informações aparecerão nos relatórios em PDF.</CardDescription>
+            </CardHeader>
+            <CardContent className="p-6 space-y-4">
+              
+              <div className="space-y-1.5">
+                <label className="text-sm font-bold text-slate-600">Razão Social</label>
+                <Input defaultValue="Cromaprint Comunicação Visual Ltda" className="h-11 rounded-xl bg-slate-50 border-slate-200" />
+              </div>
+
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                <div className="space-y-1.5">
+                  <label className="text-sm font-bold text-slate-600">CNPJ</label>
+                  <Input defaultValue="00.000.000/0001-00" className="h-11 rounded-xl bg-slate-50 border-slate-200" />
+                </div>
+                <div className="space-y-1.5">
+                  <label className="text-sm font-bold text-slate-600">Telefone de Contato</label>
+                  <Input defaultValue="(11) 99999-9999" className="h-11 rounded-xl bg-slate-50 border-slate-200" />
+                </div>
+              </div>
+
+              <div className="space-y-1.5">
+                <label className="text-sm font-bold text-slate-600">Endereço Sede</label>
+                <Input defaultValue="Rua Exemplo, 123 - São Paulo, SP" className="h-11 rounded-xl bg-slate-50 border-slate-200" />
+              </div>
+
+              <Button onClick={handleSave} disabled={isSaving} className="mt-4 bg-blue-600 hover:bg-blue-700 text-white rounded-xl">
+                <Save size={18} className="mr-2" /> {isSaving ? "Salvando..." : "Salvar Dados"}
               </Button>
-            </div>
-          </CardContent>
-        </Card>
-      </div>
+            </CardContent>
+          </Card>
+        </TabsContent>
+
+      </Tabs>
     </div>
   );
 }

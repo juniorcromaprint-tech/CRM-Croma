@@ -1,14 +1,13 @@
-import React from "react";
 import { BrowserRouter as Router, Routes, Route } from "react-router-dom";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
-import { Toaster } from "sonner";
+import { Toaster } from "react-hot-toast";
 import Layout from "./components/Layout";
 import Index from "./pages/Index";
 import Jobs from "./pages/Jobs";
+import JobDetail from "./pages/JobDetail";
 import Stores from "./pages/Stores";
 import StoreDetail from "./pages/StoreDetail";
-import JobDetail from "./pages/JobDetail";
-import NewJob from "./pages/NewJob";
+import Clients from "./pages/Clients";
 import Settings from "./pages/Settings";
 
 const queryClient = new QueryClient();
@@ -18,18 +17,18 @@ function App() {
     <QueryClientProvider client={queryClient}>
       <Router>
         <Routes>
-          <Route element={<Layout />}>
-            <Route path="/" element={<Index />} />
-            <Route path="/jobs" element={<Jobs />} />
-            <Route path="/jobs/new" element={<NewJob />} />
-            <Route path="/jobs/:id" element={<JobDetail />} />
-            <Route path="/stores" element={<Stores />} />
-            <Route path="/stores/:id" element={<StoreDetail />} />
-            <Route path="/settings" element={<Settings />} />
+          <Route path="/" element={<Layout />}>
+            <Route index element={<Index />} />
+            <Route path="jobs" element={<Jobs />} />
+            <Route path="jobs/:id" element={<JobDetail />} />
+            <Route path="stores" element={<Stores />} />
+            <Route path="stores/:id" element={<StoreDetail />} />
+            <Route path="clients" element={<Clients />} />
+            <Route path="settings" element={<Settings />} />
           </Route>
         </Routes>
       </Router>
-      <Toaster position="top-center" richColors />
+      <Toaster position="top-right" />
     </QueryClientProvider>
   );
 }
