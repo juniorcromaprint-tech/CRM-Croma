@@ -157,12 +157,17 @@ export default function Stores() {
     return Array.from(uniqueNeigh).sort();
   }, [stores, selectedStates]);
 
+  // Reseta a página quando os filtros mudam
   useEffect(() => {
     setCurrentPage(1);
   }, [searchTerm, selectedBrands, selectedStates, selectedNeighborhoods]);
 
+  // Limpa os bairros apenas se o estado mudar e já houver bairros selecionados
+  // Isso evita o loop infinito no carregamento inicial
   useEffect(() => {
-    setSelectedNeighborhoods([]);
+    if (selectedNeighborhoods.length > 0) {
+      setSelectedNeighborhoods([]);
+    }
   }, [selectedStates]);
 
   const filteredStores = useMemo(() => {

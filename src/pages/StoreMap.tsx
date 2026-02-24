@@ -196,9 +196,12 @@ export default function StoreMap() {
     return Array.from(uniqueNeigh).sort();
   }, [allStores, selectedStates]);
 
-  // Limpa bairros se o estado mudar
+  // Limpa os bairros apenas se o estado mudar e já houver bairros selecionados
+  // Isso evita o loop infinito no carregamento inicial
   useEffect(() => {
-    setSelectedNeighborhoods([]);
+    if (selectedNeighborhoods.length > 0) {
+      setSelectedNeighborhoods([]);
+    }
   }, [selectedStates]);
 
   // Aplica os filtros nas lojas
@@ -306,7 +309,7 @@ export default function StoreMap() {
             </div>
             <h3 className="text-xl font-bold text-slate-800">Nenhuma loja no mapa</h3>
             <p className="text-slate-500 mt-2 max-w-md">
-              Você ainda não tem lojas com coordenadas salvas. Vá até as Configurações e use a ferramenta de Sincronização em Massa.
+              Você pode adicionar coordenadas às lojas na tela de Lojas ou usar a Sincronização em Massa nas Configurações.
             </p>
             <Button onClick={() => navigate('/settings')} className="mt-6 bg-blue-600 hover:bg-blue-700 text-white rounded-xl">
               Ir para Configurações
