@@ -1,5 +1,5 @@
 import React from "react";
-import { Link } from "react-router-dom";
+import { Link, useNavigate } from "react-router-dom";
 import { CheckCircle2, Clock, AlertCircle, ArrowRight, MapPin, Plus, Store, Users, ClipboardList } from "lucide-react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -7,6 +7,8 @@ import { useQuery } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 
 export default function Index() {
+  const navigate = useNavigate();
+
   const { data: jobs, isLoading, error } = useQuery({
     queryKey: ['recent-jobs'],
     queryFn: async () => {
@@ -44,11 +46,14 @@ export default function Index() {
         </Button>
       </div>
 
-      {/* Cards de Estatísticas */}
+      {/* Cards de Estatísticas (Agora Clicáveis) */}
       <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-        <Card className="border-none shadow-sm rounded-2xl overflow-hidden bg-gradient-to-br from-amber-50 to-amber-100/50">
+        <Card 
+          onClick={() => navigate('/jobs?status=Pendente')}
+          className="border-none shadow-sm rounded-2xl overflow-hidden bg-gradient-to-br from-amber-50 to-amber-100/50 cursor-pointer hover:shadow-md hover:-translate-y-1 transition-all group"
+        >
           <CardContent className="p-5 flex items-center gap-4">
-            <div className="w-12 h-12 rounded-xl flex items-center justify-center bg-amber-500 text-white shadow-sm shadow-amber-200">
+            <div className="w-12 h-12 rounded-xl flex items-center justify-center bg-amber-500 text-white shadow-sm shadow-amber-200 group-hover:scale-110 transition-transform">
               <Clock size={24} />
             </div>
             <div>
@@ -58,9 +63,12 @@ export default function Index() {
           </CardContent>
         </Card>
 
-        <Card className="border-none shadow-sm rounded-2xl overflow-hidden bg-gradient-to-br from-emerald-50 to-emerald-100/50">
+        <Card 
+          onClick={() => navigate('/jobs?status=Concluído')}
+          className="border-none shadow-sm rounded-2xl overflow-hidden bg-gradient-to-br from-emerald-50 to-emerald-100/50 cursor-pointer hover:shadow-md hover:-translate-y-1 transition-all group"
+        >
           <CardContent className="p-5 flex items-center gap-4">
-            <div className="w-12 h-12 rounded-xl flex items-center justify-center bg-emerald-500 text-white shadow-sm shadow-emerald-200">
+            <div className="w-12 h-12 rounded-xl flex items-center justify-center bg-emerald-500 text-white shadow-sm shadow-emerald-200 group-hover:scale-110 transition-transform">
               <CheckCircle2 size={24} />
             </div>
             <div>
@@ -70,9 +78,12 @@ export default function Index() {
           </CardContent>
         </Card>
 
-        <Card className="border-none shadow-sm rounded-2xl overflow-hidden bg-gradient-to-br from-rose-50 to-rose-100/50">
+        <Card 
+          onClick={() => navigate('/jobs?status=Divergência')}
+          className="border-none shadow-sm rounded-2xl overflow-hidden bg-gradient-to-br from-rose-50 to-rose-100/50 cursor-pointer hover:shadow-md hover:-translate-y-1 transition-all group"
+        >
           <CardContent className="p-5 flex items-center gap-4">
-            <div className="w-12 h-12 rounded-xl flex items-center justify-center bg-rose-500 text-white shadow-sm shadow-rose-200">
+            <div className="w-12 h-12 rounded-xl flex items-center justify-center bg-rose-500 text-white shadow-sm shadow-rose-200 group-hover:scale-110 transition-transform">
               <AlertCircle size={24} />
             </div>
             <div>
