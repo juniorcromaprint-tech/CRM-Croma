@@ -61,15 +61,15 @@ export default function Layout() {
   );
 
   return (
-    <div className="min-h-screen bg-slate-50 flex flex-col md:flex-row font-sans">
+    <div className="h-[100dvh] overflow-hidden bg-slate-50 flex flex-col md:flex-row font-sans">
       {/* Desktop Sidebar */}
-      <aside className="hidden md:flex flex-col w-64 bg-white border-r border-slate-200 p-4 print:hidden">
+      <aside className="hidden md:flex flex-col w-64 bg-white border-r border-slate-200 p-4 print:hidden z-20">
         <div className="px-2 py-4 mb-6">
           <CromaLogo />
           <CromaLogoFallback />
           <p className="text-xs text-slate-500 mt-2 ml-1">Gestão de Instalações</p>
         </div>
-        <nav className="flex-1 space-y-2">
+        <nav className="flex-1 space-y-2 overflow-y-auto pr-2">
           <NavLinks />
         </nav>
         <div className="mt-auto pt-4 border-t border-slate-100">
@@ -88,7 +88,7 @@ export default function Layout() {
       </aside>
 
       {/* Mobile Header */}
-      <header className="md:hidden bg-white border-b border-slate-200 p-4 flex items-center justify-between sticky top-0 z-10 print:hidden">
+      <header className="md:hidden bg-white border-b border-slate-200 p-4 flex items-center justify-between sticky top-0 z-20 print:hidden">
         <div>
           <CromaLogo className="h-8" />
           <CromaLogoFallback />
@@ -121,14 +121,14 @@ export default function Layout() {
       </header>
 
       {/* Main Content */}
-      <main className="flex-1 overflow-y-auto p-4 md:p-8 pb-24 md:pb-8 print:p-0 print:overflow-visible">
+      <main className="flex-1 overflow-y-auto p-4 md:p-8 pb-24 md:pb-8 print:p-0 print:overflow-visible relative">
         <div className="max-w-5xl mx-auto print:max-w-none">
           <Outlet />
         </div>
       </main>
 
       {/* Mobile Bottom Nav */}
-      <nav className="md:hidden fixed bottom-0 left-0 right-0 bg-white border-t border-slate-200 flex justify-around p-2 pb-safe z-10 print:hidden">
+      <nav className="md:hidden fixed bottom-0 left-0 right-0 bg-white border-t border-slate-200 flex justify-around p-2 pb-safe z-20 print:hidden">
         {navItems.slice(0, 3).map((item) => {
           const Icon = item.icon;
           const isActive = location.pathname === item.path || (item.path !== "/" && location.pathname.startsWith(item.path));

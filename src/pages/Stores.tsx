@@ -1,7 +1,8 @@
-import React, { useState, useMemo } from "react";
-import { Search, Store, MapPin, ChevronRight, Filter, Building2 } from "lucide-react";
+import React, { useState, useMemo, useEffect } from "react";
+import { Search, Store, MapPin, ChevronRight, Filter, Building2, ChevronLeft } from "lucide-react";
 import { Input } from "@/components/ui/input";
 import { Card, CardContent } from "@/components/ui/card";
+import { Button } from "@/components/ui/button";
 import { useQuery } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import { useNavigate } from "react-router-dom";
@@ -9,6 +10,8 @@ import { useNavigate } from "react-router-dom";
 export default function Stores() {
   const [searchTerm, setSearchTerm] = useState("");
   const [selectedBrand, setSelectedBrand] = useState("all");
+  const [currentPage, setCurrentPage] = useState(1);
+  const itemsPerPage = 50;
   const navigate = useNavigate();
 
   const { data: stores, isLoading } = useQuery({
@@ -31,15 +34,18 @@ export default function Stores() {
     return Array.from(uniqueBrands).sort();
   }, [stores]);
 
+  // Reseta a página para 1 sempre que o usuário digitar algo na busca ou mudar o filtro
+  useEffect(() => {
+    setCurrentPage(1);
+  }, [searchTerm, selectedBrand]);
+
   // Filtra as lojas com base na busca e na marca selecionada
   const filteredStores = useMemo(() => {
     if (!stores) return [];
     
     return stores.filter(store => {
-      // Remove espaços em branco no início e fim para evitar erros de digitação
       const searchLower = searchTerm.toLowerCase().trim();
       
-      // Converte tudo para string com segurança e verifica se inclui o termo buscado
       const matchesSearch = 
         (String(store.name || "").toLowerCase()).includes(searchLower) ||
         (String(store.corporate_name || "").toLowerCase()).includes(searchLower) ||
@@ -48,12 +54,18 @@ export default function Stores() {
         (String(store.brand || "").toLowerCase()).includes(searchLower) ||
         (String(store.address || "").toLowerCase()).includes(searchLower);
 
-      // Verifica se a marca bate com o filtro selecionado
       const matchesBrand = selectedBrand === "all" || store.brand === selectedBrand;
 
       return matchesSearch && matchesBrand;
     });
   }, [stores, searchTerm, selectedBrand]);
+
+  // Paginação
+  const totalPages = Math.ceil(filteredStores.length / itemsPerPage);
+  const paginatedStores = filteredStores.slice(
+    (currentPage - 1) * itemsPerPage,
+    currentPage * itemsPerPage
+  );
 
   return (
     <div className="space-y-6 animate-in fade-in duration-500">
@@ -85,7 +97,6 @@ export default function Stores() {
               <option key={brand} value={brand}>{brand}</option>
             ))}
           </select>
-          {/* Ícone de seta customizado para o select */}
           <div className="absolute right-3 top-1/2 -translate-y-1/2 pointer-events-none text-slate-400">
             <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="m6 9 6 6 6-6"/></svg>
           </div>
@@ -104,50 +115,88 @@ export default function Stores() {
           <p className="text-slate-500 mt-1">Tente ajustar sua busca ou filtro.</p>
         </div>
       ) : (
-        <div className="grid gap-4">
-          {filteredStores.map((store) => (
-            <Card 
-              key={store.id} 
-              onClick={() => navigate(`/stores/${store.id}`)}
-              className="border-none shadow-sm rounded-2xl hover:shadow-md transition-all hover:-translate-y-0.5 cursor-pointer group bg-white"
-            >
-              <CardContent className="p-5 flex items-center justify-between">
-                <div className="flex items-start gap-4">
-                  <div className="w-12 h-12 bg-blue-50 rounded-xl flex items-center justify-center text-blue-600 flex-shrink-0">
-                    <Store size={24} />
-                  </div>
-                  <div className="flex-1">
-                    <h3 className="font-bold text-slate-800 text-lg leading-tight group-hover:text-blue-700 transition-colors">{store.name}</h3>
-                    
-                    {/* Mostra a Razão Social se existir */}
-                    {store.corporate_name && store.corporate_name !== store.name && (
-                      <p className="text-xs text-slate-500 flex items-center gap-1 mt-1">
-                        <Building2 size={12} /> {store.corporate_name}
-                      </p>
-                    )}
+        <div className="space-y-4">
+          <div className="flex items-center justify-between text-sm text-slate-500 px-1">
+            <span>Mostrando {paginatedStores.length} de {filteredStores.length} lojas</span>
+          </div>
 
-                    <div className="flex flex-wrap items-center gap-2 mt-2">
-                      {store.code && (
-                        <span className="text-xs font-bold text-slate-600 bg-slate-100 px-2 py-1 rounded-md border border-slate-200">
-                          Cód: {store.code}
-                        </span>
+          <div className="grid gap-4">
+            {paginatedStores.map((store) => (
+              <Card 
+                key={store.id} 
+                onClick={() => navigate(`/stores/${store.id}`)}
+                className="border-none shadow-sm rounded-2xl hover:shadow-md transition-all hover:-translate-y-0.5 cursor-pointer group bg-white"
+              >
+                <CardContent className="p-5 flex items-center justify-between">
+                  <div className="flex items-start gap-4">
+                    <div className="w-12 h-12 bg-blue-50 rounded-xl flex items-center justify-center text-blue-600 flex-shrink-0">
+                      <Store size={24} />
+                    </div>
+                    <div className="flex-1">
+                      <h3 className="font-bold text-slate-800 text-lg leading-tight group-hover:text-blue-700 transition-colors">{store.name}</h3>
+                      
+                      {store.corporate_name && store.corporate_name !== store.name && (
+                        <p className="text-xs text-slate-500 flex items-center gap-1 mt-1">
+                          <Building2 size={12} /> {store.corporate_name}
+                        </p>
                       )}
-                      <span className="text-xs font-bold text-blue-700 bg-blue-50 px-2 py-1 rounded-md border border-blue-100">
-                        {store.brand}
-                      </span>
-                      {store.address && (
-                        <span className="text-sm text-slate-500 flex items-center gap-1 ml-1">
-                          <MapPin size={14} /> 
-                          <span className="truncate max-w-[200px] md:max-w-md">{store.address}</span>
+
+                      <div className="flex flex-wrap items-center gap-2 mt-2">
+                        {store.code && (
+                          <span className="text-xs font-bold text-slate-600 bg-slate-100 px-2 py-1 rounded-md border border-slate-200">
+                            Cód: {store.code}
+                          </span>
+                        )}
+                        <span className="text-xs font-bold text-blue-700 bg-blue-50 px-2 py-1 rounded-md border border-blue-100">
+                          {store.brand}
                         </span>
-                      )}
+                        {store.address && (
+                          <span className="text-sm text-slate-500 flex items-center gap-1 ml-1">
+                            <MapPin size={14} /> 
+                            <span className="truncate max-w-[200px] md:max-w-md">{store.address}</span>
+                          </span>
+                        )}
+                      </div>
                     </div>
                   </div>
-                </div>
-                <ChevronRight className="text-slate-300 group-hover:text-blue-600 transition-colors flex-shrink-0 ml-4" />
-              </CardContent>
-            </Card>
-          ))}
+                  <ChevronRight className="text-slate-300 group-hover:text-blue-600 transition-colors flex-shrink-0 ml-4" />
+                </CardContent>
+              </Card>
+            ))}
+          </div>
+
+          {/* Controles de Paginação */}
+          {totalPages > 1 && (
+            <div className="flex items-center justify-between pt-6 pb-4">
+              <Button
+                variant="outline"
+                onClick={() => {
+                  setCurrentPage(p => Math.max(1, p - 1));
+                  window.scrollTo({ top: 0, behavior: 'smooth' });
+                }}
+                disabled={currentPage === 1}
+                className="rounded-xl border-slate-200 text-slate-600"
+              >
+                <ChevronLeft size={16} className="mr-1" /> Anterior
+              </Button>
+              
+              <span className="text-sm font-medium text-slate-500">
+                Página {currentPage} de {totalPages}
+              </span>
+              
+              <Button
+                variant="outline"
+                onClick={() => {
+                  setCurrentPage(p => Math.min(totalPages, p + 1));
+                  window.scrollTo({ top: 0, behavior: 'smooth' });
+                }}
+                disabled={currentPage === totalPages}
+                className="rounded-xl border-slate-200 text-slate-600"
+              >
+                Próxima <ChevronRight size={16} className="ml-1" />
+              </Button>
+            </div>
+          )}
         </div>
       )}
     </div>
