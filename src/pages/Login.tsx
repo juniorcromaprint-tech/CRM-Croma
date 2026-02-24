@@ -58,8 +58,21 @@ export default function Login() {
         setIsLogin(true);
       }
     } catch (error: any) {
-      console.error(error);
-      showError(error.message === 'Invalid login credentials' ? 'E-mail ou senha incorretos.' : 'Ocorreu um erro na autenticação.');
+      console.error("Erro detalhado do Supabase:", error);
+      
+      // Traduzindo os erros mais comuns do Supabase
+      let errorMessage = error.message;
+      if (errorMessage === 'Invalid login credentials') {
+        errorMessage = 'E-mail ou senha incorretos.';
+      } else if (errorMessage === 'User already registered') {
+        errorMessage = 'Este e-mail já está cadastrado no sistema.';
+      } else if (errorMessage.includes('Password should be at least')) {
+        errorMessage = 'A senha deve ter pelo menos 6 caracteres.';
+      } else if (errorMessage.includes('Email not confirmed')) {
+        errorMessage = 'E-mail não confirmado. Verifique sua caixa de entrada.';
+      }
+      
+      showError(errorMessage);
     } finally {
       setLoading(false);
     }
@@ -134,6 +147,7 @@ export default function Login() {
               onChange={(e) => setPassword(e.target.value)}
               placeholder="••••••••" 
               className="h-12 rounded-xl bg-slate-50 border-slate-200" 
+              minLength={6}
             />
           </div>
 
