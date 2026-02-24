@@ -20,6 +20,7 @@ export default function Stores() {
       const { data, error } = await supabase
         .from('stores')
         .select('*')
+        .limit(10000) // <-- Aumentando o limite padrão de 1000 para 10000
         .order('name');
       
       if (error) throw error;

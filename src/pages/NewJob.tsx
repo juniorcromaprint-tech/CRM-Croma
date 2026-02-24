@@ -25,7 +25,11 @@ export default function NewJob() {
   const { data: stores, isLoading: isLoadingStores } = useQuery({
     queryKey: ['all-stores'],
     queryFn: async () => {
-      const { data, error } = await supabase.from('stores').select('*').order('name');
+      const { data, error } = await supabase
+        .from('stores')
+        .select('*')
+        .limit(10000) // <-- Aumentando o limite padrão de 1000 para 10000
+        .order('name');
       if (error) throw error;
       return data;
     }
