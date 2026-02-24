@@ -1,5 +1,5 @@
 import React, { useState, useMemo, useEffect, useRef } from "react";
-import { Search, Store, MapPin, ChevronRight, Filter, Building2, ChevronLeft, Plus, Edit, Map, Check } from "lucide-react";
+import { Search, Store, MapPin, ChevronRight, Filter, Building2, ChevronLeft, Plus, Edit, Map, Check, Navigation } from "lucide-react";
 import { Input } from "@/components/ui/input";
 import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -98,7 +98,6 @@ const MultiSelect = ({ options, selected, onChange, placeholder, icon: Icon }: M
 export default function Stores() {
   const [searchTerm, setSearchTerm] = useState("");
   
-  // Agora os filtros são arrays para permitir múltipla escolha
   const [selectedBrands, setSelectedBrands] = useState<string[]>([]);
   const [selectedStates, setSelectedStates] = useState<string[]>([]);
   const [selectedNeighborhoods, setSelectedNeighborhoods] = useState<string[]>([]);
@@ -151,7 +150,6 @@ export default function Stores() {
   const neighborhoods = useMemo(() => {
     if (!stores) return [];
     let filtered = stores;
-    // Se houver estados selecionados, filtra os bairros apenas desses estados
     if (selectedStates.length > 0) {
       filtered = stores.filter(s => s.state && selectedStates.includes(s.state.trim().toUpperCase()));
     }
@@ -159,12 +157,10 @@ export default function Stores() {
     return Array.from(uniqueNeigh).sort();
   }, [stores, selectedStates]);
 
-  // Reseta a página ao mudar qualquer filtro
   useEffect(() => {
     setCurrentPage(1);
   }, [searchTerm, selectedBrands, selectedStates, selectedNeighborhoods]);
 
-  // Limpa os bairros selecionados se o estado mudar (para não ficar com bairro de outro estado selecionado)
   useEffect(() => {
     setSelectedNeighborhoods([]);
   }, [selectedStates]);
@@ -208,6 +204,11 @@ export default function Stores() {
     setIsSheetOpen(true);
   };
 
+  const openRoute = (e: React.MouseEvent, lat: number, lng: number) => {
+    e.stopPropagation();
+    window.open(`https://www.google.com/maps/dir/?api=1&destination=${lat},${lng}`, '_blank');
+  };
+
   return (
     <div className="space-y-6 animate-in fade-in duration-500">
       <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
@@ -224,7 +225,6 @@ export default function Stores() {
       </div>
 
       <div className="flex flex-col gap-3">
-        {/* Barra de Busca */}
         <div className="relative w-full">
           <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" size={20} />
           <Input 
@@ -235,7 +235,6 @@ export default function Stores() {
           />
         </div>
         
-        {/* Filtros Multi-select */}
         <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
           <MultiSelect 
             options={brands}
@@ -281,70 +280,94 @@ export default function Stores() {
           </div>
 
           <div className="grid gap-4">
-            {paginatedStores.map((store) => (
-              <Card 
-                key={store.id} 
-                onClick={() => navigate(`/stores/${store.id}`)}
-                className="border-none shadow-sm rounded-2xl hover:shadow-md transition-all hover:-translate-y-0.5 cursor-pointer group bg-white"
-              >
-                <CardContent className="p-5 flex items-center justify-between">
-                  <div className="flex items-start gap-4">
-                    <div className="w-12 h-12 bg-blue-50 rounded-xl flex items-center justify-center text-blue-600 flex-shrink-0">
-                      <Store size={24} />
-                    </div>
-                    <div className="flex-1">
-                      <h3 className="font-bold text-slate-800 text-lg leading-tight group-hover:text-blue-700 transition-colors">{store.name}</h3>
-                      
-                      {store.corporate_name && store.corporate_name !== store.name && (
-                        <p className="text-xs text-slate-500 flex items-center gap-1 mt-1">
-                          <Building2 size={12} /> {store.corporate_name}
-                        </p>
-                      )}
+            {paginatedStores.map((store) => {
+              const isSynced = store.lat && store.lng;
 
-                      <div className="flex flex-wrap items-center gap-2 mt-2">
-                        {store.code && (
-                          <span className="text-xs font-bold text-slate-600 bg-slate-100 px-2 py-1 rounded-md border border-slate-200">
-                            Cód: {store.code}
-                          </span>
+              return (
+                <Card 
+                  key={store.id} 
+                  onClick={() => navigate(`/stores/${store.id}`)}
+                  className="border-none shadow-sm rounded-2xl hover:shadow-md transition-all hover:-translate-y-0.5 cursor-pointer group bg-white"
+                >
+                  <CardContent className="p-5 flex items-center justify-between">
+                    <div className="flex items-start gap-4">
+                      <div className="w-12 h-12 bg-blue-50 rounded-xl flex items-center justify-center text-blue-600 flex-shrink-0">
+                        <Store size={24} />
+                      </div>
+                      <div className="flex-1">
+                        <h3 className="font-bold text-slate-800 text-lg leading-tight group-hover:text-blue-700 transition-colors">{store.name}</h3>
+                        
+                        {store.corporate_name && store.corporate_name !== store.name && (
+                          <p className="text-xs text-slate-500 flex items-center gap-1 mt-1">
+                            <Building2 size={12} /> {store.corporate_name}
+                          </p>
                         )}
-                        <span className="text-xs font-bold text-blue-700 bg-blue-50 px-2 py-1 rounded-md border border-blue-100">
-                          {store.brand}
-                        </span>
-                        {store.state && (
-                          <span className="text-xs font-bold text-emerald-700 bg-emerald-50 px-2 py-1 rounded-md border border-emerald-100">
-                            {store.state}
-                          </span>
-                        )}
-                        {store.address && (
-                          <span className="text-sm text-slate-500 flex items-center gap-1 ml-1">
-                            <MapPin size={14} /> 
-                            <span className="truncate max-w-[200px] md:max-w-md">
-                              {store.neighborhood ? `${store.neighborhood} - ` : ''}{store.address}
+
+                        <div className="flex flex-wrap items-center gap-2 mt-2">
+                          {store.code && (
+                            <span className="text-xs font-bold text-slate-600 bg-slate-100 px-2 py-1 rounded-md border border-slate-200">
+                              Cód: {store.code}
                             </span>
+                          )}
+                          <span className="text-xs font-bold text-blue-700 bg-blue-50 px-2 py-1 rounded-md border border-blue-100">
+                            {store.brand}
                           </span>
-                        )}
+                          {store.state && (
+                            <span className="text-xs font-bold text-emerald-700 bg-emerald-50 px-2 py-1 rounded-md border border-emerald-100">
+                              {store.state}
+                            </span>
+                          )}
+                          {store.address && (
+                            <span className="text-sm text-slate-500 flex items-center gap-1 ml-1" title={isSynced ? "Endereço sincronizado no mapa" : "Endereço sem coordenadas"}>
+                              <MapPin size={14} className={isSynced ? "text-emerald-500" : "text-slate-300"} /> 
+                              <span className="truncate max-w-[200px] md:max-w-md">
+                                {store.neighborhood ? `${store.neighborhood} - ` : ''}{store.address}
+                              </span>
+                            </span>
+                          )}
+                        </div>
                       </div>
                     </div>
-                  </div>
-                  
-                  <div className="flex items-center gap-1 ml-4">
-                    <Button 
-                      variant="ghost" 
-                      size="icon" 
-                      className="text-slate-400 hover:text-blue-600 hover:bg-blue-50 rounded-lg h-9 w-9"
-                      onClick={(e) => handleEditStore(e, store)}
-                      title="Editar Loja"
-                    >
-                      <Edit size={18} />
-                    </Button>
-                    <ChevronRight className="text-slate-300 group-hover:text-blue-600 transition-colors flex-shrink-0 ml-1" />
-                  </div>
-                </CardContent>
-              </Card>
-            ))}
+                    
+                    <div className="flex items-center gap-1 ml-4">
+                      {/* Botão de Rota */}
+                      {isSynced ? (
+                        <Button 
+                          variant="ghost" 
+                          size="icon" 
+                          className="text-emerald-600 hover:text-emerald-700 hover:bg-emerald-50 rounded-lg h-9 w-9"
+                          onClick={(e) => openRoute(e, store.lat, store.lng)}
+                          title="Endereço Sincronizado - Traçar Rota"
+                        >
+                          <Navigation size={18} />
+                        </Button>
+                      ) : (
+                        <div 
+                          className="flex items-center justify-center h-9 w-9 text-slate-200 cursor-help"
+                          title="Endereço não sincronizado no mapa"
+                          onClick={(e) => e.stopPropagation()}
+                        >
+                          <MapPin size={18} />
+                        </div>
+                      )}
+
+                      <Button 
+                        variant="ghost" 
+                        size="icon" 
+                        className="text-slate-400 hover:text-blue-600 hover:bg-blue-50 rounded-lg h-9 w-9"
+                        onClick={(e) => handleEditStore(e, store)}
+                        title="Editar Loja"
+                      >
+                        <Edit size={18} />
+                      </Button>
+                      <ChevronRight className="text-slate-300 group-hover:text-blue-600 transition-colors flex-shrink-0 ml-1" />
+                    </div>
+                  </CardContent>
+                </Card>
+              );
+            })}
           </div>
 
-          {/* Controles de Paginação */}
           {totalPages > 1 && (
             <div className="flex items-center justify-between pt-6 pb-4">
               <Button
@@ -379,7 +402,6 @@ export default function Stores() {
         </div>
       )}
 
-      {/* Painel Lateral de Formulário */}
       <StoreFormSheet 
         isOpen={isSheetOpen} 
         onClose={() => setIsSheetOpen(false)} 
