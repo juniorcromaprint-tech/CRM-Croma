@@ -1,15 +1,15 @@
-import React, { useState, useEffect } from "react";
+import React, { useState, useEffect, useMemo, useRef } from "react";
 import { useNavigate } from "react-router-dom";
 import { useQuery } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import { MapContainer, TileLayer, Marker, Popup, useMap } from "react-leaflet";
 import "leaflet/dist/leaflet.css";
 import L from "leaflet";
-import { MapPin, Navigation, Store, Loader2, ExternalLink, Maximize } from "lucide-react";
+import { MapPin, Navigation, Store, Loader2, ExternalLink, Maximize, Filter, Map as MapIcon, Check } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
 
-// Criando um ícone SVG personalizado que NUNCA falha ou é bloqueado pelo navegador
+// Criando um ícone SVG personalizado
 const customMarkerIcon = L.divIcon({
   className: 'bg-transparent border-none',
   html: `<svg xmlns="http://www.w3.org/2000/svg" width="36" height="36" viewBox="0 0 24 24" fill="#2563eb" stroke="white" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="filter: drop-shadow(0px 4px 4px rgba(0,0,0,0.3));"><path d="M20 10c0 6-8 12-8 12s-8-6-8-12a8 8 0 0 1 16 0Z"></path><circle cx="12" cy="10" r="3" fill="white"></circle></svg>`,
@@ -17,6 +17,93 @@ const customMarkerIcon = L.divIcon({
   iconAnchor: [18, 36],
   popupAnchor: [0, -36],
 });
+
+// Componente customizado para Múltipla Seleção (Filtros)
+interface MultiSelectProps {
+  options: string[];
+  selected: string[];
+  onChange: (selected: string[]) => void;
+  placeholder: string;
+  icon: React.ElementType;
+}
+
+const MultiSelect = ({ options, selected, onChange, placeholder, icon: Icon }: MultiSelectProps) => {
+  const [isOpen, setIsOpen] = useState(false);
+  const dropdownRef = useRef<HTMLDivElement>(null);
+
+  useEffect(() => {
+    const handleClickOutside = (event: MouseEvent) => {
+      if (dropdownRef.current && !dropdownRef.current.contains(event.target as Node)) {
+        setIsOpen(false);
+      }
+    };
+    document.addEventListener("mousedown", handleClickOutside);
+    return () => document.removeEventListener("mousedown", handleClickOutside);
+  }, []);
+
+  const toggleOption = (option: string) => {
+    if (selected.includes(option)) {
+      onChange(selected.filter((item) => item !== option));
+    } else {
+      onChange([...selected, option]);
+    }
+  };
+
+  const displayText = selected.length === 0 
+    ? placeholder 
+    : selected.length === 1 
+      ? selected[0] 
+      : `${selected.length} selecionados`;
+
+  return (
+    <div className="relative w-full" ref={dropdownRef}>
+      <button
+        type="button"
+        onClick={() => setIsOpen(!isOpen)}
+        className="w-full h-11 pl-10 pr-10 rounded-xl border border-slate-200 bg-white shadow-sm text-sm focus:ring-2 focus:ring-blue-600 focus:border-transparent outline-none text-slate-700 flex items-center justify-between text-left transition-all"
+      >
+        <div className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400">
+          <Icon size={16} />
+        </div>
+        <span className="truncate font-medium">{displayText}</span>
+        <div className="absolute right-3 top-1/2 -translate-y-1/2 text-slate-400">
+          <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className={`transition-transform duration-200 ${isOpen ? 'rotate-180' : ''}`}><path d="m6 9 6 6 6-6"/></svg>
+        </div>
+      </button>
+
+      {isOpen && (
+        <div className="absolute z-[1000] w-full mt-2 bg-white border border-slate-200 rounded-xl shadow-xl max-h-64 overflow-y-auto py-1 animate-in fade-in slide-in-from-top-2">
+          {options.length === 0 ? (
+            <div className="px-4 py-3 text-sm text-slate-500 text-center">Nenhuma opção</div>
+          ) : (
+            <>
+              {selected.length > 0 && (
+                <div 
+                  className="px-4 py-2.5 text-sm text-blue-600 font-bold hover:bg-blue-50 cursor-pointer border-b border-slate-100 flex items-center justify-center transition-colors"
+                  onClick={() => { onChange([]); setIsOpen(false); }}
+                >
+                  Limpar seleção
+                </div>
+              )}
+              {options.map((option) => (
+                <div 
+                  key={option}
+                  className="flex items-center px-4 py-2.5 hover:bg-slate-50 cursor-pointer text-sm text-slate-700 transition-colors"
+                  onClick={() => toggleOption(option)}
+                >
+                  <div className={`w-4 h-4 rounded border mr-3 flex items-center justify-center transition-colors ${selected.includes(option) ? 'bg-blue-600 border-blue-600' : 'border-slate-300'}`}>
+                    {selected.includes(option) && <Check size={12} className="text-white" />}
+                  </div>
+                  <span className="truncate">{option}</span>
+                </div>
+              ))}
+            </>
+          )}
+        </div>
+      )}
+    </div>
+  );
+};
 
 // Componente interno para controlar a câmera do mapa
 function MapController({ 
@@ -33,6 +120,7 @@ function MapController({
   useEffect(() => {
     if (viewMode === 'all' && stores && stores.length > 0) {
       const bounds = L.latLngBounds(stores.map(s => [s.lat, s.lng]));
+      // Adiciona um padding para os marcadores não ficarem colados na borda
       map.fitBounds(bounds, { padding: [50, 50], maxZoom: 15 });
     } else if (viewMode === 'user' && userLocation) {
       map.flyTo(userLocation, 14, { animate: true });
@@ -52,20 +140,79 @@ export default function StoreMap() {
   const [isLocating, setIsLocating] = useState(false);
   const [viewMode, setViewMode] = useState<'all' | 'user'>('all');
 
-  // Busca TODAS as lojas e filtra no JavaScript para evitar bugs do banco de dados
-  const { data: stores, isLoading } = useQuery({
+  // Estados dos Filtros
+  const [selectedBrands, setSelectedBrands] = useState<string[]>([]);
+  const [selectedStates, setSelectedStates] = useState<string[]>([]);
+  const [selectedNeighborhoods, setSelectedNeighborhoods] = useState<string[]>([]);
+
+  // Busca TODAS as lojas e filtra no JavaScript
+  const { data: allStores, isLoading } = useQuery({
     queryKey: ['stores-map'],
     queryFn: async () => {
-      const { data, error } = await supabase
-        .from('stores')
-        .select('*');
+      let allData: any[] = [];
+      let page = 0;
+      const pageSize = 1000;
       
-      if (error) throw error;
+      while (true) {
+        const { data, error } = await supabase
+          .from('stores')
+          .select('*')
+          .not('lat', 'is', null)
+          .not('lng', 'is', null)
+          .range(page * pageSize, (page + 1) * pageSize - 1);
+        
+        if (error) throw error;
+        if (!data || data.length === 0) break;
+        
+        allData = [...allData, ...data];
+        if (data.length < pageSize) break;
+        page++;
+      }
       
-      // Filtra apenas as lojas que realmente têm latitude e longitude válidas
-      return data?.filter(store => store.lat && store.lng) || [];
+      return allData;
     }
   });
+
+  // Extrai opções únicas para os filtros
+  const brands = useMemo(() => {
+    if (!allStores) return [];
+    const uniqueBrands = new Set(allStores.map(s => s.brand).filter(Boolean));
+    return Array.from(uniqueBrands).sort();
+  }, [allStores]);
+
+  const states = useMemo(() => {
+    if (!allStores) return [];
+    const uniqueStates = new Set(allStores.map(s => s.state?.trim().toUpperCase()).filter(Boolean));
+    return Array.from(uniqueStates).sort();
+  }, [allStores]);
+
+  const neighborhoods = useMemo(() => {
+    if (!allStores) return [];
+    let filtered = allStores;
+    if (selectedStates.length > 0) {
+      filtered = allStores.filter(s => s.state && selectedStates.includes(s.state.trim().toUpperCase()));
+    }
+    const uniqueNeigh = new Set(filtered.map(s => s.neighborhood?.trim()).filter(Boolean));
+    return Array.from(uniqueNeigh).sort();
+  }, [allStores, selectedStates]);
+
+  // Limpa bairros se o estado mudar
+  useEffect(() => {
+    setSelectedNeighborhoods([]);
+  }, [selectedStates]);
+
+  // Aplica os filtros nas lojas
+  const filteredStores = useMemo(() => {
+    if (!allStores) return [];
+    
+    return allStores.filter(store => {
+      const matchesBrand = selectedBrands.length === 0 || selectedBrands.includes(store.brand);
+      const matchesState = selectedStates.length === 0 || (store.state && selectedStates.includes(store.state.trim().toUpperCase()));
+      const matchesNeighborhood = selectedNeighborhoods.length === 0 || (store.neighborhood && selectedNeighborhoods.includes(store.neighborhood.trim()));
+
+      return matchesBrand && matchesState && matchesNeighborhood;
+    });
+  }, [allStores, selectedBrands, selectedStates, selectedNeighborhoods]);
 
   const locateUser = () => {
     setIsLocating(true);
@@ -105,7 +252,7 @@ export default function StoreMap() {
             className="bg-white border-slate-200 text-slate-700 hover:bg-slate-50 shadow-sm rounded-xl"
           >
             <Maximize size={18} className="mr-2" />
-            Ver Todas
+            Ajustar Zoom
           </Button>
           <Button 
             onClick={locateUser} 
@@ -118,6 +265,31 @@ export default function StoreMap() {
         </div>
       </div>
 
+      {/* Barra de Filtros */}
+      <div className="grid grid-cols-1 md:grid-cols-3 gap-3 shrink-0 relative z-[500]">
+        <MultiSelect 
+          options={brands}
+          selected={selectedBrands}
+          onChange={setSelectedBrands}
+          placeholder="Todas as Marcas"
+          icon={Filter}
+        />
+        <MultiSelect 
+          options={states}
+          selected={selectedStates}
+          onChange={setSelectedStates}
+          placeholder="Todos os Estados (UF)"
+          icon={MapIcon}
+        />
+        <MultiSelect 
+          options={neighborhoods}
+          selected={selectedNeighborhoods}
+          onChange={setSelectedNeighborhoods}
+          placeholder="Todos os Bairros / Regiões"
+          icon={MapPin}
+        />
+      </div>
+
       <Card className="flex-1 border-none shadow-sm rounded-2xl overflow-hidden relative z-0">
         {isLoading ? (
           <div className="absolute inset-0 flex flex-col items-center justify-center bg-slate-50/80 z-10">
@@ -127,17 +299,17 @@ export default function StoreMap() {
         ) : null}
 
         {/* Mensagem caso não tenha nenhuma loja com coordenada */}
-        {!isLoading && stores?.length === 0 && (
+        {!isLoading && allStores?.length === 0 && (
           <div className="absolute inset-0 flex flex-col items-center justify-center bg-slate-50/95 z-[400] p-6 text-center">
             <div className="w-20 h-20 bg-white rounded-full flex items-center justify-center shadow-sm mb-4">
               <MapPin size={40} className="text-slate-300" />
             </div>
             <h3 className="text-xl font-bold text-slate-800">Nenhuma loja no mapa</h3>
             <p className="text-slate-500 mt-2 max-w-md">
-              Você ainda não tem lojas com coordenadas salvas. Vá até a lista de lojas, edite uma delas, busque o CEP e <strong>não esqueça de clicar em Salvar</strong>.
+              Você ainda não tem lojas com coordenadas salvas. Vá até as Configurações e use a ferramenta de Sincronização em Massa.
             </p>
-            <Button onClick={() => navigate('/stores')} className="mt-6 bg-blue-600 hover:bg-blue-700 text-white rounded-xl">
-              Ir para Lojas
+            <Button onClick={() => navigate('/settings')} className="mt-6 bg-blue-600 hover:bg-blue-700 text-white rounded-xl">
+              Ir para Configurações
             </Button>
           </div>
         )}
@@ -154,12 +326,12 @@ export default function StoreMap() {
           />
           
           <MapController 
-            stores={stores || []} 
+            stores={filteredStores || []} 
             userLocation={userLocation} 
             viewMode={viewMode} 
           />
 
-          {stores?.map((store) => (
+          {filteredStores?.map((store) => (
             <Marker 
               key={store.id} 
               position={[store.lat, store.lng]}
@@ -206,9 +378,9 @@ export default function StoreMap() {
         </MapContainer>
 
         {/* Legenda flutuante */}
-        {stores && stores.length > 0 && (
+        {allStores && allStores.length > 0 && (
           <div className="absolute bottom-4 left-4 z-[400] bg-white/90 backdrop-blur-sm p-3 rounded-xl shadow-lg border border-slate-100 text-xs font-medium text-slate-600">
-            <p>Mostrando <strong className="text-blue-600 text-sm">{stores.length}</strong> lojas no mapa.</p>
+            <p>Mostrando <strong className="text-blue-600 text-sm">{filteredStores.length}</strong> de {allStores.length} lojas.</p>
           </div>
         )}
       </Card>
