@@ -246,11 +246,17 @@ export default function JobDetail() {
       // Get signature as base64 image
       const signatureDataUrl = sigCanvas.current?.getTrimmedCanvas().toDataURL('image/png');
       
-      if (!signatureDataUrl) throw new Error("Failed to get signature data");
+      if (!signatureDataUrl) throw new Error("Falha ao gerar imagem da assinatura");
 
-      // Convert base64 to blob
-      const res = await fetch(signatureDataUrl);
-      const blob = await res.blob();
+      // Convert base64 to blob manually (more reliable across browsers)
+      const byteString = atob(signatureDataUrl.split(',')[1]);
+      const mimeString = signatureDataUrl.split(',')[0].split(':')[1].split(';')[0];
+      const ab = new ArrayBuffer(byteString.length);
+      const ia = new Uint8Array(ab);
+      for (let i = 0; i < byteString.length; i++) {
+          ia[i] = byteString.charCodeAt(i);
+      }
+      const blob = new Blob([ab], {type: mimeString});
       
       const fileName = `${id}-signature-${Math.random()}.png`;
       
@@ -258,10 +264,14 @@ export default function JobDetail() {
       const { error: uploadError } = await supabase.storage
         .from('job_photos')
         .upload(fileName, blob, {
-          contentType: 'image/png'
+          contentType: 'image/png',
+          upsert: true
         });
 
-      if (uploadError) throw uploadError;
+      if (uploadError) {
+        console.error("Upload error details:", uploadError);
+        throw new Error(uploadError.message || "Erro no upload para o Supabase");
+      }
 
       // Get public URL
       const { data: { publicUrl } } = supabase.storage
@@ -272,11 +282,14 @@ export default function JobDetail() {
       updateJobMutation.mutate({ signature_url: publicUrl }, {
         onSuccess: () => {
           showSuccess("Assinatura salva com sucesso!");
+        },
+        onError: (err: any) => {
+          throw new Error(err.message || "Erro ao atualizar a OS com a assinatura");
         }
       });
-    } catch (error) {
+    } catch (error: any) {
       console.error("Error saving signature:", error);
-      showError("Erro ao salvar assinatura.");
+      showError(`Erro: ${error.message || 'Falha ao salvar assinatura'}`);
     } finally {
       setIsSavingSignature(false);
     }
