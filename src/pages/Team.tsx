@@ -1,14 +1,17 @@
-import React from "react";
+import React, { useState } from "react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/contexts/AuthContext";
-import { Shield, User, ShieldCheck, Loader2 } from "lucide-react";
+import { Shield, User, ShieldCheck, Loader2, Plus } from "lucide-react";
 import { Card, CardContent } from "@/components/ui/card";
+import { Button } from "@/components/ui/button";
 import { showSuccess, showError } from "@/utils/toast";
+import TeamMemberFormSheet from "@/components/TeamMemberFormSheet";
 
 export default function Team() {
   const { profile } = useAuth();
   const queryClient = useQueryClient();
+  const [isSheetOpen, setIsSheetOpen] = useState(false);
 
   // Busca todos os perfis cadastrados
   const { data: team, isLoading } = useQuery({
@@ -56,9 +59,17 @@ export default function Team() {
 
   return (
     <div className="space-y-6 animate-in fade-in duration-500 pb-10">
-      <div>
-        <h1 className="text-2xl md:text-3xl font-bold text-slate-800">Gestão de Equipe</h1>
-        <p className="text-slate-500 mt-1">Gerencie os acessos e cargos dos seus colaboradores.</p>
+      <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
+        <div>
+          <h1 className="text-2xl md:text-3xl font-bold text-slate-800">Gestão de Equipe</h1>
+          <p className="text-slate-500 mt-1">Gerencie os acessos e cargos dos seus colaboradores.</p>
+        </div>
+        <Button 
+          onClick={() => setIsSheetOpen(true)}
+          className="bg-blue-600 hover:bg-blue-700 text-white rounded-xl h-11 px-5 shadow-sm w-full md:w-auto"
+        >
+          <Plus size={20} className="mr-2" /> Novo Membro
+        </Button>
       </div>
 
       <Card className="border-none shadow-sm rounded-2xl bg-white overflow-hidden">
@@ -108,6 +119,11 @@ export default function Team() {
           )}
         </CardContent>
       </Card>
+
+      <TeamMemberFormSheet 
+        isOpen={isSheetOpen} 
+        onClose={() => setIsSheetOpen(false)} 
+      />
     </div>
   );
 }
