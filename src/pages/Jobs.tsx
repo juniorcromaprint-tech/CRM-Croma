@@ -1,8 +1,8 @@
 import React, { useState, useMemo, useEffect } from "react";
 import { useSearchParams, useNavigate } from "react-router-dom";
-import { useInfiniteQuery } from "@tanstack/react-query";
+import { useInfiniteQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
-import { Search, Plus, MapPin, ClipboardList, Filter, ChevronLeft, ChevronRight, Calendar, AlertTriangle, User, Loader2, Download } from "lucide-react";
+import { Search, Plus, MapPin, ClipboardList, Filter, ChevronLeft, ChevronRight, Calendar, AlertTriangle, User, Loader2, Download, Trash2 } from "lucide-react";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
@@ -15,16 +15,20 @@ import { showSuccess, showError } from "@/utils/toast";
 export default function Jobs() {
   const [searchParams, setSearchParams] = useSearchParams();
   const navigate = useNavigate();
+  const queryClient = useQueryClient();
   const { profile } = useAuth();
   
   const [searchTerm, setSearchTerm] = useState("");
   const [statusFilter, setStatusFilter] = useState(searchParams.get("status") || "Todos");
   const [myJobsFilter, setMyJobsFilter] = useState(searchParams.get("my_jobs") === "true");
+  const [startDate, setStartDate] = useState("");
+  const [endDate, setEndDate] = useState("");
+  
   const [isJobSheetOpen, setIsJobSheetOpen] = useState(false);
   const [isExporting, setIsExporting] = useState(false);
   const { ref, inView } = useInView();
 
-  // Sincroniza o filtro com a URL (útil quando clica nos cards da Home)
+  // Sincroniza o filtro com a URL
   useEffect(() => {
     const status = searchParams.get("status");
     if (status) {
@@ -89,6 +93,14 @@ export default function Jobs() {
       query = query.or(`os_number.ilike.%${searchTerm}%,type.ilike.%${searchTerm}%`);
     }
 
+    if (startDate) {
+      query = query.gte('created_at', `${startDate}T00:00:00.000Z`);
+    }
+
+    if (endDate) {
+      query = query.lte('created_at', `${endDate}T23:59:59.999Z`);
+    }
+
     const { data, error, count } = await query;
     
     if (error) throw error;
@@ -107,7 +119,7 @@ export default function Jobs() {
     hasNextPage,
     isFetchingNextPage
   } = useInfiniteQuery({
-    queryKey: ['infinite-jobs', statusFilter, searchTerm, myJobsFilter, profile?.id],
+    queryKey: ['infinite-jobs', statusFilter, searchTerm, myJobsFilter, profile?.id, startDate, endDate],
     queryFn: fetchJobs,
     initialPageParam: 0,
     getNextPageParam: (lastPage) => lastPage.nextPage,
@@ -125,15 +137,49 @@ export default function Jobs() {
 
   const totalCount = data?.pages[0]?.totalCount || 0;
 
+  // Mutação para excluir OS
+  const deleteJobMutation = useMutation({
+    mutationFn: async (jobId: string) => {
+      // 1. Buscar fotos para deletar do storage
+      const { data: photos } = await supabase.from('job_photos').select('photo_url').eq('job_id', jobId);
+      
+      if (photos && photos.length > 0) {
+        const fileNames = photos.map(p => {
+          const urlParts = p.photo_url.split('/');
+          return urlParts[urlParts.length - 1];
+        });
+        await supabase.storage.from('job_photos').remove(fileNames);
+      }
+      
+      // 2. Deletar a OS
+      const { error } = await supabase.from('jobs').delete().eq('id', jobId);
+      if (error) throw error;
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['infinite-jobs'] });
+      queryClient.invalidateQueries({ queryKey: ['all-jobs'] });
+      queryClient.invalidateQueries({ queryKey: ['recent-jobs'] });
+      showSuccess("OS excluída com sucesso!");
+    },
+    onError: () => {
+      showError("Erro ao excluir a OS.");
+    }
+  });
+
+  const handleDeleteClick = (e: React.MouseEvent, jobId: string) => {
+    e.stopPropagation(); // Evita que o clique abra os detalhes da OS
+    if (window.confirm("Tem certeza que deseja excluir esta OS? Todas as fotos vinculadas também serão apagadas.")) {
+      deleteJobMutation.mutate(jobId);
+    }
+  };
+
   const exportToExcel = async () => {
     setIsExporting(true);
     try {
-      // Fetch all completed jobs for the current month
       const startOfMonth = new Date();
       startOfMonth.setDate(1);
       startOfMonth.setHours(0, 0, 0, 0);
 
-      // CORREÇÃO: Removido 'city' que não existe na tabela stores, adicionado 'neighborhood'
       const { data: exportData, error } = await supabase
         .from('jobs')
         .select('*, stores!inner(name, brand, code, address, neighborhood, state), profiles!jobs_assigned_to_fkey(first_name, last_name)')
@@ -141,10 +187,7 @@ export default function Jobs() {
         .gte('created_at', startOfMonth.toISOString())
         .order('created_at', { ascending: false });
 
-      if (error) {
-        console.error("Erro na busca do Supabase:", error);
-        throw error;
-      }
+      if (error) throw error;
 
       if (!exportData || exportData.length === 0) {
         showError("Nenhuma OS concluída encontrada neste mês para exportar.");
@@ -152,7 +195,6 @@ export default function Jobs() {
         return;
       }
 
-      // Format data for Excel
       const excelData = exportData.map(job => {
         const store = Array.isArray(job.stores) ? job.stores[0] : job.stores;
         const profile = job.profiles;
@@ -173,22 +215,19 @@ export default function Jobs() {
         };
       });
 
-      // Create workbook and worksheet
       const ws = XLSX.utils.json_to_sheet(excelData);
       const wb = XLSX.utils.book_new();
       XLSX.utils.book_append_sheet(wb, ws, "OSs Concluídas");
 
-      // Generate file name
       const monthName = startOfMonth.toLocaleString('pt-BR', { month: 'long' });
       const year = startOfMonth.getFullYear();
       const fileName = `Faturamento_Cromaprint_${monthName}_${year}.xlsx`;
 
-      // Save file
       XLSX.writeFile(wb, fileName);
       showSuccess("Planilha exportada com sucesso!");
     } catch (error) {
       console.error("Error exporting to Excel:", error);
-      showError("Erro ao exportar planilha. Verifique o console para mais detalhes.");
+      showError("Erro ao exportar planilha.");
     } finally {
       setIsExporting(false);
     }
@@ -231,51 +270,86 @@ export default function Jobs() {
         </div>
       </div>
 
-      <div className="flex flex-col md:flex-row gap-3">
-        <div className="relative flex-1">
-          <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" size={20} />
-          <Input
-            placeholder="Buscar por OS, tipo, loja ou marca..."
-            value={searchTerm}
-            onChange={(e) => setSearchTerm(e.target.value)}
-            className="pl-10 rounded-xl border-slate-200 bg-white h-12 shadow-sm w-full"
-          />
-        </div>
-        
-        <div className="flex gap-2 w-full md:w-auto">
-          <Button
-            variant={myJobsFilter ? "default" : "outline"}
-            onClick={toggleMyJobsFilter}
-            className={`h-12 rounded-xl px-4 shadow-sm flex-1 md:flex-none ${
-              myJobsFilter
-                ? "bg-blue-600 hover:bg-blue-700 text-white border-transparent"
-                : "bg-white border-slate-200 text-slate-600 hover:bg-slate-50"
-            }`}
-          >
-            <User size={18} className="mr-2" />
-            Minhas OSs
-          </Button>
-
-          <div className="relative w-full md:w-48 shrink-0">
-            <div className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400">
-              <Filter size={18} />
-            </div>
-            <select
-              value={statusFilter}
-              onChange={handleStatusChange}
-              className="w-full h-12 pl-10 pr-10 rounded-xl border border-slate-200 bg-white shadow-sm text-sm focus:ring-2 focus:ring-blue-600 focus:border-transparent appearance-none outline-none text-slate-700 font-medium"
+      <div className="space-y-3">
+        {/* Linha 1: Busca e Filtros Principais */}
+        <div className="flex flex-col md:flex-row gap-3">
+          <div className="relative flex-1">
+            <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" size={20} />
+            <Input
+              placeholder="Buscar por OS, tipo, loja ou marca..."
+              value={searchTerm}
+              onChange={(e) => setSearchTerm(e.target.value)}
+              className="pl-10 rounded-xl border-slate-200 bg-white h-12 shadow-sm w-full"
+            />
+          </div>
+          
+          <div className="flex gap-2 w-full md:w-auto">
+            <Button
+              variant={myJobsFilter ? "default" : "outline"}
+              onClick={toggleMyJobsFilter}
+              className={`h-12 rounded-xl px-4 shadow-sm flex-1 md:flex-none ${
+                myJobsFilter
+                  ? "bg-blue-600 hover:bg-blue-700 text-white border-transparent"
+                  : "bg-white border-slate-200 text-slate-600 hover:bg-slate-50"
+              }`}
             >
-              <option value="Todos">Todos os Status</option>
-              <option value="Pendente">Pendentes</option>
-              <option value="Em andamento">Em andamento</option>
-              <option value="Concluído">Concluídas</option>
-              <option value="Divergência">Com Divergência</option>
-              <option value="Cancelado">Canceladas</option>
-            </select>
-            <div className="absolute right-3 top-1/2 -translate-y-1/2 pointer-events-none text-slate-400">
-              <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="m6 9 6 6 6-6"/></svg>
+              <User size={18} className="mr-2" />
+              Minhas OSs
+            </Button>
+
+            <div className="relative w-full md:w-48 shrink-0">
+              <div className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400">
+                <Filter size={18} />
+              </div>
+              <select
+                value={statusFilter}
+                onChange={handleStatusChange}
+                className="w-full h-12 pl-10 pr-10 rounded-xl border border-slate-200 bg-white shadow-sm text-sm focus:ring-2 focus:ring-blue-600 focus:border-transparent appearance-none outline-none text-slate-700 font-medium"
+              >
+                <option value="Todos">Todos os Status</option>
+                <option value="Pendente">Pendentes</option>
+                <option value="Em andamento">Em andamento</option>
+                <option value="Concluído">Concluídas</option>
+                <option value="Divergência">Com Divergência</option>
+                <option value="Cancelado">Canceladas</option>
+              </select>
+              <div className="absolute right-3 top-1/2 -translate-y-1/2 pointer-events-none text-slate-400">
+                <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="m6 9 6 6 6-6"/></svg>
+              </div>
             </div>
           </div>
+        </div>
+
+        {/* Linha 2: Filtro de Datas */}
+        <div className="flex flex-col sm:flex-row items-center gap-3 bg-slate-50 p-3 rounded-xl border border-slate-100">
+          <div className="flex items-center gap-2 w-full sm:w-auto">
+            <span className="text-sm text-slate-500 font-medium w-8">De:</span>
+            <Input 
+              type="date" 
+              value={startDate} 
+              onChange={(e) => setStartDate(e.target.value)} 
+              className="h-10 rounded-lg border-slate-200 bg-white"
+            />
+          </div>
+          <div className="flex items-center gap-2 w-full sm:w-auto">
+            <span className="text-sm text-slate-500 font-medium w-8">Até:</span>
+            <Input 
+              type="date" 
+              value={endDate} 
+              onChange={(e) => setEndDate(e.target.value)} 
+              className="h-10 rounded-lg border-slate-200 bg-white"
+            />
+          </div>
+          {(startDate || endDate) && (
+            <Button 
+              variant="ghost" 
+              size="sm"
+              onClick={() => { setStartDate(""); setEndDate(""); }} 
+              className="text-slate-500 hover:text-slate-700 w-full sm:w-auto"
+            >
+              Limpar Datas
+            </Button>
+          )}
         </div>
       </div>
 
@@ -358,7 +432,16 @@ export default function Jobs() {
                         )}
                       </div>
                       
-                      <div className="flex items-center justify-end shrink-0">
+                      <div className="flex items-center justify-end shrink-0 gap-2">
+                        <Button
+                          variant="ghost"
+                          size="icon"
+                          onClick={(e) => handleDeleteClick(e, job.id)}
+                          className="w-10 h-10 rounded-full text-slate-400 hover:text-red-600 hover:bg-red-50 z-10"
+                          title="Excluir OS"
+                        >
+                          <Trash2 size={18} />
+                        </Button>
                         <div className="w-10 h-10 rounded-full bg-slate-50 flex items-center justify-center text-slate-400 group-hover:bg-blue-50 group-hover:text-blue-600 transition-colors">
                           <ChevronRight size={20} />
                         </div>
