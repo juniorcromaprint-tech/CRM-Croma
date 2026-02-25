@@ -1,6 +1,6 @@
 import React, { useState, useRef } from "react";
 import { useParams, useNavigate } from "react-router-dom";
-import { ArrowLeft, Camera, Upload, FileText, AlertTriangle, CheckCircle2, Printer, MapPin, Calendar, Navigation, Loader2, Plus, Trash2, PenTool } from "lucide-react";
+import { ArrowLeft, Camera, Upload, FileText, AlertTriangle, CheckCircle2, Printer, MapPin, Calendar, Navigation, Loader2, Plus, Trash2, PenTool, User } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
@@ -24,13 +24,13 @@ export default function JobDetail() {
   const fileInputAfterRef = useRef<HTMLInputElement>(null);
   const sigCanvas = useRef<SignatureCanvas>(null);
 
-  // Buscar dados da OS
+  // Buscar dados da OS (agora incluindo o perfil do instalador)
   const { data: job, isLoading } = useQuery({
     queryKey: ['job', id],
     queryFn: async () => {
       const { data, error } = await supabase
         .from('jobs')
-        .select('*, stores(*)')
+        .select('*, stores(*), profiles!jobs_assigned_to_fkey(first_name, last_name)')
         .eq('id', id)
         .single();
       if (error) throw error;
@@ -82,7 +82,7 @@ export default function JobDetail() {
         await supabase.storage.from('job_photos').remove(fileNames);
       }
       
-      // 2. Deletar a OS (as fotos no banco de dados serão deletadas em cascata se configurado, ou deletamos manualmente)
+      // 2. Deletar a OS
       const { error } = await supabase.from('jobs').delete().eq('id', id);
       if (error) throw error;
     },
@@ -93,7 +93,7 @@ export default function JobDetail() {
         queryClient.invalidateQueries({ queryKey: ['store-jobs', job.store_id] });
       }
       showSuccess("OS excluída com sucesso!");
-      navigate(-1); // Volta para a tela anterior
+      navigate(-1);
     },
     onError: () => {
       showError("Erro ao excluir a OS.");
@@ -153,27 +153,23 @@ export default function JobDetail() {
       for (let i = 0; i < files.length; i++) {
         const file = files[i];
         
-        // Compress image before upload
         const options = {
-          maxSizeMB: 1, // Max 1MB
-          maxWidthOrHeight: 1920, // Max 1080p resolution
+          maxSizeMB: 1,
+          maxWidthOrHeight: 1920,
           useWebWorker: true,
-          fileType: 'image/jpeg' // Convert to JPEG to save space
+          fileType: 'image/jpeg'
         };
         
         let fileToUpload = file;
         try {
-          // Only compress if it's an image
           if (file.type.startsWith('image/')) {
             const compressedFile = await imageCompression(file, options);
-            // Create a new File object from the Blob to ensure it has a name
             fileToUpload = new File([compressedFile], file.name.replace(/\.[^/.]+$/, ".jpg"), {
               type: 'image/jpeg',
             });
           }
         } catch (compressionError) {
           console.error("Error compressing image:", compressionError);
-          // Fallback to original file if compression fails
         }
 
         const fileExt = fileToUpload.name.split('.').pop();
@@ -243,12 +239,10 @@ export default function JobDetail() {
 
     setIsSavingSignature(true);
     try {
-      // Get signature as base64 image - USANDO getCanvas() EM VEZ DE getTrimmedCanvas() PARA EVITAR O BUG
       const signatureDataUrl = sigCanvas.current?.getCanvas().toDataURL('image/png');
       
       if (!signatureDataUrl) throw new Error("Falha ao gerar imagem da assinatura");
 
-      // Convert base64 to blob manually (more reliable across browsers)
       const byteString = atob(signatureDataUrl.split(',')[1]);
       const mimeString = signatureDataUrl.split(',')[0].split(':')[1].split(';')[0];
       const ab = new ArrayBuffer(byteString.length);
@@ -260,7 +254,6 @@ export default function JobDetail() {
       
       const fileName = `${id}-signature-${Math.random()}.png`;
       
-      // Upload to storage
       const { error: uploadError } = await supabase.storage
         .from('job_photos')
         .upload(fileName, blob, {
@@ -273,12 +266,10 @@ export default function JobDetail() {
         throw new Error(uploadError.message || "Erro no upload para o Supabase");
       }
 
-      // Get public URL
       const { data: { publicUrl } } = supabase.storage
         .from('job_photos')
         .getPublicUrl(fileName);
 
-      // Update job with signature URL
       updateJobMutation.mutate({ signature_url: publicUrl }, {
         onSuccess: () => {
           showSuccess("Assinatura salva com sucesso!");
@@ -409,7 +400,7 @@ export default function JobDetail() {
             </div>
           </div>
           
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-4 print:grid-cols-2">
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-4 print:grid-cols-3">
             <div className="flex items-center gap-3 text-slate-700 bg-slate-50 p-4 rounded-xl print:bg-transparent print:p-0 print:border-t print:border-slate-100 print:pt-4 print:rounded-none">
               <MapPin size={20} className="text-blue-600 print:text-slate-400" />
               <div>
@@ -423,6 +414,13 @@ export default function JobDetail() {
               <div>
                 <p className="text-xs text-slate-500 font-medium uppercase">Data da Execução</p>
                 <p className="font-bold">{new Date(job.scheduled_date).toLocaleDateString('pt-BR')}</p>
+              </div>
+            </div>
+            <div className="flex items-center gap-3 text-slate-700 bg-slate-50 p-4 rounded-xl print:bg-transparent print:p-0 print:border-t print:border-slate-100 print:pt-4 print:rounded-none">
+              <User size={20} className="text-blue-600 print:text-slate-400" />
+              <div>
+                <p className="text-xs text-slate-500 font-medium uppercase">Instalador</p>
+                <p className="font-bold">{job.profiles ? `${job.profiles.first_name} ${job.profiles.last_name}` : 'Não atribuído'}</p>
               </div>
             </div>
           </div>
@@ -690,7 +688,7 @@ export default function JobDetail() {
       <div className="hidden print:flex justify-between items-end mt-24 pt-8 break-inside-avoid">
         <div className="w-64 text-center">
           <div className="border-t border-slate-400 pt-2">
-            <p className="font-bold text-slate-800">Equipe Cromaprint</p>
+            <p className="font-bold text-slate-800">{job.profiles ? `${job.profiles.first_name} ${job.profiles.last_name}` : 'Equipe Cromaprint'}</p>
             <p className="text-sm text-slate-500">Responsável Técnico</p>
           </div>
         </div>
