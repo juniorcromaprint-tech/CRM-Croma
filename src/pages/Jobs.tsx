@@ -86,9 +86,6 @@ export default function Jobs() {
     }
 
     if (searchTerm) {
-      // Supabase doesn't support OR across joined tables easily in a single string,
-      // so we might need to do a more complex query or filter client-side if we want to search store names.
-      // For now, we'll search OS number and type.
       query = query.or(`os_number.ilike.%${searchTerm}%,type.ilike.%${searchTerm}%`);
     }
 
@@ -136,14 +133,18 @@ export default function Jobs() {
       startOfMonth.setDate(1);
       startOfMonth.setHours(0, 0, 0, 0);
 
+      // CORREÇÃO: Removido 'city' que não existe na tabela stores, adicionado 'neighborhood'
       const { data: exportData, error } = await supabase
         .from('jobs')
-        .select('*, stores!inner(name, brand, code, address, city, state), profiles!jobs_assigned_to_fkey(first_name, last_name)')
+        .select('*, stores!inner(name, brand, code, address, neighborhood, state), profiles!jobs_assigned_to_fkey(first_name, last_name)')
         .eq('status', 'Concluído')
         .gte('created_at', startOfMonth.toISOString())
         .order('created_at', { ascending: false });
 
-      if (error) throw error;
+      if (error) {
+        console.error("Erro na busca do Supabase:", error);
+        throw error;
+      }
 
       if (!exportData || exportData.length === 0) {
         showError("Nenhuma OS concluída encontrada neste mês para exportar.");
@@ -163,7 +164,7 @@ export default function Jobs() {
           'Código Loja': store?.code || '',
           'Nome Loja': store?.name || '',
           'Endereço': store?.address || '',
-          'Cidade': store?.city || '',
+          'Bairro': store?.neighborhood || '',
           'Estado': store?.state || '',
           'Tipo de Serviço': job.type,
           'Instalador': profile ? `${profile.first_name} ${profile.last_name}` : 'Não atribuído',
@@ -187,7 +188,7 @@ export default function Jobs() {
       showSuccess("Planilha exportada com sucesso!");
     } catch (error) {
       console.error("Error exporting to Excel:", error);
-      showError("Erro ao exportar planilha.");
+      showError("Erro ao exportar planilha. Verifique o console para mais detalhes.");
     } finally {
       setIsExporting(false);
     }
