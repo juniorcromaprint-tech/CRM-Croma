@@ -243,8 +243,8 @@ export default function JobDetail() {
 
     setIsSavingSignature(true);
     try {
-      // Get signature as base64 image
-      const signatureDataUrl = sigCanvas.current?.getTrimmedCanvas().toDataURL('image/png');
+      // Get signature as base64 image - USANDO getCanvas() EM VEZ DE getTrimmedCanvas() PARA EVITAR O BUG
+      const signatureDataUrl = sigCanvas.current?.getCanvas().toDataURL('image/png');
       
       if (!signatureDataUrl) throw new Error("Falha ao gerar imagem da assinatura");
 
