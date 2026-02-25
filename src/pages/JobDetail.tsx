@@ -1,6 +1,6 @@
 import React, { useState, useRef } from "react";
 import { useParams, useNavigate } from "react-router-dom";
-import { ArrowLeft, Camera, Upload, FileText, AlertTriangle, CheckCircle2, Printer, MapPin, Calendar, Navigation, Loader2, Plus, Trash2 } from "lucide-react";
+import { ArrowLeft, Camera, Upload, FileText, AlertTriangle, CheckCircle2, Printer, MapPin, Calendar, Navigation, Loader2, Plus, Trash2, PenTool } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
@@ -9,6 +9,8 @@ import { showSuccess, showError } from "@/utils/toast";
 import { CromaLogo, CromaLogoFallback } from "@/components/Layout";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
+import imageCompression from 'browser-image-compression';
+import SignatureCanvas from 'react-signature-canvas';
 
 export default function JobDetail() {
   const { id } = useParams();
@@ -16,9 +18,11 @@ export default function JobDetail() {
   const queryClient = useQueryClient();
   const [isLocating, setIsLocating] = useState(false);
   const [uploadingType, setUploadingType] = useState<'before' | 'after' | null>(null);
+  const [isSavingSignature, setIsSavingSignature] = useState(false);
   
   const fileInputBeforeRef = useRef<HTMLInputElement>(null);
   const fileInputAfterRef = useRef<HTMLInputElement>(null);
+  const sigCanvas = useRef<SignatureCanvas>(null);
 
   // Buscar dados da OS
   const { data: job, isLoading } = useQuery({
@@ -148,12 +152,36 @@ export default function JobDetail() {
     try {
       for (let i = 0; i < files.length; i++) {
         const file = files[i];
-        const fileExt = file.name.split('.').pop();
+        
+        // Compress image before upload
+        const options = {
+          maxSizeMB: 1, // Max 1MB
+          maxWidthOrHeight: 1920, // Max 1080p resolution
+          useWebWorker: true,
+          fileType: 'image/jpeg' // Convert to JPEG to save space
+        };
+        
+        let fileToUpload = file;
+        try {
+          // Only compress if it's an image
+          if (file.type.startsWith('image/')) {
+            const compressedFile = await imageCompression(file, options);
+            // Create a new File object from the Blob to ensure it has a name
+            fileToUpload = new File([compressedFile], file.name.replace(/\.[^/.]+$/, ".jpg"), {
+              type: 'image/jpeg',
+            });
+          }
+        } catch (compressionError) {
+          console.error("Error compressing image:", compressionError);
+          // Fallback to original file if compression fails
+        }
+
+        const fileExt = fileToUpload.name.split('.').pop();
         const fileName = `${id}-${type}-${Math.random()}.${fileExt}`;
         
         const { error: uploadError } = await supabase.storage
           .from('job_photos')
-          .upload(fileName, file);
+          .upload(fileName, fileToUpload);
 
         if (uploadError) throw uploadError;
 
@@ -201,6 +229,79 @@ export default function JobDetail() {
 
   const handleNotesChange = (e: React.ChangeEvent<HTMLTextAreaElement>, field: 'notes' | 'issues') => {
     updateJobMutation.mutate({ [field]: e.target.value });
+  };
+
+  const clearSignature = () => {
+    sigCanvas.current?.clear();
+  };
+
+  const saveSignature = async () => {
+    if (sigCanvas.current?.isEmpty()) {
+      showError("Por favor, assine antes de salvar.");
+      return;
+    }
+
+    setIsSavingSignature(true);
+    try {
+      // Get signature as base64 image
+      const signatureDataUrl = sigCanvas.current?.getTrimmedCanvas().toDataURL('image/png');
+      
+      if (!signatureDataUrl) throw new Error("Failed to get signature data");
+
+      // Convert base64 to blob
+      const res = await fetch(signatureDataUrl);
+      const blob = await res.blob();
+      
+      const fileName = `${id}-signature-${Math.random()}.png`;
+      
+      // Upload to storage
+      const { error: uploadError } = await supabase.storage
+        .from('job_photos')
+        .upload(fileName, blob, {
+          contentType: 'image/png'
+        });
+
+      if (uploadError) throw uploadError;
+
+      // Get public URL
+      const { data: { publicUrl } } = supabase.storage
+        .from('job_photos')
+        .getPublicUrl(fileName);
+
+      // Update job with signature URL
+      updateJobMutation.mutate({ signature_url: publicUrl }, {
+        onSuccess: () => {
+          showSuccess("Assinatura salva com sucesso!");
+        }
+      });
+    } catch (error) {
+      console.error("Error saving signature:", error);
+      showError("Erro ao salvar assinatura.");
+    } finally {
+      setIsSavingSignature(false);
+    }
+  };
+
+  const deleteSignature = async () => {
+    if (!job?.signature_url) return;
+    
+    if (window.confirm("Tem certeza que deseja remover esta assinatura?")) {
+      try {
+        const urlParts = job.signature_url.split('/');
+        const fileName = urlParts[urlParts.length - 1];
+        
+        await supabase.storage.from('job_photos').remove([fileName]);
+        
+        updateJobMutation.mutate({ signature_url: null }, {
+          onSuccess: () => {
+            showSuccess("Assinatura removida.");
+          }
+        });
+      } catch (error) {
+        console.error("Error deleting signature:", error);
+        showError("Erro ao remover assinatura.");
+      }
+    }
   };
 
   if (isLoading) return <div className="p-10 text-center text-slate-500">Carregando OS...</div>;
@@ -349,9 +450,10 @@ export default function JobDetail() {
 
       {/* Tabs for Field Work */}
       <Tabs defaultValue="photos" className="w-full">
-        <TabsList className="grid w-full grid-cols-2 mb-6 rounded-xl p-1 bg-slate-200/50 print:hidden">
+        <TabsList className="grid w-full grid-cols-3 mb-6 rounded-xl p-1 bg-slate-200/50 print:hidden">
           <TabsTrigger value="photos" className="rounded-lg font-medium">Fotos da Instalação</TabsTrigger>
           <TabsTrigger value="notes" className="rounded-lg font-medium">Relatório & Medidas</TabsTrigger>
+          <TabsTrigger value="signature" className="rounded-lg font-medium">Assinatura</TabsTrigger>
         </TabsList>
         
         <TabsContent value="photos" className="space-y-8 print:block print:mt-8">
@@ -483,8 +585,8 @@ export default function JobDetail() {
                 <label className="text-sm font-bold text-slate-700 flex items-center gap-2 mb-2 print:text-base print:uppercase">
                   <FileText size={18} className="print:hidden" /> Relatório do Instalador
                 </label>
-                <Textarea 
-                  placeholder="Descreva como foi a instalação, materiais utilizados, etc..." 
+                <Textarea
+                  placeholder="Descreva como foi a instalação, materiais utilizados, etc..."
                   className="min-h-[120px] rounded-xl border-slate-200 resize-none print:border-slate-300 print:bg-slate-50"
                   defaultValue={job.notes || ""}
                   onBlur={(e) => handleNotesChange(e, 'notes')}
@@ -495,13 +597,77 @@ export default function JobDetail() {
                 <label className="text-sm font-bold text-rose-800 flex items-center gap-2 mb-2 print:text-slate-800 print:text-base print:uppercase">
                   <AlertTriangle size={18} className="print:hidden" /> Divergência de Medidas / Problemas
                 </label>
-                <Textarea 
-                  placeholder="Houve alguma diferença no tamanho da vitrine? O adesivo faltou? Anote aqui..." 
+                <Textarea
+                  placeholder="Houve alguma diferença no tamanho da vitrine? O adesivo faltou? Anote aqui..."
                   className="min-h-[100px] rounded-xl border-rose-200 bg-white resize-none focus-visible:ring-rose-500 print:border-none print:bg-transparent print:p-0 print:min-h-[60px]"
                   defaultValue={job.issues || ""}
                   onBlur={(e) => handleNotesChange(e, 'issues')}
                 />
               </div>
+            </CardContent>
+          </Card>
+        </TabsContent>
+
+        <TabsContent value="signature" className="space-y-6 print:hidden">
+          <Card className="border-slate-200 shadow-sm rounded-2xl">
+            <CardContent className="p-6">
+              <div className="flex items-center justify-between mb-4">
+                <h3 className="text-lg font-bold text-slate-800 flex items-center gap-2">
+                  <PenTool size={20} className="text-blue-600" /> Assinatura do Cliente
+                </h3>
+              </div>
+              
+              {job.signature_url ? (
+                <div className="space-y-4">
+                  <div className="border-2 border-slate-200 rounded-xl p-4 bg-slate-50 flex justify-center">
+                    <img src={job.signature_url} alt="Assinatura do Cliente" className="max-h-48 object-contain" />
+                  </div>
+                  <div className="flex justify-end">
+                    <Button
+                      variant="outline"
+                      onClick={deleteSignature}
+                      className="text-red-600 border-red-200 hover:bg-red-50"
+                    >
+                      <Trash2 size={16} className="mr-2" /> Remover Assinatura
+                    </Button>
+                  </div>
+                </div>
+              ) : (
+                <div className="space-y-4">
+                  <p className="text-sm text-slate-500 mb-2">
+                    Peça para o cliente ou gerente da loja assinar abaixo para confirmar a conclusão do serviço.
+                  </p>
+                  <div className="border-2 border-dashed border-slate-300 rounded-xl bg-slate-50 overflow-hidden touch-none">
+                    <SignatureCanvas
+                      ref={sigCanvas}
+                      penColor="black"
+                      canvasProps={{
+                        className: "w-full h-64 cursor-crosshair"
+                      }}
+                    />
+                  </div>
+                  <div className="flex justify-between items-center">
+                    <Button
+                      variant="ghost"
+                      onClick={clearSignature}
+                      className="text-slate-500"
+                    >
+                      Limpar
+                    </Button>
+                    <Button
+                      onClick={saveSignature}
+                      disabled={isSavingSignature}
+                      className="bg-blue-600 hover:bg-blue-700 text-white"
+                    >
+                      {isSavingSignature ? (
+                        <><Loader2 className="animate-spin mr-2" size={16} /> Salvando...</>
+                      ) : (
+                        <><CheckCircle2 className="mr-2" size={16} /> Salvar Assinatura</>
+                      )}
+                    </Button>
+                  </div>
+                </div>
+              )}
             </CardContent>
           </Card>
         </TabsContent>
@@ -516,10 +682,20 @@ export default function JobDetail() {
           </div>
         </div>
         <div className="w-64 text-center">
-          <div className="border-t border-slate-400 pt-2">
-            <p className="font-bold text-slate-800">Cliente / Gerente da Loja</p>
-            <p className="text-sm text-slate-500">Assinatura de Aprovação</p>
-          </div>
+          {job.signature_url ? (
+            <div className="flex flex-col items-center">
+              <img src={job.signature_url} alt="Assinatura" className="h-16 object-contain mb-2" />
+              <div className="border-t border-slate-400 pt-2 w-full">
+                <p className="font-bold text-slate-800">Cliente / Gerente da Loja</p>
+                <p className="text-sm text-slate-500">Assinatura Digital</p>
+              </div>
+            </div>
+          ) : (
+            <div className="border-t border-slate-400 pt-2">
+              <p className="font-bold text-slate-800">Cliente / Gerente da Loja</p>
+              <p className="text-sm text-slate-500">Assinatura de Aprovação</p>
+            </div>
+          )}
         </div>
       </div>
     </div>

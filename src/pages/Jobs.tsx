@@ -1,12 +1,13 @@
 import React, { useState, useMemo, useEffect } from "react";
 import { useSearchParams, useNavigate } from "react-router-dom";
-import { useQuery } from "@tanstack/react-query";
+import { useInfiniteQuery } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
-import { Search, Plus, MapPin, ClipboardList, Filter, ChevronLeft, ChevronRight, Calendar, AlertTriangle } from "lucide-react";
+import { Search, Plus, MapPin, ClipboardList, Filter, ChevronLeft, ChevronRight, Calendar, AlertTriangle, User, Loader2 } from "lucide-react";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
 import JobFormSheet from "@/components/JobFormSheet";
+import { useInView } from "react-intersection-observer";
 
 export default function Jobs() {
   const [searchParams, setSearchParams] = useSearchParams();
@@ -14,9 +15,8 @@ export default function Jobs() {
   
   const [searchTerm, setSearchTerm] = useState("");
   const [statusFilter, setStatusFilter] = useState(searchParams.get("status") || "Todos");
-  const [currentPage, setCurrentPage] = useState(1);
-  const itemsPerPage = 50;
   const [isJobSheetOpen, setIsJobSheetOpen] = useState(false);
+  const { ref, inView } = useInView();
 
   // Sincroniza o filtro com a URL (útil quando clica nos cards da Home)
   useEffect(() => {
@@ -31,7 +31,6 @@ export default function Jobs() {
   const handleStatusChange = (e: React.ChangeEvent<HTMLSelectElement>) => {
     const newStatus = e.target.value;
     setStatusFilter(newStatus);
-    setCurrentPage(1);
     
     if (newStatus === "Todos") {
       searchParams.delete("status");
@@ -41,50 +40,64 @@ export default function Jobs() {
     setSearchParams(searchParams);
   };
 
-  const { data: jobs, isLoading } = useQuery({
-    queryKey: ['all-jobs'],
-    queryFn: async () => {
-      const { data, error } = await supabase
-        .from('jobs')
-        .select('*, stores(name, brand)')
-        .order('created_at', { ascending: false });
-      
-      if (error) throw error;
-      return data || [];
+  const fetchJobs = async ({ pageParam = 0 }) => {
+    const limit = 20;
+    let query = supabase
+      .from('jobs')
+      .select('*, stores!inner(name, brand), profiles!jobs_assigned_to_fkey(first_name, last_name)', { count: 'exact' })
+      .order('created_at', { ascending: false })
+      .range(pageParam * limit, (pageParam + 1) * limit - 1);
+
+    if (statusFilter !== "Todos") {
+      if (statusFilter === "Divergência") {
+        query = query.not('issues', 'is', null).neq('issues', '');
+      } else {
+        query = query.eq('status', statusFilter);
+      }
     }
+
+    if (searchTerm) {
+      // Supabase doesn't support OR across joined tables easily in a single string,
+      // so we might need to do a more complex query or filter client-side if we want to search store names.
+      // For now, we'll search OS number and type.
+      query = query.or(`os_number.ilike.%${searchTerm}%,type.ilike.%${searchTerm}%`);
+    }
+
+    const { data, error, count } = await query;
+    
+    if (error) throw error;
+    
+    return {
+      data: data || [],
+      nextPage: data && data.length === limit ? pageParam + 1 : undefined,
+      totalCount: count || 0
+    };
+  };
+
+  const {
+    data,
+    isLoading,
+    fetchNextPage,
+    hasNextPage,
+    isFetchingNextPage
+  } = useInfiniteQuery({
+    queryKey: ['infinite-jobs', statusFilter, searchTerm],
+    queryFn: fetchJobs,
+    initialPageParam: 0,
+    getNextPageParam: (lastPage) => lastPage.nextPage,
   });
 
-  const filteredJobs = useMemo(() => {
-    if (!jobs) return [];
-    
-    return jobs.filter(job => {
-      const searchLower = searchTerm.toLowerCase().trim();
-      const store = Array.isArray(job.stores) ? job.stores[0] : job.stores;
-      
-      const matchesSearch = 
-        (job.os_number?.toLowerCase() || "").includes(searchLower) ||
-        (job.type?.toLowerCase() || "").includes(searchLower) ||
-        (store?.name?.toLowerCase() || "").includes(searchLower) ||
-        (store?.brand?.toLowerCase() || "").includes(searchLower);
+  useEffect(() => {
+    if (inView && hasNextPage) {
+      fetchNextPage();
+    }
+  }, [inView, hasNextPage, fetchNextPage]);
 
-      let matchesStatus = true;
-      if (statusFilter !== "Todos") {
-        if (statusFilter === "Divergência") {
-          matchesStatus = job.status === "Divergência" || (job.issues && job.issues.length > 0);
-        } else {
-          matchesStatus = job.status === statusFilter;
-        }
-      }
+  const allJobs = useMemo(() => {
+    return data?.pages.flatMap(page => page.data) || [];
+  }, [data]);
 
-      return matchesSearch && matchesStatus;
-    });
-  }, [jobs, searchTerm, statusFilter]);
-
-  const totalPages = Math.ceil(filteredJobs.length / itemsPerPage);
-  const paginatedJobs = filteredJobs.slice(
-    (currentPage - 1) * itemsPerPage,
-    currentPage * itemsPerPage
-  );
+  const totalCount = data?.pages[0]?.totalCount || 0;
 
   const getStatusColor = (status: string, issues: string) => {
     if (status === 'Divergência' || (issues && issues.length > 0)) return 'bg-rose-100 text-rose-700 border-rose-200';
@@ -196,7 +209,7 @@ export default function Jobs() {
                         
                         <div className="flex flex-wrap items-center gap-3 mt-2 text-sm text-slate-500">
                           <span className="flex items-center gap-1">
-                            <MapPin size={14} /> 
+                            <MapPin size={14} />
                             <span className="truncate max-w-[200px] md:max-w-md">
                               {store?.name || 'Sem endereço'}
                             </span>
@@ -205,6 +218,12 @@ export default function Jobs() {
                             <Calendar size={14} />
                             {new Date(job.scheduled_date || job.created_at).toLocaleDateString('pt-BR')}
                           </span>
+                          {job.profiles && (
+                            <span className="flex items-center gap-1 text-blue-600 bg-blue-50 px-2 py-0.5 rounded-md border border-blue-100">
+                              <User size={14} />
+                              {job.profiles.first_name} {job.profiles.last_name}
+                            </span>
+                          )}
                         </div>
 
                         {hasIssues && (

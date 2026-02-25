@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from "react";
-import { Save, Loader2, ClipboardList, Calendar, Store, FileText, Hash } from "lucide-react";
+import { Save, Loader2, ClipboardList, Calendar, Store, FileText, Hash, User } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Sheet, SheetContent, SheetHeader, SheetTitle, SheetDescription } from "@/components/ui/sheet";
@@ -32,13 +32,29 @@ export default function JobFormSheet({ isOpen, onClose, jobToEdit, initialStoreI
     enabled: isOpen // Só busca quando o painel for aberto
   });
 
+  // Busca a lista de instaladores para o select
+  const { data: installers } = useQuery({
+    queryKey: ['installers-list'],
+    queryFn: async () => {
+      const { data, error } = await supabase
+        .from('profiles')
+        .select('id, first_name, last_name')
+        .eq('role', 'instalador')
+        .order('first_name');
+      if (error) throw error;
+      return data || [];
+    },
+    enabled: isOpen
+  });
+
   const [formData, setFormData] = useState({
     store_id: "",
     os_number: "",
     type: "",
     status: "Pendente",
     scheduled_date: new Date().toISOString().split('T')[0],
-    notes: ""
+    notes: "",
+    assigned_to: ""
   });
 
   // Preenche o formulário ao abrir
@@ -50,7 +66,8 @@ export default function JobFormSheet({ isOpen, onClose, jobToEdit, initialStoreI
         type: jobToEdit.type || "",
         status: jobToEdit.status || "Pendente",
         scheduled_date: jobToEdit.scheduled_date ? jobToEdit.scheduled_date.split('T')[0] : new Date().toISOString().split('T')[0],
-        notes: jobToEdit.notes || ""
+        notes: jobToEdit.notes || "",
+        assigned_to: jobToEdit.assigned_to || ""
       });
     } else {
       setFormData({
@@ -59,7 +76,8 @@ export default function JobFormSheet({ isOpen, onClose, jobToEdit, initialStoreI
         type: "",
         status: "Pendente",
         scheduled_date: new Date().toISOString().split('T')[0],
-        notes: ""
+        notes: "",
+        assigned_to: ""
       });
     }
   }, [jobToEdit, initialStoreId, isOpen]);
@@ -77,12 +95,18 @@ export default function JobFormSheet({ isOpen, onClose, jobToEdit, initialStoreI
 
     setIsSubmitting(true);
     try {
+      // Prepare data for submission (handle empty assigned_to)
+      const submitData = {
+        ...formData,
+        assigned_to: formData.assigned_to === "" ? null : formData.assigned_to
+      };
+
       if (jobToEdit) {
-        const { error } = await supabase.from('jobs').update(formData).eq('id', jobToEdit.id);
+        const { error } = await supabase.from('jobs').update(submitData).eq('id', jobToEdit.id);
         if (error) throw error;
         showSuccess("OS atualizada com sucesso!");
       } else {
-        const { error } = await supabase.from('jobs').insert([formData]);
+        const { error } = await supabase.from('jobs').insert([submitData]);
         if (error) throw error;
         showSuccess("Nova OS criada com sucesso!");
       }
@@ -188,13 +212,13 @@ export default function JobFormSheet({ isOpen, onClose, jobToEdit, initialStoreI
             <div className="grid grid-cols-2 gap-3">
               <div>
                 <label className="text-xs font-bold text-slate-500 mb-1 block">Tipo de Serviço *</label>
-                <Input 
-                  name="type" 
-                  value={formData.type} 
-                  onChange={handleChange} 
-                  placeholder="Ex: Instalação de Fachada" 
-                  className="h-11 rounded-xl bg-slate-50 border-slate-200" 
-                  required 
+                <Input
+                  name="type"
+                  value={formData.type}
+                  onChange={handleChange}
+                  placeholder="Ex: Instalação de Fachada"
+                  className="h-11 rounded-xl bg-slate-50 border-slate-200"
+                  required
                 />
               </div>
               <div>
@@ -214,6 +238,30 @@ export default function JobFormSheet({ isOpen, onClose, jobToEdit, initialStoreI
                   <div className="absolute right-3 top-1/2 -translate-y-1/2 pointer-events-none text-slate-400">
                     <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="m6 9 6 6 6-6"/></svg>
                   </div>
+                </div>
+              </div>
+            </div>
+
+            <div>
+              <label className="text-xs font-bold text-slate-500 mb-1 block flex items-center gap-1">
+                <User size={12} /> Atribuir a (Instalador)
+              </label>
+              <div className="relative">
+                <select
+                  name="assigned_to"
+                  value={formData.assigned_to}
+                  onChange={handleChange}
+                  className="w-full h-11 pl-3 pr-10 rounded-xl border border-slate-200 bg-slate-50 shadow-sm text-sm focus:ring-2 focus:ring-blue-600 focus:border-transparent appearance-none outline-none text-slate-700"
+                >
+                  <option value="">Não atribuído</option>
+                  {installers?.map(installer => (
+                    <option key={installer.id} value={installer.id}>
+                      {installer.first_name} {installer.last_name}
+                    </option>
+                  ))}
+                </select>
+                <div className="absolute right-3 top-1/2 -translate-y-1/2 pointer-events-none text-slate-400">
+                  <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="m6 9 6 6 6-6"/></svg>
                 </div>
               </div>
             </div>
