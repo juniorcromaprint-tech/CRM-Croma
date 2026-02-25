@@ -1,13 +1,15 @@
-import React from "react";
+import React, { useState } from "react";
 import { Link, useNavigate } from "react-router-dom";
 import { CheckCircle2, Clock, AlertCircle, ArrowRight, MapPin, Plus, Store, Users, ClipboardList } from "lucide-react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { useQuery } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
+import JobFormSheet from "@/components/JobFormSheet";
 
 export default function Index() {
   const navigate = useNavigate();
+  const [isJobSheetOpen, setIsJobSheetOpen] = useState(false);
 
   const { data: jobs, isLoading, error } = useQuery({
     queryKey: ['recent-jobs'],
@@ -39,10 +41,11 @@ export default function Index() {
           <h1 className="text-xl md:text-2xl font-black text-slate-800 tracking-tight">Olá, Equipe! 👋</h1>
           <p className="text-slate-500 mt-1 text-sm md:text-base">Bem-vindo ao painel de Instalações e Merchandising.</p>
         </div>
-        <Button asChild className="bg-blue-600 hover:bg-blue-700 text-white rounded-xl shadow-sm h-10 px-4 text-sm font-bold">
-          <Link to="/jobs/new">
-            <Plus size={18} className="mr-2" /> Nova OS / Merchandising
-          </Link>
+        <Button
+          onClick={() => setIsJobSheetOpen(true)}
+          className="bg-blue-600 hover:bg-blue-700 text-white rounded-xl shadow-sm h-10 px-4 text-sm font-bold"
+        >
+          <Plus size={18} className="mr-2" /> Nova OS / Merchandising
         </Button>
       </div>
 
@@ -161,8 +164,12 @@ export default function Index() {
                 </div>
                 <h3 className="text-base font-bold text-slate-700 mb-1">Nenhuma OS encontrada</h3>
                 <p className="text-sm text-slate-500 mb-4">Você ainda não tem nenhuma instalação cadastrada.</p>
-                <Button asChild size="sm" className="bg-blue-600 hover:bg-blue-700 text-white rounded-lg">
-                  <Link to="/jobs/new">Criar Primeira OS</Link>
+                <Button
+                  onClick={() => setIsJobSheetOpen(true)}
+                  size="sm"
+                  className="bg-blue-600 hover:bg-blue-700 text-white rounded-lg"
+                >
+                  Criar Primeira OS
                 </Button>
               </div>
             )}
@@ -173,12 +180,15 @@ export default function Index() {
         <div className="space-y-4">
           <h3 className="text-lg font-black text-slate-800 px-1">Ações Rápidas</h3>
           <div className="grid grid-cols-2 lg:grid-cols-1 gap-3">
-            <Link to="/jobs/new" className="flex items-center gap-3 p-4 rounded-2xl bg-blue-600 text-white hover:bg-blue-700 transition-colors shadow-sm shadow-blue-200 group">
+            <button
+              onClick={() => setIsJobSheetOpen(true)}
+              className="flex items-center gap-3 p-4 rounded-2xl bg-blue-600 text-white hover:bg-blue-700 transition-colors shadow-sm shadow-blue-200 group text-left"
+            >
               <div className="w-10 h-10 bg-white/20 rounded-xl flex items-center justify-center group-hover:scale-110 transition-transform">
                 <Plus size={20} />
               </div>
               <span className="font-bold text-base">Nova OS</span>
-            </Link>
+            </button>
             
             <Link to="/stores" className="flex items-center gap-3 p-4 rounded-2xl bg-white border border-slate-100 hover:border-fuchsia-200 hover:shadow-sm transition-all group">
               <div className="w-10 h-10 bg-fuchsia-100 text-fuchsia-600 rounded-xl flex items-center justify-center group-hover:scale-110 transition-transform">
@@ -196,6 +206,11 @@ export default function Index() {
           </div>
         </div>
       </div>
+
+      <JobFormSheet
+        isOpen={isJobSheetOpen}
+        onClose={() => setIsJobSheetOpen(false)}
+      />
     </div>
   );
 }
