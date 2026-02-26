@@ -223,6 +223,7 @@ export default function JobDetail() {
   };
 
   const handleDeleteJob = () => {
+    // Adicionando a confirmação
     if (window.confirm("Tem certeza que deseja excluir esta OS? Esta ação não pode ser desfeita e apagará todas as fotos vinculadas.")) {
       deleteJobMutation.mutate();
     }
@@ -294,6 +295,7 @@ export default function JobDetail() {
   const deleteSignature = async () => {
     if (!job?.signature_url) return;
     
+    // Adicionando a confirmação
     if (window.confirm("Tem certeza que deseja remover esta assinatura?")) {
       try {
         const urlParts = job.signature_url.split('/');
@@ -316,6 +318,13 @@ export default function JobDetail() {
   const openImageModal = (url: string) => {
     setSelectedImageUrl(url);
     setIsImageModalOpen(true);
+  };
+
+  const handleDeletePhoto = (photoId: string) => {
+    // Adicionando a confirmação
+    if (window.confirm("Tem certeza que deseja excluir esta foto?")) {
+      deletePhotoMutation.mutate(photoId);
+    }
   };
 
   if (isLoading) return <div className="p-10 text-center text-slate-500">Carregando OS...</div>;
@@ -504,7 +513,7 @@ export default function JobDetail() {
                       variant="destructive" 
                       size="icon" 
                       className="rounded-full h-10 w-10"
-                      onClick={(e) => { e.stopPropagation(); deletePhotoMutation.mutate(photo.id); }} // Adicionado stopPropagation
+                      onClick={(e) => { e.stopPropagation(); handleDeletePhoto(photo.id); }} // Chamando a nova função com confirmação
                     >
                       <Trash2 size={18} />
                     </Button>
@@ -560,7 +569,7 @@ export default function JobDetail() {
                       variant="destructive" 
                       size="icon" 
                       className="rounded-full h-10 w-10"
-                      onClick={(e) => { e.stopPropagation(); deletePhotoMutation.mutate(photo.id); }} // Adicionado stopPropagation
+                      onClick={(e) => { e.stopPropagation(); handleDeletePhoto(photo.id); }} // Chamando a nova função com confirmação
                     >
                       <Trash2 size={18} />
                     </Button>
