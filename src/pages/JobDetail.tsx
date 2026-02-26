@@ -24,7 +24,8 @@ export default function JobDetail() {
   const [isSavingSignature, setIsSavingSignature] = useState(false);
   const [isImageModalOpen, setIsImageModalOpen] = useState(false); // Estado para controlar o modal
   const [selectedImageUrl, setSelectedImageUrl] = useState(""); // URL da imagem a ser exibida no modal
-  
+  const [photoDescriptions, setPhotoDescriptions] = useState<{ [key: string]: string }>({}); // Estado para descrições das fotos
+
   const fileInputBeforeRef = useRef<HTMLInputElement>(null);
   const fileInputAfterRef = useRef<HTMLInputElement>(null);
   const sigCanvas = useRef<SignatureCanvas>(null);
@@ -54,6 +55,12 @@ export default function JobDetail() {
         .eq('job_id', id)
         .order('created_at', { ascending: true });
       if (error) throw error;
+      // Inicializar descrições das fotos ao buscar
+      const initialDescriptions = {};
+      data?.forEach(photo => {
+        initialDescriptions[photo.id] = photo.description || '';
+      });
+      setPhotoDescriptions(initialDescriptions);
       return data;
     },
     enabled: !!id
@@ -231,6 +238,23 @@ export default function JobDetail() {
 
   const handleNotesChange = (e: React.ChangeEvent<HTMLTextAreaElement>, field: 'notes' | 'issues') => {
     updateJobMutation.mutate({ [field]: e.target.value });
+  };
+
+  // Nova função para lidar com a mudança na descrição da foto
+  const handleDescriptionChange = (photoId: string, description: string) => {
+    setPhotoDescriptions(prev => ({
+      ...prev,
+      [photoId]: description
+    }));
+    // Atualiza a descrição no banco de dados
+    supabase.from('job_photos').update({ description: description }).eq('id', photoId).then(({ error }) => {
+      if (error) {
+        console.error("Erro ao salvar descrição da foto:", error);
+        showError("Erro ao salvar descrição da foto.");
+      } else {
+        queryClient.invalidateQueries({ queryKey: ['job-photos', id] }); // Invalida a query para garantir que os dados mais recentes sejam carregados
+      }
+    });
   };
 
   const clearSignature = () => {
@@ -506,8 +530,8 @@ export default function JobDetail() {
             
             <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 gap-3 print:grid-cols-3">
               {beforePhotos.map(photo => (
-                <div key={photo.id} className="relative group rounded-xl overflow-hidden border border-slate-200 aspect-square bg-slate-50 cursor-pointer" onClick={() => openImageModal(photo.photo_url)}>
-                  <img src={photo.photo_url} alt="Antes" className="w-full h-full object-cover" />
+                <div key={photo.id} className="relative group rounded-xl overflow-hidden border border-slate-200 aspect-square bg-slate-50">
+                  <img src={photo.photo_url} alt="Antes" className="w-full h-full object-cover cursor-pointer" onClick={() => openImageModal(photo.photo_url)} />
                   <div className="absolute inset-0 bg-black/40 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center print:hidden">
                     <Button 
                       variant="destructive" 
@@ -562,8 +586,8 @@ export default function JobDetail() {
             
             <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 gap-3 print:grid-cols-3">
               {afterPhotos.map(photo => (
-                <div key={photo.id} className="relative group rounded-xl overflow-hidden border border-slate-200 aspect-square bg-slate-50 cursor-pointer" onClick={() => openImageModal(photo.photo_url)}>
-                  <img src={photo.photo_url} alt="Depois" className="w-full h-full object-cover" />
+                <div key={photo.id} className="relative group rounded-xl overflow-hidden border border-slate-200 aspect-square bg-slate-50">
+                  <img src={photo.photo_url} alt="Depois" className="w-full h-full object-cover cursor-pointer" onClick={() => openImageModal(photo.photo_url)} />
                   <div className="absolute inset-0 bg-black/40 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center print:hidden">
                     <Button 
                       variant="destructive" 
@@ -573,6 +597,16 @@ export default function JobDetail() {
                     >
                       <Trash2 size={18} />
                     </Button>
+                  </div>
+                  {/* Campo de descrição da foto */}
+                  <div className="absolute bottom-0 left-0 right-0 p-2 bg-black/50 rounded-b-xl">
+                    <input
+                      type="text"
+                      value={photoDescriptions[photo.id] || ''}
+                      onChange={(e) => handleDescriptionChange(photo.id, e.target.value)}
+                      placeholder="Descrição..."
+                      className="w-full p-1.5 border border-gray-600 rounded-md bg-black/30 text-white placeholder-gray-400 focus:outline-none focus:ring-blue-500 focus:border-blue-500 text-sm"
+                    />
                   </div>
                 </div>
               ))}
