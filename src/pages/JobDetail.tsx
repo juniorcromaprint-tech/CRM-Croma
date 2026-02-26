@@ -1,3 +1,5 @@
+"use client";
+
 import React, { useState, useRef } from "react";
 import { useParams, useNavigate } from "react-router-dom";
 import { ArrowLeft, Camera, Upload, FileText, AlertTriangle, CheckCircle2, Printer, MapPin, Calendar, Navigation, Loader2, Plus, Trash2, PenTool, User } from "lucide-react";
@@ -11,6 +13,7 @@ import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import imageCompression from 'browser-image-compression';
 import SignatureCanvas from 'react-signature-canvas';
+import ImageModal from "@/components/ImageModal"; // Importando o novo componente
 
 export default function JobDetail() {
   const { id } = useParams();
@@ -19,6 +22,8 @@ export default function JobDetail() {
   const [isLocating, setIsLocating] = useState(false);
   const [uploadingType, setUploadingType] = useState<'before' | 'after' | null>(null);
   const [isSavingSignature, setIsSavingSignature] = useState(false);
+  const [isImageModalOpen, setIsImageModalOpen] = useState(false); // Estado para controlar o modal
+  const [selectedImageUrl, setSelectedImageUrl] = useState(""); // URL da imagem a ser exibida no modal
   
   const fileInputBeforeRef = useRef<HTMLInputElement>(null);
   const fileInputAfterRef = useRef<HTMLInputElement>(null);
@@ -308,6 +313,11 @@ export default function JobDetail() {
     }
   };
 
+  const openImageModal = (url: string) => {
+    setSelectedImageUrl(url);
+    setIsImageModalOpen(true);
+  };
+
   if (isLoading) return <div className="p-10 text-center text-slate-500">Carregando OS...</div>;
   if (!job) return <div className="p-10 text-center text-slate-500">OS não encontrada.</div>;
 
@@ -487,14 +497,14 @@ export default function JobDetail() {
             
             <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 gap-3 print:grid-cols-3">
               {beforePhotos.map(photo => (
-                <div key={photo.id} className="relative group rounded-xl overflow-hidden border border-slate-200 aspect-square bg-slate-50">
+                <div key={photo.id} className="relative group rounded-xl overflow-hidden border border-slate-200 aspect-square bg-slate-50 cursor-pointer" onClick={() => openImageModal(photo.photo_url)}>
                   <img src={photo.photo_url} alt="Antes" className="w-full h-full object-cover" />
                   <div className="absolute inset-0 bg-black/40 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center print:hidden">
                     <Button 
                       variant="destructive" 
                       size="icon" 
                       className="rounded-full h-10 w-10"
-                      onClick={() => deletePhotoMutation.mutate(photo.id)}
+                      onClick={(e) => { e.stopPropagation(); deletePhotoMutation.mutate(photo.id); }} // Adicionado stopPropagation
                     >
                       <Trash2 size={18} />
                     </Button>
@@ -543,14 +553,14 @@ export default function JobDetail() {
             
             <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 gap-3 print:grid-cols-3">
               {afterPhotos.map(photo => (
-                <div key={photo.id} className="relative group rounded-xl overflow-hidden border border-slate-200 aspect-square bg-slate-50">
+                <div key={photo.id} className="relative group rounded-xl overflow-hidden border border-slate-200 aspect-square bg-slate-50 cursor-pointer" onClick={() => openImageModal(photo.photo_url)}>
                   <img src={photo.photo_url} alt="Depois" className="w-full h-full object-cover" />
                   <div className="absolute inset-0 bg-black/40 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center print:hidden">
                     <Button 
                       variant="destructive" 
                       size="icon" 
                       className="rounded-full h-10 w-10"
-                      onClick={() => deletePhotoMutation.mutate(photo.id)}
+                      onClick={(e) => { e.stopPropagation(); deletePhotoMutation.mutate(photo.id); }} // Adicionado stopPropagation
                     >
                       <Trash2 size={18} />
                     </Button>
@@ -709,6 +719,13 @@ export default function JobDetail() {
           )}
         </div>
       </div>
+
+      {/* Image Modal */}
+      <ImageModal
+        isOpen={isImageModalOpen}
+        onClose={() => setIsImageModalOpen(false)}
+        imageUrl={selectedImageUrl}
+      />
     </div>
   );
 }
