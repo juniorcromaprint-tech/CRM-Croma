@@ -2,7 +2,7 @@
 
 import React, { useState, useRef, useEffect } from "react";
 import { useParams, useNavigate } from "react-router-dom";
-import { ArrowLeft, Camera, Upload, FileText, AlertTriangle, CheckCircle2, Printer, MapPin, Calendar, Navigation, Loader2, Plus, Trash2, PenTool, User, MessageCircle, ExternalLink, Video, Play, WifiOff, X, Timer, Lock, PlayCircle } from "lucide-react";
+import { ArrowLeft, Camera, Upload, FileText, AlertTriangle, CheckCircle2, Printer, MapPin, Calendar, Navigation, Loader2, Plus, Trash2, PenTool, User, MessageCircle, ExternalLink, Video, Play, WifiOff, X, Timer, Lock, PlayCircle, Edit2 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
@@ -15,17 +15,26 @@ import { supabase } from "@/integrations/supabase/client";
 import imageCompression from 'browser-image-compression';
 import SignatureCanvas from 'react-signature-canvas';
 import ImageModal from "@/components/ImageModal";
+import { useAuth } from "@/contexts/AuthContext";
 
 export default function JobDetail() {
   const { id } = useParams();
   const navigate = useNavigate();
   const queryClient = useQueryClient();
+  const { profile } = useAuth();
+  const isAdmin = profile?.role === 'admin';
+
   const [isLocating, setIsLocating] = useState(false);
   const [uploadingType, setUploadingType] = useState<'before' | 'after' | 'video' | null>(null);
   const [isSavingSignature, setIsSavingSignature] = useState(false);
   const [isImageModalOpen, setIsImageModalOpen] = useState(false);
   const [selectedImageUrl, setSelectedImageUrl] = useState("");
   const [isOffline, setIsOffline] = useState(!navigator.onLine);
+
+  // Estados para edição de tempo (Admin)
+  const [isEditingTimes, setIsEditingTimes] = useState(false);
+  const [editStartTime, setEditStartTime] = useState("");
+  const [editEndTime, setEditEndTime] = useState("");
 
   const fileInputBeforeRef = useRef<HTMLInputElement>(null);
   const fileInputAfterRef = useRef<HTMLInputElement>(null);
@@ -175,7 +184,6 @@ export default function JobDetail() {
       await supabase.storage.from('job_photos').upload(fileName, blob);
       const { data: { publicUrl } } = supabase.storage.from('job_photos').getPublicUrl(fileName);
       
-      // Ao salvar a assinatura, finaliza a OS automaticamente
       updateJobMutation.mutate({ 
         signature_url: publicUrl,
         status: 'Concluído',
@@ -199,19 +207,14 @@ export default function JobDetail() {
   const handlePrint = () => {
     if (!job) return;
     const originalTitle = document.title;
-    
     const clientName = job.stores?.brand || "Cliente";
     const storeCode = job.stores?.code ? `Cod ${job.stores.code}` : "SemCod";
     const dateStr = new Date(job.scheduled_date).toLocaleDateString('pt-BR').replace(/\//g, '-');
     const osNumber = `OS ${job.os_number || "SemNumero"}`;
     
     document.title = `${clientName} - ${storeCode} - ${dateStr} - ${osNumber}`;
-    
     window.print();
-    
-    setTimeout(() => {
-      document.title = originalTitle;
-    }, 1000);
+    setTimeout(() => { document.title = originalTitle; }, 1000);
   };
 
   const formatDuration = (start: string, end?: string) => {
@@ -219,11 +222,35 @@ export default function JobDetail() {
     const startTime = new Date(start).getTime();
     const endTime = new Date(end).getTime();
     const diffMs = endTime - startTime;
+    if (diffMs < 0) return "0m";
     const diffMins = Math.floor(diffMs / 60000);
     const hours = Math.floor(diffMins / 60);
     const mins = diffMins % 60;
     if (hours > 0) return `${hours}h ${mins}m`;
     return `${mins}m`;
+  };
+
+  // Funções para edição de tempo (Admin)
+  const toLocalDatetime = (isoString?: string | null) => {
+    if (!isoString) return "";
+    const d = new Date(isoString);
+    const pad = (n: number) => n.toString().padStart(2, '0');
+    return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}T${pad(d.getHours())}:${pad(d.getMinutes())}`;
+  };
+
+  const startEditingTimes = () => {
+    setEditStartTime(toLocalDatetime(job?.started_at));
+    setEditEndTime(toLocalDatetime(job?.finished_at));
+    setIsEditingTimes(true);
+  };
+
+  const saveTimes = () => {
+    updateJobMutation.mutate({
+      started_at: editStartTime ? new Date(editStartTime).toISOString() : null,
+      finished_at: editEndTime ? new Date(editEndTime).toISOString() : null,
+    }, {
+      onSuccess: () => setIsEditingTimes(false)
+    });
   };
 
   if (isLoading) return <div className="p-10 text-center">Carregando...</div>;
@@ -235,7 +262,6 @@ export default function JobDetail() {
 
   return (
     <div className="space-y-6 pb-10 print:pb-0 print:space-y-0 print:bg-white">
-      {/* Alerta Offline */}
       {isOffline && (
         <div className="bg-amber-50 border border-amber-200 p-3 rounded-xl flex items-center gap-3 text-amber-800 animate-pulse print:hidden">
           <WifiOff size={20} />
@@ -243,7 +269,6 @@ export default function JobDetail() {
         </div>
       )}
 
-      {/* Header Ações */}
       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 print:hidden">
         <Button variant="ghost" size="icon" onClick={() => navigate(-1)} className="bg-white border shadow-sm shrink-0 self-start">
           <ArrowLeft size={20} />
@@ -263,7 +288,6 @@ export default function JobDetail() {
         </div>
       </div>
 
-      {/* Cabeçalho PDF (Apenas Impressão) */}
       <div className="hidden print:block mb-8 border-b-2 border-slate-200 pb-6">
         <div className="flex justify-between items-center">
           <div>
@@ -278,7 +302,6 @@ export default function JobDetail() {
         </div>
       </div>
 
-      {/* Card Principal de Informações */}
       <Card className="border-none shadow-sm rounded-2xl overflow-hidden bg-white print:shadow-none print:border print:border-slate-200 print:rounded-xl print:mb-6">
         <div className="h-2 w-full bg-blue-600 print:hidden" />
         <CardContent className="p-6">
@@ -318,28 +341,67 @@ export default function JobDetail() {
               <p className="font-bold text-sm text-slate-800">{job.profiles ? `${job.profiles.first_name} ${job.profiles.last_name}` : 'Não atribuído'}</p>
             </div>
 
-            {/* Métricas de Tempo */}
-            {job.started_at && (
-              <div className="bg-blue-50 p-4 rounded-xl print:bg-transparent print:border print:border-slate-100 print:p-3 col-span-1 md:col-span-3 flex justify-between items-center">
-                <div className="flex items-center gap-4">
-                  <div>
-                    <p className="text-xs text-blue-600 font-bold uppercase">Início</p>
-                    <p className="font-bold text-sm text-slate-800">{new Date(job.started_at).toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' })}</p>
+            {/* Métricas de Tempo com Edição para Admin */}
+            {(job.started_at || isAdmin) && (
+              <div className="bg-blue-50 p-4 rounded-xl print:bg-transparent print:border print:border-slate-100 print:p-3 col-span-1 md:col-span-3 flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
+                {isEditingTimes ? (
+                  <div className="flex flex-col sm:flex-row items-center gap-3 w-full">
+                    <div className="flex-1 w-full">
+                      <label className="text-xs text-blue-600 font-bold uppercase mb-1 block">Início</label>
+                      <Input type="datetime-local" value={editStartTime} onChange={e => setEditStartTime(e.target.value)} className="bg-white" />
+                    </div>
+                    <div className="flex-1 w-full">
+                      <label className="text-xs text-blue-600 font-bold uppercase mb-1 block">Fim</label>
+                      <Input type="datetime-local" value={editEndTime} onChange={e => setEditEndTime(e.target.value)} className="bg-white" />
+                    </div>
+                    <div className="flex gap-2 mt-4 sm:mt-0 self-end sm:self-center">
+                      <Button variant="ghost" size="sm" onClick={() => setIsEditingTimes(false)}>Cancelar</Button>
+                      <Button size="sm" onClick={saveTimes} disabled={updateJobMutation.isPending} className="bg-blue-600 text-white">Salvar</Button>
+                    </div>
                   </div>
-                  {job.finished_at && (
-                    <>
-                      <div className="w-px h-8 bg-blue-200"></div>
-                      <div>
-                        <p className="text-xs text-blue-600 font-bold uppercase">Fim</p>
-                        <p className="font-bold text-sm text-slate-800">{new Date(job.finished_at).toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' })}</p>
-                      </div>
-                    </>
-                  )}
-                </div>
-                <div className="text-right">
-                  <p className="text-xs text-blue-600 font-bold uppercase flex items-center gap-1 justify-end"><Timer size={12}/> Duração</p>
-                  <p className="font-black text-lg text-blue-700">{formatDuration(job.started_at, job.finished_at)}</p>
-                </div>
+                ) : (
+                  <>
+                    <div className="flex items-center gap-4">
+                      {job.started_at ? (
+                        <>
+                          <div>
+                            <p className="text-xs text-blue-600 font-bold uppercase">Início</p>
+                            <p className="font-bold text-sm text-slate-800">{new Date(job.started_at).toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' })}</p>
+                            <p className="text-[10px] text-slate-500">{new Date(job.started_at).toLocaleDateString('pt-BR')}</p>
+                          </div>
+                          {job.finished_at && (
+                            <>
+                              <div className="w-px h-8 bg-blue-200"></div>
+                              <div>
+                                <p className="text-xs text-blue-600 font-bold uppercase">Fim</p>
+                                <p className="font-bold text-sm text-slate-800">{new Date(job.finished_at).toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' })}</p>
+                                <p className="text-[10px] text-slate-500">{new Date(job.finished_at).toLocaleDateString('pt-BR')}</p>
+                              </div>
+                            </>
+                          )}
+                        </>
+                      ) : (
+                        <div>
+                          <p className="text-xs text-blue-600 font-bold uppercase">Tempo</p>
+                          <p className="font-bold text-sm text-slate-500">Não iniciado</p>
+                        </div>
+                      )}
+                    </div>
+                    <div className="flex items-center gap-4 w-full sm:w-auto justify-between sm:justify-end">
+                      {job.started_at && (
+                        <div className="text-right">
+                          <p className="text-xs text-blue-600 font-bold uppercase flex items-center gap-1 justify-end"><Timer size={12}/> Duração</p>
+                          <p className="font-black text-lg text-blue-700">{formatDuration(job.started_at, job.finished_at)}</p>
+                        </div>
+                      )}
+                      {isAdmin && (
+                        <Button variant="ghost" size="icon" onClick={startEditingTimes} className="text-blue-600 hover:bg-blue-100 print:hidden shrink-0" title="Editar Horários">
+                          <Edit2 size={16} />
+                        </Button>
+                      )}
+                    </div>
+                  </>
+                )}
               </div>
             )}
           </div>
@@ -362,7 +424,6 @@ export default function JobDetail() {
         </CardContent>
       </Card>
 
-      {/* Conteúdo Interativo (Escondido no PDF) */}
       <div className="print:hidden">
         {!canInteract ? (
           <div className="flex flex-col items-center justify-center py-16 px-4 text-center bg-white rounded-2xl border border-dashed border-slate-300 shadow-sm">
@@ -497,10 +558,8 @@ export default function JobDetail() {
         )}
       </div>
 
-      {/* Relatório Fotográfico PDF (Apenas Impressão) */}
       <div className="hidden print:block">
         <div className="space-y-10">
-          {/* Seção Antes */}
           <div>
             <h3 className="text-lg font-black text-slate-800 border-l-4 border-blue-600 pl-3 mb-4 uppercase tracking-tight">1. Antes da Instalação</h3>
             <div className="grid grid-cols-2 gap-4">
@@ -512,7 +571,6 @@ export default function JobDetail() {
             </div>
           </div>
 
-          {/* Seção Depois */}
           <div className="break-before-page">
             <h3 className="text-lg font-black text-slate-800 border-l-4 border-emerald-500 pl-3 mb-4 uppercase tracking-tight">2. Depois da Instalação</h3>
             <div className="grid grid-cols-2 gap-4">
@@ -524,7 +582,6 @@ export default function JobDetail() {
             </div>
           </div>
 
-          {/* Relatório e Divergências */}
           <div className="grid grid-cols-1 gap-6 break-inside-avoid">
             {job.notes && (
               <div className="bg-slate-50 p-4 rounded-xl border border-slate-200">
@@ -540,7 +597,6 @@ export default function JobDetail() {
             )}
           </div>
 
-          {/* Assinatura Final */}
           {job.signature_url && (
             <div className="mt-12 flex flex-col items-center border-t-2 border-slate-100 pt-8 break-inside-avoid">
               <img src={job.signature_url} className="h-32 object-contain mb-2" />
