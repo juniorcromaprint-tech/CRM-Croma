@@ -1,3 +1,5 @@
+"use client";
+
 import React, { useState, useMemo, useEffect } from "react";
 import { 
   User, Bell, Building, LogOut, Shield, 
@@ -11,7 +13,7 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { showSuccess, showError } from "@/utils/toast";
 import { useAuth } from "@/contexts/AuthContext";
 import { supabase } from "@/integrations/supabase/client";
-import { useQuery, useQueryClient } from "@tanstack/react-query";
+import { useQuery, useQueryClient, useMutation } from "@tanstack/react-query";
 
 export default function Settings() {
   const { user, profile, signOut } = useAuth();
@@ -30,6 +32,61 @@ export default function Settings() {
   // Filtros de Região
   const [selectedState, setSelectedState] = useState("");
   const [selectedNeighborhood, setSelectedNeighborhood] = useState("");
+
+  // Estados para Dados da Empresa
+  const [companyData, setCompanyData] = useState({
+    name: "",
+    cnpj: "",
+    phone: "",
+    address: ""
+  });
+
+  // Busca dados da empresa
+  const { data: dbCompany, isLoading: isLoadingCompany } = useQuery({
+    queryKey: ['company-settings'],
+    queryFn: async () => {
+      const { data, error } = await supabase
+        .from('company_settings')
+        .select('*')
+        .single();
+      if (error) throw error;
+      return data;
+    }
+  });
+
+  // Atualiza o estado local quando os dados chegam do banco
+  useEffect(() => {
+    if (dbCompany) {
+      setCompanyData({
+        name: dbCompany.name || "",
+        cnpj: dbCompany.cnpj || "",
+        phone: dbCompany.phone || "",
+        address: dbCompany.address || ""
+      });
+    }
+  }, [dbCompany]);
+
+  // Mutação para salvar dados da empresa
+  const saveCompanyMutation = useMutation({
+    mutationFn: async (newData: typeof companyData) => {
+      const { error } = await supabase
+        .from('company_settings')
+        .update(newData)
+        .eq('id', dbCompany.id);
+      if (error) throw error;
+    },
+    onSuccess: () => {
+      showSuccess("Dados da empresa atualizados!");
+      queryClient.invalidateQueries({ queryKey: ['company-settings'] });
+    },
+    onError: () => {
+      showError("Erro ao salvar dados.");
+    }
+  });
+
+  const handleSaveCompany = () => {
+    saveCompanyMutation.mutate(companyData);
+  };
 
   // Busca todas as lojas que AINDA NÃO TÊM coordenadas
   const { data: pendingStores, isLoading: isLoadingPending } = useQuery({
@@ -90,14 +147,6 @@ export default function Settings() {
       return matchState && matchNeigh;
     });
   }, [pendingStores, selectedState, selectedNeighborhood]);
-
-  const handleSave = () => {
-    setIsSaving(true);
-    setTimeout(() => {
-      setIsSaving(false);
-      showSuccess("Configurações salvas com sucesso!");
-    }, 800);
-  };
 
   const delay = (ms: number) => new Promise(resolve => setTimeout(resolve, ms));
 
@@ -333,30 +382,58 @@ export default function Settings() {
             </CardHeader>
             <CardContent className="p-6 space-y-4">
               
-              <div className="space-y-1.5">
-                <label className="text-sm font-bold text-slate-600">Razão Social</label>
-                <Input defaultValue="Cromaprint Comunicação Visual Ltda" className="h-11 rounded-xl bg-slate-50 border-slate-200" />
-              </div>
-
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                <div className="space-y-1.5">
-                  <label className="text-sm font-bold text-slate-600">CNPJ</label>
-                  <Input defaultValue="00.000.000/0001-00" className="h-11 rounded-xl bg-slate-50 border-slate-200" />
+              {isLoadingCompany ? (
+                <div className="flex items-center justify-center py-8">
+                  <Loader2 className="animate-spin text-blue-600" />
                 </div>
-                <div className="space-y-1.5">
-                  <label className="text-sm font-bold text-slate-600">Telefone de Contato</label>
-                  <Input defaultValue="(11) 99999-9999" className="h-11 rounded-xl bg-slate-50 border-slate-200" />
-                </div>
-              </div>
+              ) : (
+                <>
+                  <div className="space-y-1.5">
+                    <label className="text-sm font-bold text-slate-600">Razão Social</label>
+                    <Input 
+                      value={companyData.name} 
+                      onChange={(e) => setCompanyData({...companyData, name: e.target.value})}
+                      className="h-11 rounded-xl bg-slate-50 border-slate-200" 
+                    />
+                  </div>
 
-              <div className="space-y-1.5">
-                <label className="text-sm font-bold text-slate-600">Endereço Sede</label>
-                <Input defaultValue="Rua Exemplo, 123 - São Paulo, SP" className="h-11 rounded-xl bg-slate-50 border-slate-200" />
-              </div>
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                    <div className="space-y-1.5">
+                      <label className="text-sm font-bold text-slate-600">CNPJ</label>
+                      <Input 
+                        value={companyData.cnpj} 
+                        onChange={(e) => setCompanyData({...companyData, cnpj: e.target.value})}
+                        className="h-11 rounded-xl bg-slate-50 border-slate-200" 
+                      />
+                    </div>
+                    <div className="space-y-1.5">
+                      <label className="text-sm font-bold text-slate-600">Telefone de Contato</label>
+                      <Input 
+                        value={companyData.phone} 
+                        onChange={(e) => setCompanyData({...companyData, phone: e.target.value})}
+                        className="h-11 rounded-xl bg-slate-50 border-slate-200" 
+                      />
+                    </div>
+                  </div>
 
-              <Button onClick={handleSave} disabled={isSaving} className="mt-4 bg-blue-600 hover:bg-blue-700 text-white rounded-xl">
-                <Save size={18} className="mr-2" /> {isSaving ? "Salvando..." : "Salvar Dados"}
-              </Button>
+                  <div className="space-y-1.5">
+                    <label className="text-sm font-bold text-slate-600">Endereço Sede</label>
+                    <Input 
+                      value={companyData.address} 
+                      onChange={(e) => setCompanyData({...companyData, address: e.target.value})}
+                      className="h-11 rounded-xl bg-slate-50 border-slate-200" 
+                    />
+                  </div>
+
+                  <Button 
+                    onClick={handleSaveCompany} 
+                    disabled={saveCompanyMutation.isPending} 
+                    className="mt-4 bg-blue-600 hover:bg-blue-700 text-white rounded-xl"
+                  >
+                    <Save size={18} className="mr-2" /> {saveCompanyMutation.isPending ? "Salvando..." : "Salvar Dados"}
+                  </Button>
+                </>
+              )}
             </CardContent>
           </Card>
         </TabsContent>
