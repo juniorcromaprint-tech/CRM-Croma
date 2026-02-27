@@ -13,6 +13,7 @@ import Clients from "./pages/Clients";
 import Settings from "./pages/Settings";
 import Login from "./pages/Login";
 import Team from "./pages/Team";
+import Analytics from "./pages/Analytics";
 import { useEffect } from "react";
 
 const queryClient = new QueryClient();
@@ -71,6 +72,7 @@ function App() {
               <Route path="map" element={<StoreMap />} />
               <Route path="clients" element={<Clients />} />
               <Route path="team" element={<Team />} />
+              <Route path="analytics" element={<Analytics />} />
               <Route path="settings" element={<Settings />} />
             </Route>
           </Routes>
