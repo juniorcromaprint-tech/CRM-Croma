@@ -68,7 +68,7 @@ export default function Layout() {
   );
 
   return (
-    <div className="h-[100dvh] overflow-hidden bg-slate-50 flex flex-col md:flex-row font-sans">
+    <div className="h-[100dvh] print:h-auto print:min-h-screen overflow-hidden print:overflow-visible bg-slate-50 flex flex-col md:flex-row print:block font-sans">
       {/* Desktop Sidebar */}
       <aside className="hidden md:flex flex-col w-64 bg-white border-r border-slate-200 p-4 print:hidden z-20">
         <div className="px-2 py-4 mb-6">
@@ -128,8 +128,8 @@ export default function Layout() {
       </header>
 
       {/* Main Content */}
-      <main className="flex-1 overflow-y-auto p-4 md:p-8 pb-24 md:pb-8 print:p-0 print:overflow-visible relative">
-        <div className="max-w-5xl mx-auto print:max-w-none h-full">
+      <main className="flex-1 overflow-y-auto print:overflow-visible p-4 md:p-8 pb-24 md:pb-8 print:p-0 relative print:block print:h-auto">
+        <div className="max-w-5xl mx-auto print:max-w-none h-full print:h-auto print:block">
           <Outlet />
         </div>
       </main>
