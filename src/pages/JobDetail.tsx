@@ -206,7 +206,10 @@ export default function JobDetail() {
       const fileName = `${id}-video-${Math.random()}.${fileExt}`;
       
       const { error: uploadError } = await supabase.storage.from('job_videos').upload(fileName, file);
-      if (uploadError) throw uploadError;
+      if (uploadError) {
+        console.error("Erro no upload do Storage:", uploadError);
+        throw new Error(`Erro no Storage: ${uploadError.message}`);
+      }
 
       const { data: { publicUrl } } = supabase.storage.from('job_videos').getPublicUrl(fileName);
       
@@ -214,13 +217,16 @@ export default function JobDetail() {
         job_id: id, 
         video_url: publicUrl 
       });
-      if (dbError) throw dbError;
+      if (dbError) {
+        console.error("Erro ao salvar no Banco:", dbError);
+        throw new Error(`Erro no Banco: ${dbError.message}`);
+      }
 
       showSuccess("Vídeo enviado com sucesso!");
       queryClient.invalidateQueries({ queryKey: ['job-videos', id] });
-    } catch (error) {
-      console.error(error);
-      showError("Erro ao enviar vídeo.");
+    } catch (error: any) {
+      console.error("Erro completo:", error);
+      showError(error.message || "Erro ao enviar vídeo.");
     } finally {
       setUploadingType(null);
     }
