@@ -596,9 +596,9 @@ export default function JobDetail() {
             <h3 className="text-lg font-black text-slate-800 border-l-4 border-blue-600 pl-3 mb-4 uppercase tracking-tight">1. Antes da Instalação</h3>
             <div className="grid grid-cols-2 gap-4">
               {beforePhotos.map(photo => (
-                <div key={photo.id} className="border border-slate-200 rounded-xl overflow-hidden">
+                <a key={photo.id} href={photo.photo_url} target="_blank" rel="noopener noreferrer" className="border border-slate-200 rounded-xl overflow-hidden block hover:opacity-90 transition-opacity">
                   <img src={photo.photo_url} className="w-full h-64 object-cover" />
-                </div>
+                </a>
               ))}
             </div>
           </div>
@@ -607,9 +607,9 @@ export default function JobDetail() {
             <h3 className="text-lg font-black text-slate-800 border-l-4 border-emerald-500 pl-3 mb-4 uppercase tracking-tight">2. Depois da Instalação</h3>
             <div className="grid grid-cols-2 gap-4">
               {afterPhotos.map(photo => (
-                <div key={photo.id} className="border border-slate-200 rounded-xl overflow-hidden">
+                <a key={photo.id} href={photo.photo_url} target="_blank" rel="noopener noreferrer" className="border border-slate-200 rounded-xl overflow-hidden block hover:opacity-90 transition-opacity">
                   <img src={photo.photo_url} className="w-full h-64 object-cover" />
-                </div>
+                </a>
               ))}
             </div>
           </div>
