@@ -13,7 +13,7 @@ import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import imageCompression from 'browser-image-compression';
 import SignatureCanvas from 'react-signature-canvas';
-import ImageModal from "@/components/ImageModal"; // Importando o novo componente
+import ImageModal from "@/components/ImageModal";
 
 export default function JobDetail() {
   const { id } = useParams();
@@ -22,15 +22,14 @@ export default function JobDetail() {
   const [isLocating, setIsLocating] = useState(false);
   const [uploadingType, setUploadingType] = useState<'before' | 'after' | null>(null);
   const [isSavingSignature, setIsSavingSignature] = useState(false);
-  const [isImageModalOpen, setIsImageModalOpen] = useState(false); // Estado para controlar o modal
-  const [selectedImageUrl, setSelectedImageUrl] = useState(""); // URL da imagem a ser exibida no modal
-  const [photoDescriptions, setPhotoDescriptions] = useState<{ [key: string]: string }>({}); // Estado para descrições das fotos
+  const [isImageModalOpen, setIsImageModalOpen] = useState(false);
+  const [selectedImageUrl, setSelectedImageUrl] = useState("");
+  const [photoDescriptions, setPhotoDescriptions] = useState<{ [key: string]: string }>({});
 
   const fileInputBeforeRef = useRef<HTMLInputElement>(null);
   const fileInputAfterRef = useRef<HTMLInputElement>(null);
   const sigCanvas = useRef<SignatureCanvas>(null);
 
-  // Buscar dados da OS (agora incluindo o perfil do instalador)
   const { data: job, isLoading } = useQuery({
     queryKey: ['job', id],
     queryFn: async () => {
@@ -45,7 +44,6 @@ export default function JobDetail() {
     enabled: !!id
   });
 
-  // Buscar fotos da OS
   const { data: photos } = useQuery({
     queryKey: ['job-photos', id],
     queryFn: async () => {
@@ -55,7 +53,6 @@ export default function JobDetail() {
         .eq('job_id', id)
         .order('created_at', { ascending: true });
       if (error) throw error;
-      // Inicializar descrições das fotos ao buscar
       const initialDescriptions = {};
       data?.forEach(photo => {
         initialDescriptions[photo.id] = photo.description || '';
@@ -66,7 +63,6 @@ export default function JobDetail() {
     enabled: !!id
   });
 
-  // Atualizar OS (Status, Notas, GPS)
   const updateJobMutation = useMutation({
     mutationFn: async (updates: any) => {
       const { error } = await supabase.from('jobs').update(updates).eq('id', id);
@@ -76,16 +72,11 @@ export default function JobDetail() {
       queryClient.invalidateQueries({ queryKey: ['job', id] });
       queryClient.invalidateQueries({ queryKey: ['all-jobs'] });
       queryClient.invalidateQueries({ queryKey: ['recent-jobs'] });
-      if (job?.store_id) {
-        queryClient.invalidateQueries({ queryKey: ['store-jobs', job.store_id] });
-      }
     }
   });
 
-  // Excluir OS Inteira
   const deleteJobMutation = useMutation({
     mutationFn: async () => {
-      // 1. Deletar fotos do storage primeiro para não deixar lixo
       if (photos && photos.length > 0) {
         const fileNames = photos.map(p => {
           const urlParts = p.photo_url.split('/');
@@ -93,26 +84,15 @@ export default function JobDetail() {
         });
         await supabase.storage.from('job_photos').remove(fileNames);
       }
-      
-      // 2. Deletar a OS
       const { error } = await supabase.from('jobs').delete().eq('id', id);
       if (error) throw error;
     },
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['all-jobs'] });
-      queryClient.invalidateQueries({ queryKey: ['recent-jobs'] });
-      if (job?.store_id) {
-        queryClient.invalidateQueries({ queryKey: ['store-jobs', job.store_id] });
-      }
       showSuccess("OS excluída com sucesso!");
       navigate(-1);
-    },
-    onError: () => {
-      showError("Erro ao excluir a OS.");
     }
   });
 
-  // Excluir Foto Individual
   const deletePhotoMutation = useMutation({
     mutationFn: async (photoId: string) => {
       const photo = photos?.find(p => p.id === photoId);
@@ -141,18 +121,15 @@ export default function JobDetail() {
           }, {
             onSuccess: () => {
               setIsLocating(false);
-              showSuccess("Localização salva no banco de dados!");
+              showSuccess("Localização salva!");
             }
           });
         },
-        (error) => {
+        () => {
           setIsLocating(false);
-          showError("Não foi possível capturar a localização.");
+          showError("Erro ao capturar localização.");
         }
       );
-    } else {
-      setIsLocating(false);
-      showError("Geolocalização não suportada.");
     }
   };
 
@@ -164,178 +141,45 @@ export default function JobDetail() {
     try {
       for (let i = 0; i < files.length; i++) {
         const file = files[i];
-        
-        const options = {
-          maxSizeMB: 1,
-          maxWidthOrHeight: 1920,
-          useWebWorker: true,
-          fileType: 'image/jpeg'
-        };
-        
-        let fileToUpload = file;
-        try {
-          if (file.type.startsWith('image/')) {
-            const compressedFile = await imageCompression(file, options);
-            fileToUpload = new File([compressedFile], file.name.replace(/\.[^/.]+$/, ".jpg"), {
-              type: 'image/jpeg',
-            });
-          }
-        } catch (compressionError) {
-          console.error("Error compressing image:", compressionError);
-        }
-
-        const fileExt = fileToUpload.name.split('.').pop();
+        const options = { maxSizeMB: 1, maxWidthOrHeight: 1920, useWebWorker: true };
+        const compressedFile = await imageCompression(file, options);
+        const fileExt = file.name.split('.').pop();
         const fileName = `${id}-${type}-${Math.random()}.${fileExt}`;
         
-        const { error: uploadError } = await supabase.storage
-          .from('job_photos')
-          .upload(fileName, fileToUpload);
-
-        if (uploadError) throw uploadError;
-
-        const { data: { publicUrl } } = supabase.storage
-          .from('job_photos')
-          .getPublicUrl(fileName);
-
-        const { error: dbError } = await supabase
-          .from('job_photos')
-          .insert({ job_id: id, photo_type: type, photo_url: publicUrl });
-
-        if (dbError) throw dbError;
+        await supabase.storage.from('job_photos').upload(fileName, compressedFile);
+        const { data: { publicUrl } } = supabase.storage.from('job_photos').getPublicUrl(fileName);
+        await supabase.from('job_photos').insert({ job_id: id, photo_type: type, photo_url: publicUrl });
       }
-
-      showSuccess(`${files.length > 1 ? 'Fotos salvas' : 'Foto salva'} com sucesso!`);
+      showSuccess("Upload concluído!");
       queryClient.invalidateQueries({ queryKey: ['job-photos', id] });
     } catch (error) {
-      showError("Erro ao fazer upload da foto.");
-      console.error(error);
+      showError("Erro no upload.");
     } finally {
       setUploadingType(null);
-      if (type === 'before' && fileInputBeforeRef.current) fileInputBeforeRef.current.value = '';
-      if (type === 'after' && fileInputAfterRef.current) fileInputAfterRef.current.value = '';
     }
   };
 
-  const handleComplete = () => {
-    updateJobMutation.mutate({ status: 'Concluído' }, {
-      onSuccess: () => showSuccess("Instalação finalizada com sucesso!")
-    });
-  };
-
-  const handleStatusChange = (e: React.ChangeEvent<HTMLSelectElement>) => {
-    const newStatus = e.target.value;
-    updateJobMutation.mutate({ status: newStatus }, {
-      onSuccess: () => showSuccess(`Status alterado para ${newStatus}`)
-    });
-  };
-
-  const handleDeleteJob = () => {
-    // Adicionando a confirmação
-    if (window.confirm("Tem certeza que deseja excluir esta OS? Esta ação não pode ser desfeita e apagará todas as fotos vinculadas.")) {
-      deleteJobMutation.mutate();
-    }
-  };
-
-  const handleNotesChange = (e: React.ChangeEvent<HTMLTextAreaElement>, field: 'notes' | 'issues') => {
-    updateJobMutation.mutate({ [field]: e.target.value });
-  };
-
-  // Nova função para lidar com a mudança na descrição da foto
   const handleDescriptionChange = (photoId: string, description: string) => {
-    setPhotoDescriptions(prev => ({
-      ...prev,
-      [photoId]: description
-    }));
-    // Atualiza a descrição no banco de dados
-    supabase.from('job_photos').update({ description: description }).eq('id', photoId).then(({ error }) => {
-      if (error) {
-        console.error("Erro ao salvar descrição da foto:", error);
-        showError("Erro ao salvar descrição da foto.");
-      } else {
-        queryClient.invalidateQueries({ queryKey: ['job-photos', id] }); // Invalida a query para garantir que os dados mais recentes sejam carregados
-      }
+    setPhotoDescriptions(prev => ({ ...prev, [photoId]: description }));
+    supabase.from('job_photos').update({ description }).eq('id', photoId).then(({ error }) => {
+      if (error) showError("Erro ao salvar descrição.");
     });
-  };
-
-  const clearSignature = () => {
-    sigCanvas.current?.clear();
   };
 
   const saveSignature = async () => {
-    if (sigCanvas.current?.isEmpty()) {
-      showError("Por favor, assine antes de salvar.");
-      return;
-    }
-
+    if (sigCanvas.current?.isEmpty()) return showError("Assine primeiro.");
     setIsSavingSignature(true);
     try {
       const signatureDataUrl = sigCanvas.current?.getCanvas().toDataURL('image/png');
-      
-      if (!signatureDataUrl) throw new Error("Falha ao gerar imagem da assinatura");
-
-      const byteString = atob(signatureDataUrl.split(',')[1]);
-      const mimeString = signatureDataUrl.split(',')[0].split(':')[1].split(';')[0];
-      const ab = new ArrayBuffer(byteString.length);
-      const ia = new Uint8Array(ab);
-      for (let i = 0; i < byteString.length; i++) {
-          ia[i] = byteString.charCodeAt(i);
-      }
-      const blob = new Blob([ab], {type: mimeString});
-      
+      const blob = await (await fetch(signatureDataUrl!)).blob();
       const fileName = `${id}-signature-${Math.random()}.png`;
-      
-      const { error: uploadError } = await supabase.storage
-        .from('job_photos')
-        .upload(fileName, blob, {
-          contentType: 'image/png',
-          upsert: true
-        });
-
-      if (uploadError) {
-        console.error("Upload error details:", uploadError);
-        throw new Error(uploadError.message || "Erro no upload para o Supabase");
-      }
-
-      const { data: { publicUrl } } = supabase.storage
-        .from('job_photos')
-        .getPublicUrl(fileName);
-
-      updateJobMutation.mutate({ signature_url: publicUrl }, {
-        onSuccess: () => {
-          showSuccess("Assinatura salva com sucesso!");
-        },
-        onError: (err: any) => {
-          throw new Error(err.message || "Erro ao atualizar a OS com a assinatura");
-        }
-      });
-    } catch (error: any) {
-      console.error("Error saving signature:", error);
-      showError(`Erro: ${error.message || 'Falha ao salvar assinatura'}`);
+      await supabase.storage.from('job_photos').upload(fileName, blob);
+      const { data: { publicUrl } } = supabase.storage.from('job_photos').getPublicUrl(fileName);
+      updateJobMutation.mutate({ signature_url: publicUrl }, { onSuccess: () => showSuccess("Assinatura salva!") });
+    } catch (error) {
+      showError("Erro ao salvar assinatura.");
     } finally {
       setIsSavingSignature(false);
-    }
-  };
-
-  const deleteSignature = async () => {
-    if (!job?.signature_url) return;
-    
-    // Adicionando a confirmação
-    if (window.confirm("Tem certeza que deseja remover esta assinatura?")) {
-      try {
-        const urlParts = job.signature_url.split('/');
-        const fileName = urlParts[urlParts.length - 1];
-        
-        await supabase.storage.from('job_photos').remove([fileName]);
-        
-        updateJobMutation.mutate({ signature_url: null }, {
-          onSuccess: () => {
-            showSuccess("Assinatura removida.");
-          }
-        });
-      } catch (error) {
-        console.error("Error deleting signature:", error);
-        showError("Erro ao remover assinatura.");
-      }
     }
   };
 
@@ -344,431 +188,216 @@ export default function JobDetail() {
     setIsImageModalOpen(true);
   };
 
-  const handleDeletePhoto = (photoId: string) => {
-    // Adicionando a confirmação
-    if (window.confirm("Tem certeza que deseja excluir esta foto?")) {
-      deletePhotoMutation.mutate(photoId);
-    }
-  };
-
-  if (isLoading) return <div className="p-10 text-center text-slate-500">Carregando OS...</div>;
-  if (!job) return <div className="p-10 text-center text-slate-500">OS não encontrada.</div>;
+  if (isLoading) return <div className="p-10 text-center">Carregando...</div>;
+  if (!job) return <div className="p-10 text-center">Não encontrado.</div>;
 
   const beforePhotos = photos?.filter(p => p.photo_type === 'before') || [];
   const afterPhotos = photos?.filter(p => p.photo_type === 'after') || [];
 
   return (
-    <div className="space-y-6 animate-in fade-in duration-500 pb-10 print:space-y-8 print:pb-0 print:bg-white">
-      {/* Header - Hidden on Print */}
-      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 print:hidden">
-        <Button variant="ghost" size="icon" onClick={() => navigate(-1)} className="text-slate-600 bg-white border border-slate-200 shadow-sm hover:bg-slate-50">
+    <div className="space-y-6 pb-10 print:bg-white">
+      <div className="flex items-center justify-between print:hidden">
+        <Button variant="ghost" size="icon" onClick={() => navigate(-1)} className="bg-white border shadow-sm">
           <ArrowLeft size={20} />
         </Button>
-        <div className="flex flex-wrap gap-2">
-          <Button 
-            variant="outline" 
-            onClick={handleDeleteJob} 
-            disabled={deleteJobMutation.isPending}
-            className="rounded-xl border-red-200 text-red-600 hover:text-red-700 hover:bg-red-50 bg-white shadow-sm"
-          >
-            {deleteJobMutation.isPending ? <Loader2 className="animate-spin mr-2" size={18} /> : <Trash2 size={18} className="mr-2" />}
-            Excluir
+        <div className="flex gap-2">
+          <Button variant="outline" onClick={() => window.confirm("Excluir OS?") && deleteJobMutation.mutate()} className="text-red-600 border-red-200">
+            <Trash2 size={18} className="mr-2" /> Excluir
           </Button>
-          <Button variant="outline" onClick={() => window.print()} className="rounded-xl border-slate-200 text-blue-600 hover:text-blue-700 hover:bg-blue-50 bg-white shadow-sm">
-            <Printer size={18} className="mr-2" /> Gerar PDF
+          <Button variant="outline" onClick={() => window.print()} className="text-blue-600 border-slate-200">
+            <Printer size={18} className="mr-2" /> PDF
           </Button>
           {job.status !== "Concluído" && (
-            <Button onClick={handleComplete} className="rounded-xl bg-emerald-600 hover:bg-emerald-700 text-white shadow-sm">
-              <CheckCircle2 size={18} className="mr-2" /> Finalizar OS
+            <Button onClick={() => updateJobMutation.mutate({ status: 'Concluído' })} className="bg-emerald-600 text-white">
+              <CheckCircle2 size={18} className="mr-2" /> Finalizar
             </Button>
           )}
         </div>
       </div>
 
-      {/* Print Header */}
-      <div className="hidden print:flex items-center justify-between border-b-2 border-slate-800 pb-6 mb-8">
-        <div>
-          <CromaLogo className="scale-125 origin-left mb-2" />
-          <p className="text-sm text-slate-500">Comunicação Visual & Impressão Digital</p>
-        </div>
-        <div className="text-right">
-          <h1 className="text-2xl font-black text-slate-800 uppercase tracking-tight">Relatório de Instalação</h1>
-          <p className="text-slate-500 font-medium mt-1">Documento Oficial de Conclusão</p>
-        </div>
-      </div>
-
-      {/* Job Info Card */}
-      <Card className="border-none shadow-sm rounded-2xl overflow-hidden bg-white print:shadow-none print:border print:border-slate-200 print:rounded-lg">
+      <Card className="border-none shadow-sm rounded-2xl overflow-hidden bg-white">
         <div className="h-2 w-full bg-blue-600 print:hidden" />
-        <CardContent className="p-6 print:p-6">
-          <div className="flex flex-col sm:flex-row justify-between items-start gap-4 mb-6">
+        <CardContent className="p-6">
+          <div className="flex justify-between items-start mb-6">
             <div>
-              <span className="text-sm font-bold text-blue-600 bg-blue-50 px-3 py-1 rounded-lg inline-block mb-3 print:bg-transparent print:p-0 print:text-slate-500 print:text-base">
-                OS: {job.os_number}
-              </span>
-              <h2 className="text-3xl font-black text-slate-800 tracking-tight">{job.stores?.brand}</h2>
-              <p className="text-slate-500 font-medium text-lg mt-1">{job.type}</p>
+              <span className="text-sm font-bold text-blue-600 bg-blue-50 px-3 py-1 rounded-lg mb-3 inline-block">OS: {job.os_number}</span>
+              <h2 className="text-3xl font-black text-slate-800">{job.stores?.brand}</h2>
+              <p className="text-slate-500 font-medium text-lg">{job.type}</p>
             </div>
-            
-            {/* Dropdown de Status */}
-            <div className="relative print:hidden">
-              <select
-                value={job.status}
-                onChange={handleStatusChange}
-                className={`appearance-none pl-4 pr-10 py-2 rounded-xl text-sm font-bold outline-none cursor-pointer transition-colors shadow-sm border ${
-                  job.status === 'Concluído' ? 'bg-emerald-50 text-emerald-700 border-emerald-200 hover:bg-emerald-100' :
-                  job.status === 'Cancelado' ? 'bg-red-50 text-red-700 border-red-200 hover:bg-red-100' :
-                  job.status === 'Em andamento' ? 'bg-blue-50 text-blue-700 border-blue-200 hover:bg-blue-100' :
-                  'bg-amber-50 text-amber-700 border-amber-200 hover:bg-amber-100'
-                }`}
+            <div className="print:hidden">
+              <select 
+                value={job.status} 
+                onChange={(e) => updateJobMutation.mutate({ status: e.target.value })}
+                className="p-2 rounded-xl border font-bold text-sm bg-slate-50"
               >
                 <option value="Pendente">Pendente</option>
                 <option value="Em andamento">Em andamento</option>
                 <option value="Concluído">Concluído</option>
                 <option value="Cancelado">Cancelado</option>
               </select>
-              <div className="absolute right-3 top-1/2 -translate-y-1/2 pointer-events-none">
-                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className={
-                  job.status === 'Concluído' ? 'text-emerald-700' :
-                  job.status === 'Cancelado' ? 'text-red-700' :
-                  job.status === 'Em andamento' ? 'text-blue-700' :
-                  'text-amber-700'
-                }><path d="m6 9 6 6 6-6"/></svg>
-              </div>
-            </div>
-
-            {/* Status para Impressão */}
-            <div className="hidden print:block px-4 py-2 rounded-xl text-sm font-bold border border-slate-300 text-slate-800">
-              Status: {job.status}
             </div>
           </div>
           
-          <div className="grid grid-cols-1 md:grid-cols-3 gap-4 print:grid-cols-3">
-            <div className="flex items-center gap-3 text-slate-700 bg-slate-50 p-4 rounded-xl print:bg-transparent print:p-0 print:border-t print:border-slate-100 print:pt-4 print:rounded-none">
-              <MapPin size={20} className="text-blue-600 print:text-slate-400" />
-              <div>
-                <p className="text-xs text-slate-500 font-medium uppercase">Local da Instalação</p>
-                <p className="font-bold">{job.stores?.name}</p>
-                <p className="text-sm text-slate-500">{job.stores?.address}</p>
-              </div>
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+            <div className="bg-slate-50 p-4 rounded-xl">
+              <p className="text-xs text-slate-500 font-bold uppercase">Local</p>
+              <p className="font-bold">{job.stores?.name}</p>
+              <p className="text-sm text-slate-500">{job.stores?.address}</p>
             </div>
-            <div className="flex items-center gap-3 text-slate-700 bg-slate-50 p-4 rounded-xl print:bg-transparent print:p-0 print:border-t print:border-slate-100 print:pt-4 print:rounded-none">
-              <Calendar size={20} className="text-blue-600 print:text-slate-400" />
-              <div>
-                <p className="text-xs text-slate-500 font-medium uppercase">Data da Execução</p>
-                <p className="font-bold">{new Date(job.scheduled_date).toLocaleDateString('pt-BR')}</p>
-              </div>
+            <div className="bg-slate-50 p-4 rounded-xl">
+              <p className="text-xs text-slate-500 font-bold uppercase">Data</p>
+              <p className="font-bold">{new Date(job.scheduled_date).toLocaleDateString('pt-BR')}</p>
             </div>
-            <div className="flex items-center gap-3 text-slate-700 bg-slate-50 p-4 rounded-xl print:bg-transparent print:p-0 print:border-t print:border-slate-100 print:pt-4 print:rounded-none">
-              <User size={20} className="text-blue-600 print:text-slate-400" />
-              <div>
-                <p className="text-xs text-slate-500 font-medium uppercase">Instalador</p>
-                <p className="font-bold">{job.profiles ? `${job.profiles.first_name} ${job.profiles.last_name}` : 'Não atribuído'}</p>
-              </div>
+            <div className="bg-slate-50 p-4 rounded-xl">
+              <p className="text-xs text-slate-500 font-bold uppercase">Instalador</p>
+              <p className="font-bold">{job.profiles ? `${job.profiles.first_name} ${job.profiles.last_name}` : 'Não atribuído'}</p>
             </div>
           </div>
 
-          {/* Geolocation Section */}
-          <div className="mt-4 pt-4 border-t border-slate-100 print:border-slate-200">
-            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
-              <div className="flex items-center gap-3 text-slate-700">
-                <Navigation size={20} className={job.lat ? "text-emerald-500" : "text-slate-400"} />
-                <div>
-                  <p className="text-xs text-slate-500 font-medium uppercase">Coordenadas GPS</p>
-                  {job.lat ? (
-                    <p className="font-bold text-sm font-mono">
-                      Lat: {job.lat.toFixed(6)} <br className="sm:hidden" />
-                      Lng: {job.lng.toFixed(6)}
-                    </p>
-                  ) : (
-                    <p className="text-sm text-slate-400 italic">Localização não capturada</p>
-                  )}
-                </div>
-              </div>
-              {!job.lat && (
-                <Button 
-                  variant="outline" 
-                  size="sm" 
-                  onClick={captureLocation} 
-                  disabled={isLocating}
-                  className="rounded-xl print:hidden"
-                >
-                  {isLocating ? <Loader2 className="animate-spin mr-2" size={16} /> : null}
-                  {isLocating ? "Buscando..." : "Capturar Localização"}
-                </Button>
-              )}
+          <div className="mt-4 pt-4 border-t flex justify-between items-center">
+            <div className="flex items-center gap-2">
+              <Navigation size={18} className={job.lat ? "text-emerald-500" : "text-slate-400"} />
+              <span className="text-sm font-medium text-slate-600">
+                {job.lat ? `GPS: ${job.lat.toFixed(6)}, ${job.lng.toFixed(6)}` : "GPS não capturado"}
+              </span>
             </div>
+            {!job.lat && (
+              <Button variant="outline" size="sm" onClick={captureLocation} disabled={isLocating} className="rounded-xl">
+                {isLocating ? <Loader2 className="animate-spin mr-2" size={14} /> : null} Capturar GPS
+              </Button>
+            )}
           </div>
         </CardContent>
       </Card>
 
-      {/* Tabs for Field Work */}
       <Tabs defaultValue="photos" className="w-full">
         <TabsList className="grid w-full grid-cols-3 mb-6 rounded-xl p-1 bg-slate-200/50 print:hidden">
-          <TabsTrigger value="photos" className="rounded-lg font-medium">Fotos da Instalação</TabsTrigger>
-          <TabsTrigger value="notes" className="rounded-lg font-medium">Relatório & Medidas</TabsTrigger>
-          <TabsTrigger value="signature" className="rounded-lg font-medium">Assinatura</TabsTrigger>
+          <TabsTrigger value="photos">Fotos</TabsTrigger>
+          <TabsTrigger value="notes">Relatório</TabsTrigger>
+          <TabsTrigger value="signature">Assinatura</TabsTrigger>
         </TabsList>
         
-        <TabsContent value="photos" className="space-y-8 print:block print:mt-8">
-          <h3 className="hidden print:block text-xl font-bold text-slate-800 border-b border-slate-200 pb-2 mb-6">
-            Registro Fotográfico
-          </h3>
-          
-          {/* Seção: Antes da Instalação */}
-          <div className="print:break-inside-avoid bg-white p-5 rounded-2xl border border-slate-100 shadow-sm print:border-none print:shadow-none print:p-0">
-            <div className="flex items-center justify-between mb-4">
-              <h3 className="text-lg font-bold text-slate-800 flex items-center gap-2 print:text-base print:uppercase print:tracking-wider">
-                <Camera size={20} className="text-slate-400 print:hidden" /> Antes da Instalação
-              </h3>
-              <span className="text-sm text-slate-500 font-medium bg-slate-100 px-2 py-1 rounded-md print:hidden">
-                {beforePhotos.length} {beforePhotos.length === 1 ? 'foto' : 'fotos'}
-              </span>
+        <TabsContent value="photos" className="space-y-8">
+          {/* Antes */}
+          <div className="bg-white p-5 rounded-2xl border shadow-sm">
+            <div className="flex justify-between mb-4">
+              <h3 className="font-bold text-slate-800 flex items-center gap-2"><Camera size={20} /> Antes</h3>
+              <span className="text-xs font-bold bg-slate-100 px-2 py-1 rounded">{beforePhotos.length} fotos</span>
             </div>
-            
-            <input type="file" accept="image/*" multiple capture="environment" className="hidden" ref={fileInputBeforeRef} onChange={(e) => handleFileUpload(e, 'before')} />
-            
-            <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 gap-3 print:grid-cols-3">
+            <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
               {beforePhotos.map(photo => (
-                <div key={photo.id} className="relative group rounded-xl overflow-hidden border border-slate-200 aspect-square bg-slate-50">
-                  <img src={photo.photo_url} alt="Antes" className="w-full h-full object-cover cursor-pointer" onClick={() => openImageModal(photo.photo_url)} />
-                  <div className="absolute inset-0 bg-black/40 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center print:hidden">
-                    <Button 
-                      variant="destructive" 
-                      size="icon" 
-                      className="rounded-full h-10 w-10"
-                      onClick={(e) => { e.stopPropagation(); handleDeletePhoto(photo.id); }} // Chamando a nova função com confirmação
-                    >
-                      <Trash2 size={18} />
-                    </Button>
-                  </div>
+                <div key={photo.id} className="relative group aspect-square rounded-xl overflow-hidden border bg-slate-50">
+                  <img 
+                    src={photo.photo_url} 
+                    className="w-full h-full object-cover cursor-zoom-in" 
+                    onClick={() => openImageModal(photo.photo_url)} 
+                  />
+                  <Button 
+                    variant="destructive" size="icon" 
+                    className="absolute top-1 right-1 h-7 w-7 opacity-0 group-hover:opacity-100 transition-opacity"
+                    onClick={(e) => { e.stopPropagation(); window.confirm("Excluir foto?") && deletePhotoMutation.mutate(photo.id); }}
+                  >
+                    <Trash2 size={14} />
+                  </Button>
                 </div>
               ))}
-              
-              {/* Botão Adicionar Mais (Antes) */}
-              <div 
-                onClick={() => fileInputBeforeRef.current?.click()} 
-                className="border-2 border-dashed border-slate-200 rounded-xl flex flex-col items-center justify-center text-center bg-slate-50 hover:bg-slate-100 hover:border-blue-300 transition-colors cursor-pointer aspect-square print:hidden"
-              >
-                {uploadingType === 'before' ? (
-                  <Loader2 className="animate-spin text-blue-600" size={24} />
-                ) : (
-                  <>
-                    <div className="w-10 h-10 bg-white rounded-full shadow-sm flex items-center justify-center mb-2 text-blue-600">
-                      <Plus size={20} />
-                    </div>
-                    <span className="text-sm font-bold text-slate-600">Adicionar</span>
-                  </>
-                )}
+              <div onClick={() => fileInputBeforeRef.current?.click()} className="aspect-square border-2 border-dashed rounded-xl flex flex-col items-center justify-center cursor-pointer hover:bg-slate-50">
+                <input type="file" accept="image/*" multiple className="hidden" ref={fileInputBeforeRef} onChange={(e) => handleFileUpload(e, 'before')} />
+                {uploadingType === 'before' ? <Loader2 className="animate-spin" /> : <Plus />}
+                <span className="text-xs font-bold mt-1">Adicionar</span>
               </div>
             </div>
-            
-            {beforePhotos.length === 0 && (
-              <div className="hidden print:flex flex-col items-center justify-center text-slate-300 border-2 border-dashed border-slate-300 rounded-xl p-8 mt-2">
-                <Camera size={48} className="mb-2 opacity-20" />
-                <span className="text-sm font-medium uppercase tracking-widest">Espaço para Fotos (Antes)</span>
-              </div>
-            )}
           </div>
 
-          {/* Seção: Depois da Instalação */}
-          <div className="print:break-inside-avoid bg-white p-5 rounded-2xl border border-slate-100 shadow-sm print:border-none print:shadow-none print:p-0">
-            <div className="flex items-center justify-between mb-4">
-              <h3 className="text-lg font-bold text-slate-800 flex items-center gap-2 print:text-base print:uppercase print:tracking-wider">
-                <CheckCircle2 size={20} className="text-emerald-500 print:hidden" /> Depois da Instalação
-              </h3>
-              <span className="text-sm text-slate-500 font-medium bg-slate-100 px-2 py-1 rounded-md print:hidden">
-                {afterPhotos.length} {afterPhotos.length === 1 ? 'foto' : 'fotos'}
-              </span>
+          {/* Depois */}
+          <div className="bg-white p-5 rounded-2xl border shadow-sm">
+            <div className="flex justify-between mb-4">
+              <h3 className="font-bold text-slate-800 flex items-center gap-2"><CheckCircle2 size={20} className="text-emerald-500" /> Depois</h3>
+              <span className="text-xs font-bold bg-slate-100 px-2 py-1 rounded">{afterPhotos.length} fotos</span>
             </div>
-            
-            <input type="file" accept="image/*" multiple capture="environment" className="hidden" ref={fileInputAfterRef} onChange={(e) => handleFileUpload(e, 'after')} />
-            
-            <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 gap-3 print:grid-cols-3">
+            <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
               {afterPhotos.map(photo => (
-                <div key={photo.id} className="relative group rounded-xl overflow-hidden border border-slate-200 aspect-square bg-slate-50">
-                  <img src={photo.photo_url} alt="Depois" className="w-full h-full object-cover cursor-pointer" onClick={() => openImageModal(photo.photo_url)} />
-                  <div className="absolute inset-0 bg-black/40 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center print:hidden">
-                    <Button 
-                      variant="destructive" 
-                      size="icon" 
-                      className="rounded-full h-10 w-10"
-                      onClick={(e) => { e.stopPropagation(); handleDeletePhoto(photo.id); }} // Chamando a nova função com confirmação
-                    >
-                      <Trash2 size={18} />
-                    </Button>
-                  </div>
-                  {/* Campo de descrição da foto */}
-                  <div className="absolute bottom-0 left-0 right-0 p-2 bg-black/50 rounded-b-xl">
-                    <input
-                      type="text"
+                <div key={photo.id} className="relative group aspect-square rounded-xl overflow-hidden border bg-slate-50">
+                  <img 
+                    src={photo.photo_url} 
+                    className="w-full h-full object-cover cursor-zoom-in" 
+                    onClick={() => openImageModal(photo.photo_url)} 
+                  />
+                  <Button 
+                    variant="destructive" size="icon" 
+                    className="absolute top-1 right-1 h-7 w-7 opacity-0 group-hover:opacity-100 transition-opacity"
+                    onClick={(e) => { e.stopPropagation(); window.confirm("Excluir foto?") && deletePhotoMutation.mutate(photo.id); }}
+                  >
+                    <Trash2 size={14} />
+                  </Button>
+                  <div className="absolute bottom-0 left-0 right-0 p-1 bg-black/50">
+                    <input 
+                      className="w-full bg-transparent text-[10px] text-white outline-none" 
+                      placeholder="Legenda..." 
                       value={photoDescriptions[photo.id] || ''}
                       onChange={(e) => handleDescriptionChange(photo.id, e.target.value)}
-                      placeholder="Descrição..."
-                      className="w-full p-1.5 border border-gray-600 rounded-md bg-black/30 text-white placeholder-gray-400 focus:outline-none focus:ring-blue-500 focus:border-blue-500 text-sm"
                     />
                   </div>
                 </div>
               ))}
-              
-              {/* Botão Adicionar Mais (Depois) */}
-              <div 
-                onClick={() => fileInputAfterRef.current?.click()} 
-                className="border-2 border-dashed border-slate-200 rounded-xl flex flex-col items-center justify-center text-center bg-slate-50 hover:bg-slate-100 hover:border-emerald-300 transition-colors cursor-pointer aspect-square print:hidden"
-              >
-                {uploadingType === 'after' ? (
-                  <Loader2 className="animate-spin text-emerald-600" size={24} />
-                ) : (
-                  <>
-                    <div className="w-10 h-10 bg-white rounded-full shadow-sm flex items-center justify-center mb-2 text-emerald-600">
-                      <Plus size={20} />
-                    </div>
-                    <span className="text-sm font-bold text-slate-600">Adicionar</span>
-                  </>
-                )}
+              <div onClick={() => fileInputAfterRef.current?.click()} className="aspect-square border-2 border-dashed rounded-xl flex flex-col items-center justify-center cursor-pointer hover:bg-slate-50">
+                <input type="file" accept="image/*" multiple className="hidden" ref={fileInputAfterRef} onChange={(e) => handleFileUpload(e, 'after')} />
+                {uploadingType === 'after' ? <Loader2 className="animate-spin" /> : <Plus />}
+                <span className="text-xs font-bold mt-1">Adicionar</span>
               </div>
             </div>
-
-            {afterPhotos.length === 0 && (
-              <div className="hidden print:flex flex-col items-center justify-center text-slate-300 border-2 border-dashed border-slate-300 rounded-xl p-8 mt-2">
-                <Camera size={48} className="mb-2 opacity-20" />
-                <span className="text-sm font-medium uppercase tracking-widest">Espaço para Fotos (Depois)</span>
-              </div>
-            )}
           </div>
-
         </TabsContent>
         
-        <TabsContent value="notes" className="space-y-6 print:block print:mt-8">
-          <h3 className="hidden print:block text-xl font-bold text-slate-800 border-b border-slate-200 pb-2 mb-6">
-            Observações Técnicas
-          </h3>
-          <Card className="border-slate-200 shadow-sm rounded-2xl print:shadow-none print:border-none print:rounded-none">
-            <CardContent className="p-6 space-y-6 print:p-0">
-              <div className="print:break-inside-avoid">
-                <label className="text-sm font-bold text-slate-700 flex items-center gap-2 mb-2 print:text-base print:uppercase">
-                  <FileText size={18} className="print:hidden" /> Relatório do Instalador
-                </label>
-                <Textarea
-                  placeholder="Descreva como foi a instalação, materiais utilizados, etc..."
-                  className="min-h-[120px] rounded-xl border-slate-200 resize-none print:border-slate-300 print:bg-slate-50"
-                  defaultValue={job.notes || ""}
-                  onBlur={(e) => handleNotesChange(e, 'notes')}
-                />
-              </div>
-              
-              <div className="bg-rose-50 p-4 rounded-xl border border-rose-100 print:bg-transparent print:border-slate-300 print:break-inside-avoid">
-                <label className="text-sm font-bold text-rose-800 flex items-center gap-2 mb-2 print:text-slate-800 print:text-base print:uppercase">
-                  <AlertTriangle size={18} className="print:hidden" /> Divergência de Medidas / Problemas
-                </label>
-                <Textarea
-                  placeholder="Houve alguma diferença no tamanho da vitrine? O adesivo faltou? Anote aqui..."
-                  className="min-h-[100px] rounded-xl border-rose-200 bg-white resize-none focus-visible:ring-rose-500 print:border-none print:bg-transparent print:p-0 print:min-h-[60px]"
-                  defaultValue={job.issues || ""}
-                  onBlur={(e) => handleNotesChange(e, 'issues')}
-                />
-              </div>
-            </CardContent>
+        <TabsContent value="notes" className="space-y-6">
+          <Card className="p-6 space-y-6">
+            <div>
+              <label className="text-sm font-bold text-slate-700 block mb-2">Relatório do Instalador</label>
+              <Textarea 
+                className="min-h-[120px] rounded-xl" 
+                defaultValue={job.notes || ""} 
+                onBlur={(e) => updateJobMutation.mutate({ notes: e.target.value })} 
+              />
+            </div>
+            <div className="bg-rose-50 p-4 rounded-xl border border-rose-100">
+              <label className="text-sm font-bold text-rose-800 block mb-2">Divergências / Problemas</label>
+              <Textarea 
+                className="min-h-[100px] rounded-xl bg-white" 
+                defaultValue={job.issues || ""} 
+                onBlur={(e) => updateJobMutation.mutate({ issues: e.target.value })} 
+              />
+            </div>
           </Card>
         </TabsContent>
 
-        <TabsContent value="signature" className="space-y-6 print:hidden">
-          <Card className="border-slate-200 shadow-sm rounded-2xl">
-            <CardContent className="p-6">
-              <div className="flex items-center justify-between mb-4">
-                <h3 className="text-lg font-bold text-slate-800 flex items-center gap-2">
-                  <PenTool size={20} className="text-blue-600" /> Assinatura do Cliente
-                </h3>
+        <TabsContent value="signature" className="space-y-6">
+          <Card className="p-6">
+            <h3 className="font-bold text-slate-800 mb-4 flex items-center gap-2"><PenTool size={20} /> Assinatura</h3>
+            {job.signature_url ? (
+              <div className="space-y-4">
+                <div className="border rounded-xl p-4 bg-slate-50 flex justify-center">
+                  <img src={job.signature_url} className="max-h-48" />
+                </div>
+                <Button variant="outline" onClick={() => window.confirm("Remover?") && updateJobMutation.mutate({ signature_url: null })} className="text-red-600">Remover</Button>
               </div>
-              
-              {job.signature_url ? (
-                <div className="space-y-4">
-                  <div className="border-2 border-slate-200 rounded-xl p-4 bg-slate-50 flex justify-center">
-                    <img src={job.signature_url} alt="Assinatura do Cliente" className="max-h-48 object-contain" />
-                  </div>
-                  <div className="flex justify-end">
-                    <Button
-                      variant="outline"
-                      onClick={deleteSignature}
-                      className="text-red-600 border-red-200 hover:bg-red-50"
-                    >
-                      <Trash2 size={16} className="mr-2" /> Remover Assinatura
-                    </Button>
-                  </div>
+            ) : (
+              <div className="space-y-4">
+                <div className="border-2 border-dashed rounded-xl bg-slate-50 overflow-hidden">
+                  <SignatureCanvas ref={sigCanvas} penColor="black" canvasProps={{ className: "w-full h-64" }} />
                 </div>
-              ) : (
-                <div className="space-y-4">
-                  <p className="text-sm text-slate-500 mb-2">
-                    Peça para o cliente ou gerente da loja assinar abaixo para confirmar a conclusão do serviço.
-                  </p>
-                  <div className="border-2 border-dashed border-slate-300 rounded-xl bg-slate-50 overflow-hidden touch-none">
-                    <SignatureCanvas
-                      ref={sigCanvas}
-                      penColor="black"
-                      canvasProps={{
-                        className: "w-full h-64 cursor-crosshair"
-                      }}
-                    />
-                  </div>
-                  <div className="flex justify-between items-center">
-                    <Button
-                      variant="ghost"
-                      onClick={clearSignature}
-                      className="text-slate-500"
-                    >
-                      Limpar
-                    </Button>
-                    <Button
-                      onClick={saveSignature}
-                      disabled={isSavingSignature}
-                      className="bg-blue-600 hover:bg-blue-700 text-white"
-                    >
-                      {isSavingSignature ? (
-                        <><Loader2 className="animate-spin mr-2" size={16} /> Salvando...</>
-                      ) : (
-                        <><CheckCircle2 className="mr-2" size={16} /> Salvar Assinatura</>
-                      )}
-                    </Button>
-                  </div>
+                <div className="flex justify-between">
+                  <Button variant="ghost" onClick={() => sigCanvas.current?.clear()}>Limpar</Button>
+                  <Button onClick={saveSignature} disabled={isSavingSignature} className="bg-blue-600 text-white">
+                    {isSavingSignature ? <Loader2 className="animate-spin" /> : "Salvar Assinatura"}
+                  </Button>
                 </div>
-              )}
-            </CardContent>
+              </div>
+            )}
           </Card>
         </TabsContent>
       </Tabs>
 
-      {/* Print Signatures */}
-      <div className="hidden print:flex justify-between items-end mt-24 pt-8 break-inside-avoid">
-        <div className="w-64 text-center">
-          <div className="border-t border-slate-400 pt-2">
-            <p className="font-bold text-slate-800">{job.profiles ? `${job.profiles.first_name} ${job.profiles.last_name}` : 'Equipe Cromaprint'}</p>
-            <p className="text-sm text-slate-500">Responsável Técnico</p>
-          </div>
-        </div>
-        <div className="w-64 text-center">
-          {job.signature_url ? (
-            <div className="flex flex-col items-center">
-              <img src={job.signature_url} alt="Assinatura" className="h-16 object-contain mb-2" />
-              <div className="border-t border-slate-400 pt-2 w-full">
-                <p className="font-bold text-slate-800">Cliente / Gerente da Loja</p>
-                <p className="text-sm text-slate-500">Assinatura Digital</p>
-              </div>
-            </div>
-          ) : (
-            <div className="border-t border-slate-400 pt-2">
-              <p className="font-bold text-slate-800">Cliente / Gerente da Loja</p>
-              <p className="text-sm text-slate-500">Assinatura de Aprovação</p>
-            </div>
-          )}
-        </div>
-      </div>
-
-      {/* Image Modal */}
-      <ImageModal
-        isOpen={isImageModalOpen}
-        onClose={() => setIsImageModalOpen(false)}
-        imageUrl={selectedImageUrl}
-      />
+      <ImageModal isOpen={isImageModalOpen} onClose={() => setIsImageModalOpen(false)} imageUrl={selectedImageUrl} />
     </div>
   );
 }
