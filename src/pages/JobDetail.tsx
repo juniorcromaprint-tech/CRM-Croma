@@ -7,6 +7,7 @@ import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Textarea } from "@/components/ui/textarea";
+import { Input } from "@/components/ui/input";
 import { showSuccess, showError } from "@/utils/toast";
 import { CromaLogo, CromaLogoFallback } from "@/components/Layout";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
@@ -291,7 +292,15 @@ export default function JobDetail() {
             </div>
             <div className="bg-slate-50 p-4 rounded-xl print:bg-transparent print:border print:border-slate-100 print:p-3">
               <p className="text-xs text-slate-500 font-bold uppercase">Data</p>
-              <p className="font-bold text-sm text-slate-800">{new Date(job.scheduled_date).toLocaleDateString('pt-BR')}</p>
+              <div className="print:hidden">
+                <Input 
+                  type="date" 
+                  value={job.scheduled_date} 
+                  onChange={(e) => updateJobMutation.mutate({ scheduled_date: e.target.value })}
+                  className="h-8 text-sm font-bold bg-white border-slate-200 rounded-lg mt-1"
+                />
+              </div>
+              <p className="hidden print:block font-bold text-sm text-slate-800">{new Date(job.scheduled_date).toLocaleDateString('pt-BR')}</p>
             </div>
             <div className="bg-slate-50 p-4 rounded-xl print:bg-transparent print:border print:border-slate-100 print:p-3">
               <p className="text-xs text-slate-500 font-bold uppercase">Instalador</p>
