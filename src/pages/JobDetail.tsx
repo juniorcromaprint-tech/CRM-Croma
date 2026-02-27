@@ -185,15 +185,17 @@ export default function JobDetail() {
   const handlePrint = () => {
     if (!job) return;
     const originalTitle = document.title;
-    const brandName = job.stores?.brand || "Cliente";
-    const osNumber = job.os_number || "SemNumero";
     
-    // Define o nome do arquivo para o PDF
-    document.title = `Relatorio_OS_${osNumber}_${brandName.replace(/\s+/g, '_')}`;
+    const clientName = job.stores?.brand || "Cliente";
+    const storeCode = job.stores?.code ? `Cod ${job.stores.code}` : "SemCod";
+    const dateStr = new Date(job.scheduled_date).toLocaleDateString('pt-BR').replace(/\//g, '-');
+    const osNumber = `OS ${job.os_number || "SemNumero"}`;
+    
+    // Formato: Nome do Cliente - Cod 123 - 10-10-2023 - OS 456
+    document.title = `${clientName} - ${storeCode} - ${dateStr} - ${osNumber}`;
     
     window.print();
     
-    // Restaura o título original após a impressão
     setTimeout(() => {
       document.title = originalTitle;
     }, 1000);
