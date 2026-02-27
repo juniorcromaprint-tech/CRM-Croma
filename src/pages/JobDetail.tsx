@@ -182,6 +182,23 @@ export default function JobDetail() {
     window.open(`https://wa.me/?text=${text}`, '_blank');
   };
 
+  const handlePrint = () => {
+    if (!job) return;
+    const originalTitle = document.title;
+    const brandName = job.stores?.brand || "Cliente";
+    const osNumber = job.os_number || "SemNumero";
+    
+    // Define o nome do arquivo para o PDF
+    document.title = `Relatorio_OS_${osNumber}_${brandName.replace(/\s+/g, '_')}`;
+    
+    window.print();
+    
+    // Restaura o título original após a impressão
+    setTimeout(() => {
+      document.title = originalTitle;
+    }, 1000);
+  };
+
   if (isLoading) return <div className="p-10 text-center">Carregando...</div>;
   if (!job) return <div className="p-10 text-center">Não encontrado.</div>;
 
@@ -207,7 +224,7 @@ export default function JobDetail() {
           <Button variant="outline" onClick={handleWhatsAppShare} className="text-emerald-600 border-emerald-200 hover:bg-emerald-50 flex-1 sm:flex-none">
             <MessageCircle size={18} className="mr-2" /> WhatsApp
           </Button>
-          <Button variant="outline" onClick={() => window.print()} className="text-blue-600 border-slate-200 flex-1 sm:flex-none">
+          <Button variant="outline" onClick={handlePrint} className="text-blue-600 border-slate-200 flex-1 sm:flex-none">
             <Printer size={18} className="mr-2" /> PDF
           </Button>
           {job.status !== "Concluído" && (
