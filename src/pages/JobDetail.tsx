@@ -457,11 +457,11 @@ export default function JobDetail() {
             <div className="bg-white p-5 rounded-2xl border shadow-sm">
               <div className="flex justify-between mb-4 border-b-2 border-slate-100 pb-2">
                 <h3 className="font-bold text-slate-800 flex items-center gap-2 text-lg"><Video size={20} className="text-blue-600" /> Vídeos do Local</h3>
-                <span className="text-xs font-bold bg-slate-100 px-2 py-1 rounded">{videos.length} vídeos</span>
+                <span className="text-xs font-bold bg-slate-100 px-2 py-1 rounded">{videos?.length || 0} vídeos</span>
               </div>
               
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                {videos.map(video => (
+                {videos?.map(video => (
                   <div key={video.id} className="relative rounded-xl overflow-hidden border border-slate-200 bg-black aspect-video group">
                     <video src={video.video_url} controls className="w-full h-full" />
                     <Button 
