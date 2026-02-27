@@ -68,11 +68,6 @@ export default function JobDetail() {
         .eq('job_id', id)
         .order('created_at', { ascending: true });
       if (error) throw error;
-      const initialDescriptions = {};
-      data?.forEach(photo => {
-        initialDescriptions[photo.id] = photo.description || '';
-      });
-      setPhotoDescriptions(initialDescriptions);
       return data;
     },
     enabled: !!id
@@ -101,7 +96,7 @@ export default function JobDetail() {
       queryClient.invalidateQueries({ queryKey: ['job', id] });
       if (!isOffline) showSuccess("Alteração salva!");
     },
-    onError: (error) => {
+    onError: () => {
       if (isOffline) {
         showError("Você está offline. A alteração será salva quando houver sinal.");
       } else {
@@ -124,11 +119,7 @@ export default function JobDetail() {
   const handleFileUpload = async (event: React.ChangeEvent<HTMLInputElement>, type: 'before' | 'after') => {
     const files = event.target.files;
     if (!files || files.length === 0 || !id) return;
-
-    if (isOffline) {
-      showError("Upload de fotos requer conexão com a internet.");
-      return;
-    }
+    if (isOffline) return showError("Upload de fotos requer internet.");
 
     setUploadingType(type);
     try {
@@ -155,59 +146,39 @@ export default function JobDetail() {
   const handleVideoUpload = async (event: React.ChangeEvent<HTMLInputElement>) => {
     const file = event.target.files?.[0];
     if (!file || !id) return;
+    if (isOffline) return showError("Upload de vídeos requer internet.");
 
-    if (isOffline) {
-      showError("Upload de vídeos requer conexão com a internet.");
-      return;
-    }
-
-    if (file.size > 15 * 1024 * 1024) {
-      showError("O vídeo deve ter no máximo 15MB.");
-      return;
-    }
+    if (file.size > 15 * 1024 * 1024) return showError("Máximo 15MB.");
 
     setUploadingType('video');
     try {
       const fileExt = file.name.split('.').pop();
       const fileName = `vid_${id}_${Date.now()}.${fileExt}`;
-      
       await supabase.storage.from('job_videos').upload(fileName, file);
       const { data: { publicUrl } } = supabase.storage.from('job_videos').getPublicUrl(fileName);
       await supabase.from('job_videos').insert({ job_id: id, video_url: publicUrl });
-
-      showSuccess("Vídeo enviado com sucesso!");
+      showSuccess("Vídeo enviado!");
       queryClient.invalidateQueries({ queryKey: ['job-videos', id] });
-    } catch (error: any) {
-      showError("Erro ao enviar vídeo.");
+    } catch (error) {
+      showError("Erro no vídeo.");
     } finally {
       setUploadingType(null);
-      if (fileInputVideoRef.current) fileInputVideoRef.current.value = "";
     }
   };
 
   const captureLocation = () => {
-    if (isOffline) return showError("GPS requer internet para salvar no mapa.");
+    if (isOffline) return showError("GPS requer internet.");
     setIsLocating(true);
-    if ("geolocation" in navigator) {
-      navigator.geolocation.getCurrentPosition(
-        (position) => {
-          updateJobMutation.mutate({
-            lat: position.coords.latitude,
-            lng: position.coords.longitude
-          }, {
-            onSuccess: () => setIsLocating(false)
-          });
-        },
-        () => {
-          setIsLocating(false);
-          showError("Erro ao capturar localização.");
-        }
-      );
-    }
+    navigator.geolocation.getCurrentPosition(
+      (pos) => {
+        updateJobMutation.mutate({ lat: pos.coords.latitude, lng: pos.coords.longitude }, { onSuccess: () => setIsLocating(false) });
+      },
+      () => { setIsLocating(false); showError("Erro GPS."); }
+    );
   };
 
   const saveSignature = async () => {
-    if (isOffline) return showError("Assinatura digital requer internet para salvar.");
+    if (isOffline) return showError("Assinatura requer internet.");
     if (sigCanvas.current?.isEmpty()) return showError("Assine primeiro.");
     setIsSavingSignature(true);
     try {
@@ -218,7 +189,7 @@ export default function JobDetail() {
       const { data: { publicUrl } } = supabase.storage.from('job_photos').getPublicUrl(fileName);
       updateJobMutation.mutate({ signature_url: publicUrl });
     } catch (error) {
-      showError("Erro ao salvar assinatura.");
+      showError("Erro assinatura.");
     } finally {
       setIsSavingSignature(false);
     }
@@ -229,8 +200,7 @@ export default function JobDetail() {
     const formattedDate = new Date(job.scheduled_date).toLocaleDateString('pt-BR');
     const clientName = job.stores?.name || 'Não informado';
     const text = `Olá! Segue o status da *Ordem de Serviço* da Cromaprint:%0A%0A*OS:* ${job.os_number}%0A*Cliente:* ${clientName}%0A*Data:* ${formattedDate}%0A*Serviço:* ${job.type}%0A*Status:* ${job.status}`;
-    const url = `https://wa.me/?text=${text}`;
-    window.open(url, '_blank');
+    window.open(`https://wa.me/?text=${text}`, '_blank');
   };
 
   const openImageModal = (url: string) => {
@@ -246,27 +216,25 @@ export default function JobDetail() {
 
   return (
     <div className="space-y-6 pb-10 print:pb-0 print:space-y-0 print:bg-white print:block print:overflow-visible">
-      {/* Alerta Offline */}
       {isOffline && (
         <div className="bg-amber-50 border border-amber-200 p-3 rounded-xl flex items-center gap-3 text-amber-800 animate-pulse print:hidden">
           <WifiOff size={20} />
-          <p className="text-sm font-bold">Você está sem internet. Algumas funções estão limitadas.</p>
+          <p className="text-sm font-bold">Modo Offline Ativo.</p>
         </div>
       )}
 
-      {/* Header */}
       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 print:hidden">
         <Button variant="ghost" size="icon" onClick={() => navigate(-1)} className="bg-white border shadow-sm shrink-0 self-start">
           <ArrowLeft size={20} />
         </Button>
         <div className="flex flex-wrap gap-2 w-full sm:w-auto">
-          <Button variant="outline" onClick={() => window.confirm("Excluir OS?") && !isOffline && deleteJobMutation.mutate()} disabled={isOffline} className="text-red-600 border-red-200 flex-1 sm:flex-none">
+          <Button variant="outline" onClick={() => window.confirm("Excluir OS?") && deleteJobMutation.mutate()} disabled={isOffline} className="text-red-600 border-red-200 flex-1 sm:flex-none">
             <Trash2 size={18} className="mr-2" /> Excluir
           </Button>
-          <Button variant="outline" onClick={handleWhatsAppShare} disabled={isOffline} className="text-emerald-600 border-emerald-200 hover:bg-emerald-50 flex-1 sm:flex-none">
+          <Button variant="outline" onClick={handleWhatsAppShare} className="text-emerald-600 border-emerald-200 hover:bg-emerald-50 flex-1 sm:flex-none">
             <MessageCircle size={18} className="mr-2" /> WhatsApp
           </Button>
-          <Button variant="outline" onClick={() => !isOffline && window.print()} disabled={isOffline} className="text-blue-600 border-slate-200 flex-1 sm:flex-none">
+          <Button variant="outline" onClick={() => window.print()} className="text-blue-600 border-slate-200 flex-1 sm:flex-none">
             <Printer size={18} className="mr-2" /> PDF
           </Button>
           {job.status !== "Concluído" && (
@@ -277,7 +245,6 @@ export default function JobDetail() {
         </div>
       </div>
 
-      {/* Card Principal */}
       <Card className="border-none shadow-sm rounded-2xl overflow-hidden bg-white print:shadow-none print:border print:border-slate-200 print:rounded-xl print:mb-8">
         <div className="h-2 w-full bg-blue-600 print:hidden" />
         <CardContent className="p-6">
@@ -336,7 +303,6 @@ export default function JobDetail() {
         </CardContent>
       </Card>
 
-      {/* Tabs Interativas */}
       <div className="print:hidden">
         <Tabs defaultValue="photos" className="w-full">
           <TabsList className="grid w-full grid-cols-4 mb-6 rounded-xl p-1 bg-slate-200/50">
@@ -451,6 +417,33 @@ export default function JobDetail() {
             </div>
           </TabsContent>
         </Tabs>
+      </div>
+
+      {/* Seção de Fotos para o PDF (Sempre visível na impressão) */}
+      <div className="hidden print:block mt-8">
+        <h3 className="text-xl font-bold border-b-2 pb-2 mb-4">Relatório Fotográfico</h3>
+        <div className="grid grid-cols-2 gap-4">
+          {photos?.map(photo => (
+            <div key={photo.id} className="border p-2 rounded">
+              <img src={photo.photo_url} className="w-full h-64 object-cover rounded mb-2" />
+              <p className="text-xs font-bold uppercase text-slate-500">{photo.photo_type === 'before' ? 'Antes' : 'Depois'}</p>
+            </div>
+          ))}
+        </div>
+        
+        {job.notes && (
+          <div className="mt-8 border p-4 rounded">
+            <h4 className="font-bold mb-2">Relatório:</h4>
+            <p className="text-sm">{job.notes}</p>
+          </div>
+        )}
+
+        {job.signature_url && (
+          <div className="mt-12 flex flex-col items-center border-t pt-4">
+            <img src={job.signature_url} className="h-24 object-contain" />
+            <p className="text-xs font-bold">Assinatura do Cliente</p>
+          </div>
+        )}
       </div>
 
       <ImageModal isOpen={isImageModalOpen} onClose={() => setIsImageModalOpen(false)} imageUrl={selectedImageUrl} />
