@@ -175,7 +175,7 @@ export default function JobDetail() {
         const options = { maxSizeMB: 1, maxWidthOrHeight: 1920, useWebWorker: true };
         const compressedFile = await imageCompression(file, options);
         const fileExt = file.name.split('.').pop();
-        const fileName = `${id}-${type}-${Math.random()}.${fileExt}`;
+        const fileName = `${id}-${type}-${Date.now()}-${i}.${fileExt}`;
         
         await supabase.storage.from('job_photos').upload(fileName, compressedFile);
         const { data: { publicUrl } } = supabase.storage.from('job_photos').getPublicUrl(fileName);
@@ -203,11 +203,18 @@ export default function JobDetail() {
     setUploadingType('video');
     try {
       const fileExt = file.name.split('.').pop();
-      const fileName = `${id}-video-${Math.random()}.${fileExt}`;
+      // Nome de arquivo limpo e único
+      const fileName = `vid_${id}_${Date.now()}.${fileExt}`;
       
-      const { error: uploadError } = await supabase.storage.from('job_videos').upload(fileName, file);
+      const { error: uploadError } = await supabase.storage
+        .from('job_videos')
+        .upload(fileName, file, {
+          cacheControl: '3600',
+          upsert: false
+        });
+
       if (uploadError) {
-        console.error("Erro no upload do Storage:", uploadError);
+        console.error("Erro no Storage:", uploadError);
         throw new Error(`Erro no Storage: ${uploadError.message}`);
       }
 
@@ -217,8 +224,9 @@ export default function JobDetail() {
         job_id: id, 
         video_url: publicUrl 
       });
+
       if (dbError) {
-        console.error("Erro ao salvar no Banco:", dbError);
+        console.error("Erro no Banco:", dbError);
         throw new Error(`Erro no Banco: ${dbError.message}`);
       }
 
@@ -229,6 +237,7 @@ export default function JobDetail() {
       showError(error.message || "Erro ao enviar vídeo.");
     } finally {
       setUploadingType(null);
+      if (fileInputVideoRef.current) fileInputVideoRef.current.value = "";
     }
   };
 
@@ -245,7 +254,7 @@ export default function JobDetail() {
     try {
       const signatureDataUrl = sigCanvas.current?.getCanvas().toDataURL('image/png');
       const blob = await (await fetch(signatureDataUrl!)).blob();
-      const fileName = `${id}-signature-${Math.random()}.png`;
+      const fileName = `${id}-signature-${Date.now()}.png`;
       await supabase.storage.from('job_photos').upload(fileName, blob);
       const { data: { publicUrl } } = supabase.storage.from('job_photos').getPublicUrl(fileName);
       updateJobMutation.mutate({ signature_url: publicUrl }, { onSuccess: () => showSuccess("Assinatura salva!") });
