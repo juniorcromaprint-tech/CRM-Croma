@@ -16,30 +16,37 @@ export default defineConfig(() => ({
       registerType: 'autoUpdate',
       includeAssets: ['favicon.ico', 'logo_croma.png'],
       manifest: {
-        name: 'Cromaprint OS',
+        name: 'Cromaprint Gestão',
         short_name: 'Croma OS',
         description: 'Sistema de Gestão de Instalações Cromaprint',
-        theme_color: '#ffffff',
+        theme_color: '#2563eb',
         background_color: '#ffffff',
         display: 'standalone',
         start_url: '/',
         icons: [
           {
-            src: 'logo_croma.png',
+            src: '/logo_croma.png',
             sizes: '512x512',
             type: 'image/png',
-            purpose: 'any maskable'
+            purpose: 'any'
           },
           {
-            src: 'logo_croma.png',
+            src: '/logo_croma.png',
             sizes: '192x192',
             type: 'image/png',
             purpose: 'any'
+          },
+          {
+            src: '/logo_croma.png',
+            sizes: '512x512',
+            type: 'image/png',
+            purpose: 'maskable'
           }
         ]
       },
       workbox: {
         globPatterns: ['**/*.{js,css,html,ico,png,svg,woff2}'],
+        cleanupOutdatedCaches: true,
         runtimeCaching: [
           {
             urlPattern: /^https:\/\/vsxzrbremdmcdunwfeuu\.supabase\.co\/rest\/v1\/.*/i,
@@ -48,21 +55,7 @@ export default defineConfig(() => ({
               cacheName: 'supabase-api-cache',
               expiration: {
                 maxEntries: 100,
-                maxAgeSeconds: 60 * 60 * 24 * 7 // 1 week
-              },
-              cacheableResponse: {
-                statuses: [0, 200]
-              }
-            }
-          },
-          {
-            urlPattern: /^https:\/\/vsxzrbremdmcdunwfeuu\.supabase\.co\/storage\/v1\/.*/i,
-            handler: 'CacheFirst',
-            options: {
-              cacheName: 'supabase-storage-cache',
-              expiration: {
-                maxEntries: 200,
-                maxAgeSeconds: 60 * 60 * 24 * 30 // 30 days
+                maxAgeSeconds: 60 * 60 * 24 * 7
               },
               cacheableResponse: {
                 statuses: [0, 200]
