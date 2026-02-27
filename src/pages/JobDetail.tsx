@@ -110,6 +110,17 @@ export default function JobDetail() {
     }
   });
 
+  const deleteJobMutation = useMutation({
+    mutationFn: async () => {
+      const { error } = await supabase.from('jobs').delete().eq('id', id);
+      if (error) throw error;
+    },
+    onSuccess: () => {
+      showSuccess("OS excluída com sucesso!");
+      navigate('/jobs');
+    }
+  });
+
   const handleFileUpload = async (event: React.ChangeEvent<HTMLInputElement>, type: 'before' | 'after') => {
     const files = event.target.files;
     if (!files || files.length === 0 || !id) return;
@@ -213,6 +224,15 @@ export default function JobDetail() {
     }
   };
 
+  const handleWhatsAppShare = () => {
+    if (!job) return;
+    const formattedDate = new Date(job.scheduled_date).toLocaleDateString('pt-BR');
+    const clientName = job.stores?.name || 'Não informado';
+    const text = `Olá! Segue o status da *Ordem de Serviço* da Cromaprint:%0A%0A*OS:* ${job.os_number}%0A*Cliente:* ${clientName}%0A*Data:* ${formattedDate}%0A*Serviço:* ${job.type}%0A*Status:* ${job.status}`;
+    const url = `https://wa.me/?text=${text}`;
+    window.open(url, '_blank');
+  };
+
   const openImageModal = (url: string) => {
     setSelectedImageUrl(url);
     setIsImageModalOpen(true);
@@ -242,6 +262,9 @@ export default function JobDetail() {
         <div className="flex flex-wrap gap-2 w-full sm:w-auto">
           <Button variant="outline" onClick={() => window.confirm("Excluir OS?") && !isOffline && deleteJobMutation.mutate()} disabled={isOffline} className="text-red-600 border-red-200 flex-1 sm:flex-none">
             <Trash2 size={18} className="mr-2" /> Excluir
+          </Button>
+          <Button variant="outline" onClick={handleWhatsAppShare} disabled={isOffline} className="text-emerald-600 border-emerald-200 hover:bg-emerald-50 flex-1 sm:flex-none">
+            <MessageCircle size={18} className="mr-2" /> WhatsApp
           </Button>
           <Button variant="outline" onClick={() => !isOffline && window.print()} disabled={isOffline} className="text-blue-600 border-slate-200 flex-1 sm:flex-none">
             <Printer size={18} className="mr-2" /> PDF
