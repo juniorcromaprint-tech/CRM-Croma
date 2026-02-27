@@ -193,97 +193,104 @@ export default function JobDetail() {
   const afterPhotos = photos?.filter(p => p.photo_type === 'after') || [];
 
   return (
-    <div className="space-y-6 pb-10 print:pb-0 print:space-y-0 print:bg-white print:block print:overflow-visible">
-      {/* Header - Hidden on Print */}
-      <div className="flex items-center justify-between print:hidden">
-        <Button variant="ghost" size="icon" onClick={() => navigate(-1)} className="bg-white border shadow-sm">
-          <ArrowLeft size={20} />
-        </Button>
-        <div className="flex gap-2">
-          <Button variant="outline" onClick={() => window.confirm("Excluir OS?") && deleteJobMutation.mutate()} className="text-red-600 border-red-200">
-            <Trash2 size={18} className="mr-2" /> Excluir
+    <div className="pb-10 print:pb-0 print:bg-white">
+      {/* ESTILOS GLOBAIS PARA FORÇAR A IMPRESSÃO CORRETA */}
+      <style type="text/css" media="print">
+        {`
+          @page { size: A4 portrait; margin: 1.5cm; }
+          /* Força todos os containers pais a permitirem overflow e altura automática */
+          html, body, #root, main, .layout-container {
+            height: auto !important;
+            min-height: 100% !important;
+            overflow: visible !important;
+            position: static !important;
+            display: block !important;
+          }
+          /* Esconde barras de rolagem na impressão */
+          ::-webkit-scrollbar { display: none; }
+          /* Evita quebra de página dentro de elementos importantes */
+          .avoid-break { page-break-inside: avoid; break-inside: avoid; }
+        `}
+      </style>
+
+      {/* ================================================================= */}
+      {/* UI DA TELA (INTERATIVA) - TOTALMENTE ESCONDIDA NA IMPRESSÃO       */}
+      {/* ================================================================= */}
+      <div className="space-y-6 print:hidden">
+        <div className="flex items-center justify-between">
+          <Button variant="ghost" size="icon" onClick={() => navigate(-1)} className="bg-white border shadow-sm">
+            <ArrowLeft size={20} />
           </Button>
-          <Button variant="outline" onClick={() => window.print()} className="text-blue-600 border-slate-200">
-            <Printer size={18} className="mr-2" /> PDF
-          </Button>
-          {job.status !== "Concluído" && (
-            <Button onClick={() => updateJobMutation.mutate({ status: 'Concluído' })} className="bg-emerald-600 text-white">
-              <CheckCircle2 size={18} className="mr-2" /> Finalizar
+          <div className="flex gap-2">
+            <Button variant="outline" onClick={() => window.confirm("Excluir OS?") && deleteJobMutation.mutate()} className="text-red-600 border-red-200">
+              <Trash2 size={18} className="mr-2" /> Excluir
             </Button>
-          )}
-        </div>
-      </div>
-
-      {/* Logo for Print */}
-      <div className="hidden print:flex justify-between items-center border-b-2 border-slate-200 pb-4 mb-6">
-        <CromaLogo />
-        <div className="text-right">
-          <h1 className="text-2xl font-black text-slate-800 uppercase">Relatório de Instalação</h1>
-          <p className="text-sm text-slate-500 font-bold">OS: {job.os_number}</p>
-        </div>
-      </div>
-
-      <Card className="border-none shadow-sm rounded-2xl overflow-hidden bg-white print:shadow-none print:border print:border-slate-200 print:rounded-xl print:mb-8">
-        <div className="h-2 w-full bg-blue-600 print:hidden" />
-        <CardContent className="p-6">
-          <div className="flex justify-between items-start mb-6">
-            <div>
-              <span className="text-sm font-bold text-blue-600 bg-blue-50 px-3 py-1 rounded-lg mb-3 inline-block print:bg-transparent print:p-0 print:text-slate-500">OS: {job.os_number}</span>
-              <h2 className="text-3xl font-black text-slate-800 print:text-2xl">{job.stores?.brand}</h2>
-              <p className="text-slate-500 font-medium text-lg print:text-base">{job.type}</p>
-            </div>
-            <div className="print:hidden">
-              <select 
-                value={job.status} 
-                onChange={(e) => updateJobMutation.mutate({ status: e.target.value })}
-                className="p-2 rounded-xl border font-bold text-sm bg-slate-50"
-              >
-                <option value="Pendente">Pendente</option>
-                <option value="Em andamento">Em andamento</option>
-                <option value="Concluído">Concluído</option>
-                <option value="Cancelado">Cancelado</option>
-              </select>
-            </div>
-            <div className="hidden print:block text-right">
-              <p className="text-xs font-bold uppercase text-slate-400">Status</p>
-              <p className="font-bold text-slate-800">{job.status}</p>
-            </div>
-          </div>
-          
-          <div className="grid grid-cols-1 md:grid-cols-3 gap-4 print:grid-cols-3">
-            <div className="bg-slate-50 p-4 rounded-xl print:bg-transparent print:border print:border-slate-100 print:p-3">
-              <p className="text-xs text-slate-500 font-bold uppercase">Local</p>
-              <p className="font-bold text-sm text-slate-800">{job.stores?.name}</p>
-              <p className="text-xs text-slate-500">{job.stores?.address}</p>
-            </div>
-            <div className="bg-slate-50 p-4 rounded-xl print:bg-transparent print:border print:border-slate-100 print:p-3">
-              <p className="text-xs text-slate-500 font-bold uppercase">Data</p>
-              <p className="font-bold text-sm text-slate-800">{new Date(job.scheduled_date).toLocaleDateString('pt-BR')}</p>
-            </div>
-            <div className="bg-slate-50 p-4 rounded-xl print:bg-transparent print:border print:border-slate-100 print:p-3">
-              <p className="text-xs text-slate-500 font-bold uppercase">Instalador</p>
-              <p className="font-bold text-sm text-slate-800">{job.profiles ? `${job.profiles.first_name} ${job.profiles.last_name}` : 'Não atribuído'}</p>
-            </div>
-          </div>
-
-          <div className="mt-4 pt-4 border-t flex justify-between items-center print:border-slate-100">
-            <div className="flex items-center gap-2">
-              <Navigation size={18} className={job.lat ? "text-emerald-500" : "text-slate-400"} />
-              <span className="text-sm font-medium text-slate-600 print:text-xs">
-                {job.lat ? `GPS: ${job.lat.toFixed(6)}, ${job.lng.toFixed(6)}` : "GPS não capturado"}
-              </span>
-            </div>
-            {!job.lat && (
-              <Button variant="outline" size="sm" onClick={captureLocation} disabled={isLocating} className="rounded-xl print:hidden">
-                {isLocating ? <Loader2 className="animate-spin mr-2" size={14} /> : null} Capturar GPS
+            <Button variant="outline" onClick={() => window.print()} className="text-blue-600 border-slate-200">
+              <Printer size={18} className="mr-2" /> PDF
+            </Button>
+            {job.status !== "Concluído" && (
+              <Button onClick={() => updateJobMutation.mutate({ status: 'Concluído' })} className="bg-emerald-600 text-white">
+                <CheckCircle2 size={18} className="mr-2" /> Finalizar
               </Button>
             )}
           </div>
-        </CardContent>
-      </Card>
+        </div>
 
-      {/* UI INTERATIVA (TABS) - ESCONDIDA NA IMPRESSÃO */}
-      <div className="print:hidden">
+        <Card className="border-none shadow-sm rounded-2xl overflow-hidden bg-white">
+          <div className="h-2 w-full bg-blue-600" />
+          <CardContent className="p-6">
+            <div className="flex justify-between items-start mb-6">
+              <div>
+                <span className="text-sm font-bold text-blue-600 bg-blue-50 px-3 py-1 rounded-lg mb-3 inline-block">OS: {job.os_number}</span>
+                <h2 className="text-3xl font-black text-slate-800">{job.stores?.brand}</h2>
+                <p className="text-slate-500 font-medium text-lg">{job.type}</p>
+              </div>
+              <div>
+                <select 
+                  value={job.status} 
+                  onChange={(e) => updateJobMutation.mutate({ status: e.target.value })}
+                  className="p-2 rounded-xl border font-bold text-sm bg-slate-50"
+                >
+                  <option value="Pendente">Pendente</option>
+                  <option value="Em andamento">Em andamento</option>
+                  <option value="Concluído">Concluído</option>
+                  <option value="Cancelado">Cancelado</option>
+                </select>
+              </div>
+            </div>
+            
+            <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+              <div className="bg-slate-50 p-4 rounded-xl">
+                <p className="text-xs text-slate-500 font-bold uppercase">Local</p>
+                <p className="font-bold text-sm text-slate-800">{job.stores?.name}</p>
+                <p className="text-xs text-slate-500">{job.stores?.address}</p>
+              </div>
+              <div className="bg-slate-50 p-4 rounded-xl">
+                <p className="text-xs text-slate-500 font-bold uppercase">Data</p>
+                <p className="font-bold text-sm text-slate-800">{new Date(job.scheduled_date).toLocaleDateString('pt-BR')}</p>
+              </div>
+              <div className="bg-slate-50 p-4 rounded-xl">
+                <p className="text-xs text-slate-500 font-bold uppercase">Instalador</p>
+                <p className="font-bold text-sm text-slate-800">{job.profiles ? `${job.profiles.first_name} ${job.profiles.last_name}` : 'Não atribuído'}</p>
+              </div>
+            </div>
+
+            <div className="mt-4 pt-4 border-t flex justify-between items-center">
+              <div className="flex items-center gap-2">
+                <Navigation size={18} className={job.lat ? "text-emerald-500" : "text-slate-400"} />
+                <span className="text-sm font-medium text-slate-600">
+                  {job.lat ? `GPS: ${job.lat.toFixed(6)}, ${job.lng.toFixed(6)}` : "GPS não capturado"}
+                </span>
+              </div>
+              {!job.lat && (
+                <Button variant="outline" size="sm" onClick={captureLocation} disabled={isLocating} className="rounded-xl">
+                  {isLocating ? <Loader2 className="animate-spin mr-2" size={14} /> : null} Capturar GPS
+                </Button>
+              )}
+            </div>
+          </CardContent>
+        </Card>
+
         <Tabs defaultValue="photos" className="w-full">
           <TabsList className="grid w-full grid-cols-3 mb-6 rounded-xl p-1 bg-slate-200/50">
             <TabsTrigger value="photos">Fotos</TabsTrigger>
@@ -384,54 +391,98 @@ export default function JobDetail() {
         </Tabs>
       </div>
 
-      {/* CONTEÚDO EXCLUSIVO PARA IMPRESSÃO (PDF) - SEMPRE VISÍVEL NO PDF */}
-      <div className="hidden print:block space-y-10">
-        {/* Fotos Antes */}
-        <div className="break-inside-avoid">
-          <h3 className="font-bold text-slate-800 text-lg border-b-2 border-slate-200 pb-2 mb-4">1. Fotos Antes da Instalação</h3>
-          <div className="grid grid-cols-2 gap-4">
-            {beforePhotos.map(photo => (
-              <div key={photo.id} className="border border-slate-200 rounded-lg overflow-hidden aspect-video">
-                <img src={photo.photo_url} className="w-full h-full object-cover" />
-              </div>
-            ))}
+      {/* ================================================================= */}
+      {/* CONTEÚDO EXCLUSIVO PARA IMPRESSÃO (PDF) - ESCONDIDO NA TELA       */}
+      {/* ================================================================= */}
+      <div className="hidden print:block w-full bg-white text-black space-y-8">
+        
+        {/* Cabeçalho do PDF */}
+        <div className="flex justify-between items-center border-b-2 border-slate-200 pb-4 mb-6">
+          <CromaLogo />
+          <div className="text-right">
+            <h1 className="text-2xl font-black text-slate-800 uppercase">Relatório de Instalação</h1>
+            <p className="text-sm text-slate-500 font-bold">OS: {job.os_number}</p>
           </div>
         </div>
+
+        {/* Informações da OS */}
+        <div className="border border-slate-200 rounded-xl p-4 mb-8 avoid-break">
+          <div className="flex justify-between items-start mb-4">
+            <div>
+              <h2 className="text-2xl font-black text-slate-800">{job.stores?.brand}</h2>
+              <p className="text-slate-600 font-medium">{job.type}</p>
+            </div>
+            <div className="text-right">
+              <p className="text-xs font-bold uppercase text-slate-400">Status</p>
+              <p className="font-bold text-slate-800">{job.status}</p>
+            </div>
+          </div>
+          
+          <div className="grid grid-cols-3 gap-4 border-t border-slate-100 pt-4">
+            <div>
+              <p className="text-xs text-slate-500 font-bold uppercase">Local</p>
+              <p className="font-bold text-sm text-slate-800">{job.stores?.name}</p>
+              <p className="text-xs text-slate-500">{job.stores?.address}</p>
+            </div>
+            <div>
+              <p className="text-xs text-slate-500 font-bold uppercase">Data</p>
+              <p className="font-bold text-sm text-slate-800">{new Date(job.scheduled_date).toLocaleDateString('pt-BR')}</p>
+            </div>
+            <div>
+              <p className="text-xs text-slate-500 font-bold uppercase">Instalador</p>
+              <p className="font-bold text-sm text-slate-800">{job.profiles ? `${job.profiles.first_name} ${job.profiles.last_name}` : 'Não atribuído'}</p>
+            </div>
+          </div>
+        </div>
+
+        {/* Fotos Antes */}
+        {beforePhotos.length > 0 && (
+          <div className="mb-8">
+            <h3 className="font-bold text-slate-800 text-lg border-b-2 border-slate-200 pb-2 mb-4">1. Fotos Antes da Instalação</h3>
+            <div className="grid grid-cols-2 gap-4">
+              {beforePhotos.map(photo => (
+                <div key={photo.id} className="border border-slate-200 rounded-lg overflow-hidden avoid-break">
+                  <img src={photo.photo_url} className="w-full h-48 object-cover" />
+                </div>
+              ))}
+            </div>
+          </div>
+        )}
 
         {/* Fotos Depois */}
-        <div className="break-inside-avoid">
-          <h3 className="font-bold text-slate-800 text-lg border-b-2 border-slate-200 pb-2 mb-4">2. Fotos Depois da Instalação</h3>
-          <div className="grid grid-cols-2 gap-4">
-            {afterPhotos.map(photo => (
-              <div key={photo.id} className="border border-slate-200 rounded-lg overflow-hidden">
-                <div className="aspect-video">
-                  <img src={photo.photo_url} className="w-full h-full object-cover" />
+        {afterPhotos.length > 0 && (
+          <div className="mb-8">
+            <h3 className="font-bold text-slate-800 text-lg border-b-2 border-slate-200 pb-2 mb-4">2. Fotos Depois da Instalação</h3>
+            <div className="grid grid-cols-2 gap-4">
+              {afterPhotos.map(photo => (
+                <div key={photo.id} className="border border-slate-200 rounded-lg overflow-hidden avoid-break">
+                  <img src={photo.photo_url} className="w-full h-48 object-cover" />
+                  {photoDescriptions[photo.id] && (
+                    <div className="p-2 bg-slate-50 border-t border-slate-200">
+                      <p className="text-xs font-bold text-slate-700">Legenda: {photoDescriptions[photo.id]}</p>
+                    </div>
+                  )}
                 </div>
-                {photo.description && (
-                  <div className="p-2 bg-slate-50 border-t border-slate-200">
-                    <p className="text-xs font-bold text-slate-700">Legenda: {photo.description}</p>
-                  </div>
-                )}
-              </div>
-            ))}
+              ))}
+            </div>
           </div>
-        </div>
+        )}
 
         {/* Relatório e Divergências */}
-        <div className="break-inside-avoid space-y-6">
+        <div className="space-y-6 avoid-break">
           <h3 className="font-bold text-slate-800 text-lg border-b-2 border-slate-200 pb-2 mb-4">3. Relatório Técnico</h3>
           <div className="bg-slate-50 p-4 rounded-xl border border-slate-200">
             <p className="text-xs font-bold text-slate-500 uppercase mb-2">Observações do Instalador:</p>
             <p className="text-sm text-slate-800 whitespace-pre-wrap">{job.notes || "Nenhuma observação registrada."}</p>
           </div>
-          <div className="bg-rose-50 p-4 rounded-xl border border-rose-200">
-            <p className="text-xs font-bold text-rose-800 uppercase mb-2">Divergências / Problemas:</p>
+          <div className="bg-white p-4 rounded-xl border border-slate-200">
+            <p className="text-xs font-bold text-slate-800 uppercase mb-2">Divergências / Problemas:</p>
             <p className="text-sm text-slate-800 whitespace-pre-wrap">{job.issues || "Nenhuma divergência relatada."}</p>
           </div>
         </div>
 
         {/* Assinatura */}
-        <div className="break-inside-avoid pt-10">
+        <div className="pt-10 avoid-break">
           <h3 className="font-bold text-slate-800 text-lg border-b-2 border-slate-200 pb-2 mb-8">4. Formalização e Recebimento</h3>
           <div className="flex flex-col items-center">
             {job.signature_url ? (
@@ -450,15 +501,16 @@ export default function JobDetail() {
             )}
           </div>
         </div>
+
+        {/* Rodapé do PDF */}
+        <div className="mt-20 pt-6 border-t-2 border-slate-100 text-[10px] text-slate-400 text-center avoid-break">
+          <p className="font-bold">Cromaprint Comunicação Visual & Impressão Digital</p>
+          <p className="mt-1">Relatório gerado automaticamente em {new Date().toLocaleString('pt-BR')}</p>
+        </div>
+
       </div>
 
       <ImageModal isOpen={isImageModalOpen} onClose={() => setIsImageModalOpen(false)} imageUrl={selectedImageUrl} />
-      
-      {/* Footer for Print */}
-      <div className="hidden print:block mt-20 pt-6 border-t-2 border-slate-100 text-[10px] text-slate-400 text-center">
-        <p className="font-bold">Cromaprint Comunicação Visual & Impressão Digital</p>
-        <p className="mt-1">Relatório gerado automaticamente em {new Date().toLocaleString('pt-BR')}</p>
-      </div>
     </div>
   );
 }
