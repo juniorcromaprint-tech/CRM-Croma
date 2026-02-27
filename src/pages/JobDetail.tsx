@@ -2,7 +2,7 @@
 
 import React, { useState, useRef, useEffect } from "react";
 import { useParams, useNavigate } from "react-router-dom";
-import { ArrowLeft, Camera, Upload, FileText, AlertTriangle, CheckCircle2, Printer, MapPin, Calendar, Navigation, Loader2, Plus, Trash2, PenTool, User, MessageCircle, ExternalLink, Video, Play, WifiOff, X } from "lucide-react";
+import { ArrowLeft, Camera, Upload, FileText, AlertTriangle, CheckCircle2, Printer, MapPin, Calendar, Navigation, Loader2, Plus, Trash2, PenTool, User, MessageCircle, ExternalLink, Video, Play, WifiOff, X, Timer, Lock, PlayCircle } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
@@ -96,6 +96,14 @@ export default function JobDetail() {
     }
   });
 
+  const handleStartJob = () => {
+    if (isOffline) return showError("Requer internet para iniciar o serviço.");
+    updateJobMutation.mutate({
+      status: 'Em andamento',
+      started_at: new Date().toISOString()
+    });
+  };
+
   const handleFileUpload = async (event: React.ChangeEvent<HTMLInputElement>, type: 'before' | 'after') => {
     const files = event.target.files;
     if (!files || files.length === 0 || !id) return;
@@ -166,7 +174,13 @@ export default function JobDetail() {
       const fileName = `sig_${id}_${Date.now()}.png`;
       await supabase.storage.from('job_photos').upload(fileName, blob);
       const { data: { publicUrl } } = supabase.storage.from('job_photos').getPublicUrl(fileName);
-      updateJobMutation.mutate({ signature_url: publicUrl });
+      
+      // Ao salvar a assinatura, finaliza a OS automaticamente
+      updateJobMutation.mutate({ 
+        signature_url: publicUrl,
+        status: 'Concluído',
+        finished_at: new Date().toISOString()
+      });
     } catch (error) {
       showError("Erro assinatura.");
     } finally {
@@ -191,7 +205,6 @@ export default function JobDetail() {
     const dateStr = new Date(job.scheduled_date).toLocaleDateString('pt-BR').replace(/\//g, '-');
     const osNumber = `OS ${job.os_number || "SemNumero"}`;
     
-    // Formato: Nome do Cliente - Cod 123 - 10-10-2023 - OS 456
     document.title = `${clientName} - ${storeCode} - ${dateStr} - ${osNumber}`;
     
     window.print();
@@ -201,11 +214,24 @@ export default function JobDetail() {
     }, 1000);
   };
 
+  const formatDuration = (start: string, end?: string) => {
+    if (!end) return "Em andamento...";
+    const startTime = new Date(start).getTime();
+    const endTime = new Date(end).getTime();
+    const diffMs = endTime - startTime;
+    const diffMins = Math.floor(diffMs / 60000);
+    const hours = Math.floor(diffMins / 60);
+    const mins = diffMins % 60;
+    if (hours > 0) return `${hours}h ${mins}m`;
+    return `${mins}m`;
+  };
+
   if (isLoading) return <div className="p-10 text-center">Carregando...</div>;
   if (!job) return <div className="p-10 text-center">Não encontrado.</div>;
 
   const beforePhotos = photos?.filter(p => p.photo_type === 'before') || [];
   const afterPhotos = photos?.filter(p => p.photo_type === 'after') || [];
+  const canInteract = job.status !== 'Pendente';
 
   return (
     <div className="space-y-6 pb-10 print:pb-0 print:space-y-0 print:bg-white">
@@ -229,8 +255,8 @@ export default function JobDetail() {
           <Button variant="outline" onClick={handlePrint} className="text-blue-600 border-slate-200 flex-1 sm:flex-none">
             <Printer size={18} className="mr-2" /> PDF
           </Button>
-          {job.status !== "Concluído" && (
-            <Button onClick={() => updateJobMutation.mutate({ status: 'Concluído' })} disabled={isOffline} className="bg-emerald-600 text-white flex-1 sm:flex-none">
+          {job.status !== "Concluído" && canInteract && (
+            <Button onClick={() => updateJobMutation.mutate({ status: 'Concluído', finished_at: new Date().toISOString() })} disabled={isOffline} className="bg-emerald-600 text-white flex-1 sm:flex-none">
               <CheckCircle2 size={18} className="mr-2" /> Finalizar
             </Button>
           )}
@@ -291,6 +317,31 @@ export default function JobDetail() {
               <p className="text-xs text-slate-500 font-bold uppercase">Instalador</p>
               <p className="font-bold text-sm text-slate-800">{job.profiles ? `${job.profiles.first_name} ${job.profiles.last_name}` : 'Não atribuído'}</p>
             </div>
+
+            {/* Métricas de Tempo */}
+            {job.started_at && (
+              <div className="bg-blue-50 p-4 rounded-xl print:bg-transparent print:border print:border-slate-100 print:p-3 col-span-1 md:col-span-3 flex justify-between items-center">
+                <div className="flex items-center gap-4">
+                  <div>
+                    <p className="text-xs text-blue-600 font-bold uppercase">Início</p>
+                    <p className="font-bold text-sm text-slate-800">{new Date(job.started_at).toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' })}</p>
+                  </div>
+                  {job.finished_at && (
+                    <>
+                      <div className="w-px h-8 bg-blue-200"></div>
+                      <div>
+                        <p className="text-xs text-blue-600 font-bold uppercase">Fim</p>
+                        <p className="font-bold text-sm text-slate-800">{new Date(job.finished_at).toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' })}</p>
+                      </div>
+                    </>
+                  )}
+                </div>
+                <div className="text-right">
+                  <p className="text-xs text-blue-600 font-bold uppercase flex items-center gap-1 justify-end"><Timer size={12}/> Duração</p>
+                  <p className="font-black text-lg text-blue-700">{formatDuration(job.started_at, job.finished_at)}</p>
+                </div>
+              </div>
+            )}
           </div>
 
           <div className="mt-4 pt-4 border-t flex justify-between items-center print:border-slate-100">
@@ -313,119 +364,137 @@ export default function JobDetail() {
 
       {/* Conteúdo Interativo (Escondido no PDF) */}
       <div className="print:hidden">
-        <Tabs defaultValue="photos" className="w-full">
-          <TabsList className="grid w-full grid-cols-4 mb-6 rounded-xl p-1 bg-slate-200/50">
-            <TabsTrigger value="photos">Fotos</TabsTrigger>
-            <TabsTrigger value="videos">Vídeos</TabsTrigger>
-            <TabsTrigger value="notes">Relatório</TabsTrigger>
-            <TabsTrigger value="signature">Assinatura</TabsTrigger>
-          </TabsList>
-          
-          <TabsContent value="photos" className="space-y-8">
-            <div className="bg-white p-5 rounded-2xl border shadow-sm">
-              <div className="flex justify-between mb-4 border-b-2 border-slate-100 pb-2">
-                <h3 className="font-bold text-slate-800 flex items-center gap-2 text-lg"><Camera size={20} /> Antes da Instalação</h3>
-                <span className="text-xs font-bold bg-slate-100 px-2 py-1 rounded">{beforePhotos.length} fotos</span>
-              </div>
-              <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
-                {beforePhotos.map(photo => (
-                  <div key={photo.id} className="relative group aspect-square rounded-xl overflow-hidden border border-slate-100 bg-slate-50">
-                    <img src={photo.photo_url} className="w-full h-full object-cover cursor-zoom-in" onClick={() => { setSelectedImageUrl(photo.photo_url); setIsImageModalOpen(true); }} />
+        {!canInteract ? (
+          <div className="flex flex-col items-center justify-center py-16 px-4 text-center bg-white rounded-2xl border border-dashed border-slate-300 shadow-sm">
+            <div className="w-20 h-20 bg-slate-50 rounded-full flex items-center justify-center mb-6">
+              <Lock size={40} className="text-slate-300" />
+            </div>
+            <h3 className="text-2xl font-black text-slate-800">Serviço não iniciado</h3>
+            <p className="text-slate-500 max-w-md mt-2 text-lg">
+              Você precisa iniciar o serviço para liberar o envio de fotos, vídeos e a assinatura.
+            </p>
+            <Button 
+              onClick={handleStartJob} 
+              className="mt-8 bg-blue-600 hover:bg-blue-700 text-white rounded-xl h-14 px-8 text-lg font-bold shadow-lg shadow-blue-200 w-full sm:w-auto transition-transform hover:scale-105"
+            >
+              <PlayCircle size={24} className="mr-2" /> Iniciar Serviço Agora
+            </Button>
+          </div>
+        ) : (
+          <Tabs defaultValue="photos" className="w-full">
+            <TabsList className="grid w-full grid-cols-4 mb-6 rounded-xl p-1 bg-slate-200/50">
+              <TabsTrigger value="photos">Fotos</TabsTrigger>
+              <TabsTrigger value="videos">Vídeos</TabsTrigger>
+              <TabsTrigger value="notes">Relatório</TabsTrigger>
+              <TabsTrigger value="signature">Assinatura</TabsTrigger>
+            </TabsList>
+            
+            <TabsContent value="photos" className="space-y-8">
+              <div className="bg-white p-5 rounded-2xl border shadow-sm">
+                <div className="flex justify-between mb-4 border-b-2 border-slate-100 pb-2">
+                  <h3 className="font-bold text-slate-800 flex items-center gap-2 text-lg"><Camera size={20} /> Antes da Instalação</h3>
+                  <span className="text-xs font-bold bg-slate-100 px-2 py-1 rounded">{beforePhotos.length} fotos</span>
+                </div>
+                <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
+                  {beforePhotos.map(photo => (
+                    <div key={photo.id} className="relative group aspect-square rounded-xl overflow-hidden border border-slate-100 bg-slate-50">
+                      <img src={photo.photo_url} className="w-full h-full object-cover cursor-zoom-in" onClick={() => { setSelectedImageUrl(photo.photo_url); setIsImageModalOpen(true); }} />
+                    </div>
+                  ))}
+                  <div onClick={() => !isOffline && fileInputBeforeRef.current?.click()} className={`aspect-square border-2 border-dashed rounded-xl flex flex-col items-center justify-center cursor-pointer hover:bg-slate-50 ${isOffline ? 'opacity-50 cursor-not-allowed' : ''}`}>
+                    <input type="file" accept="image/*" multiple className="hidden" ref={fileInputBeforeRef} onChange={(e) => handleFileUpload(e, 'before')} />
+                    {uploadingType === 'before' ? <Loader2 className="animate-spin" /> : <Plus />}
+                    <span className="text-xs font-bold mt-1">Adicionar</span>
                   </div>
-                ))}
-                <div onClick={() => !isOffline && fileInputBeforeRef.current?.click()} className={`aspect-square border-2 border-dashed rounded-xl flex flex-col items-center justify-center cursor-pointer hover:bg-slate-50 ${isOffline ? 'opacity-50 cursor-not-allowed' : ''}`}>
-                  <input type="file" accept="image/*" multiple className="hidden" ref={fileInputBeforeRef} onChange={(e) => handleFileUpload(e, 'before')} />
-                  {uploadingType === 'before' ? <Loader2 className="animate-spin" /> : <Plus />}
-                  <span className="text-xs font-bold mt-1">Adicionar</span>
                 </div>
               </div>
-            </div>
 
-            <div className="bg-white p-5 rounded-2xl border shadow-sm">
-              <div className="flex justify-between mb-4 border-b-2 border-slate-100 pb-2">
-                <h3 className="font-bold text-slate-800 flex items-center gap-2 text-lg"><CheckCircle2 size={20} className="text-emerald-500" /> Depois da Instalação</h3>
-                <span className="text-xs font-bold bg-slate-100 px-2 py-1 rounded">{afterPhotos.length} fotos</span>
-              </div>
-              <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
-                {afterPhotos.map(photo => (
-                  <div key={photo.id} className="relative group aspect-square rounded-xl overflow-hidden border border-slate-100 bg-slate-50">
-                    <img src={photo.photo_url} className="w-full h-full object-cover cursor-zoom-in" onClick={() => { setSelectedImageUrl(photo.photo_url); setIsImageModalOpen(true); }} />
+              <div className="bg-white p-5 rounded-2xl border shadow-sm">
+                <div className="flex justify-between mb-4 border-b-2 border-slate-100 pb-2">
+                  <h3 className="font-bold text-slate-800 flex items-center gap-2 text-lg"><CheckCircle2 size={20} className="text-emerald-500" /> Depois da Instalação</h3>
+                  <span className="text-xs font-bold bg-slate-100 px-2 py-1 rounded">{afterPhotos.length} fotos</span>
+                </div>
+                <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
+                  {afterPhotos.map(photo => (
+                    <div key={photo.id} className="relative group aspect-square rounded-xl overflow-hidden border border-slate-100 bg-slate-50">
+                      <img src={photo.photo_url} className="w-full h-full object-cover cursor-zoom-in" onClick={() => { setSelectedImageUrl(photo.photo_url); setIsImageModalOpen(true); }} />
+                    </div>
+                  ))}
+                  <div onClick={() => !isOffline && fileInputAfterRef.current?.click()} className={`aspect-square border-2 border-dashed rounded-xl flex flex-col items-center justify-center cursor-pointer hover:bg-slate-50 ${isOffline ? 'opacity-50 cursor-not-allowed' : ''}`}>
+                    <input type="file" accept="image/*" multiple className="hidden" ref={fileInputAfterRef} onChange={(e) => handleFileUpload(e, 'after')} />
+                    {uploadingType === 'after' ? <Loader2 className="animate-spin" /> : <Plus />}
+                    <span className="text-xs font-bold mt-1">Adicionar</span>
                   </div>
-                ))}
-                <div onClick={() => !isOffline && fileInputAfterRef.current?.click()} className={`aspect-square border-2 border-dashed rounded-xl flex flex-col items-center justify-center cursor-pointer hover:bg-slate-50 ${isOffline ? 'opacity-50 cursor-not-allowed' : ''}`}>
-                  <input type="file" accept="image/*" multiple className="hidden" ref={fileInputAfterRef} onChange={(e) => handleFileUpload(e, 'after')} />
-                  {uploadingType === 'after' ? <Loader2 className="animate-spin" /> : <Plus />}
-                  <span className="text-xs font-bold mt-1">Adicionar</span>
                 </div>
               </div>
-            </div>
-          </TabsContent>
+            </TabsContent>
 
-          <TabsContent value="videos" className="space-y-6">
-            <div className="bg-white p-5 rounded-2xl border shadow-sm">
-              <div className="flex justify-between mb-4 border-b-2 border-slate-100 pb-2">
-                <h3 className="font-bold text-slate-800 flex items-center gap-2 text-lg"><Video size={20} className="text-blue-600" /> Vídeos do Local</h3>
-              </div>
-              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                {videos?.map(video => (
-                  <div key={video.id} className="relative rounded-xl overflow-hidden border border-slate-200 bg-black aspect-video">
-                    <video src={video.video_url} controls className="w-full h-full" />
+            <TabsContent value="videos" className="space-y-6">
+              <div className="bg-white p-5 rounded-2xl border shadow-sm">
+                <div className="flex justify-between mb-4 border-b-2 border-slate-100 pb-2">
+                  <h3 className="font-bold text-slate-800 flex items-center gap-2 text-lg"><Video size={20} className="text-blue-600" /> Vídeos do Local</h3>
+                </div>
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                  {videos?.map(video => (
+                    <div key={video.id} className="relative rounded-xl overflow-hidden border border-slate-200 bg-black aspect-video">
+                      <video src={video.video_url} controls className="w-full h-full" />
+                    </div>
+                  ))}
+                  <div onClick={() => !isOffline && fileInputVideoRef.current?.click()} className={`aspect-video border-2 border-dashed rounded-xl flex flex-col items-center justify-center cursor-pointer hover:bg-slate-50 ${isOffline ? 'opacity-50 cursor-not-allowed' : ''}`}>
+                    <input type="file" accept="video/*" className="hidden" ref={fileInputVideoRef} onChange={handleVideoUpload} />
+                    {uploadingType === 'video' ? <Loader2 className="animate-spin" /> : <Plus />}
+                    <span className="text-sm font-bold mt-1">Adicionar Vídeo</span>
                   </div>
-                ))}
-                <div onClick={() => !isOffline && fileInputVideoRef.current?.click()} className={`aspect-video border-2 border-dashed rounded-xl flex flex-col items-center justify-center cursor-pointer hover:bg-slate-50 ${isOffline ? 'opacity-50 cursor-not-allowed' : ''}`}>
-                  <input type="file" accept="video/*" className="hidden" ref={fileInputVideoRef} onChange={handleVideoUpload} />
-                  {uploadingType === 'video' ? <Loader2 className="animate-spin" /> : <Plus />}
-                  <span className="text-sm font-bold mt-1">Adicionar Vídeo</span>
                 </div>
               </div>
-            </div>
-          </TabsContent>
-          
-          <TabsContent value="notes" className="space-y-6">
-            <div className="bg-white p-6 rounded-2xl border shadow-sm">
-              <div className="mb-8">
-                <label className="text-sm font-bold text-slate-500 uppercase tracking-wider block mb-3 border-b pb-1">Relatório do Instalador</label>
-                <Textarea 
-                  className="min-h-[120px] rounded-xl" 
-                  defaultValue={job.notes || ""} 
-                  onBlur={(e) => updateJobMutation.mutate({ notes: e.target.value })} 
-                />
+            </TabsContent>
+            
+            <TabsContent value="notes" className="space-y-6">
+              <div className="bg-white p-6 rounded-2xl border shadow-sm">
+                <div className="mb-8">
+                  <label className="text-sm font-bold text-slate-500 uppercase tracking-wider block mb-3 border-b pb-1">Relatório do Instalador</label>
+                  <Textarea 
+                    className="min-h-[120px] rounded-xl" 
+                    defaultValue={job.notes || ""} 
+                    onBlur={(e) => updateJobMutation.mutate({ notes: e.target.value })} 
+                  />
+                </div>
+                <div className="bg-rose-50 p-5 rounded-2xl border border-rose-100">
+                  <label className="text-sm font-bold text-rose-800 block mb-3 border-b border-rose-200 pb-1">Divergências / Problemas Relatados</label>
+                  <Textarea 
+                    className="min-h-[100px] rounded-xl bg-white" 
+                    defaultValue={job.issues || ""} 
+                    onBlur={(e) => updateJobMutation.mutate({ issues: e.target.value })} 
+                  />
+                </div>
               </div>
-              <div className="bg-rose-50 p-5 rounded-2xl border border-rose-100">
-                <label className="text-sm font-bold text-rose-800 block mb-3 border-b border-rose-200 pb-1">Divergências / Problemas Relatados</label>
-                <Textarea 
-                  className="min-h-[100px] rounded-xl bg-white" 
-                  defaultValue={job.issues || ""} 
-                  onBlur={(e) => updateJobMutation.mutate({ issues: e.target.value })} 
-                />
-              </div>
-            </div>
-          </TabsContent>
+            </TabsContent>
 
-          <TabsContent value="signature" className="space-y-6">
-            <div className="bg-white p-6 rounded-2xl border shadow-sm">
-              <h3 className="font-bold text-slate-800 mb-6 flex items-center gap-2 text-lg border-b-2 border-slate-100 pb-2"><PenTool size={20} /> Assinatura de Recebimento</h3>
-              {job.signature_url ? (
-                <div className="flex flex-col items-center">
-                  <img src={job.signature_url} className="max-h-40 object-contain mb-4" />
-                  <p className="text-xs uppercase font-black text-slate-600">Assinatura do Cliente</p>
-                </div>
-              ) : (
-                <div className="space-y-6">
-                  <div className="border-2 border-dashed border-slate-200 rounded-2xl bg-slate-50 overflow-hidden">
-                    <SignatureCanvas ref={sigCanvas} penColor="black" canvasProps={{ className: "w-full h-64" }} />
+            <TabsContent value="signature" className="space-y-6">
+              <div className="bg-white p-6 rounded-2xl border shadow-sm">
+                <h3 className="font-bold text-slate-800 mb-6 flex items-center gap-2 text-lg border-b-2 border-slate-100 pb-2"><PenTool size={20} /> Assinatura de Recebimento</h3>
+                {job.signature_url ? (
+                  <div className="flex flex-col items-center">
+                    <img src={job.signature_url} className="max-h-40 object-contain mb-4" />
+                    <p className="text-xs uppercase font-black text-slate-600">Assinatura do Cliente</p>
                   </div>
-                  <div className="flex justify-between">
-                    <Button variant="ghost" onClick={() => sigCanvas.current?.clear()}>Limpar</Button>
-                    <Button onClick={saveSignature} disabled={isSavingSignature || isOffline} className="bg-blue-600 text-white rounded-xl px-6">
-                      {isSavingSignature ? <Loader2 className="animate-spin mr-2" /> : null} Salvar Assinatura
-                    </Button>
+                ) : (
+                  <div className="space-y-6">
+                    <div className="border-2 border-dashed border-slate-200 rounded-2xl bg-slate-50 overflow-hidden">
+                      <SignatureCanvas ref={sigCanvas} penColor="black" canvasProps={{ className: "w-full h-64" }} />
+                    </div>
+                    <div className="flex justify-between">
+                      <Button variant="ghost" onClick={() => sigCanvas.current?.clear()}>Limpar</Button>
+                      <Button onClick={saveSignature} disabled={isSavingSignature || isOffline} className="bg-blue-600 text-white rounded-xl px-6">
+                        {isSavingSignature ? <Loader2 className="animate-spin mr-2" /> : null} Salvar e Finalizar
+                      </Button>
+                    </div>
                   </div>
-                </div>
-              )}
-            </div>
-          </TabsContent>
-        </Tabs>
+                )}
+              </div>
+            </TabsContent>
+          </Tabs>
+        )}
       </div>
 
       {/* Relatório Fotográfico PDF (Apenas Impressão) */}
