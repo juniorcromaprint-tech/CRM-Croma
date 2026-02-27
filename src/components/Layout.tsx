@@ -1,6 +1,6 @@
 import React from "react";
 import { Link, useLocation, Outlet } from "react-router-dom";
-import { Home, ClipboardList, Store, Users, Settings as SettingsIcon, Menu, ShieldCheck, Map as MapIcon } from "lucide-react";
+import { Home, ClipboardList, Users, Settings as SettingsIcon, Menu, ShieldCheck, Map as MapIcon } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Sheet, SheetContent, SheetTrigger } from "@/components/ui/sheet";
 import { useAuth } from "@/contexts/AuthContext";
@@ -35,7 +35,6 @@ export default function Layout() {
   const navItems = [
     { name: "Início", path: "/", icon: Home },
     { name: "Instalações", path: "/jobs", icon: ClipboardList },
-    { name: "Lojas", path: "/stores", icon: Store },
     { name: "Mapa", path: "/map", icon: MapIcon },
     { name: "Clientes", path: "/clients", icon: Users },
   ];
