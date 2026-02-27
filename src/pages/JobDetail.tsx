@@ -193,7 +193,7 @@ export default function JobDetail() {
   const afterPhotos = photos?.filter(p => p.photo_type === 'after') || [];
 
   return (
-    <div className="space-y-6 pb-10 print:pb-0 print:space-y-4 print:bg-white print:block print:h-auto print:overflow-visible">
+    <div className="space-y-6 pb-10 print:pb-0 print:space-y-0 print:bg-white print:block print:overflow-visible">
       {/* Header - Hidden on Print */}
       <div className="flex items-center justify-between print:hidden">
         <Button variant="ghost" size="icon" onClick={() => navigate(-1)} className="bg-white border shadow-sm">
@@ -282,41 +282,31 @@ export default function JobDetail() {
         </CardContent>
       </Card>
 
-      {/* Tabs Container - Print logic: force all content to display block */}
-      <div className="w-full print:space-y-12">
-        <Tabs defaultValue="photos" className="w-full print:!block">
-          <TabsList className="grid w-full grid-cols-3 mb-6 rounded-xl p-1 bg-slate-200/50 print:hidden">
+      {/* UI INTERATIVA (TABS) - ESCONDIDA NA IMPRESSÃO */}
+      <div className="print:hidden">
+        <Tabs defaultValue="photos" className="w-full">
+          <TabsList className="grid w-full grid-cols-3 mb-6 rounded-xl p-1 bg-slate-200/50">
             <TabsTrigger value="photos">Fotos</TabsTrigger>
             <TabsTrigger value="notes">Relatório</TabsTrigger>
             <TabsTrigger value="signature">Assinatura</TabsTrigger>
           </TabsList>
           
-          {/* Photos Section */}
-          <TabsContent value="photos" className="space-y-8 print:!block print:!opacity-100 print:!visible print:!static print:!translate-x-0">
-            {/* Antes */}
-            <div className="bg-white p-5 rounded-2xl border shadow-sm print:shadow-none print:border-none print:p-0 print:break-inside-avoid">
-              <div className="flex justify-between mb-4 border-b-2 border-slate-100 pb-2 print:mb-4">
+          <TabsContent value="photos" className="space-y-8">
+            <div className="bg-white p-5 rounded-2xl border shadow-sm">
+              <div className="flex justify-between mb-4 border-b-2 border-slate-100 pb-2">
                 <h3 className="font-bold text-slate-800 flex items-center gap-2 text-lg"><Camera size={20} /> Antes da Instalação</h3>
-                <span className="text-xs font-bold bg-slate-100 px-2 py-1 rounded print:hidden">{beforePhotos.length} fotos</span>
+                <span className="text-xs font-bold bg-slate-100 px-2 py-1 rounded">{beforePhotos.length} fotos</span>
               </div>
-              <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 print:grid-cols-2 print:gap-4">
+              <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
                 {beforePhotos.map(photo => (
-                  <div key={photo.id} className="relative group aspect-square rounded-xl overflow-hidden border border-slate-100 bg-slate-50 print:rounded-lg print:border-slate-200">
-                    <img 
-                      src={photo.photo_url} 
-                      className="w-full h-full object-cover cursor-zoom-in" 
-                      onClick={() => openImageModal(photo.photo_url)} 
-                    />
-                    <Button 
-                      variant="destructive" size="icon" 
-                      className="absolute top-1 right-1 h-7 w-7 opacity-0 group-hover:opacity-100 transition-opacity print:hidden"
-                      onClick={(e) => { e.stopPropagation(); window.confirm("Excluir foto?") && deletePhotoMutation.mutate(photo.id); }}
-                    >
+                  <div key={photo.id} className="relative group aspect-square rounded-xl overflow-hidden border border-slate-100 bg-slate-50">
+                    <img src={photo.photo_url} className="w-full h-full object-cover cursor-zoom-in" onClick={() => openImageModal(photo.photo_url)} />
+                    <Button variant="destructive" size="icon" className="absolute top-1 right-1 h-7 w-7 opacity-0 group-hover:opacity-100 transition-opacity" onClick={(e) => { e.stopPropagation(); window.confirm("Excluir foto?") && deletePhotoMutation.mutate(photo.id); }}>
                       <Trash2 size={14} />
                     </Button>
                   </div>
                 ))}
-                <div onClick={() => fileInputBeforeRef.current?.click()} className="aspect-square border-2 border-dashed rounded-xl flex flex-col items-center justify-center cursor-pointer hover:bg-slate-50 print:hidden">
+                <div onClick={() => fileInputBeforeRef.current?.click()} className="aspect-square border-2 border-dashed rounded-xl flex flex-col items-center justify-center cursor-pointer hover:bg-slate-50">
                   <input type="file" accept="image/*" multiple className="hidden" ref={fileInputBeforeRef} onChange={(e) => handleFileUpload(e, 'before')} />
                   {uploadingType === 'before' ? <Loader2 className="animate-spin" /> : <Plus />}
                   <span className="text-xs font-bold mt-1">Adicionar</span>
@@ -324,35 +314,24 @@ export default function JobDetail() {
               </div>
             </div>
 
-            {/* Depois */}
-            <div className="bg-white p-5 rounded-2xl border shadow-sm print:shadow-none print:border-none print:p-0 print:break-inside-avoid print:mt-12">
-              <div className="flex justify-between mb-4 border-b-2 border-slate-100 pb-2 print:mb-4">
+            <div className="bg-white p-5 rounded-2xl border shadow-sm">
+              <div className="flex justify-between mb-4 border-b-2 border-slate-100 pb-2">
                 <h3 className="font-bold text-slate-800 flex items-center gap-2 text-lg"><CheckCircle2 size={20} className="text-emerald-500" /> Depois da Instalação</h3>
-                <span className="text-xs font-bold bg-slate-100 px-2 py-1 rounded print:hidden">{afterPhotos.length} fotos</span>
+                <span className="text-xs font-bold bg-slate-100 px-2 py-1 rounded">{afterPhotos.length} fotos</span>
               </div>
-              <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 print:grid-cols-2 print:gap-4">
+              <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
                 {afterPhotos.map(photo => (
-                  <div key={photo.id} className="relative group aspect-square rounded-xl overflow-hidden border border-slate-100 bg-slate-50 print:rounded-lg print:border-slate-200">
-                    <img 
-                      src={photo.photo_url} 
-                      className="w-full h-full object-cover cursor-zoom-in" 
-                      onClick={() => openImageModal(photo.photo_url)} 
-                    />
-                    <Button 
-                      variant="destructive" size="icon" 
-                      className="absolute top-1 right-1 h-7 w-7 opacity-0 group-hover:opacity-100 transition-opacity print:hidden"
-                      onClick={(e) => { e.stopPropagation(); window.confirm("Excluir foto?") && deletePhotoMutation.mutate(photo.id); }}
-                    >
+                  <div key={photo.id} className="relative group aspect-square rounded-xl overflow-hidden border border-slate-100 bg-slate-50">
+                    <img src={photo.photo_url} className="w-full h-full object-cover cursor-zoom-in" onClick={() => openImageModal(photo.photo_url)} />
+                    <Button variant="destructive" size="icon" className="absolute top-1 right-1 h-7 w-7 opacity-0 group-hover:opacity-100 transition-opacity" onClick={(e) => { e.stopPropagation(); window.confirm("Excluir foto?") && deletePhotoMutation.mutate(photo.id); }}>
                       <Trash2 size={14} />
                     </Button>
-                    <div className="absolute bottom-0 left-0 right-0 p-2 bg-black/60 print:bg-white/90 print:border-t print:border-slate-200">
-                      <p className="text-[10px] text-white font-medium truncate print:text-slate-800 print:font-bold">
-                        {photoDescriptions[photo.id] || 'Sem descrição'}
-                      </p>
+                    <div className="absolute bottom-0 left-0 right-0 p-2 bg-black/60">
+                      <p className="text-[10px] text-white font-medium truncate">{photoDescriptions[photo.id] || 'Sem descrição'}</p>
                     </div>
                   </div>
                 ))}
-                <div onClick={() => fileInputAfterRef.current?.click()} className="aspect-square border-2 border-dashed rounded-xl flex flex-col items-center justify-center cursor-pointer hover:bg-slate-50 print:hidden">
+                <div onClick={() => fileInputAfterRef.current?.click()} className="aspect-square border-2 border-dashed rounded-xl flex flex-col items-center justify-center cursor-pointer hover:bg-slate-50">
                   <input type="file" accept="image/*" multiple className="hidden" ref={fileInputAfterRef} onChange={(e) => handleFileUpload(e, 'after')} />
                   {uploadingType === 'after' ? <Loader2 className="animate-spin" /> : <Plus />}
                   <span className="text-xs font-bold mt-1">Adicionar</span>
@@ -361,72 +340,41 @@ export default function JobDetail() {
             </div>
           </TabsContent>
           
-          {/* Notes Section */}
-          <TabsContent value="notes" className="space-y-6 print:!block print:!opacity-100 print:!visible print:!static print:!translate-x-0 print:mt-12">
-            <div className="bg-white p-6 rounded-2xl border shadow-sm print:shadow-none print:border-none print:p-0 print:break-inside-avoid">
+          <TabsContent value="notes" className="space-y-6">
+            <div className="bg-white p-6 rounded-2xl border shadow-sm">
               <div className="mb-8">
                 <label className="text-sm font-bold text-slate-500 uppercase tracking-wider block mb-3 border-b pb-1">Relatório do Instalador</label>
-                <div className="hidden print:block text-slate-800 text-sm leading-relaxed whitespace-pre-wrap bg-slate-50 p-4 rounded-xl border border-slate-100">
-                  {job.notes || "Nenhuma observação registrada."}
-                </div>
-                <Textarea 
-                  className="min-h-[120px] rounded-xl print:hidden" 
-                  defaultValue={job.notes || ""} 
-                  onBlur={(e) => updateJobMutation.mutate({ notes: e.target.value })} 
-                />
+                <Textarea className="min-h-[120px] rounded-xl" defaultValue={job.notes || ""} onBlur={(e) => updateJobMutation.mutate({ notes: e.target.value })} />
               </div>
-              <div className="bg-rose-50 p-5 rounded-2xl border border-rose-100 print:bg-white print:border-slate-200 print:p-4">
-                <label className="text-sm font-bold text-rose-800 block mb-3 border-b border-rose-200 pb-1 print:text-slate-800 print:border-slate-200">Divergências / Problemas Relatados</label>
-                <div className="hidden print:block text-slate-800 text-sm leading-relaxed whitespace-pre-wrap">
-                  {job.issues || "Nenhuma divergência relatada."}
-                </div>
-                <Textarea 
-                  className="min-h-[100px] rounded-xl bg-white print:hidden" 
-                  defaultValue={job.issues || ""} 
-                  onBlur={(e) => updateJobMutation.mutate({ issues: e.target.value })} 
-                />
+              <div className="bg-rose-50 p-5 rounded-2xl border border-rose-100">
+                <label className="text-sm font-bold text-rose-800 block mb-3 border-b border-rose-200 pb-1">Divergências / Problemas Relatados</label>
+                <Textarea className="min-h-[100px] rounded-xl bg-white" defaultValue={job.issues || ""} onBlur={(e) => updateJobMutation.mutate({ issues: e.target.value })} />
               </div>
             </div>
           </TabsContent>
 
-          {/* Signature Section */}
-          <TabsContent value="signature" className="space-y-6 print:!block print:!opacity-100 print:!visible print:!static print:!translate-x-0 print:mt-16">
-            <div className="print:break-inside-avoid">
+          <TabsContent value="signature" className="space-y-6">
+            <div className="bg-white p-6 rounded-2xl border shadow-sm">
               <h3 className="font-bold text-slate-800 mb-6 flex items-center gap-2 text-lg border-b-2 border-slate-100 pb-2"><PenTool size={20} /> Assinatura de Recebimento</h3>
               {job.signature_url ? (
                 <div className="flex flex-col items-center space-y-4">
-                  <div className="border-2 border-slate-100 rounded-2xl p-6 bg-slate-50 flex flex-col items-center print:bg-white print:border-slate-200 print:w-full max-w-md">
+                  <div className="border-2 border-slate-100 rounded-2xl p-6 bg-slate-50 flex flex-col items-center max-w-md">
                     <img src={job.signature_url} className="max-h-40 object-contain mb-4" />
                     <div className="w-full border-t border-slate-300 pt-2 text-center">
                       <p className="text-xs uppercase font-black text-slate-600">Assinatura do Cliente</p>
-                      <p className="text-[10px] text-slate-400 mt-1">Confirmado via sistema Cromaprint</p>
                     </div>
                   </div>
-                  <Button 
-                    variant="outline" 
-                    onClick={() => window.confirm("Remover assinatura?") && updateJobMutation.mutate({ signature_url: null })} 
-                    className="text-red-600 print:hidden"
-                  >
-                    Remover Assinatura
-                  </Button>
+                  <Button variant="outline" onClick={() => window.confirm("Remover assinatura?") && updateJobMutation.mutate({ signature_url: null })} className="text-red-600">Remover Assinatura</Button>
                 </div>
               ) : (
                 <div className="space-y-6">
-                  <div className="border-2 border-dashed border-slate-200 rounded-2xl bg-slate-50 overflow-hidden print:hidden">
+                  <div className="border-2 border-dashed border-slate-200 rounded-2xl bg-slate-50 overflow-hidden">
                     <SignatureCanvas ref={sigCanvas} penColor="black" canvasProps={{ className: "w-full h-64" }} />
                   </div>
-                  
-                  {/* Placeholder para assinatura manual no papel se não houver digital */}
-                  <div className="hidden print:flex flex-col items-center mt-12">
-                    <div className="w-80 h-32 border-b-2 border-slate-400 mb-2"></div>
-                    <p className="text-xs font-bold text-slate-500 uppercase">Assinatura do Cliente / Responsável</p>
-                  </div>
-                  
-                  <div className="flex justify-between print:hidden">
+                  <div className="flex justify-between">
                     <Button variant="ghost" onClick={() => sigCanvas.current?.clear()}>Limpar</Button>
                     <Button onClick={saveSignature} disabled={isSavingSignature} className="bg-blue-600 text-white rounded-xl px-6">
-                      {isSavingSignature ? <Loader2 className="animate-spin mr-2" /> : null}
-                      Salvar Assinatura Digital
+                      {isSavingSignature ? <Loader2 className="animate-spin mr-2" /> : null} Salvar Assinatura Digital
                     </Button>
                   </div>
                 </div>
@@ -436,13 +384,80 @@ export default function JobDetail() {
         </Tabs>
       </div>
 
+      {/* CONTEÚDO EXCLUSIVO PARA IMPRESSÃO (PDF) - SEMPRE VISÍVEL NO PDF */}
+      <div className="hidden print:block space-y-10">
+        {/* Fotos Antes */}
+        <div className="break-inside-avoid">
+          <h3 className="font-bold text-slate-800 text-lg border-b-2 border-slate-200 pb-2 mb-4">1. Fotos Antes da Instalação</h3>
+          <div className="grid grid-cols-2 gap-4">
+            {beforePhotos.map(photo => (
+              <div key={photo.id} className="border border-slate-200 rounded-lg overflow-hidden aspect-video">
+                <img src={photo.photo_url} className="w-full h-full object-cover" />
+              </div>
+            ))}
+          </div>
+        </div>
+
+        {/* Fotos Depois */}
+        <div className="break-inside-avoid">
+          <h3 className="font-bold text-slate-800 text-lg border-b-2 border-slate-200 pb-2 mb-4">2. Fotos Depois da Instalação</h3>
+          <div className="grid grid-cols-2 gap-4">
+            {afterPhotos.map(photo => (
+              <div key={photo.id} className="border border-slate-200 rounded-lg overflow-hidden">
+                <div className="aspect-video">
+                  <img src={photo.photo_url} className="w-full h-full object-cover" />
+                </div>
+                {photo.description && (
+                  <div className="p-2 bg-slate-50 border-t border-slate-200">
+                    <p className="text-xs font-bold text-slate-700">Legenda: {photo.description}</p>
+                  </div>
+                )}
+              </div>
+            ))}
+          </div>
+        </div>
+
+        {/* Relatório e Divergências */}
+        <div className="break-inside-avoid space-y-6">
+          <h3 className="font-bold text-slate-800 text-lg border-b-2 border-slate-200 pb-2 mb-4">3. Relatório Técnico</h3>
+          <div className="bg-slate-50 p-4 rounded-xl border border-slate-200">
+            <p className="text-xs font-bold text-slate-500 uppercase mb-2">Observações do Instalador:</p>
+            <p className="text-sm text-slate-800 whitespace-pre-wrap">{job.notes || "Nenhuma observação registrada."}</p>
+          </div>
+          <div className="bg-rose-50 p-4 rounded-xl border border-rose-200">
+            <p className="text-xs font-bold text-rose-800 uppercase mb-2">Divergências / Problemas:</p>
+            <p className="text-sm text-slate-800 whitespace-pre-wrap">{job.issues || "Nenhuma divergência relatada."}</p>
+          </div>
+        </div>
+
+        {/* Assinatura */}
+        <div className="break-inside-avoid pt-10">
+          <h3 className="font-bold text-slate-800 text-lg border-b-2 border-slate-200 pb-2 mb-8">4. Formalização e Recebimento</h3>
+          <div className="flex flex-col items-center">
+            {job.signature_url ? (
+              <div className="flex flex-col items-center">
+                <img src={job.signature_url} className="max-h-32 object-contain mb-2" />
+                <div className="w-64 border-t border-slate-400 pt-2 text-center">
+                  <p className="text-xs font-bold text-slate-600 uppercase">Assinatura do Cliente</p>
+                  <p className="text-[10px] text-slate-400">Confirmado digitalmente via Cromaprint</p>
+                </div>
+              </div>
+            ) : (
+              <div className="flex flex-col items-center mt-10">
+                <div className="w-80 h-20 border-b-2 border-slate-400 mb-2"></div>
+                <p className="text-xs font-bold text-slate-500 uppercase">Assinatura do Cliente / Responsável</p>
+              </div>
+            )}
+          </div>
+        </div>
+      </div>
+
       <ImageModal isOpen={isImageModalOpen} onClose={() => setIsImageModalOpen(false)} imageUrl={selectedImageUrl} />
       
       {/* Footer for Print */}
       <div className="hidden print:block mt-20 pt-6 border-t-2 border-slate-100 text-[10px] text-slate-400 text-center">
         <p className="font-bold">Cromaprint Comunicação Visual & Impressão Digital</p>
         <p className="mt-1">Relatório gerado automaticamente em {new Date().toLocaleString('pt-BR')}</p>
-        <p className="mt-1">Página 1 de 1 (O navegador gerará as páginas adicionais conforme necessário)</p>
       </div>
     </div>
   );
