@@ -1,11 +1,16 @@
+"use client";
+
 import React, { useState, useEffect } from "react";
-import { Save, Loader2, ClipboardList, Calendar, Store, FileText, Hash, User } from "lucide-react";
+import { Save, Loader2, ClipboardList, Calendar, Store, FileText, Hash, User, Check, ChevronsUpDown, Search } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Sheet, SheetContent, SheetHeader, SheetTitle, SheetDescription } from "@/components/ui/sheet";
 import { supabase } from "@/integrations/supabase/client";
 import { showSuccess, showError } from "@/utils/toast";
 import { useQueryClient, useQuery } from "@tanstack/react-query";
+import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
+import { Command, CommandEmpty, CommandGroup, CommandInput, CommandItem, CommandList } from "@/components/ui/command";
+import { cn } from "@/lib/utils";
 
 interface JobFormSheetProps {
   isOpen: boolean;
@@ -17,6 +22,7 @@ interface JobFormSheetProps {
 export default function JobFormSheet({ isOpen, onClose, jobToEdit, initialStoreId }: JobFormSheetProps) {
   const queryClient = useQueryClient();
   const [isSubmitting, setIsSubmitting] = useState(false);
+  const [openStoreSelect, setOpenStoreSelect] = useState(false);
 
   // Busca a lista de lojas para o select
   const { data: stores } = useQuery({
@@ -29,7 +35,7 @@ export default function JobFormSheet({ isOpen, onClose, jobToEdit, initialStoreI
       if (error) throw error;
       return data || [];
     },
-    enabled: isOpen // Só busca quando o painel for aberto
+    enabled: isOpen
   });
 
   // Busca a lista de instaladores para o select
@@ -86,6 +92,11 @@ export default function JobFormSheet({ isOpen, onClose, jobToEdit, initialStoreI
     setFormData(prev => ({ ...prev, [e.target.name]: e.target.value }));
   };
 
+  const handleStoreSelect = (storeId: string) => {
+    setFormData(prev => ({ ...prev, store_id: storeId }));
+    setOpenStoreSelect(false);
+  };
+
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!formData.store_id || !formData.os_number || !formData.type) {
@@ -95,7 +106,6 @@ export default function JobFormSheet({ isOpen, onClose, jobToEdit, initialStoreI
 
     setIsSubmitting(true);
     try {
-      // Prepare data for submission (handle empty assigned_to)
       const submitData = {
         ...formData,
         assigned_to: formData.assigned_to === "" ? null : formData.assigned_to
@@ -111,7 +121,6 @@ export default function JobFormSheet({ isOpen, onClose, jobToEdit, initialStoreI
         showSuccess("Nova OS criada com sucesso!");
       }
       
-      // Atualiza as listas na tela
       queryClient.invalidateQueries({ queryKey: ['all-jobs'] });
       if (formData.store_id) {
         queryClient.invalidateQueries({ queryKey: ['store-jobs', formData.store_id] });
@@ -125,6 +134,8 @@ export default function JobFormSheet({ isOpen, onClose, jobToEdit, initialStoreI
       setIsSubmitting(false);
     }
   };
+
+  const selectedStore = stores?.find((store) => store.id === formData.store_id);
 
   return (
     <Sheet open={isOpen} onOpenChange={onClose}>
@@ -149,26 +160,53 @@ export default function JobFormSheet({ isOpen, onClose, jobToEdit, initialStoreI
             </h3>
             <div>
               <label className="text-xs font-bold text-slate-500 mb-1 block">Selecione a Loja *</label>
-              <div className="relative">
-                <select
-                  name="store_id"
-                  value={formData.store_id}
-                  onChange={handleChange}
-                  required
-                  disabled={!!initialStoreId && !jobToEdit} // Bloqueia se veio da tela da loja
-                  className="w-full h-11 pl-3 pr-10 rounded-xl border border-slate-200 bg-slate-50 shadow-sm text-sm focus:ring-2 focus:ring-blue-600 focus:border-transparent appearance-none outline-none text-slate-700 disabled:opacity-70 disabled:cursor-not-allowed"
-                >
-                  <option value="" disabled>Selecione um cliente...</option>
-                  {stores?.map(store => (
-                    <option key={store.id} value={store.id}>
-                      {store.name} {store.code ? `(${store.code})` : ''} - {store.brand}
-                    </option>
-                  ))}
-                </select>
-                <div className="absolute right-3 top-1/2 -translate-y-1/2 pointer-events-none text-slate-400">
-                  <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="m6 9 6 6 6-6"/></svg>
-                </div>
-              </div>
+              
+              <Popover open={openStoreSelect} onOpenChange={setOpenStoreSelect}>
+                <PopoverTrigger asChild>
+                  <Button
+                    variant="outline"
+                    role="combobox"
+                    aria-expanded={openStoreSelect}
+                    disabled={!!initialStoreId && !jobToEdit}
+                    className="w-full justify-between h-11 rounded-xl border-slate-200 bg-slate-50 text-sm font-normal text-slate-700 hover:bg-slate-100"
+                  >
+                    {selectedStore 
+                      ? `${selectedStore.name} ${selectedStore.code ? `(${selectedStore.code})` : ''}`
+                      : "Pesquisar cliente..."}
+                    <ChevronsUpDown className="ml-2 h-4 w-4 shrink-0 opacity-50" />
+                  </Button>
+                </PopoverTrigger>
+                <PopoverContent className="w-[var(--radix-popover-trigger-width)] p-0 rounded-xl shadow-xl border-slate-200" align="start">
+                  <Command className="rounded-xl">
+                    <CommandInput placeholder="Digite o nome ou código..." className="h-11" />
+                    <CommandList className="max-h-[300px]">
+                      <CommandEmpty>Nenhum cliente encontrado.</CommandEmpty>
+                      <CommandGroup>
+                        {stores?.map((store) => (
+                          <CommandItem
+                            key={store.id}
+                            value={`${store.name} ${store.code || ''} ${store.brand}`}
+                            onSelect={() => handleStoreSelect(store.id)}
+                            className="py-3 px-4 cursor-pointer hover:bg-blue-50"
+                          >
+                            <Check
+                              className={cn(
+                                "mr-2 h-4 w-4 text-blue-600",
+                                formData.store_id === store.id ? "opacity-100" : "opacity-0"
+                              )}
+                            />
+                            <div className="flex flex-col">
+                              <span className="font-bold text-slate-800">{store.name}</span>
+                              <span className="text-xs text-slate-500">{store.brand} {store.code ? `• ${store.code}` : ''}</span>
+                            </div>
+                          </CommandItem>
+                        ))}
+                      </CommandGroup>
+                    </CommandList>
+                  </Command>
+                </PopoverContent>
+              </Popover>
+
               {initialStoreId && !jobToEdit && (
                 <p className="text-xs text-blue-600 mt-1 font-medium">Loja pré-selecionada automaticamente.</p>
               )}
