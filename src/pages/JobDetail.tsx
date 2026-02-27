@@ -2,7 +2,7 @@
 
 import React, { useState, useRef } from "react";
 import { useParams, useNavigate } from "react-router-dom";
-import { ArrowLeft, Camera, Upload, FileText, AlertTriangle, CheckCircle2, Printer, MapPin, Calendar, Navigation, Loader2, Plus, Trash2, PenTool, User } from "lucide-react";
+import { ArrowLeft, Camera, Upload, FileText, AlertTriangle, CheckCircle2, Printer, MapPin, Calendar, Navigation, Loader2, Plus, Trash2, PenTool, User, MessageCircle } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
@@ -186,6 +186,35 @@ export default function JobDetail() {
     setIsImageModalOpen(true);
   };
 
+  // Função para imprimir com nome personalizado
+  const handlePrint = () => {
+    if (!job) return;
+    const originalTitle = document.title;
+    const formattedDate = new Date(job.scheduled_date).toLocaleDateString('pt-BR').replace(/\//g, '-');
+    const clientName = job.stores?.name || 'Cliente';
+    
+    // Altera o título da página temporariamente para definir o nome do arquivo PDF
+    document.title = `${clientName} - ${formattedDate} - OS ${job.os_number}`;
+    
+    window.print();
+    
+    // Restaura o título original
+    document.title = originalTitle;
+  };
+
+  // Função para compartilhar no WhatsApp
+  const handleWhatsAppShare = () => {
+    if (!job) return;
+    const formattedDate = new Date(job.scheduled_date).toLocaleDateString('pt-BR');
+    const clientName = job.stores?.name || 'Não informado';
+    const address = job.stores?.address ? `\n*Endereço:* ${job.stores.address}` : '';
+    
+    const text = `*Relatório de Instalação - Cromaprint*%0A*OS:* ${job.os_number}%0A*Cliente:* ${clientName}${address}%0A*Data:* ${formattedDate}%0A*Status:* ${job.status}%0A*Serviço:* ${job.type}`;
+    
+    const url = `https://wa.me/?text=${text}`;
+    window.open(url, '_blank');
+  };
+
   if (isLoading) return <div className="p-10 text-center">Carregando...</div>;
   if (!job) return <div className="p-10 text-center">Não encontrado.</div>;
 
@@ -195,19 +224,22 @@ export default function JobDetail() {
   return (
     <div className="space-y-6 pb-10 print:pb-0 print:space-y-0 print:bg-white print:block print:overflow-visible">
       {/* Header - Hidden on Print */}
-      <div className="flex items-center justify-between print:hidden">
-        <Button variant="ghost" size="icon" onClick={() => navigate(-1)} className="bg-white border shadow-sm">
+      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 print:hidden">
+        <Button variant="ghost" size="icon" onClick={() => navigate(-1)} className="bg-white border shadow-sm shrink-0 self-start">
           <ArrowLeft size={20} />
         </Button>
-        <div className="flex gap-2">
-          <Button variant="outline" onClick={() => window.confirm("Excluir OS?") && deleteJobMutation.mutate()} className="text-red-600 border-red-200">
+        <div className="flex flex-wrap gap-2 w-full sm:w-auto">
+          <Button variant="outline" onClick={() => window.confirm("Excluir OS?") && deleteJobMutation.mutate()} className="text-red-600 border-red-200 flex-1 sm:flex-none">
             <Trash2 size={18} className="mr-2" /> Excluir
           </Button>
-          <Button variant="outline" onClick={() => window.print()} className="text-blue-600 border-slate-200">
+          <Button variant="outline" onClick={handleWhatsAppShare} className="text-emerald-600 border-emerald-200 hover:bg-emerald-50 flex-1 sm:flex-none">
+            <MessageCircle size={18} className="mr-2" /> WhatsApp
+          </Button>
+          <Button variant="outline" onClick={handlePrint} className="text-blue-600 border-slate-200 flex-1 sm:flex-none">
             <Printer size={18} className="mr-2" /> PDF
           </Button>
           {job.status !== "Concluído" && (
-            <Button onClick={() => updateJobMutation.mutate({ status: 'Concluído' })} className="bg-emerald-600 text-white">
+            <Button onClick={() => updateJobMutation.mutate({ status: 'Concluído' })} className="bg-emerald-600 text-white flex-1 sm:flex-none">
               <CheckCircle2 size={18} className="mr-2" /> Finalizar
             </Button>
           )}
