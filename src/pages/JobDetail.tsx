@@ -2,7 +2,7 @@
 
 import React, { useState, useRef } from "react";
 import { useParams, useNavigate } from "react-router-dom";
-import { ArrowLeft, Camera, Upload, FileText, AlertTriangle, CheckCircle2, Printer, MapPin, Calendar, Navigation, Loader2, Plus, Trash2, PenTool, User, MessageCircle } from "lucide-react";
+import { ArrowLeft, Camera, Upload, FileText, AlertTriangle, CheckCircle2, Printer, MapPin, Calendar, Navigation, Loader2, Plus, Trash2, PenTool, User, MessageCircle, ExternalLink } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
@@ -311,9 +311,21 @@ export default function JobDetail() {
           <div className="mt-4 pt-4 border-t flex justify-between items-center print:border-slate-100">
             <div className="flex items-center gap-2">
               <Navigation size={18} className={job.lat ? "text-emerald-500" : "text-slate-400"} />
-              <span className="text-sm font-medium text-slate-600 print:text-xs">
-                {job.lat ? `GPS: ${job.lat.toFixed(6)}, ${job.lng.toFixed(6)}` : "GPS não capturado"}
-              </span>
+              {job.lat ? (
+                <a 
+                  href={`https://www.google.com/maps/search/?api=1&query=${job.lat},${job.lng}`} 
+                  target="_blank" 
+                  rel="noopener noreferrer"
+                  className="text-sm font-bold text-blue-600 hover:underline flex items-center gap-1 print:text-slate-600 print:no-underline print:font-medium"
+                >
+                  GPS: {job.lat.toFixed(6)}, {job.lng.toFixed(6)}
+                  <ExternalLink size={12} className="print:hidden" />
+                </a>
+              ) : (
+                <span className="text-sm font-medium text-slate-600 print:text-xs">
+                  GPS não capturado
+                </span>
+              )}
             </div>
             {!job.lat && (
               <Button variant="outline" size="sm" onClick={captureLocation} disabled={isLocating} className="rounded-xl print:hidden">
