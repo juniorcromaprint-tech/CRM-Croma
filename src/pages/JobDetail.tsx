@@ -2,7 +2,7 @@
 
 import React, { useState, useRef, useEffect } from "react";
 import { useParams, useNavigate } from "react-router-dom";
-import { ArrowLeft, Camera, Upload, FileText, AlertTriangle, CheckCircle2, Printer, MapPin, Calendar, Navigation, Loader2, Plus, Trash2, PenTool, User, MessageCircle, ExternalLink, Video, Play, WifiOff } from "lucide-react";
+import { ArrowLeft, Camera, Upload, FileText, AlertTriangle, CheckCircle2, Printer, MapPin, Calendar, Navigation, Loader2, Plus, Trash2, PenTool, User, MessageCircle, ExternalLink, Video, Play, WifiOff, X } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
@@ -25,7 +25,6 @@ export default function JobDetail() {
   const [isSavingSignature, setIsSavingSignature] = useState(false);
   const [isImageModalOpen, setIsImageModalOpen] = useState(false);
   const [selectedImageUrl, setSelectedImageUrl] = useState("");
-  const [photoDescriptions, setPhotoDescriptions] = useState<{ [key: string]: string }>({});
   const [isOffline, setIsOffline] = useState(!navigator.onLine);
 
   const fileInputBeforeRef = useRef<HTMLInputElement>(null);
@@ -33,7 +32,6 @@ export default function JobDetail() {
   const fileInputVideoRef = useRef<HTMLInputElement>(null);
   const sigCanvas = useRef<SignatureCanvas>(null);
 
-  // Monitorar status da conexão
   useEffect(() => {
     const handleOnline = () => setIsOffline(false);
     const handleOffline = () => setIsOffline(true);
@@ -95,31 +93,13 @@ export default function JobDetail() {
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['job', id] });
       if (!isOffline) showSuccess("Alteração salva!");
-    },
-    onError: () => {
-      if (isOffline) {
-        showError("Você está offline. A alteração será salva quando houver sinal.");
-      } else {
-        showError("Erro ao salvar alteração.");
-      }
-    }
-  });
-
-  const deleteJobMutation = useMutation({
-    mutationFn: async () => {
-      const { error } = await supabase.from('jobs').delete().eq('id', id);
-      if (error) throw error;
-    },
-    onSuccess: () => {
-      showSuccess("OS excluída com sucesso!");
-      navigate('/jobs');
     }
   });
 
   const handleFileUpload = async (event: React.ChangeEvent<HTMLInputElement>, type: 'before' | 'after') => {
     const files = event.target.files;
     if (!files || files.length === 0 || !id) return;
-    if (isOffline) return showError("Upload de fotos requer internet.");
+    if (isOffline) return showError("Upload requer internet.");
 
     setUploadingType(type);
     try {
@@ -146,8 +126,7 @@ export default function JobDetail() {
   const handleVideoUpload = async (event: React.ChangeEvent<HTMLInputElement>) => {
     const file = event.target.files?.[0];
     if (!file || !id) return;
-    if (isOffline) return showError("Upload de vídeos requer internet.");
-
+    if (isOffline) return showError("Upload requer internet.");
     if (file.size > 15 * 1024 * 1024) return showError("Máximo 15MB.");
 
     setUploadingType('video');
@@ -203,11 +182,6 @@ export default function JobDetail() {
     window.open(`https://wa.me/?text=${text}`, '_blank');
   };
 
-  const openImageModal = (url: string) => {
-    setSelectedImageUrl(url);
-    setIsImageModalOpen(true);
-  };
-
   if (isLoading) return <div className="p-10 text-center">Carregando...</div>;
   if (!job) return <div className="p-10 text-center">Não encontrado.</div>;
 
@@ -215,7 +189,8 @@ export default function JobDetail() {
   const afterPhotos = photos?.filter(p => p.photo_type === 'after') || [];
 
   return (
-    <div className="space-y-6 pb-10 print:pb-0 print:space-y-0 print:bg-white print:block print:overflow-visible">
+    <div className="space-y-6 pb-10 print:pb-0 print:space-y-0 print:bg-white">
+      {/* Alerta Offline */}
       {isOffline && (
         <div className="bg-amber-50 border border-amber-200 p-3 rounded-xl flex items-center gap-3 text-amber-800 animate-pulse print:hidden">
           <WifiOff size={20} />
@@ -223,14 +198,12 @@ export default function JobDetail() {
         </div>
       )}
 
+      {/* Header Ações */}
       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 print:hidden">
         <Button variant="ghost" size="icon" onClick={() => navigate(-1)} className="bg-white border shadow-sm shrink-0 self-start">
           <ArrowLeft size={20} />
         </Button>
         <div className="flex flex-wrap gap-2 w-full sm:w-auto">
-          <Button variant="outline" onClick={() => window.confirm("Excluir OS?") && deleteJobMutation.mutate()} disabled={isOffline} className="text-red-600 border-red-200 flex-1 sm:flex-none">
-            <Trash2 size={18} className="mr-2" /> Excluir
-          </Button>
           <Button variant="outline" onClick={handleWhatsAppShare} className="text-emerald-600 border-emerald-200 hover:bg-emerald-50 flex-1 sm:flex-none">
             <MessageCircle size={18} className="mr-2" /> WhatsApp
           </Button>
@@ -245,12 +218,28 @@ export default function JobDetail() {
         </div>
       </div>
 
-      <Card className="border-none shadow-sm rounded-2xl overflow-hidden bg-white print:shadow-none print:border print:border-slate-200 print:rounded-xl print:mb-8">
+      {/* Cabeçalho PDF (Apenas Impressão) */}
+      <div className="hidden print:block mb-8 border-b-2 border-slate-200 pb-6">
+        <div className="flex justify-between items-center">
+          <div>
+            <CromaLogo className="h-12 mb-2" />
+            <CromaLogoFallback className="h-12 mb-2" />
+            <h1 className="text-2xl font-black text-slate-800">RELATÓRIO DE INSTALAÇÃO</h1>
+          </div>
+          <div className="text-right">
+            <p className="text-sm font-bold text-blue-600">OS: {job.os_number}</p>
+            <p className="text-xs text-slate-500">Gerado em: {new Date().toLocaleDateString('pt-BR')}</p>
+          </div>
+        </div>
+      </div>
+
+      {/* Card Principal de Informações */}
+      <Card className="border-none shadow-sm rounded-2xl overflow-hidden bg-white print:shadow-none print:border print:border-slate-200 print:rounded-xl print:mb-6">
         <div className="h-2 w-full bg-blue-600 print:hidden" />
         <CardContent className="p-6">
           <div className="flex justify-between items-start mb-6">
             <div>
-              <span className="text-sm font-bold text-blue-600 bg-blue-50 px-3 py-1 rounded-lg mb-3 inline-block print:bg-transparent print:p-0 print:text-slate-500">OS: {job.os_number}</span>
+              <span className="text-sm font-bold text-blue-600 bg-blue-50 px-3 py-1 rounded-lg mb-3 inline-block print:hidden">OS: {job.os_number}</span>
               <h2 className="text-3xl font-black text-slate-800 print:text-2xl">{job.stores?.brand}</h2>
               <p className="text-slate-500 font-medium text-lg print:text-base">{job.type}</p>
             </div>
@@ -259,7 +248,7 @@ export default function JobDetail() {
                 value={job.status} 
                 disabled={isOffline}
                 onChange={(e) => updateJobMutation.mutate({ status: e.target.value })}
-                className="p-2 rounded-xl border font-bold text-sm bg-slate-50 disabled:opacity-50"
+                className="p-2 rounded-xl border font-bold text-sm bg-slate-50"
               >
                 <option value="Pendente">Pendente</option>
                 <option value="Em andamento">Em andamento</option>
@@ -303,6 +292,7 @@ export default function JobDetail() {
         </CardContent>
       </Card>
 
+      {/* Conteúdo Interativo (Escondido no PDF) */}
       <div className="print:hidden">
         <Tabs defaultValue="photos" className="w-full">
           <TabsList className="grid w-full grid-cols-4 mb-6 rounded-xl p-1 bg-slate-200/50">
@@ -321,7 +311,7 @@ export default function JobDetail() {
               <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
                 {beforePhotos.map(photo => (
                   <div key={photo.id} className="relative group aspect-square rounded-xl overflow-hidden border border-slate-100 bg-slate-50">
-                    <img src={photo.photo_url} className="w-full h-full object-cover cursor-zoom-in" onClick={() => openImageModal(photo.photo_url)} />
+                    <img src={photo.photo_url} className="w-full h-full object-cover cursor-zoom-in" onClick={() => { setSelectedImageUrl(photo.photo_url); setIsImageModalOpen(true); }} />
                   </div>
                 ))}
                 <div onClick={() => !isOffline && fileInputBeforeRef.current?.click()} className={`aspect-square border-2 border-dashed rounded-xl flex flex-col items-center justify-center cursor-pointer hover:bg-slate-50 ${isOffline ? 'opacity-50 cursor-not-allowed' : ''}`}>
@@ -340,7 +330,7 @@ export default function JobDetail() {
               <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
                 {afterPhotos.map(photo => (
                   <div key={photo.id} className="relative group aspect-square rounded-xl overflow-hidden border border-slate-100 bg-slate-50">
-                    <img src={photo.photo_url} className="w-full h-full object-cover cursor-zoom-in" onClick={() => openImageModal(photo.photo_url)} />
+                    <img src={photo.photo_url} className="w-full h-full object-cover cursor-zoom-in" onClick={() => { setSelectedImageUrl(photo.photo_url); setIsImageModalOpen(true); }} />
                   </div>
                 ))}
                 <div onClick={() => !isOffline && fileInputAfterRef.current?.click()} className={`aspect-square border-2 border-dashed rounded-xl flex flex-col items-center justify-center cursor-pointer hover:bg-slate-50 ${isOffline ? 'opacity-50 cursor-not-allowed' : ''}`}>
@@ -419,31 +409,58 @@ export default function JobDetail() {
         </Tabs>
       </div>
 
-      {/* Seção de Fotos para o PDF (Sempre visível na impressão) */}
-      <div className="hidden print:block mt-8">
-        <h3 className="text-xl font-bold border-b-2 pb-2 mb-4">Relatório Fotográfico</h3>
-        <div className="grid grid-cols-2 gap-4">
-          {photos?.map(photo => (
-            <div key={photo.id} className="border p-2 rounded">
-              <img src={photo.photo_url} className="w-full h-64 object-cover rounded mb-2" />
-              <p className="text-xs font-bold uppercase text-slate-500">{photo.photo_type === 'before' ? 'Antes' : 'Depois'}</p>
+      {/* Relatório Fotográfico PDF (Apenas Impressão) */}
+      <div className="hidden print:block">
+        <div className="space-y-10">
+          {/* Seção Antes */}
+          <div>
+            <h3 className="text-lg font-black text-slate-800 border-l-4 border-blue-600 pl-3 mb-4 uppercase tracking-tight">1. Antes da Instalação</h3>
+            <div className="grid grid-cols-2 gap-4">
+              {beforePhotos.map(photo => (
+                <div key={photo.id} className="border border-slate-200 rounded-xl overflow-hidden">
+                  <img src={photo.photo_url} className="w-full h-64 object-cover" />
+                </div>
+              ))}
             </div>
-          ))}
-        </div>
-        
-        {job.notes && (
-          <div className="mt-8 border p-4 rounded">
-            <h4 className="font-bold mb-2">Relatório:</h4>
-            <p className="text-sm">{job.notes}</p>
           </div>
-        )}
 
-        {job.signature_url && (
-          <div className="mt-12 flex flex-col items-center border-t pt-4">
-            <img src={job.signature_url} className="h-24 object-contain" />
-            <p className="text-xs font-bold">Assinatura do Cliente</p>
+          {/* Seção Depois */}
+          <div className="break-before-page">
+            <h3 className="text-lg font-black text-slate-800 border-l-4 border-emerald-500 pl-3 mb-4 uppercase tracking-tight">2. Depois da Instalação</h3>
+            <div className="grid grid-cols-2 gap-4">
+              {afterPhotos.map(photo => (
+                <div key={photo.id} className="border border-slate-200 rounded-xl overflow-hidden">
+                  <img src={photo.photo_url} className="w-full h-64 object-cover" />
+                </div>
+              ))}
+            </div>
           </div>
-        )}
+
+          {/* Relatório e Divergências */}
+          <div className="grid grid-cols-1 gap-6 break-inside-avoid">
+            {job.notes && (
+              <div className="bg-slate-50 p-4 rounded-xl border border-slate-200">
+                <h4 className="text-sm font-bold text-slate-500 uppercase mb-2">Relatório Técnico:</h4>
+                <p className="text-sm text-slate-700 whitespace-pre-wrap">{job.notes}</p>
+              </div>
+            )}
+            {job.issues && (
+              <div className="bg-rose-50 p-4 rounded-xl border border-rose-200">
+                <h4 className="text-sm font-bold text-rose-800 uppercase mb-2">Divergências / Observações:</h4>
+                <p className="text-sm text-rose-900 whitespace-pre-wrap">{job.issues}</p>
+              </div>
+            )}
+          </div>
+
+          {/* Assinatura Final */}
+          {job.signature_url && (
+            <div className="mt-12 flex flex-col items-center border-t-2 border-slate-100 pt-8 break-inside-avoid">
+              <img src={job.signature_url} className="h-32 object-contain mb-2" />
+              <div className="w-64 h-px bg-slate-300 mb-2" />
+              <p className="text-xs font-black text-slate-500 uppercase tracking-widest">Assinatura do Cliente / Responsável</p>
+            </div>
+          )}
+        </div>
       </div>
 
       <ImageModal isOpen={isImageModalOpen} onClose={() => setIsImageModalOpen(false)} imageUrl={selectedImageUrl} />
