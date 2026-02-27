@@ -30,6 +30,7 @@ export default function JobDetail() {
   const [isImageModalOpen, setIsImageModalOpen] = useState(false);
   const [selectedImageUrl, setSelectedImageUrl] = useState("");
   const [isOffline, setIsOffline] = useState(!navigator.onLine);
+  const [signerName, setSignerName] = useState("");
 
   // Estados para edição de tempo (Admin)
   const [isEditingTimes, setIsEditingTimes] = useState(false);
@@ -175,7 +176,9 @@ export default function JobDetail() {
 
   const saveSignature = async () => {
     if (isOffline) return showError("Assinatura requer internet.");
+    if (!signerName.trim()) return showError("Informe o nome do responsável.");
     if (sigCanvas.current?.isEmpty()) return showError("Assine primeiro.");
+    
     setIsSavingSignature(true);
     try {
       const signatureDataUrl = sigCanvas.current?.getCanvas().toDataURL('image/png');
@@ -186,6 +189,7 @@ export default function JobDetail() {
       
       updateJobMutation.mutate({ 
         signature_url: publicUrl,
+        notes: job.notes ? `${job.notes}\n\nAssinado por: ${signerName}` : `Assinado por: ${signerName}`,
         status: 'Concluído',
         finished_at: new Date().toISOString()
       });
@@ -264,8 +268,10 @@ export default function JobDetail() {
     <div className="space-y-6 pb-10 print:pb-0 print:space-y-0 print:bg-white">
       {isOffline && (
         <div className="bg-amber-50 border border-amber-200 p-3 rounded-xl flex items-center gap-3 text-amber-800 animate-pulse print:hidden">
-          <WifiOff size={20} />
-          <p className="text-sm font-bold">Modo Offline Ativo.</p>
+          <div className="flex items-center gap-3">
+            <WifiOff size={20} />
+            <p className="text-sm font-bold">Modo Offline Ativo.</p>
+          </div>
         </div>
       )}
 
@@ -541,6 +547,15 @@ export default function JobDetail() {
                   </div>
                 ) : (
                   <div className="space-y-6">
+                    <div className="space-y-2">
+                      <label className="text-sm font-bold text-slate-600">Nome do Responsável / Recebedor</label>
+                      <Input 
+                        placeholder="Digite o nome completo" 
+                        value={signerName}
+                        onChange={(e) => setSignerName(e.target.value)}
+                        className="h-12 rounded-xl border-slate-200"
+                      />
+                    </div>
                     <div className="border-2 border-dashed border-slate-200 rounded-2xl bg-slate-50 overflow-hidden">
                       <SignatureCanvas ref={sigCanvas} penColor="black" canvasProps={{ className: "w-full h-64" }} />
                     </div>
