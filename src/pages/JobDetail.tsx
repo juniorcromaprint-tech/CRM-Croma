@@ -50,7 +50,7 @@ export default function JobDetail() {
       const { data, error } = await supabase
         .from('job_photos')
         .select('*')
-        .eq('id', id)
+        .eq('job_id', id)
         .order('created_at', { ascending: true });
       if (error) throw error;
       const initialDescriptions = {};
@@ -402,7 +402,13 @@ export default function JobDetail() {
                       <p className="text-[10px] text-slate-400 mt-1">Confirmado via sistema Cromaprint</p>
                     </div>
                   </div>
-                  <Button variant="outline" onClick={deleteSignature} className="text-red-600 print:hidden">Remover Assinatura</Button>
+                  <Button 
+                    variant="outline" 
+                    onClick={() => window.confirm("Remover assinatura?") && updateJobMutation.mutate({ signature_url: null })} 
+                    className="text-red-600 print:hidden"
+                  >
+                    Remover Assinatura
+                  </Button>
                 </div>
               ) : (
                 <div className="space-y-6">
