@@ -394,10 +394,10 @@ export default function JobDetail() {
               <h3 className="font-bold text-slate-800 flex items-center gap-2 text-lg"><Camera size={20} /> Antes da Instalação</h3>
               <span className="text-xs font-bold bg-slate-100 px-2 py-1 rounded">{beforePhotos.length} fotos</span>
             </div>
-            <div className="grid grid-cols-3 gap-4">
+            <div className="grid grid-cols-4 gap-3">
               {beforePhotos.map(photo => (
-                <div key={photo.id} className="aspect-square rounded-xl overflow-hidden border border-slate-100 bg-slate-50 p-1 break-inside-avoid">
-                  <img src={photo.photo_url} className="w-full h-full object-contain" />
+                <div key={photo.id} className="aspect-square rounded-xl overflow-hidden border border-slate-100 bg-slate-50 break-inside-avoid">
+                  <img src={photo.photo_url} className="w-full h-full object-cover" />
                 </div>
               ))}
             </div>
@@ -411,11 +411,11 @@ export default function JobDetail() {
               <h3 className="font-bold text-slate-800 flex items-center gap-2 text-lg"><CheckCircle2 size={20} className="text-emerald-500" /> Depois da Instalação</h3>
               <span className="text-xs font-bold bg-slate-100 px-2 py-1 rounded">{afterPhotos.length} fotos</span>
             </div>
-            <div className="grid grid-cols-3 gap-4">
+            <div className="grid grid-cols-4 gap-3">
               {afterPhotos.map(photo => (
                 <div key={photo.id} className="rounded-xl overflow-hidden border border-slate-100 bg-slate-50 flex flex-col break-inside-avoid">
-                  <div className="aspect-square p-1">
-                    <img src={photo.photo_url} className="w-full h-full object-contain" />
+                  <div className="aspect-square">
+                    <img src={photo.photo_url} className="w-full h-full object-cover" />
                   </div>
                   {photoDescriptions[photo.id] && (
                     <div className="p-2 bg-white border-t border-slate-100">
