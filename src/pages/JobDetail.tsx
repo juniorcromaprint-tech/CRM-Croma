@@ -208,9 +208,9 @@ export default function JobDetail() {
     if (!job) return;
     const formattedDate = new Date(job.scheduled_date).toLocaleDateString('pt-BR');
     const clientName = job.stores?.name || 'Não informado';
-    const address = job.stores?.address ? `\n*Endereço:* ${job.stores.address}` : '';
     
-    const text = `*Relatório de Instalação - Cromaprint*%0A*OS:* ${job.os_number}%0A*Cliente:* ${clientName}${address}%0A*Data:* ${formattedDate}%0A*Status:* ${job.status}%0A*Serviço:* ${job.type}`;
+    // Mensagem formatada indicando que o PDF será enviado em anexo
+    const text = `Olá! Segue em anexo o *Relatório de Instalação* da Cromaprint.%0A%0A*OS:* ${job.os_number}%0A*Cliente:* ${clientName}%0A*Data:* ${formattedDate}%0A*Serviço:* ${job.type}`;
     
     const url = `https://wa.me/?text=${text}`;
     window.open(url, '_blank');
