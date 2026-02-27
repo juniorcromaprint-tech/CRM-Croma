@@ -176,8 +176,8 @@ export default function JobDetail() {
 
   const saveSignature = async () => {
     if (isOffline) return showError("Assinatura requer internet.");
-    if (!signerName.trim()) return showError("Informe o nome do responsável.");
-    if (sigCanvas.current?.isEmpty()) return showError("Assine primeiro.");
+    if (!signerName.trim()) return showError("Informe o nome do responsável da loja.");
+    if (sigCanvas.current?.isEmpty()) return showError("A loja deve assinar o campo.");
     
     setIsSavingSignature(true);
     try {
@@ -187,14 +187,17 @@ export default function JobDetail() {
       await supabase.storage.from('job_photos').upload(fileName, blob);
       const { data: { publicUrl } } = supabase.storage.from('job_photos').getPublicUrl(fileName);
       
+      // Salva o nome do responsável nas notas para histórico
+      const signatureNote = `\n\n[ASSINATURA DIGITAL]\nResponsável pela Loja: ${signerName.toUpperCase()}\nData/Hora: ${new Date().toLocaleString('pt-BR')}`;
+      
       updateJobMutation.mutate({ 
         signature_url: publicUrl,
-        notes: job.notes ? `${job.notes}\n\nAssinado por: ${signerName}` : `Assinado por: ${signerName}`,
+        notes: job.notes ? `${job.notes}${signatureNote}` : signatureNote,
         status: 'Concluído',
         finished_at: new Date().toISOString()
       });
     } catch (error) {
-      showError("Erro assinatura.");
+      showError("Erro ao salvar assinatura.");
     } finally {
       setIsSavingSignature(false);
     }
@@ -263,6 +266,13 @@ export default function JobDetail() {
   const beforePhotos = photos?.filter(p => p.photo_type === 'before') || [];
   const afterPhotos = photos?.filter(p => p.photo_type === 'after') || [];
   const canInteract = job.status !== 'Pendente';
+
+  // Extrair nome do responsável das notas se já assinado
+  const extractSigner = () => {
+    if (!job.notes) return "";
+    const match = job.notes.match(/Responsável pela Loja: (.*)/);
+    return match ? match[1] : "";
+  };
 
   return (
     <div className="space-y-6 pb-10 print:pb-0 print:space-y-0 print:bg-white">
@@ -539,30 +549,37 @@ export default function JobDetail() {
 
             <TabsContent value="signature" className="space-y-6">
               <div className="bg-white p-6 rounded-2xl border shadow-sm">
-                <h3 className="font-bold text-slate-800 mb-6 flex items-center gap-2 text-lg border-b-2 border-slate-100 pb-2"><PenTool size={20} /> Assinatura de Recebimento</h3>
+                <h3 className="font-bold text-slate-800 mb-6 flex items-center gap-2 text-lg border-b-2 border-slate-100 pb-2"><PenTool size={20} /> Validação da Loja</h3>
                 {job.signature_url ? (
-                  <div className="flex flex-col items-center">
+                  <div className="flex flex-col items-center py-6">
                     <img src={job.signature_url} className="max-h-40 object-contain mb-4" />
-                    <p className="text-xs uppercase font-black text-slate-600">Assinatura do Cliente</p>
+                    <div className="text-center">
+                      <p className="text-xs uppercase font-black text-slate-400 tracking-widest">Assinado por:</p>
+                      <p className="text-lg font-bold text-slate-800 uppercase">{extractSigner()}</p>
+                    </div>
                   </div>
                 ) : (
                   <div className="space-y-6">
                     <div className="space-y-2">
-                      <label className="text-sm font-bold text-slate-600">Nome do Responsável / Recebedor</label>
+                      <label className="text-sm font-bold text-slate-600">Nome do Responsável (Gerente/Dono)</label>
                       <Input 
-                        placeholder="Digite o nome completo" 
+                        placeholder="Quem está acompanhando a instalação?" 
                         value={signerName}
                         onChange={(e) => setSignerName(e.target.value)}
-                        className="h-12 rounded-xl border-slate-200"
+                        className="h-12 rounded-xl border-slate-200 focus:ring-blue-500"
                       />
+                      <p className="text-[10px] text-slate-400 italic">* Obrigatório para identificar a rubrica abaixo.</p>
                     </div>
-                    <div className="border-2 border-dashed border-slate-200 rounded-2xl bg-slate-50 overflow-hidden">
-                      <SignatureCanvas ref={sigCanvas} penColor="black" canvasProps={{ className: "w-full h-64" }} />
+                    <div className="space-y-2">
+                      <label className="text-sm font-bold text-slate-600">Assinatura / Rubrica</label>
+                      <div className="border-2 border-dashed border-slate-200 rounded-2xl bg-slate-50 overflow-hidden">
+                        <SignatureCanvas ref={sigCanvas} penColor="black" canvasProps={{ className: "w-full h-64" }} />
+                      </div>
                     </div>
-                    <div className="flex justify-between">
-                      <Button variant="ghost" onClick={() => sigCanvas.current?.clear()}>Limpar</Button>
-                      <Button onClick={saveSignature} disabled={isSavingSignature || isOffline} className="bg-blue-600 text-white rounded-xl px-6">
-                        {isSavingSignature ? <Loader2 className="animate-spin mr-2" /> : null} Salvar e Finalizar
+                    <div className="flex justify-between items-center">
+                      <Button variant="ghost" onClick={() => sigCanvas.current?.clear()} className="text-slate-500">Limpar Campo</Button>
+                      <Button onClick={saveSignature} disabled={isSavingSignature || isOffline} className="bg-blue-600 hover:bg-blue-700 text-white rounded-xl px-8 h-12 font-bold shadow-lg shadow-blue-100">
+                        {isSavingSignature ? <Loader2 className="animate-spin mr-2" /> : null} Validar e Finalizar OS
                       </Button>
                     </div>
                   </div>
@@ -615,8 +632,11 @@ export default function JobDetail() {
           {job.signature_url && (
             <div className="mt-12 flex flex-col items-center border-t-2 border-slate-100 pt-8 break-inside-avoid">
               <img src={job.signature_url} className="h-32 object-contain mb-2" />
-              <div className="w-64 h-px bg-slate-300 mb-2" />
-              <p className="text-xs font-black text-slate-500 uppercase tracking-widest">Assinatura do Cliente / Responsável</p>
+              <div className="text-center">
+                <p className="text-sm font-black text-slate-800 uppercase">{extractSigner()}</p>
+                <div className="w-64 h-px bg-slate-300 my-1 mx-auto" />
+                <p className="text-[10px] font-bold text-slate-400 uppercase tracking-widest">Responsável pela Loja / Recebimento</p>
+              </div>
             </div>
           )}
         </div>
