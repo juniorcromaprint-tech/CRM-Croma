@@ -2,7 +2,7 @@
 
 import React, { useState, useRef } from "react";
 import { useParams, useNavigate } from "react-router-dom";
-import { ArrowLeft, Camera, Upload, FileText, AlertTriangle, CheckCircle2, Printer, MapPin, Calendar, Navigation, Loader2, Plus, Trash2, PenTool, User, MessageCircle, ExternalLink } from "lucide-react";
+import { ArrowLeft, Camera, Upload, FileText, AlertTriangle, CheckCircle2, Printer, MapPin, Calendar, Navigation, Loader2, Plus, Trash2, PenTool, User, MessageCircle, ExternalLink, Video, Play } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
@@ -21,7 +21,7 @@ export default function JobDetail() {
   const navigate = useNavigate();
   const queryClient = useQueryClient();
   const [isLocating, setIsLocating] = useState(false);
-  const [uploadingType, setUploadingType] = useState<'before' | 'after' | null>(null);
+  const [uploadingType, setUploadingType] = useState<'before' | 'after' | 'video' | null>(null);
   const [isSavingSignature, setIsSavingSignature] = useState(false);
   const [isImageModalOpen, setIsImageModalOpen] = useState(false);
   const [selectedImageUrl, setSelectedImageUrl] = useState("");
@@ -29,6 +29,7 @@ export default function JobDetail() {
 
   const fileInputBeforeRef = useRef<HTMLInputElement>(null);
   const fileInputAfterRef = useRef<HTMLInputElement>(null);
+  const fileInputVideoRef = useRef<HTMLInputElement>(null);
   const sigCanvas = useRef<SignatureCanvas>(null);
 
   const { data: job, isLoading } = useQuery({
@@ -60,6 +61,20 @@ export default function JobDetail() {
       });
       setPhotoDescriptions(initialDescriptions);
       return data;
+    },
+    enabled: !!id
+  });
+
+  const { data: videos } = useQuery({
+    queryKey: ['job-videos', id],
+    queryFn: async () => {
+      const { data, error } = await supabase
+        .from('job_videos')
+        .select('*')
+        .eq('job_id', id)
+        .order('created_at', { ascending: true });
+      if (error) throw error;
+      return data || [];
     },
     enabled: !!id
   });
@@ -106,6 +121,23 @@ export default function JobDetail() {
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['job-photos', id] });
       showSuccess("Foto removida com sucesso!");
+    }
+  });
+
+  const deleteVideoMutation = useMutation({
+    mutationFn: async (videoId: string) => {
+      const video = videos?.find(v => v.id === videoId);
+      if (video) {
+        const urlParts = video.video_url.split('/');
+        const fileName = urlParts[urlParts.length - 1];
+        await supabase.storage.from('job_videos').remove([fileName]);
+      }
+      const { error } = await supabase.from('job_videos').delete().eq('id', videoId);
+      if (error) throw error;
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['job-videos', id] });
+      showSuccess("Vídeo removido com sucesso!");
     }
   });
 
@@ -158,6 +190,42 @@ export default function JobDetail() {
     }
   };
 
+  const handleVideoUpload = async (event: React.ChangeEvent<HTMLInputElement>) => {
+    const file = event.target.files?.[0];
+    if (!file || !id) return;
+
+    // Limite de 15MB para vídeos
+    if (file.size > 15 * 1024 * 1024) {
+      showError("O vídeo deve ter no máximo 15MB.");
+      return;
+    }
+
+    setUploadingType('video');
+    try {
+      const fileExt = file.name.split('.').pop();
+      const fileName = `${id}-video-${Math.random()}.${fileExt}`;
+      
+      const { error: uploadError } = await supabase.storage.from('job_videos').upload(fileName, file);
+      if (uploadError) throw uploadError;
+
+      const { data: { publicUrl } } = supabase.storage.from('job_videos').getPublicUrl(fileName);
+      
+      const { error: dbError } = await supabase.from('job_videos').insert({ 
+        job_id: id, 
+        video_url: publicUrl 
+      });
+      if (dbError) throw dbError;
+
+      showSuccess("Vídeo enviado com sucesso!");
+      queryClient.invalidateQueries({ queryKey: ['job-videos', id] });
+    } catch (error) {
+      console.error(error);
+      showError("Erro ao enviar vídeo.");
+    } finally {
+      setUploadingType(null);
+    }
+  };
+
   const handleDescriptionChange = (photoId: string, description: string) => {
     setPhotoDescriptions(prev => ({ ...prev, [photoId]: description }));
     supabase.from('job_photos').update({ description }).eq('id', photoId).then(({ error }) => {
@@ -187,32 +255,22 @@ export default function JobDetail() {
     setIsImageModalOpen(true);
   };
 
-  // Função para imprimir com nome personalizado
   const handlePrint = () => {
     if (!job) return;
     const originalTitle = document.title;
     const formattedDate = new Date(job.scheduled_date).toLocaleDateString('pt-BR').replace(/\//g, '-');
     const clientName = job.stores?.name || 'Cliente';
     const clientCode = job.stores?.code ? ` - Cod ${job.stores.code}` : '';
-    
-    // Altera o título da página temporariamente para definir o nome do arquivo PDF
     document.title = `${clientName}${clientCode} - ${formattedDate} - OS ${job.os_number}`;
-    
     window.print();
-    
-    // Restaura o título original
     document.title = originalTitle;
   };
 
-  // Função para compartilhar no WhatsApp
   const handleWhatsAppShare = () => {
     if (!job) return;
     const formattedDate = new Date(job.scheduled_date).toLocaleDateString('pt-BR');
     const clientName = job.stores?.name || 'Não informado';
-    
-    // Mensagem formatada indicando que o PDF será enviado em anexo
     const text = `Olá! Segue em anexo o *Relatório de Instalação* da Cromaprint.%0A%0A*OS:* ${job.os_number}%0A*Cliente:* ${clientName}%0A*Data:* ${formattedDate}%0A*Serviço:* ${job.type}`;
-    
     const url = `https://wa.me/?text=${text}`;
     window.open(url, '_blank');
   };
@@ -339,8 +397,9 @@ export default function JobDetail() {
       {/* UI INTERATIVA (TABS) - ESCONDIDA NA IMPRESSÃO */}
       <div className="print:hidden">
         <Tabs defaultValue="photos" className="w-full">
-          <TabsList className="grid w-full grid-cols-3 mb-6 rounded-xl p-1 bg-slate-200/50">
+          <TabsList className="grid w-full grid-cols-4 mb-6 rounded-xl p-1 bg-slate-200/50">
             <TabsTrigger value="photos">Fotos</TabsTrigger>
+            <TabsTrigger value="videos">Vídeos</TabsTrigger>
             <TabsTrigger value="notes">Relatório</TabsTrigger>
             <TabsTrigger value="signature">Assinatura</TabsTrigger>
           </TabsList>
@@ -389,6 +448,58 @@ export default function JobDetail() {
                   <input type="file" accept="image/*" multiple className="hidden" ref={fileInputAfterRef} onChange={(e) => handleFileUpload(e, 'after')} />
                   {uploadingType === 'after' ? <Loader2 className="animate-spin" /> : <Plus />}
                   <span className="text-xs font-bold mt-1">Adicionar</span>
+                </div>
+              </div>
+            </div>
+          </TabsContent>
+
+          <TabsContent value="videos" className="space-y-6">
+            <div className="bg-white p-5 rounded-2xl border shadow-sm">
+              <div className="flex justify-between mb-4 border-b-2 border-slate-100 pb-2">
+                <h3 className="font-bold text-slate-800 flex items-center gap-2 text-lg"><Video size={20} className="text-blue-600" /> Vídeos do Local</h3>
+                <span className="text-xs font-bold bg-slate-100 px-2 py-1 rounded">{videos.length} vídeos</span>
+              </div>
+              
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                {videos.map(video => (
+                  <div key={video.id} className="relative rounded-xl overflow-hidden border border-slate-200 bg-black aspect-video group">
+                    <video src={video.video_url} controls className="w-full h-full" />
+                    <Button 
+                      variant="destructive" 
+                      size="icon" 
+                      className="absolute top-2 right-2 h-8 w-8 opacity-0 group-hover:opacity-100 transition-opacity z-10" 
+                      onClick={() => window.confirm("Excluir vídeo?") && deleteVideoMutation.mutate(video.id)}
+                    >
+                      <Trash2 size={16} />
+                    </Button>
+                  </div>
+                ))}
+                
+                <div 
+                  onClick={() => fileInputVideoRef.current?.click()} 
+                  className="aspect-video border-2 border-dashed rounded-xl flex flex-col items-center justify-center cursor-pointer hover:bg-slate-50 transition-colors"
+                >
+                  <input 
+                    type="file" 
+                    accept="video/*" 
+                    className="hidden" 
+                    ref={fileInputVideoRef} 
+                    onChange={handleVideoUpload} 
+                  />
+                  {uploadingType === 'video' ? (
+                    <div className="flex flex-col items-center">
+                      <Loader2 className="animate-spin text-blue-600 mb-2" />
+                      <span className="text-xs font-bold text-slate-500">Enviando vídeo...</span>
+                    </div>
+                  ) : (
+                    <>
+                      <div className="w-12 h-12 bg-blue-50 text-blue-600 rounded-full flex items-center justify-center mb-2">
+                        <Plus size={24} />
+                      </div>
+                      <span className="text-sm font-bold text-slate-700">Adicionar Vídeo</span>
+                      <span className="text-[10px] text-slate-400 mt-1">Máximo 15MB</span>
+                    </>
+                  )}
                 </div>
               </div>
             </div>
