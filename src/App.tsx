@@ -8,7 +8,7 @@ import Layout from "./components/Layout";
 import Index from "./pages/Index";
 import Login from "./pages/Login";
 import Jobs from "./pages/Jobs";
-import JobDetails from "./pages/JobDetails";
+import JobDetail from "./pages/JobDetail";
 import Clients from "./pages/Clients";
 import Settings from "./pages/Settings";
 import Map from "./pages/Map";
@@ -19,9 +19,9 @@ import Team from "./pages/Team";
 const queryClient = new QueryClient();
 
 const ProtectedRoute = ({ children }: { children: React.ReactNode }) => {
-  const { session, loading } = useAuth();
+  const { session, isLoading } = useAuth();
   
-  if (loading) return null;
+  if (isLoading) return null;
   if (!session) return <Navigate to="/login" />;
   
   return <>{children}</>;
@@ -46,7 +46,7 @@ const App = () => (
             >
               <Route index element={<Index />} />
               <Route path="jobs" element={<Jobs />} />
-              <Route path="jobs/:id" element={<JobDetails />} />
+              <Route path="jobs/:id" element={<JobDetail />} />
               <Route path="clients" element={<Clients />} />
               <Route path="settings" element={<Settings />} />
               <Route path="map" element={<Map />} />
