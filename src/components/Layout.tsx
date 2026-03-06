@@ -1,6 +1,6 @@
 import React from "react";
 import { Link, useLocation, Outlet } from "react-router-dom";
-import { Home, ClipboardList, Users, Settings as SettingsIcon, Menu, ShieldCheck, Map as MapIcon, BarChart3 } from "lucide-react";
+import { Home, ClipboardList, Users, Settings as SettingsIcon, Menu, ShieldCheck, Map as MapIcon, BarChart3, FileText } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Sheet, SheetContent, SheetTrigger } from "@/components/ui/sheet";
 import { useAuth } from "@/contexts/AuthContext";
@@ -41,6 +41,7 @@ export default function Layout() {
 
   if (profile?.role === 'admin') {
     navItems.push({ name: "Relatórios", path: "/analytics", icon: BarChart3 });
+    navItems.push({ name: "Faturamento", path: "/billing-report", icon: FileText });
     navItems.push({ name: "Equipe", path: "/team", icon: ShieldCheck });
   }
 

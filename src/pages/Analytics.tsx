@@ -1,275 +1,138 @@
 "use client";
 
-import React, { useMemo } from "react";
+import React from "react";
 import { useQuery } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
+import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { 
-  BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, 
-  PieChart, Pie, Cell, LineChart, Line, Legend 
-} from "recharts";
-import { 
-  TrendingUp, Clock, AlertTriangle, CheckCircle2, 
-  Calendar, Filter, Download, Loader2, BarChart3 
+  BarChart3, 
+  CheckCircle2, 
+  Clock, 
+  TrendingUp, 
+  Calendar,
+  FileText,
+  MapPin,
+  Truck
 } from "lucide-react";
-import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
-import { useAuth } from "@/contexts/AuthContext";
-
-const COLORS = ['#2563eb', '#7c3aed', '#db2777', '#ea580c', '#16a34a', '#ca8a04'];
+import { useNavigate } from "react-router-dom";
 
 export default function Analytics() {
-  const { profile } = useAuth();
+  const navigate = useNavigate();
 
-  const { data: jobs, isLoading } = useQuery({
-    queryKey: ['analytics-jobs'],
+  const { data: stats, isLoading } = useQuery({
+    queryKey: ['analytics-stats'],
     queryFn: async () => {
-      const { data, error } = await supabase
+      const { data: jobs, error } = await supabase
         .from('jobs')
-        .select('*, profiles!jobs_assigned_to_fkey(first_name, last_name)');
+        .select('status, created_at, finished_at, started_at');
+      
       if (error) throw error;
-      return data || [];
+
+      const total = jobs.length;
+      const completed = jobs.filter(j => j.status === 'Concluído').length;
+      const pending = jobs.filter(j => j.status === 'Pendente').length;
+      
+      // Cálculo de deslocamento médio (exemplo simplificado)
+      const travelTimes = jobs
+        .filter(j => j.started_at && j.finished_at)
+        .map(j => {
+          const start = new Date(j.started_at!).getTime();
+          const end = new Date(j.finished_at!).getTime();
+          return (end - start) / (1000 * 60); // minutos
+        });
+      
+      const avgTravel = travelTimes.length > 0 
+        ? Math.round(travelTimes.reduce((a, b) => a + b, 0) / travelTimes.length) 
+        : 0;
+
+      return { total, completed, pending, avgTravel };
     }
   });
 
-  const stats = useMemo(() => {
-    if (!jobs) return null;
-
-    const completed = jobs.filter(j => j.status === 'Concluído');
-    const withIssues = jobs.filter(j => j.issues && j.issues.length > 0);
-    
-    // Tempo Médio (em minutos)
-    const durations = completed
-      .filter(j => j.started_at && j.finished_at)
-      .map(j => {
-        const start = new Date(j.started_at).getTime();
-        const end = new Date(j.finished_at).getTime();
-        return (end - start) / 60000;
-      });
-    
-    const avgTime = durations.length > 0
-      ? Math.round(durations.reduce((a, b) => a + b, 0) / durations.length)
-      : 0;
-
-    // Cálculo de Tempo de Deslocamento (Média entre o fim de uma OS e o início da próxima do mesmo instalador no mesmo dia)
-    const travelTimes: number[] = [];
-    const jobsByInstaller: any = {};
-
-    jobs.filter(j => j.assigned_to && j.finished_at && j.started_at).forEach(j => {
-      if (!jobsByInstaller[j.assigned_to]) jobsByInstaller[j.assigned_to] = [];
-      jobsByInstaller[j.assigned_to].push(j);
-    });
-
-    Object.values(jobsByInstaller).forEach((installerJobs: any) => {
-      const sorted = installerJobs.sort((a: any, b: any) => new Date(a.finished_at).getTime() - new Date(b.finished_at).getTime());
-      for (let i = 0; i < sorted.length - 1; i++) {
-        const endCurrent = new Date(sorted[i].finished_at).getTime();
-        const startNext = new Date(sorted[i+1].started_at).getTime();
-        const diff = (startNext - endCurrent) / 60000;
-        if (diff > 0 && diff < 240) { // Apenas se for no mesmo dia (max 4h)
-          travelTimes.push(diff);
-        }
-      }
-    });
-
-    const avgTravelTime = travelTimes.length > 0
-      ? Math.round(travelTimes.reduce((a, b) => a + b, 0) / travelTimes.length)
-      : 0;
-
-    // Dados para Gráfico de Pizza (Tipos)
-    const typesMap = jobs.reduce((acc: any, job) => {
-      acc[job.type] = (acc[job.type] || 0) + 1;
-      return acc;
-    }, {});
-    const pieData = Object.keys(typesMap).map(name => ({ name, value: typesMap[name] }));
-
-    // Dados para Gráfico de Linha (Evolução Diária - últimos 15 dias)
-    const last15Days = Array.from({ length: 15 }, (_, i) => {
-      const d = new Date();
-      d.setDate(d.getDate() - i);
-      return d.toISOString().split('T')[0];
-    }).reverse();
-
-    const lineData = last15Days.map(date => ({
-      date: new Date(date).toLocaleDateString('pt-BR', { day: '2-digit', month: '2-digit' }),
-      total: jobs.filter(j => j.created_at.startsWith(date)).length,
-      concluidas: jobs.filter(j => j.status === 'Concluído' && j.finished_at?.startsWith(date)).length
-    }));
-
-    // Ranking de Instaladores
-    const installerMap = completed.reduce((acc: any, job) => {
-      const name = job.profiles ? `${job.profiles.first_name}` : 'N/A';
-      acc[name] = (acc[name] || 0) + 1;
-      return acc;
-    }, {});
-    const barData = Object.keys(installerMap)
-      .map(name => ({ name, total: installerMap[name] }))
-      .sort((a, b) => b.total - a.total)
-      .slice(0, 5);
-
-    return {
-      total: jobs.length,
-      completedCount: completed.length,
-      issueRate: Math.round((withIssues.length / jobs.length) * 100) || 0,
-      avgTime,
-      pieData,
-      lineData,
-      barData
-    };
-  }, [jobs]);
-
-  if (profile?.role !== 'admin') {
-    return <div className="p-10 text-center">Acesso restrito a administradores.</div>;
-  }
-
-  if (isLoading) return (
-    <div className="flex flex-col items-center justify-center py-20">
-      <Loader2 className="animate-spin text-blue-600 mb-4" size={40} />
-      <p className="text-slate-500">Gerando relatórios...</p>
-    </div>
-  );
-
   return (
-    <div className="space-y-6 animate-in fade-in duration-500 pb-10">
-      <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
+    <div className="space-y-6">
+      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
         <div>
-          <h1 className="text-2xl md:text-3xl font-bold text-slate-800">Relatórios & Análises</h1>
-          <p className="text-slate-500 mt-1">Métricas de desempenho da equipe e volume de serviços.</p>
+          <h1 className="text-3xl font-black text-slate-800 tracking-tight">Relatórios</h1>
+          <p className="text-slate-500">Visão geral de produtividade e desempenho.</p>
         </div>
-        <Button variant="outline" className="rounded-xl border-slate-200">
-          <Download size={18} className="mr-2" /> Exportar Dados
+        <Button 
+          onClick={() => navigate('/billing-report')}
+          className="bg-slate-900 text-white shadow-lg hover:bg-slate-800"
+        >
+          <FileText size={18} className="mr-2" /> Relatório de Faturamento
         </Button>
       </div>
 
-      {/* KPI Cards */}
-      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
-        <Card className="border-none shadow-sm bg-white">
-          <CardContent className="p-6 flex items-center gap-4">
-            <div className="w-12 h-12 rounded-2xl bg-blue-50 text-blue-600 flex items-center justify-center">
-              <TrendingUp size={24} />
-            </div>
-            <div>
-              <p className="text-xs font-bold text-slate-500 uppercase">Total de OSs</p>
-              <h3 className="text-2xl font-black text-slate-800">{stats?.total}</h3>
-            </div>
-          </CardContent>
-        </Card>
-
-        <Card className="border-none shadow-sm bg-white">
-          <CardContent className="p-6 flex items-center gap-4">
-            <div className="w-12 h-12 rounded-2xl bg-emerald-50 text-emerald-600 flex items-center justify-center">
-              <CheckCircle2 size={24} />
-            </div>
-            <div>
-              <p className="text-xs font-bold text-slate-500 uppercase">Concluídas</p>
-              <h3 className="text-2xl font-black text-slate-800">{stats?.completedCount}</h3>
+      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
+        <Card className="border-none shadow-sm bg-blue-600 text-white">
+          <CardContent className="p-6">
+            <div className="flex justify-between items-start">
+              <div>
+                <p className="text-blue-100 text-xs font-bold uppercase tracking-wider">Total de OS</p>
+                <h3 className="text-3xl font-black mt-1">{stats?.total || 0}</h3>
+              </div>
+              <div className="bg-blue-500/30 p-2 rounded-lg">
+                <BarChart3 size={20} />
+              </div>
             </div>
           </CardContent>
         </Card>
 
         <Card className="border-none shadow-sm bg-white">
-          <CardContent className="p-6 flex items-center gap-4">
-            <div className="w-12 h-12 rounded-2xl bg-amber-50 text-amber-600 flex items-center justify-center">
-              <Clock size={24} />
-            </div>
-            <div>
-              <p className="text-xs font-bold text-slate-500 uppercase">Tempo Médio</p>
-              <h3 className="text-2xl font-black text-slate-800">{stats?.avgTime} min</h3>
+          <CardContent className="p-6">
+            <div className="flex justify-between items-start">
+              <div>
+                <p className="text-slate-500 text-xs font-bold uppercase tracking-wider">Concluídas</p>
+                <h3 className="text-3xl font-black mt-1 text-emerald-600">{stats?.completed || 0}</h3>
+              </div>
+              <div className="bg-emerald-50 p-2 rounded-lg text-emerald-600">
+                <CheckCircle2 size={20} />
+              </div>
             </div>
           </CardContent>
         </Card>
 
         <Card className="border-none shadow-sm bg-white">
-          <CardContent className="p-6 flex items-center gap-4">
-            <div className="w-12 h-12 rounded-2xl bg-cyan-50 text-cyan-600 flex items-center justify-center">
-              <MapPin size={24} />
+          <CardContent className="p-6">
+            <div className="flex justify-between items-start">
+              <div>
+                <p className="text-slate-500 text-xs font-bold uppercase tracking-wider">Pendentes</p>
+                <h3 className="text-3xl font-black mt-1 text-amber-500">{stats?.pending || 0}</h3>
+              </div>
+              <div className="bg-amber-50 p-2 rounded-lg text-amber-500">
+                <Clock size={20} />
+              </div>
             </div>
-            <div>
-              <p className="text-xs font-bold text-slate-500 uppercase">Deslocamento Médio</p>
-              <h3 className="text-2xl font-black text-slate-800">{stats?.avgTravelTime} min</h3>
+          </CardContent>
+        </Card>
+
+        <Card className="border-none shadow-sm bg-white">
+          <CardContent className="p-6">
+            <div className="flex justify-between items-start">
+              <div>
+                <p className="text-slate-500 text-xs font-bold uppercase tracking-wider">Tempo Médio</p>
+                <h3 className="text-3xl font-black mt-1 text-blue-600">{stats?.avgTravel || 0} min</h3>
+              </div>
+              <div className="bg-blue-50 p-2 rounded-lg text-blue-600">
+                <Truck size={20} />
+              </div>
             </div>
           </CardContent>
         </Card>
       </div>
 
-      <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-        {/* Gráfico de Evolução */}
-        <Card className="border-none shadow-sm bg-white">
-          <CardHeader>
-            <CardTitle className="text-lg font-bold flex items-center gap-2">
-              <BarChart3 size={20} className="text-blue-600" /> Evolução Diária
-            </CardTitle>
-            <CardDescription>Volume de OSs criadas vs concluídas nos últimos 15 dias.</CardDescription>
-          </CardHeader>
-          <CardContent className="h-[300px] w-full">
-            <ResponsiveContainer width="100%" height="100%">
-              <LineChart data={stats?.lineData}>
-                <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#f1f5f9" />
-                <XAxis dataKey="date" axisLine={false} tickLine={false} tick={{fontSize: 12, fill: '#64748b'}} />
-                <YAxis axisLine={false} tickLine={false} tick={{fontSize: 12, fill: '#64748b'}} />
-                <Tooltip 
-                  contentStyle={{ borderRadius: '12px', border: 'none', boxShadow: '0 10px 15px -3px rgb(0 0 0 / 0.1)' }}
-                />
-                <Legend />
-                <Line type="monotone" dataKey="total" name="Criadas" stroke="#94a3b8" strokeWidth={2} dot={false} />
-                <Line type="monotone" dataKey="concluidas" name="Concluídas" stroke="#2563eb" strokeWidth={3} dot={{ r: 4, fill: '#2563eb' }} />
-              </LineChart>
-            </ResponsiveContainer>
-          </CardContent>
-        </Card>
-
-        {/* Gráfico de Tipos de Serviço */}
-        <Card className="border-none shadow-sm bg-white">
-          <CardHeader>
-            <CardTitle className="text-lg font-bold">Distribuição por Tipo</CardTitle>
-            <CardDescription>Quais serviços são mais solicitados.</CardDescription>
-          </CardHeader>
-          <CardContent className="h-[300px] w-full">
-            <ResponsiveContainer width="100%" height="100%">
-              <PieChart>
-                <Pie
-                  data={stats?.pieData}
-                  cx="50%"
-                  cy="50%"
-                  innerRadius={60}
-                  outerRadius={80}
-                  paddingAngle={5}
-                  dataKey="value"
-                >
-                  {stats?.pieData.map((entry, index) => (
-                    <Cell key={`cell-${index}`} fill={COLORS[index % COLORS.length]} />
-                  ))}
-                </Pie>
-                <Tooltip 
-                  contentStyle={{ borderRadius: '12px', border: 'none', boxShadow: '0 10px 15px -3px rgb(0 0 0 / 0.1)' }}
-                />
-                <Legend />
-              </PieChart>
-            </ResponsiveContainer>
-          </CardContent>
-        </Card>
-
-        {/* Ranking de Instaladores */}
-        <Card className="border-none shadow-sm bg-white lg:col-span-2">
-          <CardHeader>
-            <CardTitle className="text-lg font-bold">Top 5 Instaladores</CardTitle>
-            <CardDescription>Membros da equipe com maior número de conclusões.</CardDescription>
-          </CardHeader>
-          <CardContent className="h-[300px] w-full">
-            <ResponsiveContainer width="100%" height="100%">
-              <BarChart data={stats?.barData} layout="vertical">
-                <CartesianGrid strokeDasharray="3 3" horizontal={false} stroke="#f1f5f9" />
-                <XAxis type="number" hide />
-                <YAxis dataKey="name" type="category" axisLine={false} tickLine={false} width={100} tick={{fontSize: 12, fontWeight: 'bold'}} />
-                <Tooltip 
-                  cursor={{fill: '#f8fafc'}}
-                  contentStyle={{ borderRadius: '12px', border: 'none', boxShadow: '0 10px 15px -3px rgb(0 0 0 / 0.1)' }}
-                />
-                <Bar dataKey="total" name="OSs Concluídas" fill="#2563eb" radius={[0, 8, 8, 0]} barSize={30} />
-              </BarChart>
-            </ResponsiveContainer>
-          </CardContent>
-        </Card>
-      </div>
+      <Card className="border-none shadow-sm bg-white">
+        <CardHeader>
+          <CardTitle className="text-lg font-bold flex items-center gap-2">
+            <TrendingUp size={20} className="text-blue-600" /> Desempenho Mensal
+          </CardTitle>
+        </CardHeader>
+        <CardContent className="h-[300px] flex items-center justify-center text-slate-400 italic">
+          Gráfico de evolução de instalações (Em breve)
+        </CardContent>
+      </Card>
     </div>
   );
 }
