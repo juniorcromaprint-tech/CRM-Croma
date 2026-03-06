@@ -115,6 +115,21 @@ export default function Settings() {
     setShowPasswordForm(false);
   };
 
+  // Busca logs de auditoria (apenas para admins)
+  const { data: auditLogs, isLoading: isLoadingLogs } = useQuery({
+    queryKey: ['audit-logs'],
+    queryFn: async () => {
+      const { data, error } = await supabase
+        .from('audit_logs')
+        .select('*, profiles:user_id(first_name, last_name)')
+        .order('created_at', { ascending: false })
+        .limit(50);
+      if (error) throw error;
+      return data;
+    },
+    enabled: profile?.role === 'admin'
+  });
+
   // Busca todas as lojas que AINDA NÃO TÊM coordenadas
   const { data: pendingStores, isLoading: isLoadingPending } = useQuery({
     queryKey: ['pending-sync-stores'],
@@ -630,6 +645,47 @@ export default function Settings() {
 
             </CardContent>
           </Card>
+
+          {profile?.role === 'admin' && (
+            <Card className="border-none shadow-sm rounded-2xl bg-white overflow-hidden mt-6">
+              <CardHeader className="border-b border-slate-100 pb-4 bg-slate-50/50">
+                <CardTitle className="text-lg flex items-center gap-2 text-slate-800">
+                  <Shield size={20} className="text-blue-600" /> Logs de Auditoria
+                </CardTitle>
+                <CardDescription>Histórico de ações críticas realizadas no sistema.</CardDescription>
+              </CardHeader>
+              <CardContent className="p-0">
+                {isLoadingLogs ? (
+                  <div className="p-8 text-center text-slate-500"><Loader2 className="animate-spin mx-auto mb-2" /> Carregando logs...</div>
+                ) : auditLogs?.length === 0 ? (
+                  <div className="p-8 text-center text-slate-500 italic">Nenhum log registrado ainda.</div>
+                ) : (
+                  <div className="divide-y divide-slate-100 max-h-[400px] overflow-y-auto">
+                    {auditLogs?.map((log) => (
+                      <div key={log.id} className="p-4 hover:bg-slate-50 transition-colors">
+                        <div className="flex justify-between items-start mb-1">
+                          <span className="text-xs font-bold text-blue-600 bg-blue-50 px-2 py-0.5 rounded uppercase">
+                            {log.action.replace('_', ' ')}
+                          </span>
+                          <span className="text-[10px] text-slate-400 font-medium">
+                            {new Date(log.created_at).toLocaleString('pt-BR')}
+                          </span>
+                        </div>
+                        <p className="text-sm text-slate-700">
+                          <span className="font-bold">{log.profiles?.first_name || 'Sistema'}</span> alterou dados na OS/Loja <span className="font-mono text-xs bg-slate-100 px-1 rounded">{log.target_id.substring(0,8)}</span>
+                        </p>
+                        {log.new_value?.status && (
+                          <p className="text-[10px] text-slate-500 mt-1">
+                            Status alterado para: <span className="font-bold text-slate-700">{log.new_value.status}</span>
+                          </p>
+                        )}
+                      </div>
+                    ))}
+                  </div>
+                )}
+              </CardContent>
+            </Card>
+          )}
         </TabsContent>
 
       </Tabs>
