@@ -1,5 +1,3 @@
-"use client";
-
 import React, { useState, useEffect } from "react";
 import { Save, Loader2, ClipboardList, Calendar, Store, FileText, Hash, User, Check, ChevronsUpDown, Search } from "lucide-react";
 import { Button } from "@/components/ui/button";
@@ -18,6 +16,17 @@ interface JobFormSheetProps {
   jobToEdit?: any | null;
   initialStoreId?: string;
 }
+
+const SERVICE_TYPES = [
+  'Instalação de Adesivo',
+  'Troca de Adesivo',
+  'Manutenção de Adesivo',
+  'Instalação de Fachada',
+  'Instalação de Banner',
+  'Instalação de Placa',
+  'Retirada de Material',
+  'Vistoria Técnica',
+];
 
 export default function JobFormSheet({ isOpen, onClose, jobToEdit, initialStoreId }: JobFormSheetProps) {
   const queryClient = useQueryClient();
@@ -250,14 +259,36 @@ export default function JobFormSheet({ isOpen, onClose, jobToEdit, initialStoreI
             <div className="grid grid-cols-2 gap-3">
               <div>
                 <label className="text-xs font-bold text-slate-500 mb-1 block">Tipo de Serviço *</label>
-                <Input
-                  name="type"
-                  value={formData.type}
-                  onChange={handleChange}
-                  placeholder="Ex: Instalação de Fachada"
-                  className="h-11 rounded-xl bg-slate-50 border-slate-200"
-                  required
-                />
+                <div className="relative">
+                  <select
+                    value={SERVICE_TYPES.includes(formData.type) ? formData.type : (formData.type ? '__custom__' : '')}
+                    onChange={(e) => {
+                      if (e.target.value === '__custom__') {
+                        setFormData(prev => ({ ...prev, type: '' }));
+                      } else {
+                        setFormData(prev => ({ ...prev, type: e.target.value }));
+                      }
+                    }}
+                    className="w-full h-11 pl-3 pr-10 rounded-xl border border-slate-200 bg-slate-50 shadow-sm text-sm focus:ring-2 focus:ring-blue-600 focus:border-transparent appearance-none outline-none text-slate-700"
+                    required={SERVICE_TYPES.includes(formData.type)}
+                  >
+                    <option value="">Selecione o tipo...</option>
+                    {SERVICE_TYPES.map(t => <option key={t} value={t}>{t}</option>)}
+                    <option value="__custom__">Outro (digitar)</option>
+                  </select>
+                  <div className="absolute right-3 top-1/2 -translate-y-1/2 pointer-events-none text-slate-400">
+                    <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="m6 9 6 6 6-6"/></svg>
+                  </div>
+                </div>
+                {!SERVICE_TYPES.includes(formData.type) && (
+                  <Input
+                    value={formData.type}
+                    onChange={(e) => setFormData(prev => ({ ...prev, type: e.target.value }))}
+                    placeholder="Descreva o tipo de serviço..."
+                    className="mt-2 h-11 rounded-xl bg-slate-50 border-slate-200"
+                    required
+                  />
+                )}
               </div>
               <div>
                 <label className="text-xs font-bold text-slate-500 mb-1 block">Status</label>

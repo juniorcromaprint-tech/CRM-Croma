@@ -1,10 +1,8 @@
-"use client";
-
 import React, { useState, useMemo, useEffect } from "react";
-import { 
-  User, Bell, Building, LogOut, Shield, 
+import {
+  User, Bell, Building, LogOut, Shield,
   Smartphone, Image as ImageIcon, Save, ChevronRight, ShieldCheck,
-  Wrench, MapPin, Play, Loader2, AlertTriangle, Filter
+  Wrench, MapPin, Play, Loader2, AlertTriangle, Filter, Eye, EyeOff, KeyRound
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
@@ -20,8 +18,12 @@ export default function Settings() {
   const queryClient = useQueryClient();
   const [isSaving, setIsSaving] = useState(false);
 
-  const [notifications, setNotifications] = useState(true);
-  const [compressPhotos, setCompressPhotos] = useState(true);
+  const [notifications, setNotifications] = useState(() => localStorage.getItem('pref_notifications') !== 'false');
+  const [compressPhotos, setCompressPhotos] = useState(() => localStorage.getItem('pref_compress') !== 'false');
+  const [showPasswordForm, setShowPasswordForm] = useState(false);
+  const [newPassword, setNewPassword] = useState('');
+  const [showPassword, setShowPassword] = useState(false);
+  const [isChangingPassword, setIsChangingPassword] = useState(false);
 
   // Estados para a Sincronização em Massa
   const [isSyncing, setIsSyncing] = useState(false);
@@ -86,6 +88,29 @@ export default function Settings() {
 
   const handleSaveCompany = () => {
     saveCompanyMutation.mutate(companyData);
+  };
+
+  const toggleNotifications = () => {
+    const v = !notifications;
+    setNotifications(v);
+    localStorage.setItem('pref_notifications', String(v));
+  };
+
+  const toggleCompressPhotos = () => {
+    const v = !compressPhotos;
+    setCompressPhotos(v);
+    localStorage.setItem('pref_compress', String(v));
+  };
+
+  const handleChangePassword = async () => {
+    if (newPassword.length < 6) return showError('A senha deve ter pelo menos 6 caracteres.');
+    setIsChangingPassword(true);
+    const { error } = await supabase.auth.updateUser({ password: newPassword });
+    setIsChangingPassword(false);
+    if (error) return showError('Erro ao alterar senha. Tente novamente.');
+    showSuccess('Senha alterada com sucesso!');
+    setNewPassword('');
+    setShowPasswordForm(false);
   };
 
   // Busca todas as lojas que AINDA NÃO TÊM coordenadas
@@ -303,12 +328,44 @@ export default function Settings() {
               </CardTitle>
             </CardHeader>
             <CardContent className="p-0">
-              <div className="p-4 flex items-center justify-between border-b border-slate-100 hover:bg-slate-50 transition-colors cursor-pointer">
-                <div>
-                  <p className="font-bold text-slate-800">Alterar Senha</p>
-                  <p className="text-sm text-slate-500">Atualize sua senha de acesso regularmente.</p>
+              <div>
+                <div
+                  onClick={() => setShowPasswordForm(p => !p)}
+                  className="p-4 flex items-center justify-between border-b border-slate-100 hover:bg-slate-50 transition-colors cursor-pointer"
+                >
+                  <div>
+                    <p className="font-bold text-slate-800 flex items-center gap-2"><KeyRound size={16} className="text-slate-500" /> Alterar Senha</p>
+                    <p className="text-sm text-slate-500">Atualize sua senha de acesso regularmente.</p>
+                  </div>
+                  <ChevronRight size={20} className={`text-slate-400 transition-transform ${showPasswordForm ? 'rotate-90' : ''}`} />
                 </div>
-                <ChevronRight size={20} className="text-slate-400" />
+                {showPasswordForm && (
+                  <div className="p-4 bg-slate-50 border-b border-slate-100 space-y-3">
+                    <div className="relative">
+                      <Input
+                        type={showPassword ? 'text' : 'password'}
+                        placeholder="Nova senha (mínimo 6 caracteres)"
+                        value={newPassword}
+                        onChange={(e) => setNewPassword(e.target.value)}
+                        className="h-11 rounded-xl pr-10"
+                      />
+                      <button
+                        type="button"
+                        onClick={() => setShowPassword(p => !p)}
+                        className="absolute right-3 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-600"
+                      >
+                        {showPassword ? <EyeOff size={18} /> : <Eye size={18} />}
+                      </button>
+                    </div>
+                    <div className="flex gap-2">
+                      <Button variant="ghost" onClick={() => { setShowPasswordForm(false); setNewPassword(''); }} className="flex-1">Cancelar</Button>
+                      <Button onClick={handleChangePassword} disabled={isChangingPassword || newPassword.length < 6} className="flex-1 bg-blue-600 hover:bg-blue-700 text-white rounded-xl">
+                        {isChangingPassword ? <Loader2 className="animate-spin mr-2" size={16} /> : null}
+                        Salvar Nova Senha
+                      </Button>
+                    </div>
+                  </div>
+                )}
               </div>
               <div 
                 onClick={signOut}
@@ -346,7 +403,7 @@ export default function Settings() {
                   </div>
                 </div>
                 <label className="relative inline-flex items-center cursor-pointer">
-                  <input type="checkbox" className="sr-only peer" checked={notifications} onChange={() => setNotifications(!notifications)} />
+                  <input type="checkbox" className="sr-only peer" checked={notifications} onChange={toggleNotifications} />
                   <div className="w-11 h-6 bg-slate-200 peer-focus:outline-none rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-slate-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-blue-600"></div>
                 </label>
               </div>
@@ -362,8 +419,8 @@ export default function Settings() {
                   </div>
                 </div>
                 <label className="relative inline-flex items-center cursor-pointer">
-                  <input type="checkbox" className="sr-only peer" checked={compressPhotos} onChange={() => setCompressPhotos(!compressPhotos)} />
-                  <div className="w-11 h-6 bg-slate-200 peer-focus:outline-none rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-slate-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-blue-600"></div>
+                  <input type="checkbox" className="sr-only peer" checked={compressPhotos} onChange={toggleCompressPhotos} />
+                  <div className="w-11 h-6 bg-slate-200 peer-focus:outline-none rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-slate-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-emerald-600"></div>
                 </label>
               </div>
 

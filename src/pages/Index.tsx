@@ -19,7 +19,7 @@ export default function Index() {
         .select('*, stores(name, brand)')
         .order('created_at', { ascending: false })
         .limit(5);
-      
+
       if (error) {
         console.error("Erro ao buscar jobs:", error);
         return [];
@@ -28,10 +28,23 @@ export default function Index() {
     }
   });
 
-  // Cálculos seguros (não quebra se jobs for undefined)
-  const pendentes = jobs ? jobs.filter(j => j.status === 'Pendente').length : 0;
-  const concluidas = jobs ? jobs.filter(j => j.status === 'Concluído').length : 0;
-  const divergencias = jobs ? jobs.filter(j => j.status === 'Divergência' || (j.issues && j.issues.length > 0)).length : 0;
+  const { data: stats } = useQuery({
+    queryKey: ['dashboard-stats'],
+    queryFn: async () => {
+      const [pendRes, andRes, concRes, divRes] = await Promise.all([
+        supabase.from('jobs').select('*', { count: 'exact', head: true }).eq('status', 'Pendente'),
+        supabase.from('jobs').select('*', { count: 'exact', head: true }).eq('status', 'Em andamento'),
+        supabase.from('jobs').select('*', { count: 'exact', head: true }).eq('status', 'Concluído'),
+        supabase.from('jobs').select('*', { count: 'exact', head: true }).not('issues', 'is', null).neq('issues', ''),
+      ]);
+      return {
+        pendentes: pendRes.count ?? 0,
+        emAndamento: andRes.count ?? 0,
+        concluidas: concRes.count ?? 0,
+        divergencias: divRes.count ?? 0,
+      };
+    }
+  });
 
   return (
     <div className="space-y-6 animate-in fade-in duration-500">
@@ -49,9 +62,9 @@ export default function Index() {
         </Button>
       </div>
 
-      {/* Cards de Estatísticas (Agora Clicáveis) */}
-      <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-        <Card 
+      {/* Cards de Estatísticas */}
+      <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+        <Card
           onClick={() => navigate('/jobs?status=Pendente')}
           className="border-none shadow-sm rounded-2xl overflow-hidden bg-gradient-to-br from-amber-50 to-amber-100/50 cursor-pointer hover:shadow-md hover:-translate-y-1 transition-all group"
         >
@@ -61,12 +74,27 @@ export default function Index() {
             </div>
             <div>
               <p className="text-xs font-bold text-amber-700/70 uppercase tracking-wider">Pendentes</p>
-              <h3 className="text-2xl font-black text-amber-900">{isLoading ? '-' : pendentes}</h3>
+              <h3 className="text-2xl font-black text-amber-900">{stats?.pendentes ?? '-'}</h3>
             </div>
           </CardContent>
         </Card>
 
-        <Card 
+        <Card
+          onClick={() => navigate('/jobs?status=Em andamento')}
+          className="border-none shadow-sm rounded-2xl overflow-hidden bg-gradient-to-br from-blue-50 to-blue-100/50 cursor-pointer hover:shadow-md hover:-translate-y-1 transition-all group"
+        >
+          <CardContent className="p-5 flex items-center gap-4">
+            <div className="w-12 h-12 rounded-xl flex items-center justify-center bg-blue-500 text-white shadow-sm shadow-blue-200 group-hover:scale-110 transition-transform">
+              <Clock size={24} />
+            </div>
+            <div>
+              <p className="text-xs font-bold text-blue-700/70 uppercase tracking-wider">Em andamento</p>
+              <h3 className="text-2xl font-black text-blue-900">{stats?.emAndamento ?? '-'}</h3>
+            </div>
+          </CardContent>
+        </Card>
+
+        <Card
           onClick={() => navigate('/jobs?status=Concluído')}
           className="border-none shadow-sm rounded-2xl overflow-hidden bg-gradient-to-br from-emerald-50 to-emerald-100/50 cursor-pointer hover:shadow-md hover:-translate-y-1 transition-all group"
         >
@@ -76,12 +104,12 @@ export default function Index() {
             </div>
             <div>
               <p className="text-xs font-bold text-emerald-700/70 uppercase tracking-wider">Concluídas</p>
-              <h3 className="text-2xl font-black text-emerald-900">{isLoading ? '-' : concluidas}</h3>
+              <h3 className="text-2xl font-black text-emerald-900">{stats?.concluidas ?? '-'}</h3>
             </div>
           </CardContent>
         </Card>
 
-        <Card 
+        <Card
           onClick={() => navigate('/jobs?status=Divergência')}
           className="border-none shadow-sm rounded-2xl overflow-hidden bg-gradient-to-br from-rose-50 to-rose-100/50 cursor-pointer hover:shadow-md hover:-translate-y-1 transition-all group"
         >
@@ -91,7 +119,7 @@ export default function Index() {
             </div>
             <div>
               <p className="text-xs font-bold text-rose-700/70 uppercase tracking-wider">Divergências</p>
-              <h3 className="text-2xl font-black text-rose-900">{isLoading ? '-' : divergencias}</h3>
+              <h3 className="text-2xl font-black text-rose-900">{stats?.divergencias ?? '-'}</h3>
             </div>
           </CardContent>
         </Card>

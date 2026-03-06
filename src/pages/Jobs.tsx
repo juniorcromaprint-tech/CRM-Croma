@@ -2,7 +2,7 @@ import React, { useState, useMemo, useEffect } from "react";
 import { useSearchParams, useNavigate } from "react-router-dom";
 import { useInfiniteQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
-import { Search, Plus, MapPin, ClipboardList, Filter, ChevronLeft, ChevronRight, Calendar, AlertTriangle, User, Loader2, Download, Trash2 } from "lucide-react";
+import { Search, Plus, MapPin, ClipboardList, Filter, ChevronLeft, ChevronRight, Calendar, AlertTriangle, User, Loader2, Download, Trash2, CalendarCheck } from "lucide-react";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
@@ -26,6 +26,7 @@ export default function Jobs() {
   
   const [isJobSheetOpen, setIsJobSheetOpen] = useState(false);
   const [isExporting, setIsExporting] = useState(false);
+  const [todayFilter, setTodayFilter] = useState(searchParams.get("today") === "true");
   const { ref, inView } = useInView();
 
   // Sincroniza o filtro com a URL
@@ -93,6 +94,11 @@ export default function Jobs() {
       query = query.or(`os_number.ilike.%${searchTerm}%,type.ilike.%${searchTerm}%`);
     }
 
+    if (todayFilter) {
+      const today = new Date().toISOString().split('T')[0];
+      query = query.eq('scheduled_date', today);
+    }
+
     if (startDate) {
       query = query.gte('created_at', `${startDate}T00:00:00.000Z`);
     }
@@ -119,7 +125,7 @@ export default function Jobs() {
     hasNextPage,
     isFetchingNextPage
   } = useInfiniteQuery({
-    queryKey: ['infinite-jobs', statusFilter, searchTerm, myJobsFilter, profile?.id, startDate, endDate],
+    queryKey: ['infinite-jobs', statusFilter, searchTerm, myJobsFilter, profile?.id, startDate, endDate, todayFilter],
     queryFn: fetchJobs,
     initialPageParam: 0,
     getNextPageParam: (lastPage) => lastPage.nextPage,
@@ -140,18 +146,22 @@ export default function Jobs() {
   // Mutação para excluir OS
   const deleteJobMutation = useMutation({
     mutationFn: async (jobId: string) => {
-      // 1. Buscar fotos para deletar do storage
-      const { data: photos } = await supabase.from('job_photos').select('photo_url').eq('job_id', jobId);
-      
+      const extractFileName = (url: string) => url.split('/').pop() || '';
+
+      // 1. Buscar e deletar arquivos do storage
+      const [{ data: photos }, { data: videos }] = await Promise.all([
+        supabase.from('job_photos').select('photo_url').eq('job_id', jobId),
+        supabase.from('job_videos').select('video_url').eq('job_id', jobId),
+      ]);
+
       if (photos && photos.length > 0) {
-        const fileNames = photos.map(p => {
-          const urlParts = p.photo_url.split('/');
-          return urlParts[urlParts.length - 1];
-        });
-        await supabase.storage.from('job_photos').remove(fileNames);
+        await supabase.storage.from('job_photos').remove(photos.map(p => extractFileName(p.photo_url)));
       }
-      
-      // 2. Deletar a OS
+      if (videos && videos.length > 0) {
+        await supabase.storage.from('job_videos').remove(videos.map(v => extractFileName(v.video_url)));
+      }
+
+      // 2. Deletar a OS (cascade deleta job_photos e job_videos)
       const { error } = await supabase.from('jobs').delete().eq('id', jobId);
       if (error) throw error;
     },
@@ -284,6 +294,23 @@ export default function Jobs() {
           </div>
           
           <div className="flex gap-2 w-full md:w-auto">
+            <Button
+              variant={todayFilter ? "default" : "outline"}
+              onClick={() => {
+                const newVal = !todayFilter;
+                setTodayFilter(newVal);
+                if (newVal) searchParams.set("today", "true"); else searchParams.delete("today");
+                setSearchParams(searchParams);
+              }}
+              className={`h-12 rounded-xl px-4 shadow-sm flex-1 md:flex-none ${
+                todayFilter
+                  ? "bg-emerald-600 hover:bg-emerald-700 text-white border-transparent"
+                  : "bg-white border-slate-200 text-slate-600 hover:bg-slate-50"
+              }`}
+            >
+              <CalendarCheck size={18} className="mr-2" />
+              Hoje
+            </Button>
             <Button
               variant={myJobsFilter ? "default" : "outline"}
               onClick={toggleMyJobsFilter}

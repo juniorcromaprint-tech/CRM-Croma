@@ -1,8 +1,6 @@
-"use client";
-
 import React, { useState, useRef, useEffect } from "react";
 import { useParams, useNavigate } from "react-router-dom";
-import { ArrowLeft, Camera, Upload, FileText, AlertTriangle, CheckCircle2, Printer, MapPin, Calendar, Navigation, Loader2, Plus, Trash2, PenTool, User, MessageCircle, ExternalLink, Video, Play, WifiOff, X, Timer, Lock, PlayCircle, Edit2 } from "lucide-react";
+import { ArrowLeft, Camera, Upload, FileText, AlertTriangle, CheckCircle2, Printer, MapPin, Calendar, Navigation, Loader2, Plus, Trash2, PenTool, User, MessageCircle, ExternalLink, Video, Play, WifiOff, X, Timer, Lock, PlayCircle, Edit2, MessageSquare, Share2, Mic, MicOff } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
@@ -37,10 +35,27 @@ export default function JobDetail() {
   const [editStartTime, setEditStartTime] = useState("");
   const [editEndTime, setEditEndTime] = useState("");
 
+  const [showPhotoSourcePicker, setShowPhotoSourcePicker] = useState<'before' | 'after' | null>(null);
+  const [isSignatureModalOpen, setIsSignatureModalOpen] = useState(false);
+  const [canvasSize, setCanvasSize] = useState({ width: 0, height: 0 });
+  const [annotatingPhoto, setAnnotatingPhoto] = useState<{ id: string; currentNote: string } | null>(null);
+  const [jobFinished, setJobFinished] = useState(false);
+  const [isGeneratingPDF, setIsGeneratingPDF] = useState(false);
+  const [notesValue, setNotesValue] = useState('');
+  const [isRecording, setIsRecording] = useState(false);
+
+  const sigCanvasFullscreen = useRef<SignatureCanvas>(null);
+  const canvasContainerRef = useRef<HTMLDivElement>(null);
+  const printSectionRef = useRef<HTMLDivElement>(null);
+  const recognitionRef = useRef<any>(null);
+  const notesDebounceRef = useRef<ReturnType<typeof setTimeout>>();
+  const issuesDebounceRef = useRef<ReturnType<typeof setTimeout>>();
+
   const fileInputBeforeRef = useRef<HTMLInputElement>(null);
+  const cameraInputBeforeRef = useRef<HTMLInputElement>(null);
   const fileInputAfterRef = useRef<HTMLInputElement>(null);
+  const cameraInputAfterRef = useRef<HTMLInputElement>(null);
   const fileInputVideoRef = useRef<HTMLInputElement>(null);
-  const sigCanvas = useRef<SignatureCanvas>(null);
 
   useEffect(() => {
     const handleOnline = () => setIsOffline(false);
@@ -106,12 +121,124 @@ export default function JobDetail() {
     }
   });
 
+  const deletePhotoMutation = useMutation({
+    mutationFn: async (photo: { id: string; photo_url: string }) => {
+      const fileName = photo.photo_url.split('/').pop() || '';
+      await supabase.storage.from('job_photos').remove([fileName]);
+      const { error } = await supabase.from('job_photos').delete().eq('id', photo.id);
+      if (error) throw error;
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['job-photos', id] });
+      showSuccess('Foto removida.');
+    },
+    onError: () => showError('Erro ao remover foto.'),
+  });
+
+  const updatePhotoNoteMutation = useMutation({
+    mutationFn: async ({ photoId, note }: { photoId: string; note: string }) => {
+      const { error } = await supabase.from('job_photos').update({ note }).eq('id', photoId);
+      if (error) throw error;
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['job-photos', id] });
+      setAnnotatingPhoto(null);
+      showSuccess('Anotação salva!');
+    },
+    onError: () => showError('Erro ao salvar anotação.'),
+  });
+
   const handleStartJob = () => {
     if (isOffline) return showError("Requer internet para iniciar o serviço.");
-    updateJobMutation.mutate({
-      status: 'Em andamento',
-      started_at: new Date().toISOString()
-    });
+    const updates: any = { status: 'Em andamento', started_at: new Date().toISOString() };
+    // Captura GPS automaticamente ao iniciar
+    navigator.geolocation.getCurrentPosition(
+      (pos) => {
+        updateJobMutation.mutate({ ...updates, lat: pos.coords.latitude, lng: pos.coords.longitude });
+      },
+      () => updateJobMutation.mutate(updates),
+      { timeout: 6000 }
+    );
+  };
+
+  const handleFinishJob = () => {
+    updateJobMutation.mutate(
+      { status: 'Concluído', finished_at: new Date().toISOString() },
+      { onSuccess: () => setJobFinished(true) }
+    );
+  };
+
+  // Inicializa o campo de notas quando o job carrega
+  useEffect(() => {
+    if (job) setNotesValue(job.notes || '');
+  }, [job?.id]);
+
+  // Para a gravação se o componente for desmontado
+  useEffect(() => {
+    return () => { recognitionRef.current?.stop(); };
+  }, []);
+
+  const toggleVoice = () => {
+    if (isRecording) {
+      recognitionRef.current?.stop();
+      return;
+    }
+
+    const SpeechRecognition = (window as any).SpeechRecognition || (window as any).webkitSpeechRecognition;
+    if (!SpeechRecognition) {
+      showError('Reconhecimento de voz não suportado. Use Chrome no Android ou Chrome/Edge no PC.');
+      return;
+    }
+
+    const recognition = new SpeechRecognition();
+    recognition.lang = 'pt-BR';
+    recognition.continuous = true;
+    recognition.interimResults = true;
+
+    recognition.onstart = () => setIsRecording(true);
+
+    recognition.onresult = (event: any) => {
+      let finalText = '';
+      let interimText = '';
+      for (let i = event.resultIndex; i < event.results.length; i++) {
+        const t = event.results[i][0].transcript;
+        if (event.results[i].isFinal) finalText += t + ' ';
+        else interimText += t;
+      }
+      if (finalText) {
+        setNotesValue(prev => {
+          const updated = prev ? prev.trimEnd() + ' ' + finalText.trim() : finalText.trim();
+          handleNotesChange(updated);
+          return updated;
+        });
+      }
+    };
+
+    recognition.onerror = (event: any) => {
+      if (event.error !== 'aborted' && event.error !== 'no-speech') {
+        showError('Erro no microfone. Verifique as permissões do navegador.');
+      }
+      setIsRecording(false);
+    };
+
+    recognition.onend = () => setIsRecording(false);
+
+    recognitionRef.current = recognition;
+    recognition.start();
+  };
+
+  const handleNotesChange = (value: string) => {
+    clearTimeout(notesDebounceRef.current);
+    notesDebounceRef.current = setTimeout(() => {
+      updateJobMutation.mutate({ notes: value });
+    }, 1500);
+  };
+
+  const handleIssuesChange = (value: string) => {
+    clearTimeout(issuesDebounceRef.current);
+    issuesDebounceRef.current = setTimeout(() => {
+      updateJobMutation.mutate({ issues: value });
+    }, 1500);
   };
 
   const handleFileUpload = async (event: React.ChangeEvent<HTMLInputElement>, type: 'before' | 'after') => {
@@ -174,14 +301,41 @@ export default function JobDetail() {
     );
   };
 
+  // Mede o container e atualiza o canvas quando o modal de assinatura abre ou a tela rotaciona
+  useEffect(() => {
+    if (!isSignatureModalOpen) return;
+
+    const updateSize = () => {
+      if (!canvasContainerRef.current) return;
+      // Salva o desenho atual antes de redimensionar
+      const savedData = sigCanvasFullscreen.current?.isEmpty() ? null : sigCanvasFullscreen.current?.toDataURL();
+      const { offsetWidth, offsetHeight } = canvasContainerRef.current;
+      setCanvasSize({ width: offsetWidth, height: offsetHeight });
+      // Restaura o desenho após o canvas re-renderizar nas novas dimensões
+      if (savedData) {
+        setTimeout(() => {
+          sigCanvasFullscreen.current?.fromDataURL(savedData, { width: offsetWidth, height: offsetHeight });
+        }, 50);
+      }
+    };
+
+    // Pequeno delay para o DOM estar pronto ao abrir
+    const timer = setTimeout(updateSize, 50);
+    window.addEventListener('resize', updateSize);
+    return () => {
+      clearTimeout(timer);
+      window.removeEventListener('resize', updateSize);
+    };
+  }, [isSignatureModalOpen]);
+
   const saveSignature = async () => {
     if (isOffline) return showError("Assinatura requer internet.");
     if (!signerName.trim()) return showError("Informe o nome do responsável da loja.");
-    if (sigCanvas.current?.isEmpty()) return showError("A loja deve assinar o campo.");
+    if (sigCanvasFullscreen.current?.isEmpty()) return showError("A loja deve assinar o campo.");
     
     setIsSavingSignature(true);
     try {
-      const signatureDataUrl = sigCanvas.current?.getCanvas().toDataURL('image/png');
+      const signatureDataUrl = sigCanvasFullscreen.current?.getCanvas().toDataURL('image/png');
       const blob = await (await fetch(signatureDataUrl!)).blob();
       const fileName = `sig_${id}_${Date.now()}.png`;
       await supabase.storage.from('job_photos').upload(fileName, blob);
@@ -218,10 +372,66 @@ export default function JobDetail() {
     const storeCode = job.stores?.code ? `Cod ${job.stores.code}` : "SemCod";
     const dateStr = new Date(job.scheduled_date).toLocaleDateString('pt-BR').replace(/\//g, '-');
     const osNumber = `OS ${job.os_number || "SemNumero"}`;
-    
+
     document.title = `${clientName} - ${storeCode} - ${dateStr} - ${osNumber}`;
     window.print();
     setTimeout(() => { document.title = originalTitle; }, 1000);
+  };
+
+  const handleSharePDF = async () => {
+    if (!job || !printSectionRef.current) return;
+
+    const clientName = job.stores?.brand || "Cliente";
+    const storeCode = job.stores?.code ? `Cod${job.stores.code}` : "";
+    const dateStr = new Date(job.scheduled_date).toLocaleDateString('pt-BR').replace(/\//g, '-');
+    const fileName = `Relatorio_${clientName}${storeCode ? '_' + storeCode : ''}_${dateStr}_OS${job.os_number || ''}.pdf`.replace(/\s+/g, '_');
+
+    setIsGeneratingPDF(true);
+    // Aguarda o DOM mostrar a seção antes de capturar
+    await new Promise(r => setTimeout(r, 150));
+
+    try {
+      const html2pdf = (await import('html2pdf.js')).default;
+
+      const opt = {
+        margin: [10, 10, 10, 10],
+        filename: fileName,
+        image: { type: 'jpeg', quality: 0.92 },
+        html2canvas: {
+          scale: 2,
+          useCORS: true,
+          allowTaint: false,
+          logging: false,
+        },
+        jsPDF: { unit: 'mm', format: 'a4', orientation: 'portrait' },
+        pagebreak: { mode: 'avoid-all', before: '.break-before-page' },
+      };
+
+      const pdfBlob: Blob = await html2pdf().set(opt).from(printSectionRef.current).outputPdf('blob');
+      const pdfFile = new File([pdfBlob], fileName, { type: 'application/pdf' });
+
+      const formattedDate = new Date(job.scheduled_date).toLocaleDateString('pt-BR');
+      const shareText = `Olá! Segue o relatório de instalação da *Cromaprint*.\n\n*OS:* ${job.os_number}\n*Cliente:* ${job.stores?.name || 'Não informado'}\n*Marca:* ${job.stores?.brand || ''}\n*Data:* ${formattedDate}\n*Serviço:* ${job.type}\n*Status:* ${job.status}${job.notes ? `\n\n*Relatório:* ${job.notes}` : ''}`;
+
+      // Web Share API com arquivo e texto — abre o menu nativo do celular (inclui WhatsApp)
+      if (navigator.canShare && navigator.canShare({ files: [pdfFile] })) {
+        await navigator.share({ files: [pdfFile], title: fileName, text: shareText });
+      } else {
+        // Fallback para desktop: baixa o PDF
+        const url = URL.createObjectURL(pdfFile);
+        const a = document.createElement('a');
+        a.href = url;
+        a.download = fileName;
+        a.click();
+        URL.revokeObjectURL(url);
+        showSuccess('PDF baixado! Anexe-o manualmente no WhatsApp.');
+      }
+    } catch (err) {
+      console.error(err);
+      showError('Erro ao gerar o PDF. Tente usar o botão "PDF" normal.');
+    } finally {
+      setIsGeneratingPDF(false);
+    }
   };
 
   const formatDuration = (start: string, end?: string) => {
@@ -293,11 +503,22 @@ export default function JobDetail() {
           <Button variant="outline" onClick={handleWhatsAppShare} className="text-emerald-600 border-emerald-200 hover:bg-emerald-50 flex-1 sm:flex-none">
             <MessageCircle size={18} className="mr-2" /> WhatsApp
           </Button>
+          <Button
+            variant="outline"
+            onClick={handleSharePDF}
+            disabled={isGeneratingPDF}
+            className="text-green-700 border-green-200 hover:bg-green-50 flex-1 sm:flex-none"
+          >
+            {isGeneratingPDF
+              ? <><Loader2 size={18} className="mr-2 animate-spin" /> Gerando...</>
+              : <><Share2 size={18} className="mr-2" /> PDF + WA</>
+            }
+          </Button>
           <Button variant="outline" onClick={handlePrint} className="text-blue-600 border-slate-200 flex-1 sm:flex-none">
             <Printer size={18} className="mr-2" /> PDF
           </Button>
           {job.status !== "Concluído" && canInteract && (
-            <Button onClick={() => updateJobMutation.mutate({ status: 'Concluído', finished_at: new Date().toISOString() })} disabled={isOffline} className="bg-emerald-600 text-white flex-1 sm:flex-none">
+            <Button onClick={handleFinishJob} disabled={isOffline || updateJobMutation.isPending} className="bg-emerald-600 text-white flex-1 sm:flex-none">
               <CheckCircle2 size={18} className="mr-2" /> Finalizar
             </Button>
           )}
@@ -474,12 +695,22 @@ export default function JobDetail() {
                 </div>
                 <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
                   {beforePhotos.map(photo => (
-                    <div key={photo.id} className="relative group aspect-square rounded-xl overflow-hidden border border-slate-100 bg-slate-50">
-                      <img src={photo.photo_url} className="w-full h-full object-cover cursor-zoom-in" onClick={() => { setSelectedImageUrl(photo.photo_url); setIsImageModalOpen(true); }} />
+                    <div key={photo.id} className="flex flex-col gap-1">
+                      <div className="relative group aspect-square rounded-xl overflow-hidden border border-slate-100 bg-slate-50">
+                        <img src={photo.photo_url} className="w-full h-full object-cover cursor-zoom-in" onClick={() => { setSelectedImageUrl(photo.photo_url); setIsImageModalOpen(true); }} />
+                        <button onClick={() => { if (window.confirm('Remover esta foto?')) deletePhotoMutation.mutate({ id: photo.id, photo_url: photo.photo_url }); }} className="absolute top-1.5 right-1.5 w-7 h-7 bg-red-500 text-white rounded-lg flex items-center justify-center opacity-100 sm:opacity-0 sm:group-hover:opacity-100 transition-opacity shadow-md">
+                          <Trash2 size={13} />
+                        </button>
+                        <button onClick={() => setAnnotatingPhoto({ id: photo.id, currentNote: (photo as any).note || '' })} className="absolute bottom-1.5 right-1.5 w-7 h-7 bg-black/60 text-white rounded-lg flex items-center justify-center opacity-100 sm:opacity-0 sm:group-hover:opacity-100 transition-opacity shadow-md">
+                          <MessageSquare size={13} className={(photo as any).note ? 'text-yellow-300' : ''} />
+                        </button>
+                      </div>
+                      {(photo as any).note && <p className="text-[10px] text-slate-500 px-0.5 line-clamp-2 italic leading-tight">{(photo as any).note}</p>}
                     </div>
                   ))}
-                  <div onClick={() => !isOffline && fileInputBeforeRef.current?.click()} className={`aspect-square border-2 border-dashed rounded-xl flex flex-col items-center justify-center cursor-pointer hover:bg-slate-50 ${isOffline ? 'opacity-50 cursor-not-allowed' : ''}`}>
+                  <div onClick={() => !isOffline && setShowPhotoSourcePicker('before')} className={`aspect-square border-2 border-dashed rounded-xl flex flex-col items-center justify-center cursor-pointer hover:bg-slate-50 ${isOffline ? 'opacity-50 cursor-not-allowed' : ''}`}>
                     <input type="file" accept="image/*" multiple className="hidden" ref={fileInputBeforeRef} onChange={(e) => handleFileUpload(e, 'before')} />
+                    <input type="file" accept="image/*" capture="environment" multiple className="hidden" ref={cameraInputBeforeRef} onChange={(e) => handleFileUpload(e, 'before')} />
                     {uploadingType === 'before' ? <Loader2 className="animate-spin" /> : <Plus />}
                     <span className="text-xs font-bold mt-1">Adicionar</span>
                   </div>
@@ -493,12 +724,22 @@ export default function JobDetail() {
                 </div>
                 <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
                   {afterPhotos.map(photo => (
-                    <div key={photo.id} className="relative group aspect-square rounded-xl overflow-hidden border border-slate-100 bg-slate-50">
-                      <img src={photo.photo_url} className="w-full h-full object-cover cursor-zoom-in" onClick={() => { setSelectedImageUrl(photo.photo_url); setIsImageModalOpen(true); }} />
+                    <div key={photo.id} className="flex flex-col gap-1">
+                      <div className="relative group aspect-square rounded-xl overflow-hidden border border-slate-100 bg-slate-50">
+                        <img src={photo.photo_url} className="w-full h-full object-cover cursor-zoom-in" onClick={() => { setSelectedImageUrl(photo.photo_url); setIsImageModalOpen(true); }} />
+                        <button onClick={() => { if (window.confirm('Remover esta foto?')) deletePhotoMutation.mutate({ id: photo.id, photo_url: photo.photo_url }); }} className="absolute top-1.5 right-1.5 w-7 h-7 bg-red-500 text-white rounded-lg flex items-center justify-center opacity-100 sm:opacity-0 sm:group-hover:opacity-100 transition-opacity shadow-md">
+                          <Trash2 size={13} />
+                        </button>
+                        <button onClick={() => setAnnotatingPhoto({ id: photo.id, currentNote: (photo as any).note || '' })} className="absolute bottom-1.5 right-1.5 w-7 h-7 bg-black/60 text-white rounded-lg flex items-center justify-center opacity-100 sm:opacity-0 sm:group-hover:opacity-100 transition-opacity shadow-md">
+                          <MessageSquare size={13} className={(photo as any).note ? 'text-yellow-300' : ''} />
+                        </button>
+                      </div>
+                      {(photo as any).note && <p className="text-[10px] text-slate-500 px-0.5 line-clamp-2 italic leading-tight">{(photo as any).note}</p>}
                     </div>
                   ))}
-                  <div onClick={() => !isOffline && fileInputAfterRef.current?.click()} className={`aspect-square border-2 border-dashed rounded-xl flex flex-col items-center justify-center cursor-pointer hover:bg-slate-50 ${isOffline ? 'opacity-50 cursor-not-allowed' : ''}`}>
+                  <div onClick={() => !isOffline && setShowPhotoSourcePicker('after')} className={`aspect-square border-2 border-dashed rounded-xl flex flex-col items-center justify-center cursor-pointer hover:bg-slate-50 ${isOffline ? 'opacity-50 cursor-not-allowed' : ''}`}>
                     <input type="file" accept="image/*" multiple className="hidden" ref={fileInputAfterRef} onChange={(e) => handleFileUpload(e, 'after')} />
+                    <input type="file" accept="image/*" capture="environment" multiple className="hidden" ref={cameraInputAfterRef} onChange={(e) => handleFileUpload(e, 'after')} />
                     {uploadingType === 'after' ? <Loader2 className="animate-spin" /> : <Plus />}
                     <span className="text-xs font-bold mt-1">Adicionar</span>
                   </div>
@@ -529,19 +770,40 @@ export default function JobDetail() {
             <TabsContent value="notes" className="space-y-6">
               <div className="bg-white p-6 rounded-2xl border shadow-sm">
                 <div className="mb-8">
-                  <label className="text-sm font-bold text-slate-500 uppercase tracking-wider block mb-3 border-b pb-1">Relatório do Instalador</label>
-                  <Textarea 
-                    className="min-h-[120px] rounded-xl" 
-                    defaultValue={job.notes || ""} 
-                    onBlur={(e) => updateJobMutation.mutate({ notes: e.target.value })} 
+                  <div className="flex items-center justify-between border-b pb-2 mb-3">
+                    <label className="text-sm font-bold text-slate-500 uppercase tracking-wider">Relatório do Instalador</label>
+                    <button
+                      onClick={toggleVoice}
+                      className={`flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-sm font-bold transition-all ${
+                        isRecording
+                          ? 'bg-red-500 text-white shadow-lg shadow-red-200 animate-pulse'
+                          : 'bg-slate-100 text-slate-600 hover:bg-blue-50 hover:text-blue-600'
+                      }`}
+                    >
+                      {isRecording ? <MicOff size={15} /> : <Mic size={15} />}
+                      {isRecording ? 'Parar' : 'Falar'}
+                    </button>
+                  </div>
+                  {isRecording && (
+                    <div className="flex items-center gap-2 mb-2 text-xs text-red-600 font-medium bg-red-50 border border-red-100 rounded-xl px-3 py-2">
+                      <span className="w-2 h-2 bg-red-500 rounded-full animate-pulse shrink-0" />
+                      Ouvindo... fale o relatório em português. Toque em "Parar" quando terminar.
+                    </div>
+                  )}
+                  <Textarea
+                    className="min-h-[120px] rounded-xl"
+                    value={notesValue}
+                    onChange={(e) => { setNotesValue(e.target.value); handleNotesChange(e.target.value); }}
+                    placeholder="Descreva o serviço realizado..."
                   />
+                  <p className="text-[10px] text-slate-400 mt-1 italic">Salvo automaticamente enquanto você digita.</p>
                 </div>
                 <div className="bg-rose-50 p-5 rounded-2xl border border-rose-100">
                   <label className="text-sm font-bold text-rose-800 block mb-3 border-b border-rose-200 pb-1">Divergências / Problemas Relatados</label>
-                  <Textarea 
-                    className="min-h-[100px] rounded-xl bg-white" 
-                    defaultValue={job.issues || ""} 
-                    onBlur={(e) => updateJobMutation.mutate({ issues: e.target.value })} 
+                  <Textarea
+                    className="min-h-[100px] rounded-xl bg-white"
+                    defaultValue={job.issues || ""}
+                    onChange={(e) => handleIssuesChange(e.target.value)}
                   />
                 </div>
               </div>
@@ -562,26 +824,23 @@ export default function JobDetail() {
                   <div className="space-y-6">
                     <div className="space-y-2">
                       <label className="text-sm font-bold text-slate-600">Nome do Responsável (Gerente/Dono)</label>
-                      <Input 
-                        placeholder="Quem está acompanhando a instalação?" 
+                      <Input
+                        placeholder="Quem está acompanhando a instalação?"
                         value={signerName}
                         onChange={(e) => setSignerName(e.target.value)}
                         className="h-12 rounded-xl border-slate-200 focus:ring-blue-500"
                       />
                       <p className="text-[10px] text-slate-400 italic">* Obrigatório para identificar a rubrica abaixo.</p>
                     </div>
-                    <div className="space-y-2">
-                      <label className="text-sm font-bold text-slate-600">Assinatura / Rubrica</label>
-                      <div className="border-2 border-dashed border-slate-200 rounded-2xl bg-slate-50 overflow-hidden">
-                        <SignatureCanvas ref={sigCanvas} penColor="black" canvasProps={{ className: "w-full h-64" }} />
-                      </div>
-                    </div>
-                    <div className="flex justify-between items-center">
-                      <Button variant="ghost" onClick={() => sigCanvas.current?.clear()} className="text-slate-500">Limpar Campo</Button>
-                      <Button onClick={saveSignature} disabled={isSavingSignature || isOffline} className="bg-blue-600 hover:bg-blue-700 text-white rounded-xl px-8 h-12 font-bold shadow-lg shadow-blue-100">
-                        {isSavingSignature ? <Loader2 className="animate-spin mr-2" /> : null} Validar e Finalizar OS
-                      </Button>
-                    </div>
+                    <button
+                      onClick={() => setIsSignatureModalOpen(true)}
+                      disabled={isOffline}
+                      className="w-full border-2 border-dashed border-blue-300 rounded-2xl bg-blue-50 hover:bg-blue-100 transition-colors flex flex-col items-center justify-center gap-3 py-10 disabled:opacity-50 disabled:cursor-not-allowed"
+                    >
+                      <PenTool size={36} className="text-blue-400" />
+                      <span className="font-bold text-blue-700 text-lg">Toque para Assinar</span>
+                      <span className="text-xs text-blue-400">Abre tela cheia para facilitar a assinatura</span>
+                    </button>
                   </div>
                 )}
               </div>
@@ -590,15 +849,22 @@ export default function JobDetail() {
         )}
       </div>
 
-      <div className="hidden print:block">
+      <div ref={printSectionRef} className={isGeneratingPDF ? 'block' : 'hidden print:block'}>
         <div className="space-y-10">
           <div>
             <h3 className="text-lg font-black text-slate-800 border-l-4 border-blue-600 pl-3 mb-4 uppercase tracking-tight">1. Antes da Instalação</h3>
             <div className="grid grid-cols-2 gap-4">
               {beforePhotos.map(photo => (
-                <a key={photo.id} href={photo.photo_url} target="_blank" rel="noopener noreferrer" className="border border-slate-200 rounded-xl overflow-hidden block hover:opacity-90 transition-opacity">
-                  <img src={photo.photo_url} className="w-full h-64 object-cover" />
-                </a>
+                <div key={photo.id} className="border border-slate-200 rounded-xl overflow-hidden">
+                  <a href={photo.photo_url} target="_blank" rel="noopener noreferrer">
+                    <img src={photo.photo_url} crossOrigin="anonymous" className="w-full h-64 object-cover" />
+                  </a>
+                  {(photo as any).note && (
+                    <div className="p-2 bg-amber-50 border-t border-amber-100">
+                      <p className="text-xs text-amber-800 italic">{(photo as any).note}</p>
+                    </div>
+                  )}
+                </div>
               ))}
             </div>
           </div>
@@ -607,9 +873,16 @@ export default function JobDetail() {
             <h3 className="text-lg font-black text-slate-800 border-l-4 border-emerald-500 pl-3 mb-4 uppercase tracking-tight">2. Depois da Instalação</h3>
             <div className="grid grid-cols-2 gap-4">
               {afterPhotos.map(photo => (
-                <a key={photo.id} href={photo.photo_url} target="_blank" rel="noopener noreferrer" className="border border-slate-200 rounded-xl overflow-hidden block hover:opacity-90 transition-opacity">
-                  <img src={photo.photo_url} className="w-full h-64 object-cover" />
-                </a>
+                <div key={photo.id} className="border border-slate-200 rounded-xl overflow-hidden">
+                  <a href={photo.photo_url} target="_blank" rel="noopener noreferrer">
+                    <img src={photo.photo_url} crossOrigin="anonymous" className="w-full h-64 object-cover" />
+                  </a>
+                  {(photo as any).note && (
+                    <div className="p-2 bg-amber-50 border-t border-amber-100">
+                      <p className="text-xs text-amber-800 italic">{(photo as any).note}</p>
+                    </div>
+                  )}
+                </div>
               ))}
             </div>
           </div>
@@ -641,6 +914,139 @@ export default function JobDetail() {
           )}
         </div>
       </div>
+
+      {jobFinished && (
+        <div className="fixed inset-0 z-[9997] bg-emerald-600 flex flex-col items-center justify-center text-white print:hidden animate-in fade-in duration-300">
+          <div className="text-center p-8">
+            <div className="w-28 h-28 rounded-full bg-white/20 flex items-center justify-center mx-auto mb-6">
+              <CheckCircle2 size={60} className="text-white" />
+            </div>
+            <h2 className="text-3xl font-black mb-2">OS Finalizada!</h2>
+            <p className="text-emerald-100 text-lg mb-8">Serviço concluído com sucesso.</p>
+            <Button onClick={() => setJobFinished(false)} className="bg-white text-emerald-700 hover:bg-emerald-50 font-bold px-10 py-3 rounded-2xl text-lg shadow-lg h-auto">
+              Fechar
+            </Button>
+          </div>
+        </div>
+      )}
+
+      {annotatingPhoto && (
+        <div className="fixed inset-0 z-[9998] flex items-end justify-center print:hidden" onClick={() => setAnnotatingPhoto(null)}>
+          <div className="absolute inset-0 bg-black/50" />
+          <div className="relative bg-white w-full max-w-lg rounded-t-2xl p-5 pb-10 shadow-2xl" onClick={(e) => e.stopPropagation()}>
+            <p className="font-bold text-slate-800 mb-3 flex items-center gap-2 text-lg">
+              <MessageSquare size={20} className="text-blue-600" /> Anotação da Foto
+            </p>
+            <p className="text-xs text-slate-400 mb-3">Use para registrar observações sobre esta foto — o que precisa ser corrigido, tamanhos, detalhes para a próxima visita, etc.</p>
+            <textarea
+              autoFocus
+              className="w-full min-h-[110px] p-3 rounded-xl border border-slate-200 text-sm resize-none focus:outline-none focus:ring-2 focus:ring-blue-500 bg-slate-50"
+              placeholder="Ex: Na próxima instalação mandar adesivo maior, cor diferente..."
+              value={annotatingPhoto.currentNote}
+              onChange={(e) => setAnnotatingPhoto(prev => prev ? { ...prev, currentNote: e.target.value } : null)}
+            />
+            <div className="flex gap-3 mt-3">
+              <button onClick={() => setAnnotatingPhoto(null)} className="flex-1 py-3 rounded-xl border border-slate-200 text-slate-500 font-medium hover:bg-slate-50 transition-colors">
+                Cancelar
+              </button>
+              <button
+                onClick={() => updatePhotoNoteMutation.mutate({ photoId: annotatingPhoto.id, note: annotatingPhoto.currentNote })}
+                disabled={updatePhotoNoteMutation.isPending}
+                className="flex-1 py-3 rounded-xl bg-blue-600 text-white font-bold hover:bg-blue-700 transition-colors disabled:opacity-50"
+              >
+                {updatePhotoNoteMutation.isPending ? 'Salvando...' : 'Salvar Anotação'}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {isSignatureModalOpen && (
+        <div className="fixed inset-0 z-[9999] bg-white flex flex-col print:hidden">
+          {/* Cabeçalho fixo */}
+          <div className="shrink-0 bg-slate-50 border-b border-slate-200 px-4 py-3 flex items-center justify-between gap-3">
+            <div className="min-w-0">
+              <p className="font-black text-slate-800 text-base leading-tight truncate">Assinatura da Loja</p>
+              {signerName ? (
+                <p className="text-xs text-blue-600 font-bold truncate">{signerName.toUpperCase()}</p>
+              ) : (
+                <p className="text-xs text-rose-500 font-medium">Informe o nome antes de assinar</p>
+              )}
+            </div>
+            <div className="flex items-center gap-2 shrink-0">
+              <Button variant="outline" size="sm" onClick={() => sigCanvasFullscreen.current?.clear()} className="rounded-xl">
+                Limpar
+              </Button>
+              <Button
+                size="sm"
+                onClick={saveSignature}
+                disabled={isSavingSignature || isOffline}
+                className="bg-blue-600 hover:bg-blue-700 text-white rounded-xl font-bold px-4"
+              >
+                {isSavingSignature ? <Loader2 className="animate-spin mr-1" size={16} /> : null}
+                Validar OS
+              </Button>
+              <Button variant="ghost" size="icon" onClick={() => setIsSignatureModalOpen(false)} className="text-slate-400 rounded-xl">
+                <X size={20} />
+              </Button>
+            </div>
+          </div>
+
+          {/* Área de assinatura — preenche todo o espaço restante */}
+          <div ref={canvasContainerRef} className="flex-1 relative bg-slate-50 overflow-hidden">
+            {canvasSize.width > 0 && (
+              <SignatureCanvas
+                ref={sigCanvasFullscreen}
+                penColor="black"
+                canvasProps={{ width: canvasSize.width, height: canvasSize.height, style: { display: 'block' } }}
+              />
+            )}
+            <p className="absolute bottom-6 left-1/2 -translate-x-1/2 text-xs text-slate-300 pointer-events-none select-none">
+              Assine acima com o dedo
+            </p>
+          </div>
+        </div>
+      )}
+
+      {showPhotoSourcePicker && (
+        <div className="fixed inset-0 z-50 flex items-end justify-center print:hidden" onClick={() => setShowPhotoSourcePicker(null)}>
+          <div className="absolute inset-0 bg-black/40" />
+          <div className="relative bg-white w-full max-w-md rounded-t-2xl p-6 pb-10 shadow-2xl" onClick={(e) => e.stopPropagation()}>
+            <p className="text-center text-sm font-bold text-slate-500 uppercase tracking-wider mb-5">
+              {showPhotoSourcePicker === 'before' ? 'Antes da Instalação' : 'Depois da Instalação'}
+            </p>
+            <div className="grid grid-cols-2 gap-3">
+              <button
+                onClick={() => {
+                  const ref = showPhotoSourcePicker === 'before' ? cameraInputBeforeRef : cameraInputAfterRef;
+                  setShowPhotoSourcePicker(null);
+                  ref.current?.click();
+                }}
+                className="flex flex-col items-center justify-center gap-3 p-6 rounded-2xl border-2 border-slate-200 hover:border-blue-400 hover:bg-blue-50 transition-all"
+              >
+                <Camera size={32} className="text-blue-600" />
+                <span className="font-bold text-slate-800">Câmera</span>
+                <span className="text-xs text-slate-400">Tirar foto agora</span>
+              </button>
+              <button
+                onClick={() => {
+                  const ref = showPhotoSourcePicker === 'before' ? fileInputBeforeRef : fileInputAfterRef;
+                  setShowPhotoSourcePicker(null);
+                  ref.current?.click();
+                }}
+                className="flex flex-col items-center justify-center gap-3 p-6 rounded-2xl border-2 border-slate-200 hover:border-blue-400 hover:bg-blue-50 transition-all"
+              >
+                <Upload size={32} className="text-blue-600" />
+                <span className="font-bold text-slate-800">Galeria</span>
+                <span className="text-xs text-slate-400">Escolher da galeria</span>
+              </button>
+            </div>
+            <button onClick={() => setShowPhotoSourcePicker(null)} className="w-full mt-4 py-3 rounded-xl text-slate-500 font-medium hover:bg-slate-100 transition-colors">
+              Cancelar
+            </button>
+          </div>
+        </div>
+      )}
 
       <ImageModal isOpen={isImageModalOpen} onClose={() => setIsImageModalOpen(false)} imageUrl={selectedImageUrl} />
     </div>
