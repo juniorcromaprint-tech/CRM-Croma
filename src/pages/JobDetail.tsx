@@ -25,6 +25,7 @@ export default function JobDetail() {
 
   const [isLocating, setIsLocating] = useState(false);
   const [uploadingType, setUploadingType] = useState<'before' | 'after' | 'video' | null>(null);
+  const [isUploading, setIsUploading] = useState(false); // Trava global de upload
   const [isSavingSignature, setIsSavingSignature] = useState(false);
   const [isImageModalOpen, setIsImageModalOpen] = useState(false);
   const [selectedImageUrl, setSelectedImageUrl] = useState("");
@@ -271,6 +272,7 @@ export default function JobDetail() {
     if (isOffline) return showError("Upload requer internet.");
 
     setUploadingType(type);
+    setIsUploading(true);
     try {
       for (let i = 0; i < files.length; i++) {
         let file = files[i];
@@ -558,8 +560,16 @@ export default function JobDetail() {
             <Printer size={18} className="mr-2" /> PDF
           </Button>
           {job.status !== "Concluído" && canInteract && (
-            <Button onClick={handleFinishJob} disabled={isOffline || updateJobMutation.isPending} className="bg-emerald-600 text-white flex-1 sm:flex-none">
-              <CheckCircle2 size={18} className="mr-2" /> Finalizar
+            <Button
+              onClick={handleFinishJob}
+              disabled={isOffline || updateJobMutation.isPending || isUploading}
+              className="bg-emerald-600 text-white flex-1 sm:flex-none shadow-lg active:scale-95 transition-transform"
+            >
+              {isUploading ? (
+                <><Loader2 size={18} className="mr-2 animate-spin" /> Subindo Fotos...</>
+              ) : (
+                <><CheckCircle2 size={18} className="mr-2" /> Finalizar</>
+              )}
             </Button>
           )}
         </div>

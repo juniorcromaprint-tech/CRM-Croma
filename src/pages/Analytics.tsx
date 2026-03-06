@@ -46,8 +46,33 @@ export default function Analytics() {
         return (end - start) / 60000;
       });
     
-    const avgTime = durations.length > 0 
-      ? Math.round(durations.reduce((a, b) => a + b, 0) / durations.length) 
+    const avgTime = durations.length > 0
+      ? Math.round(durations.reduce((a, b) => a + b, 0) / durations.length)
+      : 0;
+
+    // Cálculo de Tempo de Deslocamento (Média entre o fim de uma OS e o início da próxima do mesmo instalador no mesmo dia)
+    const travelTimes: number[] = [];
+    const jobsByInstaller: any = {};
+
+    jobs.filter(j => j.assigned_to && j.finished_at && j.started_at).forEach(j => {
+      if (!jobsByInstaller[j.assigned_to]) jobsByInstaller[j.assigned_to] = [];
+      jobsByInstaller[j.assigned_to].push(j);
+    });
+
+    Object.values(jobsByInstaller).forEach((installerJobs: any) => {
+      const sorted = installerJobs.sort((a: any, b: any) => new Date(a.finished_at).getTime() - new Date(b.finished_at).getTime());
+      for (let i = 0; i < sorted.length - 1; i++) {
+        const endCurrent = new Date(sorted[i].finished_at).getTime();
+        const startNext = new Date(sorted[i+1].started_at).getTime();
+        const diff = (startNext - endCurrent) / 60000;
+        if (diff > 0 && diff < 240) { // Apenas se for no mesmo dia (max 4h)
+          travelTimes.push(diff);
+        }
+      }
+    });
+
+    const avgTravelTime = travelTimes.length > 0
+      ? Math.round(travelTimes.reduce((a, b) => a + b, 0) / travelTimes.length)
       : 0;
 
     // Dados para Gráfico de Pizza (Tipos)
@@ -155,12 +180,12 @@ export default function Analytics() {
 
         <Card className="border-none shadow-sm bg-white">
           <CardContent className="p-6 flex items-center gap-4">
-            <div className="w-12 h-12 rounded-2xl bg-rose-50 text-rose-600 flex items-center justify-center">
-              <AlertTriangle size={24} />
+            <div className="w-12 h-12 rounded-2xl bg-cyan-50 text-cyan-600 flex items-center justify-center">
+              <MapPin size={24} />
             </div>
             <div>
-              <p className="text-xs font-bold text-slate-500 uppercase">Divergências</p>
-              <h3 className="text-2xl font-black text-slate-800">{stats?.issueRate}%</h3>
+              <p className="text-xs font-bold text-slate-500 uppercase">Deslocamento Médio</p>
+              <h3 className="text-2xl font-black text-slate-800">{stats?.avgTravelTime} min</h3>
             </div>
           </CardContent>
         </Card>
