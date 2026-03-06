@@ -1,86 +1,64 @@
-import { BrowserRouter as Router, Routes, Route, Navigate } from "react-router-dom";
+import { Toaster } from "@/components/ui/toaster";
+import { Toaster as Sonner } from "@/components/ui/sonner";
+import { TooltipProvider } from "@/components/ui/tooltip";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
-import { Toaster } from "sonner";
+import { BrowserRouter, Routes, Route, Navigate } from "react-router-dom";
 import { AuthProvider, useAuth } from "./contexts/AuthContext";
 import Layout from "./components/Layout";
 import Index from "./pages/Index";
+import Login from "./pages/Login";
 import Jobs from "./pages/Jobs";
-import JobDetail from "./pages/JobDetail";
-import Stores from "./pages/Stores";
-import StoreDetail from "./pages/StoreDetail";
-import StoreMap from "./pages/StoreMap";
+import JobDetails from "./pages/JobDetails";
 import Clients from "./pages/Clients";
 import Settings from "./pages/Settings";
-import Login from "./pages/Login";
-import Team from "./pages/Team";
+import Map from "./pages/Map";
 import Analytics from "./pages/Analytics";
-import { useEffect } from "react";
+import BillingReport from "./pages/BillingReport";
+import Team from "./pages/Team";
 
 const queryClient = new QueryClient();
 
-// Componente para proteger as rotas
 const ProtectedRoute = ({ children }: { children: React.ReactNode }) => {
-  const { session, isLoading } = useAuth();
+  const { session, loading } = useAuth();
   
-  if (isLoading) {
-    return (
-      <div className="min-h-screen flex flex-col items-center justify-center bg-slate-50">
-        <div className="w-10 h-10 border-4 border-blue-200 border-t-blue-600 rounded-full animate-spin mb-4"></div>
-      </div>
-    );
-  }
-  
-  if (!session) {
-    return <Navigate to="/login" replace />;
-  }
+  if (loading) return null;
+  if (!session) return <Navigate to="/login" />;
   
   return <>{children}</>;
 };
 
-function App() {
-  // Register service worker for PWA
-  useEffect(() => {
-    if ('serviceWorker' in navigator) {
-      window.addEventListener('load', () => {
-        navigator.serviceWorker.register('/sw.js').then(registration => {
-          console.log('SW registered: ', registration);
-        }).catch(registrationError => {
-          console.log('SW registration failed: ', registrationError);
-        });
-      });
-    }
-  }, []);
-
-  return (
-    <QueryClientProvider client={queryClient}>
-      <AuthProvider>
-        <Router>
+const App = () => (
+  <QueryClientProvider client={queryClient}>
+    <AuthProvider>
+      <TooltipProvider>
+        <Toaster />
+        <Sonner />
+        <BrowserRouter>
           <Routes>
             <Route path="/login" element={<Login />} />
-            
-            {/* Rotas Protegidas */}
-            <Route path="/" element={
-              <ProtectedRoute>
-                <Layout />
-              </ProtectedRoute>
-            }>
+            <Route
+              path="/"
+              element={
+                <ProtectedRoute>
+                  <Layout />
+                </ProtectedRoute>
+              }
+            >
               <Route index element={<Index />} />
               <Route path="jobs" element={<Jobs />} />
-              <Route path="jobs/:id" element={<JobDetail />} />
-              <Route path="stores" element={<Stores />} />
-              <Route path="stores/:id" element={<StoreDetail />} />
-              <Route path="map" element={<StoreMap />} />
+              <Route path="jobs/:id" element={<JobDetails />} />
               <Route path="clients" element={<Clients />} />
-              <Route path="team" element={<Team />} />
-              <Route path="analytics" element={<Analytics />} />
               <Route path="settings" element={<Settings />} />
+              <Route path="map" element={<Map />} />
+              <Route path="analytics" element={<Analytics />} />
+              <Route path="billing-report" element={<BillingReport />} />
+              <Route path="team" element={<Team />} />
             </Route>
           </Routes>
-        </Router>
-        <Toaster position="top-right" richColors />
-      </AuthProvider>
-    </QueryClientProvider>
-  );
-}
+        </BrowserRouter>
+      </TooltipProvider>
+    </AuthProvider>
+  </QueryClientProvider>
+);
 
 export default App;

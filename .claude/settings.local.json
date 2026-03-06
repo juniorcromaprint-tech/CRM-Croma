@@ -1,0 +1,10 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(python3:*)",
+      "Bash(pnpm tsc:*)",
+      "Bash(node:*)",
+      "Bash(pnpm build:*)"
+    ]
+  }
+}
