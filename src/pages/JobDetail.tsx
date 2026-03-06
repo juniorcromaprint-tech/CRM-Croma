@@ -11,6 +11,7 @@ import { CromaLogo, CromaLogoFallback } from "@/components/Layout";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import imageCompression from 'browser-image-compression';
+import { applyWatermark } from "@/utils/watermark";
 import SignatureCanvas from 'react-signature-canvas';
 import ImageModal from "@/components/ImageModal";
 import { useAuth } from "@/contexts/AuthContext";
@@ -80,6 +81,15 @@ export default function JobDetail() {
       return data;
     },
     enabled: !!id
+  });
+
+  const { data: companySettings } = useQuery({
+    queryKey: ['company-settings'],
+    queryFn: async () => {
+      const { data, error } = await supabase.from('company_settings').select('*').single();
+      if (error) throw error;
+      return data;
+    }
   });
 
   const { data: photos } = useQuery({
@@ -228,11 +238,25 @@ export default function JobDetail() {
   };
 
   const handleNotesChange = (value: string) => {
+    // Salva no localStorage como rascunho
+    localStorage.setItem(`draft_notes_${id}`, value);
+    
     clearTimeout(notesDebounceRef.current);
     notesDebounceRef.current = setTimeout(() => {
       updateJobMutation.mutate({ notes: value });
     }, 1500);
   };
+
+  // Carrega rascunho do localStorage se existir e o campo estiver vazio
+  useEffect(() => {
+    if (job && !job.notes) {
+      const draft = localStorage.getItem(`draft_notes_${id}`);
+      if (draft) {
+        setNotesValue(draft);
+        // Opcional: sincronizar com o banco imediatamente ou esperar o debounce
+      }
+    }
+  }, [job?.id]);
 
   const handleIssuesChange = (value: string) => {
     clearTimeout(issuesDebounceRef.current);
@@ -249,7 +273,23 @@ export default function JobDetail() {
     setUploadingType(type);
     try {
       for (let i = 0; i < files.length; i++) {
-        const file = files[i];
+        let file = files[i];
+        
+        // Aplica marca d'água se estiver habilitado nas configurações da empresa
+        if (companySettings?.watermark_enabled) {
+          try {
+            const watermarkedBlob = await applyWatermark(file, {
+              lat: job?.lat,
+              lng: job?.lng,
+              companyName: companySettings?.name
+            });
+            file = new File([watermarkedBlob], file.name, { type: file.type });
+          } catch (err) {
+            console.error("Erro ao aplicar marca d'água:", err);
+            // Continua sem marca d'água se falhar
+          }
+        }
+
         const options = { maxSizeMB: 1, maxWidthOrHeight: 1920, useWebWorker: true };
         const compressedFile = await imageCompression(file, options);
         const fileExt = file.name.split('.').pop();

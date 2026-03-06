@@ -40,7 +40,8 @@ export default function Settings() {
     name: "",
     cnpj: "",
     phone: "",
-    address: ""
+    address: "",
+    watermark_enabled: true
   });
 
   // Busca dados da empresa
@@ -63,7 +64,8 @@ export default function Settings() {
         name: dbCompany.name || "",
         cnpj: dbCompany.cnpj || "",
         phone: dbCompany.phone || "",
-        address: dbCompany.address || ""
+        address: dbCompany.address || "",
+        watermark_enabled: dbCompany.watermark_enabled ?? true
       });
     }
   }, [dbCompany]);
@@ -475,16 +477,39 @@ export default function Settings() {
 
                   <div className="space-y-1.5">
                     <label className="text-sm font-bold text-slate-600">Endereço Sede</label>
-                    <Input 
-                      value={companyData.address} 
+                    <Input
+                      value={companyData.address}
                       onChange={(e) => setCompanyData({...companyData, address: e.target.value})}
-                      className="h-11 rounded-xl bg-slate-50 border-slate-200" 
+                      className="h-11 rounded-xl bg-slate-50 border-slate-200"
                     />
                   </div>
 
-                  <Button 
-                    onClick={handleSaveCompany} 
-                    disabled={saveCompanyMutation.isPending} 
+                  <div className="pt-4 border-t border-slate-100">
+                    <div className="flex items-center justify-between bg-blue-50/50 p-4 rounded-xl border border-blue-100">
+                      <div className="flex gap-3">
+                        <div className="w-10 h-10 rounded-full bg-blue-100 flex items-center justify-center text-blue-600 shrink-0">
+                          <ImageIcon size={20} />
+                        </div>
+                        <div>
+                          <p className="font-bold text-slate-800">Marca d'Água Automática</p>
+                          <p className="text-sm text-slate-500">Insere Data, Hora e GPS nas fotos enviadas pelos instaladores.</p>
+                        </div>
+                      </div>
+                      <label className="relative inline-flex items-center cursor-pointer">
+                        <input
+                          type="checkbox"
+                          className="sr-only peer"
+                          checked={companyData.watermark_enabled}
+                          onChange={(e) => setCompanyData({...companyData, watermark_enabled: e.target.checked})}
+                        />
+                        <div className="w-11 h-6 bg-slate-200 peer-focus:outline-none rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-slate-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-blue-600"></div>
+                      </label>
+                    </div>
+                  </div>
+
+                  <Button
+                    onClick={handleSaveCompany}
+                    disabled={saveCompanyMutation.isPending}
                     className="mt-4 bg-blue-600 hover:bg-blue-700 text-white rounded-xl"
                   >
                     <Save size={18} className="mr-2" /> {saveCompanyMutation.isPending ? "Salvando..." : "Salvar Dados"}
