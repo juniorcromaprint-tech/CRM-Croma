@@ -27,6 +27,9 @@ import ComprasPage from "@/domains/compras/pages/ComprasPage";
 import InstalacaoPage from "@/domains/instalacao/pages/InstalacaoPage";
 import OcorrenciasPage from "@/domains/qualidade/pages/OcorrenciasPage";
 
+// ---- Phase 6 Admin Pages ----
+import AdminUsuariosPage from "@/domains/admin/pages/AdminUsuariosPage";
+
 // ---- Legacy pages (still usable) ----
 import ClienteDetailPage from "@/domains/clientes/pages/ClienteDetailPage";
 import Produtos from "./pages/Produtos";
@@ -96,9 +99,9 @@ const App = () => (
               <Route path="ocorrencias" element={<OcorrenciasPage />} />
 
               {/* ===== ADMINISTRAÇÃO ===== */}
-              <Route path="admin/usuarios" element={<PlaceholderPage title="Usuários" description="Gestão de usuários, perfis e permissões" phase="Fase 6" />} />
+              <Route path="admin/usuarios" element={<AdminUsuariosPage />} />
               <Route path="admin/config" element={<Settings />} />
-              <Route path="admin/auditoria" element={<PlaceholderPage title="Auditoria" description="Logs de auditoria e rastreabilidade de ações" phase="Fase 6" />} />
+              <Route path="admin/auditoria" element={<AdminUsuariosPage />} />
             </Route>
 
             {/* Catch-all */}
