@@ -30,6 +30,14 @@ import OcorrenciasPage from "@/domains/qualidade/pages/OcorrenciasPage";
 // ---- Phase 6 Admin Pages ----
 import AdminUsuariosPage from "@/domains/admin/pages/AdminUsuariosPage";
 
+// ---- Fiscal Domain Pages ----
+import FiscalDashboardPage from "@/domains/fiscal/pages/FiscalDashboardPage";
+import FiscalDocumentosPage from "@/domains/fiscal/pages/FiscalDocumentosPage";
+import FiscalFilaPage from "@/domains/fiscal/pages/FiscalFilaPage";
+import FiscalConfiguracaoPage from "@/domains/fiscal/pages/FiscalConfiguracaoPage";
+import FiscalCertificadoPage from "@/domains/fiscal/pages/FiscalCertificadoPage";
+import FiscalAuditoriaPage from "@/domains/fiscal/pages/FiscalAuditoriaPage";
+
 // ---- Legacy pages (still usable) ----
 import ClienteDetailPage from "@/domains/clientes/pages/ClienteDetailPage";
 import Produtos from "./pages/Produtos";
@@ -97,6 +105,14 @@ const App = () => (
 
               {/* ===== QUALIDADE ===== */}
               <Route path="ocorrencias" element={<OcorrenciasPage />} />
+
+              {/* ===== FISCAL ===== */}
+              <Route path="fiscal" element={<FiscalDashboardPage />} />
+              <Route path="fiscal/documentos" element={<FiscalDocumentosPage />} />
+              <Route path="fiscal/fila" element={<FiscalFilaPage />} />
+              <Route path="fiscal/configuracao" element={<FiscalConfiguracaoPage />} />
+              <Route path="fiscal/certificado" element={<FiscalCertificadoPage />} />
+              <Route path="fiscal/auditoria" element={<FiscalAuditoriaPage />} />
 
               {/* ===== ADMINISTRAÇÃO ===== */}
               <Route path="admin/usuarios" element={<AdminUsuariosPage />} />

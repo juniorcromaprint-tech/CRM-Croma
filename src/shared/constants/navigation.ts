@@ -62,6 +62,17 @@ export const NAV_GROUPS: NavGroup[] = [
     ],
   },
   {
+    label: 'FISCAL',
+    items: [
+      { name: 'NF-e Dashboard', path: '/fiscal', icon: 'Receipt', module: 'fiscal' },
+      { name: 'Documentos', path: '/fiscal/documentos', icon: 'FileCheck', module: 'fiscal' },
+      { name: 'Fila de Emissão', path: '/fiscal/fila', icon: 'List', module: 'fiscal' },
+      { name: 'Configuração Fiscal', path: '/fiscal/configuracao', icon: 'SlidersHorizontal', module: 'fiscal' },
+      { name: 'Certificado Digital', path: '/fiscal/certificado', icon: 'Key', module: 'fiscal' },
+      { name: 'Auditoria Fiscal', path: '/fiscal/auditoria', icon: 'BookOpen', module: 'fiscal' },
+    ],
+  },
+  {
     label: 'ADMINISTRAÇÃO',
     items: [
       { name: 'Usuários', path: '/admin/usuarios', icon: 'Users', module: 'admin' },

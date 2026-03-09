@@ -11,6 +11,7 @@ import {
   type PedidoStatus,
   type PedidoPrioridade,
 } from "@/shared/constants/status";
+import StatusFiscalBadge from "@/domains/fiscal/components/StatusFiscalBadge";
 
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
@@ -66,6 +67,7 @@ interface PedidoRow {
   data_prometida: string | null;
   data_conclusao: string | null;
   observacoes: string | null;
+  status_fiscal?: string | null;
   created_at: string;
   excluido_em: string | null;
   clientes: {
@@ -211,7 +213,7 @@ export default function PedidosPage() {
     queryFn: async () => {
       const { data, error } = await supabase
         .from("pedidos")
-        .select("*, clientes(nome_fantasia, razao_social), pedido_itens(count)")
+        .select("*, status_fiscal, clientes(nome_fantasia, razao_social), pedido_itens(count)")
         .is("excluido_em", null)
         .order("created_at", { ascending: false });
 
@@ -592,6 +594,11 @@ export default function PedidosPage() {
                           >
                             {prioCfg?.label ?? pedido.prioridade}
                           </span>
+                          {pedido.status_fiscal ? (
+                            <StatusFiscalBadge status={pedido.status_fiscal} size="sm" />
+                          ) : (
+                            <span className="text-xs text-slate-400">—</span>
+                          )}
                           {overdue && (
                             <span className="text-xs font-semibold px-2 py-0.5 rounded-md border bg-red-50 text-red-600 border-red-200 flex items-center gap-1">
                               <AlertTriangle size={12} />

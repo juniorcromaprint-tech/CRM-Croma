@@ -1,0 +1,194 @@
+import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
+import { supabase } from '@/integrations/supabase/client';
+import { showSuccess, showError } from '@/utils/toast';
+
+export function useFiscalDocumentos(filters?: { status?: string; pedido_id?: string }) {
+  return useQuery({
+    queryKey: ['fiscal_documentos', filters],
+    queryFn: async () => {
+      let query = supabase
+        .from('fiscal_documentos')
+        .select(`*, clientes(razao_social, nome_fantasia), pedidos(numero), fiscal_ambientes(nome, tipo), fiscal_series(serie)`)
+        .order('created_at', { ascending: false })
+        .limit(200);
+      if (filters?.status) query = query.eq('status', filters.status);
+      if (filters?.pedido_id) query = query.eq('pedido_id', filters.pedido_id);
+      const { data, error } = await query;
+      if (error) throw error;
+      return data ?? [];
+    },
+  });
+}
+
+export function useFiscalDocumento(id: string | null) {
+  return useQuery({
+    queryKey: ['fiscal_documento', id],
+    enabled: !!id,
+    queryFn: async () => {
+      const { data, error } = await supabase
+        .from('fiscal_documentos')
+        .select(`*, fiscal_documentos_itens(*), fiscal_eventos(*), fiscal_xmls(*), clientes(*), pedidos(numero, status, valor_total), fiscal_ambientes(nome, tipo), fiscal_series(serie), fiscal_certificados(nome, validade_fim)`)
+        .eq('id', id!)
+        .single();
+      if (error) throw error;
+      return data;
+    },
+  });
+}
+
+export function useFiscalAmbientes() {
+  return useQuery({
+    queryKey: ['fiscal_ambientes'],
+    queryFn: async () => {
+      const { data, error } = await supabase.from('fiscal_ambientes').select('*').order('tipo');
+      if (error) throw error;
+      return data ?? [];
+    },
+  });
+}
+
+export function useFiscalSeries() {
+  return useQuery({
+    queryKey: ['fiscal_series'],
+    queryFn: async () => {
+      const { data, error } = await supabase.from('fiscal_series').select('*, fiscal_ambientes(nome, tipo)').order('serie');
+      if (error) throw error;
+      return data ?? [];
+    },
+  });
+}
+
+export function useFiscalCertificados() {
+  return useQuery({
+    queryKey: ['fiscal_certificados'],
+    queryFn: async () => {
+      const { data, error } = await supabase
+        .from('fiscal_certificados')
+        .select('id, nome, tipo_certificado, thumbprint, cnpj_titular, validade_inicio, validade_fim, ambiente_id, ativo, ultimo_teste_em, ultimo_teste_status, observacoes, created_at, updated_at')
+        .order('created_at', { ascending: false });
+      if (error) throw error;
+      return data ?? [];
+    },
+  });
+}
+
+export function useFiscalRegras() {
+  return useQuery({
+    queryKey: ['fiscal_regras_operacao'],
+    queryFn: async () => {
+      const { data, error } = await supabase
+        .from('fiscal_regras_operacao')
+        .select('*, fiscal_series(serie), fiscal_ambientes(nome, tipo)')
+        .order('prioridade_regra', { ascending: false });
+      if (error) throw error;
+      return data ?? [];
+    },
+  });
+}
+
+export function useFiscalFila() {
+  return useQuery({
+    queryKey: ['fiscal_filas_emissao'],
+    queryFn: async () => {
+      const { data, error } = await supabase
+        .from('fiscal_filas_emissao')
+        .select(`*, fiscal_documentos(id, status, valor_total, tipo_documento, clientes(razao_social), pedidos(numero))`)
+        .order('created_at', { ascending: false })
+        .limit(100);
+      if (error) throw error;
+      return data ?? [];
+    },
+    refetchInterval: 15000,
+  });
+}
+
+export function useFiscalAuditLogs(params?: { entidade_id?: string }) {
+  return useQuery({
+    queryKey: ['fiscal_audit_logs', params],
+    queryFn: async () => {
+      let query = supabase.from('fiscal_audit_logs').select('*').order('created_at', { ascending: false }).limit(500);
+      if (params?.entidade_id) query = query.eq('entidade_id', params.entidade_id);
+      const { data, error } = await query;
+      if (error) throw error;
+      return data ?? [];
+    },
+  });
+}
+
+export function useGerarRascunhoFiscal() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: async (pedidoId: string) => {
+      const { data, error } = await supabase.rpc('fiscal_criar_rascunho_nfe', {
+        p_pedido_id: pedidoId,
+        p_user_id: '00000000-0000-0000-0000-000000000000',
+        p_provider: 'nfe_provider',
+      });
+      if (error) throw error;
+      return data as string;
+    },
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: ['fiscal_documentos'] });
+      qc.invalidateQueries({ queryKey: ['pedidos'] });
+      showSuccess('Rascunho fiscal gerado com sucesso!');
+    },
+    onError: (err: any) => showError(err.message ?? 'Erro ao gerar rascunho fiscal'),
+  });
+}
+
+export function useEmitirNFe() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: async (documentoId: string) => {
+      const { data, error } = await supabase.functions.invoke('fiscal-emitir-nfe', {
+        body: { documento_id: documentoId },
+      });
+      if (error) throw error;
+      return data as any;
+    },
+    onSuccess: (data: any) => {
+      qc.invalidateQueries({ queryKey: ['fiscal_documentos'] });
+      qc.invalidateQueries({ queryKey: ['pedidos'] });
+      if (data?.sucesso) {
+        showSuccess(`NF-e autorizada! Protocolo: ${data.protocolo ?? '---'}`);
+      } else {
+        showError('NF-e rejeitada: ' + (data?.mensagem_erro ?? 'Verifique os dados'));
+      }
+    },
+    onError: (err: any) => showError(err.message ?? 'Erro ao emitir NF-e'),
+  });
+}
+
+export function useCancelarNFe() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: async ({ documentoId, justificativa }: { documentoId: string; justificativa: string }) => {
+      const { data, error } = await supabase.functions.invoke('fiscal-cancelar-nfe', {
+        body: { documento_id: documentoId, justificativa },
+      });
+      if (error) throw error;
+      return data as any;
+    },
+    onSuccess: (data: any) => {
+      qc.invalidateQueries({ queryKey: ['fiscal_documentos'] });
+      qc.invalidateQueries({ queryKey: ['pedidos'] });
+      if (data?.sucesso) {
+        showSuccess('NF-e cancelada com sucesso!');
+      } else {
+        showError('Erro no cancelamento: ' + (data?.mensagem ?? 'Erro desconhecido'));
+      }
+    },
+    onError: (err: any) => showError(err.message ?? 'Erro ao cancelar NF-e'),
+  });
+}
+
+export function useValidarPedidoFiscal() {
+  return useMutation({
+    mutationFn: async (pedidoId: string) => {
+      const { data, error } = await supabase.rpc('fiscal_validar_pedido_nfe', { p_pedido_id: pedidoId });
+      if (error) throw error;
+      return Array.isArray(data) ? data[0] : data;
+    },
+    onError: (err: any) => showError(err.message ?? 'Erro na validação fiscal'),
+  });
+}

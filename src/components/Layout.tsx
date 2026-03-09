@@ -33,6 +33,12 @@ import {
   Settings,
   Shield,
   Menu,
+  Receipt,
+  FileCheck,
+  List,
+  SlidersHorizontal,
+  Key,
+  BookOpen,
   type LucideIcon,
 } from "lucide-react";
 
@@ -55,6 +61,12 @@ const ICON_MAP: Record<string, LucideIcon> = {
   Users,
   Settings,
   Shield,
+  Receipt,
+  FileCheck,
+  List,
+  SlidersHorizontal,
+  Key,
+  BookOpen,
 };
 
 // ---------------------------------------------------------------------------
