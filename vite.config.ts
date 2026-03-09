@@ -7,7 +7,7 @@ import { VitePWA } from 'vite-plugin-pwa';
 export default defineConfig(() => ({
   server: {
     host: "::",
-    port: 8080,
+    port: parseInt(process.env.PORT || "8080"),
   },
   plugins: [
     dyadComponentTagger(),
@@ -51,7 +51,7 @@ export default defineConfig(() => ({
         clientsClaim: true,
         runtimeCaching: [
           {
-            urlPattern: /^https:\/\/vsxzrbremdmcdunwfeuu\.supabase\.co\/rest\/v1\/.*/i,
+            urlPattern: /^https:\/\/djwjmfgplnqyffdcgdaw\.supabase\.co\/rest\/v1\/.*/i,
             handler: 'NetworkFirst',
             options: {
               cacheName: 'supabase-api-cache',

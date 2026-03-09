@@ -1,6 +1,6 @@
 import React from "react";
 import { Link, useLocation, Outlet } from "react-router-dom";
-import { Home, ClipboardList, Users, Settings as SettingsIcon, Menu, ShieldCheck, Map as MapIcon, BarChart3, FileText } from "lucide-react";
+import { Home, ClipboardList, Users, Settings as SettingsIcon, Menu, ShieldCheck, Map as MapIcon, BarChart3, FileText, Building2, Receipt, Kanban, Package, Wallet } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Sheet, SheetContent, SheetTrigger } from "@/components/ui/sheet";
 import { useAuth } from "@/contexts/AuthContext";
@@ -36,35 +36,62 @@ export default function Layout() {
     { name: "Início", path: "/", icon: Home },
     { name: "Instalações", path: "/jobs", icon: ClipboardList },
     { name: "Mapa", path: "/map", icon: MapIcon },
-    { name: "Clientes", path: "/clients", icon: Users },
   ];
 
-  if (profile?.role === 'admin') {
-    navItems.push({ name: "Relatórios", path: "/analytics", icon: BarChart3 });
-    navItems.push({ name: "Faturamento", path: "/billing-report", icon: FileText });
-    navItems.push({ name: "Equipe", path: "/team", icon: ShieldCheck });
-  }
+  // Módulo comercial (separador visual)
+  const navComercial = [
+    { name: "Clientes", path: "/clientes", icon: Building2 },
+    { name: "Orçamentos", path: "/orcamentos", icon: Receipt },
+    { name: "Funil de Vendas", path: "/funil-vendas", icon: Kanban },
+    { name: "Produtos", path: "/produtos", icon: Package },
+  ];
+
+  // Mostrar admin para admins ou em modo demo (sem login)
+  const isAdmin = !profile || profile?.role === 'admin';
+  const navAdmin = isAdmin ? [
+    { name: "Relatórios", path: "/analytics", icon: BarChart3 },
+    { name: "Faturamento", path: "/billing-report", icon: FileText },
+    { name: "Financeiro", path: "/financeiro", icon: Wallet },
+    { name: "Equipe", path: "/team", icon: ShieldCheck },
+  ] : [];
+
+  const NavLink = ({ item }: { item: { name: string; path: string; icon: any } }) => {
+    const Icon = item.icon;
+    const isActive = location.pathname === item.path || (item.path !== "/" && location.pathname.startsWith(item.path));
+    return (
+      <Link
+        to={item.path}
+        className={`flex items-center gap-3 px-4 py-3 rounded-2xl transition-all duration-200 ${
+          isActive
+            ? "bg-blue-600 text-white shadow-md"
+            : "text-slate-600 hover:bg-blue-50 hover:text-blue-600"
+        }`}
+      >
+        <Icon size={20} className={isActive ? "text-white" : "text-slate-400"} />
+        <span className="font-medium">{item.name}</span>
+      </Link>
+    );
+  };
 
   const NavLinks = () => (
     <>
-      {navItems.map((item) => {
-        const Icon = item.icon;
-        const isActive = location.pathname === item.path || (item.path !== "/" && location.pathname.startsWith(item.path));
-        return (
-          <Link
-            key={item.name}
-            to={item.path}
-            className={`flex items-center gap-3 px-4 py-3 rounded-2xl transition-all duration-200 ${
-              isActive
-                ? "bg-blue-600 text-white shadow-md"
-                : "text-slate-600 hover:bg-blue-50 hover:text-blue-600"
-            }`}
-          >
-            <Icon size={20} className={isActive ? "text-white" : "text-slate-400"} />
-            <span className="font-medium">{item.name}</span>
-          </Link>
-        );
-      })}
+      {navItems.map((item) => <NavLink key={item.name} item={item} />)}
+
+      {/* Separador Comercial */}
+      <div className="pt-3 pb-1">
+        <p className="px-4 text-[10px] font-bold text-slate-400 uppercase tracking-widest">Comercial</p>
+      </div>
+      {navComercial.map((item) => <NavLink key={item.name} item={item} />)}
+
+      {/* Admin */}
+      {navAdmin.length > 0 && (
+        <>
+          <div className="pt-3 pb-1">
+            <p className="px-4 text-[10px] font-bold text-slate-400 uppercase tracking-widest">Administração</p>
+          </div>
+          {navAdmin.map((item) => <NavLink key={item.name} item={item} />)}
+        </>
+      )}
     </>
   );
 
@@ -137,7 +164,7 @@ export default function Layout() {
 
       {/* Mobile Bottom Nav */}
       <nav className="md:hidden fixed bottom-0 left-0 right-0 bg-white border-t border-slate-200 flex justify-around p-2 pb-safe z-20 print:hidden">
-        {navItems.slice(0, 4).map((item) => {
+        {[...navItems, ...navComercial].slice(0, 4).map((item) => {
           const Icon = item.icon;
           const isActive = location.pathname === item.path || (item.path !== "/" && location.pathname.startsWith(item.path));
           return (

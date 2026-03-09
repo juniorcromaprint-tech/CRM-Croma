@@ -1,6 +1,6 @@
 import React, { useState } from "react";
 import { Link, useNavigate } from "react-router-dom";
-import { CheckCircle2, Clock, AlertCircle, ArrowRight, MapPin, Plus, Store, Users, ClipboardList } from "lucide-react";
+import { CheckCircle2, Clock, AlertCircle, ArrowRight, MapPin, Plus, Store, Users, ClipboardList, TrendingUp, Trophy, Building2, FileText } from "lucide-react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { useQuery } from "@tanstack/react-query";
@@ -232,6 +232,168 @@ export default function Index() {
               <span className="font-bold text-slate-700 text-base">Clientes</span>
             </Link>
           </div>
+        </div>
+      </div>
+
+      {/* === MÓDULO COMERCIAL === */}
+      <div className="pt-4 border-t border-slate-200 mt-2">
+        <h2 className="text-lg font-bold text-slate-700 mb-4 flex items-center gap-2">
+          <TrendingUp size={20} className="text-blue-600" />
+          Comercial
+        </h2>
+
+        {/* KPI Cards */}
+        <div className="grid grid-cols-2 md:grid-cols-4 gap-3 mb-4">
+          {/* Pipeline */}
+          <Card className="border-none shadow-sm rounded-2xl bg-white">
+            <CardContent className="p-4 flex items-center gap-3">
+              <div className="w-10 h-10 rounded-xl flex items-center justify-center bg-blue-100 shrink-0">
+                <TrendingUp size={18} className="text-blue-600" />
+              </div>
+              <div>
+                <p className="text-[11px] font-semibold text-slate-500 uppercase tracking-wide leading-none mb-1">Pipeline</p>
+                <p className="text-lg font-black text-slate-800 leading-none">R$ 354.500</p>
+              </div>
+            </CardContent>
+          </Card>
+
+          {/* Ganho/Mês */}
+          <Card className="border-none shadow-sm rounded-2xl bg-white">
+            <CardContent className="p-4 flex items-center gap-3">
+              <div className="w-10 h-10 rounded-xl flex items-center justify-center bg-emerald-100 shrink-0">
+                <Trophy size={18} className="text-emerald-600" />
+              </div>
+              <div>
+                <p className="text-[11px] font-semibold text-slate-500 uppercase tracking-wide leading-none mb-1">Ganho/Mês</p>
+                <p className="text-lg font-black text-slate-800 leading-none">R$ 27.350</p>
+              </div>
+            </CardContent>
+          </Card>
+
+          {/* Orçamentos Abertos */}
+          <Card className="border-none shadow-sm rounded-2xl bg-white">
+            <CardContent className="p-4 flex items-center gap-3">
+              <div className="w-10 h-10 rounded-xl flex items-center justify-center bg-amber-100 shrink-0">
+                <FileText size={18} className="text-amber-600" />
+              </div>
+              <div>
+                <p className="text-[11px] font-semibold text-slate-500 uppercase tracking-wide leading-none mb-1">Orçamentos</p>
+                <p className="text-lg font-black text-slate-800 leading-none">4 abertos</p>
+              </div>
+            </CardContent>
+          </Card>
+
+          {/* Clientes */}
+          <Card className="border-none shadow-sm rounded-2xl bg-white">
+            <CardContent className="p-4 flex items-center gap-3">
+              <div className="w-10 h-10 rounded-xl flex items-center justify-center bg-slate-100 shrink-0">
+                <Building2 size={18} className="text-slate-600" />
+              </div>
+              <div>
+                <p className="text-[11px] font-semibold text-slate-500 uppercase tracking-wide leading-none mb-1">Clientes</p>
+                <p className="text-lg font-black text-slate-800 leading-none">7</p>
+              </div>
+            </CardContent>
+          </Card>
+        </div>
+
+        {/* Two columns: Recent Orçamentos + Funil */}
+        <div className="grid md:grid-cols-2 gap-4">
+
+          {/* Últimos Orçamentos */}
+          <Card className="border-none shadow-sm rounded-2xl bg-white">
+            <CardHeader className="flex flex-row items-center justify-between pb-2 pt-5 px-5">
+              <CardTitle className="text-base font-black text-slate-800">Últimos Orçamentos</CardTitle>
+              <Link
+                to="/orcamentos"
+                className="text-xs font-bold text-blue-600 hover:text-blue-800 flex items-center gap-1"
+              >
+                Ver todos <ArrowRight size={13} />
+              </Link>
+            </CardHeader>
+            <CardContent className="px-5 pb-5 pt-1">
+              <div className="space-y-2">
+                {[
+                  { id: "ORC-2026-002", title: "Campanha Verão 2026", client: "Renner", status: "enviado", value: "R$ 32.800" },
+                  { id: "ORC-2026-004", title: "Proj. Visual Shopping", client: "Paquetá", status: "aprovado", value: "R$ 27.350" },
+                  { id: "ORC-2026-007", title: "Totem + Painel", client: "Kreatif", status: "enviado", value: "R$ 12.300" },
+                  { id: "ORC-2026-003", title: "Adesivação Vitrine", client: "São João", status: "rascunho", value: "R$ 4.200" },
+                ].map((orc) => {
+                  const badgeMap: Record<string, string> = {
+                    rascunho: "bg-slate-100 text-slate-600",
+                    enviado: "bg-blue-100 text-blue-700",
+                    aprovado: "bg-emerald-100 text-emerald-700",
+                    convertido: "bg-purple-100 text-purple-700",
+                  };
+                  return (
+                    <Link
+                      key={orc.id}
+                      to="/orcamentos"
+                      className="flex items-center gap-2 p-3 rounded-xl border border-slate-100 hover:border-blue-200 hover:bg-blue-50/30 transition-all group"
+                    >
+                      <span className={`text-[10px] font-bold px-2 py-0.5 rounded-md shrink-0 ${badgeMap[orc.status]}`}>
+                        {orc.status.charAt(0).toUpperCase() + orc.status.slice(1)}
+                      </span>
+                      <div className="flex-1 min-w-0">
+                        <p className="text-sm font-bold text-slate-800 truncate">{orc.title}</p>
+                        <p className="text-[11px] text-slate-500 truncate">{orc.id} · {orc.client}</p>
+                      </div>
+                      <span className="text-sm font-black text-slate-700 shrink-0">{orc.value}</span>
+                      <ArrowRight size={13} className="text-slate-300 group-hover:text-blue-500 transition-colors shrink-0" />
+                    </Link>
+                  );
+                })}
+              </div>
+            </CardContent>
+          </Card>
+
+          {/* Funil de Vendas */}
+          <Card className="border-none shadow-sm rounded-2xl bg-white">
+            <CardHeader className="flex flex-row items-center justify-between pb-2 pt-5 px-5">
+              <CardTitle className="text-base font-black text-slate-800">Funil de Vendas</CardTitle>
+              <Link
+                to="/funil-vendas"
+                className="text-xs font-bold text-blue-600 hover:text-blue-800 flex items-center gap-1"
+              >
+                Ver funil <ArrowRight size={13} />
+              </Link>
+            </CardHeader>
+            <CardContent className="px-5 pb-5 pt-1">
+              {(() => {
+                const stages = [
+                  { label: "Prospecto", count: 1, value: 94000, color: "bg-slate-400", dot: "bg-slate-400" },
+                  { label: "Contato Feito", count: 2, value: 40500, color: "bg-blue-400", dot: "bg-blue-400" },
+                  { label: "Proposta Enviada", count: 2, value: 110000, color: "bg-blue-500", dot: "bg-blue-500" },
+                  { label: "Negociação", count: 2, value: 110000, color: "bg-amber-500", dot: "bg-amber-500" },
+                  { label: "Ganho (mês)", count: 1, value: 27350, color: "bg-emerald-500", dot: "bg-emerald-500" },
+                ];
+                const maxValue = Math.max(...stages.map((s) => s.value));
+                return (
+                  <div className="space-y-3">
+                    {stages.map((stage) => (
+                      <div key={stage.label} className="flex items-center gap-2">
+                        <span className={`w-2 h-2 rounded-full shrink-0 ${stage.dot}`} />
+                        <span className="text-xs font-semibold text-slate-600 w-32 shrink-0 truncate">{stage.label}</span>
+                        <span className="text-[11px] text-slate-400 w-12 shrink-0">{stage.count} op.</span>
+                        <div className="flex-1 bg-slate-100 rounded-full h-2 overflow-hidden">
+                          <div
+                            className={`h-2 rounded-full ${stage.color}`}
+                            style={{ width: `${Math.round((stage.value / maxValue) * 100)}%` }}
+                          />
+                        </div>
+                        <span className="text-xs font-black text-slate-700 w-20 text-right shrink-0">
+                          {stage.value >= 1000
+                            ? `R$ ${(stage.value / 1000).toFixed(0)}k`
+                            : `R$ ${stage.value}`}
+                        </span>
+                      </div>
+                    ))}
+                  </div>
+                );
+              })()}
+            </CardContent>
+          </Card>
+
         </div>
       </div>
 
