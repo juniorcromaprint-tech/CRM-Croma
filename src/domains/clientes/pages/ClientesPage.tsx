@@ -21,10 +21,10 @@ import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 
 const CLASSIFICACAO_CONFIG: Record<string, { label: string; color: string; icon: string }> = {
-  bronze: { label: "Bronze", color: "bg-orange-100 text-orange-700 border-orange-200", icon: "🥉" },
-  prata: { label: "Prata", color: "bg-slate-100 text-slate-600 border-slate-200", icon: "🥈" },
-  ouro: { label: "Ouro", color: "bg-yellow-100 text-yellow-700 border-yellow-200", icon: "🥇" },
-  diamante: { label: "Diamante", color: "bg-blue-100 text-blue-700 border-blue-200", icon: "💎" },
+  A: { label: "A", color: "bg-blue-100 text-blue-700 border-blue-200", icon: "💎" },
+  B: { label: "B", color: "bg-yellow-100 text-yellow-700 border-yellow-200", icon: "🥇" },
+  C: { label: "C", color: "bg-slate-100 text-slate-600 border-slate-200", icon: "🥈" },
+  D: { label: "D", color: "bg-orange-100 text-orange-700 border-orange-200", icon: "🥉" },
 };
 
 const SEGMENTO_LABELS: Record<string, string> = {
@@ -43,7 +43,7 @@ export default function ClientesPage() {
 
   const [form, setForm] = useState({
     razao_social: "", nome_fantasia: "", cnpj: "", segmento: "",
-    classificacao: "bronze", email: "", telefone: "", website: "",
+    classificacao: "C", email: "", telefone: "", website: "",
     endereco_cidade: "", endereco_estado: "", observacoes: "",
   });
 
@@ -52,7 +52,7 @@ export default function ClientesPage() {
     queryFn: async () => {
       let query = supabase
         .from("clientes")
-        .select("*, unidades_cliente(count)")
+        .select("*, cliente_unidades(count)")
         .eq("ativo", true)
         .order("nome_fantasia", { ascending: true });
 
@@ -68,7 +68,12 @@ export default function ClientesPage() {
 
   const createCliente = useMutation({
     mutationFn: async (newCliente: typeof form) => {
-      const { error } = await supabase.from("clientes").insert(newCliente);
+      const { endereco_cidade, endereco_estado, ...rest } = newCliente;
+      const { error } = await supabase.from("clientes").insert({
+        ...rest,
+        cidade: endereco_cidade,
+        estado: endereco_estado,
+      });
       if (error) throw error;
     },
     onSuccess: () => {
@@ -76,7 +81,7 @@ export default function ClientesPage() {
       queryClient.invalidateQueries({ queryKey: ["dashboard"] });
       showSuccess("Cliente criado com sucesso!");
       setShowNew(false);
-      setForm({ razao_social: "", nome_fantasia: "", cnpj: "", segmento: "", classificacao: "bronze", email: "", telefone: "", website: "", endereco_cidade: "", endereco_estado: "", observacoes: "" });
+      setForm({ razao_social: "", nome_fantasia: "", cnpj: "", segmento: "", classificacao: "C", email: "", telefone: "", website: "", endereco_cidade: "", endereco_estado: "", observacoes: "" });
     },
     onError: (err: any) => showError(err.message || "Erro ao criar cliente"),
   });
@@ -178,8 +183,8 @@ export default function ClientesPage() {
                       {c.cnpj && <span className="font-mono text-xs">{formatCNPJ(c.cnpj)}</span>}
                       {c.telefone && <span className="flex items-center gap-1"><Phone size={13} /> {formatPhone(c.telefone)}</span>}
                       {c.email && <span className="flex items-center gap-1"><Mail size={13} /> {c.email}</span>}
-                      {c.endereco_cidade && (
-                        <span className="flex items-center gap-1"><MapPin size={13} /> {c.endereco_cidade}/{c.endereco_estado}</span>
+                      {c.cidade && (
+                        <span className="flex items-center gap-1"><MapPin size={13} /> {c.cidade}/{c.estado}</span>
                       )}
                       {c.unidades_cliente?.[0]?.count > 0 && (
                         <span className="text-xs text-blue-500 font-medium">{c.unidades_cliente[0].count} unidade(s)</span>
