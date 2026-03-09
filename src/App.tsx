@@ -13,9 +13,13 @@ import PipelinePage from "@/domains/comercial/pages/PipelinePage";
 import PropostasPage from "@/domains/comercial/pages/PropostasPage";
 import ClientesPage from "@/domains/clientes/pages/ClientesPage";
 
+// ---- Phase 2 Domain Pages ----
+import PedidosPage from "@/domains/pedidos/pages/PedidosPage";
+import FinanceiroPage from "@/domains/financeiro/pages/FinanceiroPage";
+import ComissoesPage from "@/domains/financeiro/pages/ComissoesPage";
+
 // ---- Legacy pages (still usable) ----
 import ClienteDetailPage from "@/domains/clientes/pages/ClienteDetailPage";
-import Financeiro from "./pages/Financeiro";
 import Produtos from "./pages/Produtos";
 import Settings from "./pages/Settings";
 
@@ -66,7 +70,7 @@ const App = () => (
               <Route path="clientes/:id" element={<ClienteDetailPage />} />
 
               {/* ===== OPERACIONAL ===== */}
-              <Route path="pedidos" element={<PlaceholderPage title="Pedidos" description="Gestão completa de pedidos com workflow de status" phase="Fase 2" />} />
+              <Route path="pedidos" element={<PedidosPage />} />
               <Route path="producao" element={<PlaceholderPage title="Produção" description="Ordens de produção, etapas e apontamentos" phase="Fase 3" />} />
               <Route path="instalacoes" element={<PlaceholderPage title="Instalações" description="Agendamento e acompanhamento de instalações em campo" phase="Fase 4" />} />
 
@@ -76,9 +80,8 @@ const App = () => (
               <Route path="produtos" element={<Produtos />} />
 
               {/* ===== FINANCEIRO ===== */}
-              <Route path="financeiro" element={<Financeiro />} />
-              <Route path="dre" element={<PlaceholderPage title="DRE" description="Demonstrativo de Resultado do Exercício" phase="Fase 2" />} />
-              <Route path="comissoes" element={<PlaceholderPage title="Comissões" description="Cálculo e acompanhamento de comissões de vendedores" phase="Fase 2" />} />
+              <Route path="financeiro" element={<FinanceiroPage />} />
+              <Route path="comissoes" element={<ComissoesPage />} />
 
               {/* ===== QUALIDADE ===== */}
               <Route path="ocorrencias" element={<PlaceholderPage title="Ocorrências" description="Registro e tratativa de não-conformidades" phase="Fase 5" />} />
