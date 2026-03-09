@@ -18,6 +18,15 @@ import PedidosPage from "@/domains/pedidos/pages/PedidosPage";
 import FinanceiroPage from "@/domains/financeiro/pages/FinanceiroPage";
 import ComissoesPage from "@/domains/financeiro/pages/ComissoesPage";
 
+// ---- Phase 3 Domain Pages ----
+import ProducaoPage from "@/domains/producao/pages/ProducaoPage";
+import EstoquePage from "@/domains/estoque/pages/EstoquePage";
+
+// ---- Phase 4-5 Domain Pages ----
+import ComprasPage from "@/domains/compras/pages/ComprasPage";
+import InstalacaoPage from "@/domains/instalacao/pages/InstalacaoPage";
+import OcorrenciasPage from "@/domains/qualidade/pages/OcorrenciasPage";
+
 // ---- Legacy pages (still usable) ----
 import ClienteDetailPage from "@/domains/clientes/pages/ClienteDetailPage";
 import Produtos from "./pages/Produtos";
@@ -71,12 +80,12 @@ const App = () => (
 
               {/* ===== OPERACIONAL ===== */}
               <Route path="pedidos" element={<PedidosPage />} />
-              <Route path="producao" element={<PlaceholderPage title="Produção" description="Ordens de produção, etapas e apontamentos" phase="Fase 3" />} />
-              <Route path="instalacoes" element={<PlaceholderPage title="Instalações" description="Agendamento e acompanhamento de instalações em campo" phase="Fase 4" />} />
+              <Route path="producao" element={<ProducaoPage />} />
+              <Route path="instalacoes" element={<InstalacaoPage />} />
 
               {/* ===== SUPRIMENTOS ===== */}
-              <Route path="estoque" element={<PlaceholderPage title="Estoque" description="Saldos, movimentações e inventário de materiais" phase="Fase 3" />} />
-              <Route path="compras" element={<PlaceholderPage title="Compras" description="Solicitações, cotações e pedidos de compra" phase="Fase 5" />} />
+              <Route path="estoque" element={<EstoquePage />} />
+              <Route path="compras" element={<ComprasPage />} />
               <Route path="produtos" element={<Produtos />} />
 
               {/* ===== FINANCEIRO ===== */}
@@ -84,7 +93,7 @@ const App = () => (
               <Route path="comissoes" element={<ComissoesPage />} />
 
               {/* ===== QUALIDADE ===== */}
-              <Route path="ocorrencias" element={<PlaceholderPage title="Ocorrências" description="Registro e tratativa de não-conformidades" phase="Fase 5" />} />
+              <Route path="ocorrencias" element={<OcorrenciasPage />} />
 
               {/* ===== ADMINISTRAÇÃO ===== */}
               <Route path="admin/usuarios" element={<PlaceholderPage title="Usuários" description="Gestão de usuários, perfis e permissões" phase="Fase 6" />} />
