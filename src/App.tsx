@@ -9,10 +9,12 @@ import Layout from "./components/Layout";
 // ---- Domain Pages (real) ----
 import DashboardPage from "@/domains/comercial/pages/DashboardPage";
 import LeadsPage from "@/domains/comercial/pages/LeadsPage";
+import PipelinePage from "@/domains/comercial/pages/PipelinePage";
+import PropostasPage from "@/domains/comercial/pages/PropostasPage";
 import ClientesPage from "@/domains/clientes/pages/ClientesPage";
 
 // ---- Legacy pages (still usable) ----
-import ClienteDetail from "./pages/ClienteDetail";
+import ClienteDetailPage from "@/domains/clientes/pages/ClienteDetailPage";
 import Financeiro from "./pages/Financeiro";
 import Produtos from "./pages/Produtos";
 import Settings from "./pages/Settings";
@@ -56,12 +58,12 @@ const App = () => (
 
               {/* ===== COMERCIAL ===== */}
               <Route path="leads" element={<LeadsPage />} />
-              <Route path="pipeline" element={<PlaceholderPage title="Pipeline de Vendas" description="Visão Kanban do funil comercial com drag-and-drop" phase="Fase 1 — Em desenvolvimento" />} />
-              <Route path="propostas" element={<PlaceholderPage title="Propostas Comerciais" description="Gestão de propostas com versionamento e aprovação" phase="Fase 1 — Em desenvolvimento" />} />
+              <Route path="pipeline" element={<PipelinePage />} />
+              <Route path="propostas" element={<PropostasPage />} />
 
               {/* ===== CLIENTES ===== */}
               <Route path="clientes" element={<ClientesPage />} />
-              <Route path="clientes/:id" element={<ClienteDetail />} />
+              <Route path="clientes/:id" element={<ClienteDetailPage />} />
 
               {/* ===== OPERACIONAL ===== */}
               <Route path="pedidos" element={<PlaceholderPage title="Pedidos" description="Gestão completa de pedidos com workflow de status" phase="Fase 2" />} />

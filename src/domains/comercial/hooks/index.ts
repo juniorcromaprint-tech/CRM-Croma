@@ -46,3 +46,50 @@ export type {
   PipelineStage,
   PipelineData,
 } from './usePipeline';
+
+// Oportunidades
+export {
+  useOportunidades,
+  useOportunidade,
+  useCreateOportunidade,
+  useUpdateOportunidade,
+  useOportunidadeStats,
+} from './useOportunidades';
+
+export type {
+  Oportunidade,
+  OportunidadeCreate,
+  OportunidadeUpdate,
+  OportunidadeFilters,
+  OportunidadeFase,
+} from './useOportunidades';
+
+// Atividades Comerciais
+export {
+  useAtividades,
+  useAtividadesRecentes,
+  useCreateAtividade,
+} from './useAtividades';
+
+export type {
+  AtividadeComercial,
+  AtividadeCreate,
+  AtividadeTipo,
+} from './useAtividades';
+
+// Tarefas Comerciais
+export {
+  useTarefas,
+  useTarefasPendentes,
+  useCreateTarefa,
+  useUpdateTarefa,
+} from './useTarefas';
+
+export type {
+  TarefaComercial,
+  TarefaCreate,
+  TarefaUpdate,
+  TarefaTipo,
+  TarefaStatus,
+  TarefaPrioridade,
+} from './useTarefas';
