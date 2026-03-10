@@ -1,12 +1,21 @@
-import React, { createContext, useContext, useEffect, useState } from 'react';
+import React, { createContext, useContext, useEffect, useState, useMemo } from 'react';
 import { Session, User } from '@supabase/supabase-js';
 import { supabase } from '@/integrations/supabase/client';
+import {
+  type RoleName,
+  type Module,
+  type Action,
+  ROLE_PERMISSIONS,
+  getAccessibleModules,
+} from '@/shared/constants/permissions';
+
+export type { RoleName };
 
 type Profile = {
   id: string;
   first_name: string | null;
   last_name: string | null;
-  role: 'admin' | 'instalador' | null;
+  role: RoleName | null;
 };
 
 type AuthContextType = {
@@ -15,6 +24,10 @@ type AuthContextType = {
   profile: Profile | null;
   isLoading: boolean;
   signOut: () => Promise<void>;
+  /** Verifica se o usuário tem permissão para uma ação em um módulo */
+  can: (module: Module, action: Action) => boolean;
+  /** Módulos acessíveis: null = todos (demo/admin) */
+  accessibleModules: string[] | null;
 };
 
 const AuthContext = createContext<AuthContextType | undefined>(undefined);
@@ -33,23 +46,20 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
           .select('*')
           .eq('id', userId)
           .single();
-        
+
         if (!error && data) {
-          setProfile(data);
+          setProfile(data as Profile);
         }
       } catch (error) {
         console.error('Erro ao buscar perfil:', error);
       } finally {
-        // Garante que o carregamento sempre termine, independente de erros
         setIsLoading(false);
       }
     };
 
-    // Busca a sessão inicial ao abrir o app
     supabase.auth.getSession().then(({ data: { session } }) => {
       setSession(session);
       setUser(session?.user ?? null);
-      
       if (session?.user) {
         fetchProfile(session.user.id);
       } else {
@@ -57,11 +67,9 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
       }
     });
 
-    // Escuta mudanças (quando o usuário faz login ou logout)
     const { data: { subscription } } = supabase.auth.onAuthStateChange((_event, session) => {
       setSession(session);
       setUser(session?.user ?? null);
-      
       if (session?.user) {
         fetchProfile(session.user.id);
       } else {
@@ -70,17 +78,30 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
       }
     });
 
-    return () => {
-      subscription.unsubscribe();
-    };
+    return () => { subscription.unsubscribe(); };
   }, []);
 
   const signOut = async () => {
     await supabase.auth.signOut();
   };
 
+  /** Verifica permissão: sem role = demo mode (tudo liberado) */
+  const can = useMemo(() => {
+    return (module: Module, action: Action): boolean => {
+      if (!profile?.role) return true; // demo: tudo liberado
+      const rolePerms = ROLE_PERMISSIONS[profile.role];
+      return rolePerms?.[module]?.includes(action) ?? false;
+    };
+  }, [profile?.role]);
+
+  /** Módulos acessíveis: null = todos (demo mode) */
+  const accessibleModules = useMemo<string[] | null>(() => {
+    if (!profile?.role) return null;
+    return getAccessibleModules(profile.role);
+  }, [profile?.role]);
+
   return (
-    <AuthContext.Provider value={{ session, user, profile, isLoading, signOut }}>
+    <AuthContext.Provider value={{ session, user, profile, isLoading, signOut, can, accessibleModules }}>
       {children}
     </AuthContext.Provider>
   );

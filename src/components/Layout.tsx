@@ -3,6 +3,7 @@ import { Link, useLocation, Outlet } from "react-router-dom";
 import { Button } from "@/components/ui/button";
 import { Sheet, SheetContent, SheetTrigger } from "@/components/ui/sheet";
 import { useAuth } from "@/contexts/AuthContext";
+import { ROLES } from "@/shared/constants/permissions";
 import {
   NAV_GROUPS,
   filterNavByModules,
@@ -39,6 +40,8 @@ import {
   SlidersHorizontal,
   Key,
   BookOpen,
+  LogOut,
+  User,
   type LucideIcon,
 } from "lucide-react";
 
@@ -150,14 +153,11 @@ function SidebarNavGroups({ groups, currentPath }: SidebarNavGroupsProps) {
     <>
       {groups.map((group, groupIdx) => (
         <div key={group.label}>
-          {/* Group label separator */}
           <div className={groupIdx === 0 ? "pb-1" : "pt-4 pb-1"}>
             <p className="px-4 text-[10px] font-bold text-slate-400 uppercase tracking-widest">
               {group.label}
             </p>
           </div>
-
-          {/* Group items */}
           <div className="space-y-1">
             {group.items.map((item) => (
               <SidebarNavLink
@@ -174,23 +174,93 @@ function SidebarNavGroups({ groups, currentPath }: SidebarNavGroupsProps) {
 }
 
 // ---------------------------------------------------------------------------
+// User Info + Logout
+// ---------------------------------------------------------------------------
+
+interface UserSectionProps {
+  onSignOut?: () => void;
+}
+
+function UserSection({ onSignOut }: UserSectionProps) {
+  const { profile, signOut } = useAuth();
+
+  const displayName = profile
+    ? [profile.first_name, profile.last_name].filter(Boolean).join(" ") || "Usuário"
+    : "Demo";
+
+  const roleLabel = profile?.role
+    ? (ROLES[profile.role as keyof typeof ROLES]?.label ?? profile.role)
+    : "Modo Demo";
+
+  const initials = displayName
+    .split(" ")
+    .map((w) => w[0])
+    .slice(0, 2)
+    .join("")
+    .toUpperCase() || "?";
+
+  const handleSignOut = async () => {
+    if (onSignOut) onSignOut();
+    await signOut();
+  };
+
+  return (
+    <div className="pt-3 border-t border-slate-100 space-y-2">
+      {/* User avatar + info */}
+      <div className="flex items-center gap-3 px-2 py-1">
+        <div className="w-8 h-8 rounded-full bg-blue-100 flex items-center justify-center shrink-0">
+          <span className="text-blue-600 font-bold text-xs">{initials}</span>
+        </div>
+        <div className="min-w-0 flex-1">
+          <p className="text-sm font-semibold text-slate-800 truncate">{displayName}</p>
+          <p className="text-[11px] text-slate-500 truncate">{roleLabel}</p>
+        </div>
+      </div>
+
+      {/* Settings link */}
+      <Link
+        to="/settings"
+        className="flex items-center gap-3 px-4 py-2 w-full rounded-2xl transition-colors text-slate-600 hover:bg-slate-100"
+      >
+        <Settings size={16} className="text-slate-400" />
+        <span className="font-medium text-sm">Configurações</span>
+      </Link>
+
+      {/* Logout (only when authenticated) */}
+      {profile && (
+        <button
+          onClick={handleSignOut}
+          className="flex items-center gap-3 px-4 py-2 w-full rounded-2xl transition-colors text-slate-500 hover:bg-red-50 hover:text-red-600 text-sm font-medium"
+        >
+          <LogOut size={16} className="text-slate-400 group-hover:text-red-500" />
+          Sair da conta
+        </button>
+      )}
+    </div>
+  );
+}
+
+// ---------------------------------------------------------------------------
 // Layout
 // ---------------------------------------------------------------------------
 
 export default function Layout() {
   const location = useLocation();
-  const { profile } = useAuth();
+  const { profile, accessibleModules } = useAuth();
 
-  // Demo mode: pass null to show all modules; in production, pass user modules
-  const navGroups = useMemo(() => filterNavByModules(null), []);
+  // Filtra nav pelo role do usuário. null = todos os módulos (demo/admin)
+  const navGroups = useMemo(
+    () => filterNavByModules(accessibleModules),
+    [accessibleModules],
+  );
 
-  // Mobile bottom nav: Dashboard + first 3 items from COMERCIAL group
+  // Mobile bottom nav: Dashboard + primeiros 3 itens do grupo COMERCIAL
   const mobileNavItems = useMemo(() => {
     const dashboard = NAV_GROUPS[0]?.items[0];
-    const comercialGroup = NAV_GROUPS.find((g) => g.label === "COMERCIAL");
+    const comercialGroup = navGroups.find((g) => g.label === "COMERCIAL");
     const comercialItems = comercialGroup?.items.slice(0, 3) ?? [];
     return dashboard ? [dashboard, ...comercialItems] : comercialItems;
-  }, []);
+  }, [navGroups]);
 
   return (
     <div className="h-[100dvh] print:h-auto print:min-h-screen overflow-hidden print:overflow-visible bg-slate-50 flex flex-col md:flex-row print:block font-sans">
@@ -212,19 +282,9 @@ export default function Layout() {
           <SidebarNavGroups groups={navGroups} currentPath={location.pathname} />
         </nav>
 
-        {/* Settings — always at bottom */}
-        <div className="mt-auto pt-4 border-t border-slate-100">
-          <Link
-            to="/settings"
-            className={`flex items-center gap-3 px-4 py-2.5 w-full rounded-2xl transition-colors ${
-              location.pathname === "/settings"
-                ? "bg-blue-50 text-blue-600"
-                : "text-slate-600 hover:bg-slate-100"
-            }`}
-          >
-            <Settings size={20} />
-            <span className="font-medium text-sm">Configurações</span>
-          </Link>
+        {/* User Info + Settings + Logout */}
+        <div className="mt-auto pt-4">
+          <UserSection />
         </div>
       </aside>
 
@@ -249,18 +309,8 @@ export default function Layout() {
                 currentPath={location.pathname}
               />
             </nav>
-            <div className="mt-auto pt-4 border-t border-slate-100">
-              <Link
-                to="/settings"
-                className={`flex items-center gap-3 px-4 py-2.5 w-full rounded-2xl transition-colors ${
-                  location.pathname === "/settings"
-                    ? "bg-blue-50 text-blue-600"
-                    : "text-slate-600 hover:bg-slate-100"
-                }`}
-              >
-                <Settings size={20} />
-                <span className="font-medium text-sm">Configurações</span>
-              </Link>
+            <div className="mt-auto pt-4">
+              <UserSection />
             </div>
           </SheetContent>
         </Sheet>

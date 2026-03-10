@@ -101,6 +101,7 @@ const App = () => (
 
               {/* ===== FINANCEIRO ===== */}
               <Route path="financeiro" element={<FinanceiroPage />} />
+              <Route path="dre" element={<PlaceholderPage />} />
               <Route path="comissoes" element={<ComissoesPage />} />
 
               {/* ===== QUALIDADE ===== */}
@@ -118,6 +119,9 @@ const App = () => (
               <Route path="admin/usuarios" element={<AdminUsuariosPage />} />
               <Route path="admin/config" element={<Settings />} />
               <Route path="admin/auditoria" element={<AdminUsuariosPage />} />
+
+              {/* ===== SETTINGS ===== */}
+              <Route path="settings" element={<Settings />} />
             </Route>
 
             {/* Catch-all */}
