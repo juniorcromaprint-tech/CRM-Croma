@@ -56,6 +56,20 @@ export interface OrcamentoItemPricingResult {
   detalhes: PricingResult;
 }
 
+// ─── Tipos de Precificação ───────────────────────────────────────────────────
+
+// Interface correta para a tabela regras_precificacao (migration 007)
+export interface RegraPrecificacao {
+  id?: string
+  categoria: string
+  markup_minimo: number
+  markup_sugerido: number
+  desconto_maximo?: number | null
+  preco_m2_minimo?: number | null
+  taxa_urgencia?: number | null
+  ativo?: boolean
+}
+
 // ─── Helpers ────────────────────────────────────────────────────────────────
 
 /**
@@ -144,19 +158,16 @@ export function calcOrcamentoTotal(
  */
 export function sugerirMarkup(
   categoria: string | null | undefined,
-  regras: Array<{ tipo: string; categoria: string | null; valor: number }>,
+  regras: RegraPrecificacao[],
 ): number {
+  const ativas = regras.filter(r => r.ativo !== false)
   // Busca regra específica para a categoria
-  const regraCat = regras.find(
-    (r) => r.tipo === "markup_padrao" && r.categoria === categoria,
-  );
-  if (regraCat) return regraCat.valor;
+  const especifica = ativas.find(r => r.categoria === categoria)
+  if (especifica) return especifica.markup_sugerido
 
-  // Fallback: regra geral (categoria null)
-  const regraGeral = regras.find(
-    (r) => r.tipo === "markup_padrao" && !r.categoria,
-  );
-  if (regraGeral) return regraGeral.valor;
+  // Fallback: regra geral
+  const geral = ativas.find(r => r.categoria === 'geral')
+  if (geral) return geral.markup_sugerido
 
   return 40; // Default
 }
@@ -167,18 +178,13 @@ export function sugerirMarkup(
 export function validarMarkup(
   markup: number,
   categoria: string | null | undefined,
-  regras: Array<{ tipo: string; categoria: string | null; valor: number }>,
+  regras: RegraPrecificacao[],
 ): { valido: boolean; markup_minimo: number; aviso: string | null } {
-  const regraCat = regras.find(
-    (r) => r.tipo === "markup_minimo" && r.categoria === categoria,
-  );
-  const regraGeral = regras.find(
-    (r) => r.tipo === "markup_minimo" && !r.categoria,
-  );
-
-  const markup_minimo = regraCat?.valor ?? regraGeral?.valor ?? 25;
-  const valido = markup >= markup_minimo;
-  const aviso = valido ? null : `Markup abaixo do mínimo (${markup_minimo}%). Verifique com seu gestor.`;
+  const ativas = regras.filter(r => r.ativo !== false)
+  const regra = ativas.find(r => r.categoria === categoria) ?? ativas.find(r => r.categoria === 'geral')
+  const markup_minimo = regra?.markup_minimo ?? 25
+  const valido = markup >= markup_minimo
+  const aviso = valido ? null : `Markup abaixo do mínimo (${markup_minimo}%). Verifique com seu gestor.`
 
   return { valido, markup_minimo, aviso };
 }

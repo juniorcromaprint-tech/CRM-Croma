@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from "react";
 import { useNavigate, useParams, Link } from "react-router-dom";
-import { ArrowLeft, Plus, Trash2, Save, Loader2 } from "lucide-react";
+import { ArrowLeft, Plus, Trash2, Save, Loader2, AlertTriangle } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
@@ -8,6 +8,7 @@ import { Label } from "@/components/ui/label";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Separator } from "@/components/ui/separator";
+import { Badge } from "@/components/ui/badge";
 import {
   useOrcamento,
   useCriarOrcamento,
@@ -63,6 +64,7 @@ export default function OrcamentoEditorPage() {
   // Item being added
   const [newItem, setNewItem] = useState<ItemFormState>(DEFAULT_ITEM);
   const [showItemForm, setShowItemForm] = useState(false);
+  const [materiaisSemPreco, setMateriaisSemPreco] = useState<string[]>([]);
 
   // Load clientes for dropdown
   const { data: clientes = [] } = useQuery({
@@ -160,6 +162,7 @@ export default function OrcamentoEditorPage() {
     // Recalculate totals
     await orcamentoService.recalcularTotais(id);
     setNewItem(DEFAULT_ITEM);
+    setMateriaisSemPreco([]);
     setShowItemForm(false);
   };
 
@@ -342,6 +345,11 @@ export default function OrcamentoEditorPage() {
                           {item.largura_cm && item.altura_cm && (
                             <p className="text-xs text-slate-400 mt-0.5">{item.largura_cm}×{item.altura_cm}cm</p>
                           )}
+                          {item.valor_total === 0 && (
+                            <Badge variant="outline" className="text-[10px] h-5 border-amber-300 text-amber-600 bg-amber-50 mt-1">
+                              Precificação Pendente
+                            </Badge>
+                          )}
                         </td>
                         <td className="py-3 px-3 text-right text-slate-600 tabular-nums hidden md:table-cell">{item.quantidade}</td>
                         <td className="py-3 px-3 text-right text-slate-600 tabular-nums hidden md:table-cell">{brl(item.valor_unitario)}</td>
@@ -441,10 +449,21 @@ export default function OrcamentoEditorPage() {
                 {/* Pricing Calculator */}
                 <PricingCalculator resultado={pricingResult} quantidade={newItem.quantidade} />
 
+                {materiaisSemPreco.length > 0 && (
+                  <div className="flex items-start gap-2 bg-amber-50 border border-amber-200 rounded-xl p-3 text-xs text-amber-800">
+                    <AlertTriangle size={14} className="mt-0.5 shrink-0 text-amber-500" />
+                    <span>
+                      <strong>{materiaisSemPreco.length} material(is) sem preço:</strong>{' '}
+                      {materiaisSemPreco.join(', ')}.{' '}
+                      Configure em <strong>Admin → Produtos</strong>.
+                    </span>
+                  </div>
+                )}
+
                 <div className="flex justify-end gap-2">
                   <Button
                     variant="ghost" size="sm" className="rounded-xl"
-                    onClick={() => { setShowItemForm(false); setNewItem(DEFAULT_ITEM); }}
+                    onClick={() => { setShowItemForm(false); setNewItem(DEFAULT_ITEM); setMateriaisSemPreco([]); }}
                   >
                     Cancelar
                   </Button>

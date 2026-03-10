@@ -7,6 +7,7 @@ import {
   validarMarkup,
   type OrcamentoItemInput,
   type OrcamentoItemPricingResult,
+  type RegraPrecificacao,
 } from "@/shared/services/orcamento-pricing.service";
 import { DEFAULT_PRICING_CONFIG, type PricingConfig } from "@/shared/services/pricing-engine";
 
@@ -20,7 +21,7 @@ export function useRegrasPrecificacao() {
         .from("regras_precificacao")
         .select("*")
         .eq("ativo", true)
-        .order("tipo");
+        .order("categoria");
       if (error) throw error;
       return data ?? [];
     },
@@ -80,14 +81,14 @@ export function useOrcamentoPricing(
   }, [item, config]);
 
   const markupSugerido = useMemo(
-    () => sugerirMarkup(categoria, regras as Array<{ tipo: string; categoria: string | null; valor: number }>),
+    () => sugerirMarkup(categoria, regras as RegraPrecificacao[]),
     [categoria, regras],
   );
 
   const validacaoMarkup = useMemo(
     () =>
       item
-        ? validarMarkup(item.markup_percentual, categoria, regras as Array<{ tipo: string; categoria: string | null; valor: number }>)
+        ? validarMarkup(item.markup_percentual, categoria, regras as RegraPrecificacao[])
         : { valido: true, markup_minimo: 25, aviso: null },
     [item, categoria, regras],
   );

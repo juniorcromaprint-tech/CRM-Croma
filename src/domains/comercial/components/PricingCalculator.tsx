@@ -20,10 +20,10 @@ export default function PricingCalculator({ resultado, quantidade = 1 }: Pricing
   }
 
   const rows = [
-    { label: "Matéria Prima (MP)", value: resultado.custoMP, color: "text-slate-600" },
+    { label: "Custo de Material", value: resultado.custoMP, color: "text-slate-600" },
     { label: "Acabamentos", value: resultado.custosAcabamentos, color: "text-slate-600" },
-    { label: "Mão de Obra (MO)", value: resultado.custoMO, color: "text-slate-600" },
-    { label: "Custo Total", value: resultado.custoTotal, color: "text-slate-800 font-semibold" },
+    { label: "Custo de Produção", value: resultado.custoMO, color: "text-slate-600" },
+    { label: "Custo de Produção Total", value: resultado.custoTotal, color: "text-slate-800 font-semibold" },
     { label: "Preço Unitário", value: resultado.precoUnitario, color: "text-blue-700 font-bold" },
     { label: "Preço Total", value: resultado.precoTotal, color: "text-blue-700 font-bold" },
   ];
@@ -34,7 +34,7 @@ export default function PricingCalculator({ resultado, quantidade = 1 }: Pricing
       <div className="flex items-center justify-between px-4 py-3">
         <div className="flex items-center gap-2">
           <Info size={14} className="text-blue-500" />
-          <span className="text-sm font-semibold text-blue-800">Precificação Mubisys</span>
+          <span className="text-sm font-semibold text-blue-800">Precificação</span>
         </div>
         <div className="flex items-center gap-3">
           <span className="text-base font-bold text-blue-800 tabular-nums">{brl(resultado.precoUnitario)}/un</span>
