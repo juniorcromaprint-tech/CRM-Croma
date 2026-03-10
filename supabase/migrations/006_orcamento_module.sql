@@ -24,7 +24,7 @@ CREATE TABLE IF NOT EXISTS servicos (
   custo_hora NUMERIC(12,2) NOT NULL DEFAULT 0,
   horas_estimadas NUMERIC(8,2) DEFAULT 1,
   preco_fixo NUMERIC(12,2), -- se null, usa custo_hora * horas
-  categoria TEXT DEFAULT 'servico' CHECK (categoria IN ('criacao', 'instalacao', 'montagem', 'transporte', 'consultoria', 'outro')),
+  categoria TEXT DEFAULT 'outro' CHECK (categoria IN ('criacao', 'instalacao', 'montagem', 'transporte', 'consultoria', 'outro')),
   ativo BOOLEAN DEFAULT TRUE,
   created_at TIMESTAMPTZ DEFAULT NOW(),
   updated_at TIMESTAMPTZ DEFAULT NOW()

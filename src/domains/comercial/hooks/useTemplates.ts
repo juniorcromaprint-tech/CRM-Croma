@@ -49,7 +49,7 @@ export function useTemplates() {
     queryFn: async () => {
       try {
         const { data, error } = await supabase
-          .from("templates_orcamento" as string)
+          .from("templates_orcamento" as any)
           .select("*")
           .eq("ativo", true)
           .order("nome");
@@ -73,7 +73,7 @@ export function useTemplate(id: string | undefined) {
     queryKey: [TEMPLATES_KEY, id],
     queryFn: async () => {
       const { data, error } = await supabase
-        .from("templates_orcamento" as string)
+        .from("templates_orcamento" as any)
         .select("*")
         .eq("id", id!)
         .single();
@@ -93,7 +93,7 @@ export function useCriarTemplate() {
   return useMutation({
     mutationFn: async (input: TemplateCreateInput) => {
       const { data, error } = await supabase
-        .from("templates_orcamento" as string)
+        .from("templates_orcamento" as any)
         .insert({
           nome: input.nome,
           descricao: input.descricao ?? null,
@@ -122,7 +122,7 @@ export function useAtualizarTemplate() {
   return useMutation({
     mutationFn: async ({ id, updates }: { id: string; updates: Partial<TemplateCreateInput & { ativo: boolean }> }) => {
       const { data, error } = await supabase
-        .from("templates_orcamento" as string)
+        .from("templates_orcamento" as any)
         .update({ ...updates, updated_at: new Date().toISOString() })
         .eq("id", id)
         .select()
@@ -146,7 +146,7 @@ export function useExcluirTemplate() {
   return useMutation({
     mutationFn: async (id: string) => {
       const { error } = await supabase
-        .from("templates_orcamento" as string)
+        .from("templates_orcamento" as any)
         .update({ ativo: false, updated_at: new Date().toISOString() })
         .eq("id", id);
       if (error) throw error;
@@ -195,7 +195,7 @@ export function useCriarTemplateDeOrcamento() {
       }));
 
       const { data, error } = await supabase
-        .from("templates_orcamento" as string)
+        .from("templates_orcamento" as any)
         .insert({
           nome,
           descricao: descricao ?? null,

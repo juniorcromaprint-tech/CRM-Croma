@@ -52,7 +52,6 @@ export interface PricingInput {
   materiais: MaterialItem[];
   processos: ProcessoItem[];
   markupPercentual: number;
-  quantidade?: number;
 }
 
 export interface PricingResult {
@@ -177,7 +176,6 @@ export function calcPricing(
   input: PricingInput,
   config: PricingConfig = DEFAULT_PRICING_CONFIG,
 ): PricingResult {
-  const quantidade = input.quantidade ?? 1;
 
   // =========================================================================
   // PASSO 1: Levantamento de Matéria Prima (Vmp)
@@ -237,29 +235,30 @@ export function calcPricing(
 
   // =========================================================================
   // PASSO 8: Aplicar Markup (Vm)
-  // Vm = (Vam × Pm/100) / (1 - Pv)
+  // Vm = Vam × (Pm/100)
   //
   // Onde Pm = percentual de markup desejado
+  // Nota: Vam já incorporou Pv no Passo 7 — não dividir por (1 - Pv) novamente
   // =========================================================================
-  const valorMarkup = denominadorVendas > 0
-    ? (valorAntesMarkup * input.markupPercentual / 100) / denominadorVendas
-    : valorAntesMarkup * input.markupPercentual / 100;
+  const valorMarkup = valorAntesMarkup * (input.markupPercentual / 100);
 
   // =========================================================================
   // PASSO 9: Valor Final de Venda (Vv)
   // Vv = Vam + Vm
+  //
+  // O motor retorna SEMPRE o preço UNITÁRIO.
+  // A multiplicação por quantidade é responsabilidade de quem chama (orcamento-pricing.service).
   // =========================================================================
-  const precoVendaUnitario = valorAntesMarkup + valorMarkup;
-  const precoVenda = precoVendaUnitario * quantidade;
+  const precoVenda = valorAntesMarkup + valorMarkup;
 
   // =========================================================================
   // MÉTRICAS DERIVADAS
   // =========================================================================
 
-  // Custo total real (MP + MO + fixos rateados)
-  const custoTotal = custoBase * quantidade;
+  // Custo total real (MP + MO + fixos rateados) — unitário
+  const custoTotal = custoBase;
 
-  // Lucro estimado
+  // Lucro estimado — unitário
   const lucroEstimado = precoVenda - custoTotal - (precoVenda * percentualVendas);
 
   // Margem bruta: (preço - custo) / preço × 100
@@ -268,7 +267,7 @@ export function calcPricing(
     : 0;
 
   // Breakdown percentual (sobre preço de venda unitário)
-  const pv = precoVendaUnitario > 0 ? precoVendaUnitario : 1;
+  const pv = precoVenda > 0 ? precoVenda : 1;
   const percMP = (custoMP / pv) * 100;
   const percMO = (custoMO / pv) * 100;
 

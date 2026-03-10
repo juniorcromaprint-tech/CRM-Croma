@@ -275,6 +275,7 @@ export default function OrcamentoEditorPage() {
       propostaId: id,
       item: {
         produto_id: newItem.produto_id,
+        modelo_id: newItem.modelo_id ?? undefined,
         descricao: newItem.descricao,
         especificacao: newItem.especificacao || null,
         quantidade: newItem.quantidade,
@@ -319,9 +320,14 @@ export default function OrcamentoEditorPage() {
     await orcamentoService.recalcularTotais(id);
   };
 
-  const handleTemplateSelect = (template: OrcamentoTemplate) => {
-    // Aplicar template: popula itens (para agora, apenas o primeiro)
-    if (template.itens && template.itens.length > 0) {
+  const handleTemplateSelect = async (template: OrcamentoTemplate) => {
+    if (!template.itens || template.itens.length === 0) {
+      setShowTemplateModal(false);
+      return;
+    }
+
+    if (template.itens.length === 1) {
+      // Single item: populate the editor form
       const firstItem = template.itens[0];
       setNewItem({
         ...DEFAULT_ITEM,
@@ -333,9 +339,43 @@ export default function OrcamentoEditorPage() {
         markup_percentual: firstItem.markup_percentual,
       });
       setShowItemForm(true);
+      setShowTemplateModal(false);
+      showSuccess(`Template "${template.nome}" aplicado!`);
+    } else {
+      // Multiple items: add all directly to the budget
+      if (!id || isNew) {
+        showError("Salve o orcamento antes de aplicar templates com multiplos itens");
+        setShowTemplateModal(false);
+        return;
+      }
+      try {
+        for (const item of template.itens) {
+          const largura = item.largura_cm ?? undefined;
+          const altura = item.altura_cm ?? undefined;
+          await adicionarItem.mutateAsync({
+            propostaId: id,
+            item: {
+              descricao: item.descricao,
+              especificacao: item.especificacao || "",
+              quantidade: item.quantidade ?? 1,
+              largura_cm: largura ?? null,
+              altura_cm: altura ?? null,
+              area_m2: (largura && altura) ? (largura * altura) / 10000 : undefined,
+              markup_percentual: item.markup_percentual ?? 40,
+              valor_unitario: 0,
+              valor_total: 0,
+              materiais: [],
+              acabamentos: [],
+            },
+          });
+        }
+        await orcamentoService.recalcularTotais(id);
+        showSuccess(`${template.itens.length} itens do template "${template.nome}" adicionados`);
+      } catch {
+        showError("Erro ao aplicar template");
+      }
+      setShowTemplateModal(false);
     }
-    setShowTemplateModal(false);
-    showSuccess(`Template "${template.nome}" aplicado!`);
   };
 
   // ─── Derived data ───────────────────────────────────────────────────────
@@ -704,6 +744,11 @@ export default function OrcamentoEditorPage() {
                             <AlertTriangle size={14} />
                             {validacaoMarkup.aviso}
                           </div>
+                        )}
+                        {validacaoMarkup.valido && newItem.markup_percentual < 30 && (
+                          <p className="text-xs text-amber-600 mt-1">
+                            ⚠️ Markup abaixo de 30% — verifique a rentabilidade
+                          </p>
                         )}
                       </div>
 

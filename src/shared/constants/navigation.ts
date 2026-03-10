@@ -82,6 +82,7 @@ export const NAV_GROUPS: NavGroup[] = [
       { name: 'Configurações', path: '/admin/config', icon: 'Settings', module: 'admin' },
       { name: 'Auditoria', path: '/admin/auditoria', icon: 'Shield', module: 'admin' },
       { name: 'Precificação', path: '/admin/precificacao', icon: 'SlidersHorizontal', module: 'admin' },
+      { name: 'Produtos', path: '/admin/produtos', icon: 'Package', module: 'admin' },
     ],
   },
 ];

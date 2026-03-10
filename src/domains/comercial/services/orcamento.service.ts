@@ -115,6 +115,7 @@ export interface OrcamentoCreateInput {
 
 export interface OrcamentoItemCreateInput {
   produto_id?: string | null;
+  modelo_id?: string;
   descricao: string;
   especificacao?: string | null;
   quantidade: number;
@@ -133,6 +134,7 @@ export interface OrcamentoItemCreateInput {
 }
 
 export interface OrcamentoItemCreateDetalhado extends OrcamentoItemCreateInput {
+  modelo_id?: string;
   materiais?: Array<{
     material_id?: string | null;
     descricao: string;
@@ -239,8 +241,8 @@ export const orcamentoService = {
             .select("*")
             .eq("proposta_item_id", item.id);
           materiais = (data ?? []) as OrcamentoItemMaterial[];
-        } catch {
-          // Tabela não existe ainda
+        } catch (err) {
+          console.warn("proposta_item_materiais não disponível (migration 006 pendente?):", err);
         }
 
         try {
@@ -249,8 +251,8 @@ export const orcamentoService = {
             .select("*")
             .eq("proposta_item_id", item.id);
           acabamentos = (data ?? []) as OrcamentoItemAcabamento[];
-        } catch {
-          // Tabela não existe ainda
+        } catch (err) {
+          console.warn("proposta_item_acabamentos não disponível (migration 006 pendente?):", err);
         }
 
         return { ...item, materiais, acabamentos };
@@ -506,30 +508,63 @@ export const orcamentoService = {
 
   // ─── Duplicar orçamento ──────────────────────────────────────────────────
   async duplicar(id: string): Promise<Orcamento> {
+    // 1. Buscar orçamento original com todos os dados
     const original = await orcamentoService.buscarPorId(id);
-    const { itens, servicos, ...orcData } = original;
+    if (!original) throw new Error("Orçamento não encontrado");
 
-    const novo = await orcamentoService.criar({
-      cliente_id: orcData.cliente_id,
-      oportunidade_id: orcData.oportunidade_id,
-      vendedor_id: orcData.vendedor_id,
-      titulo: `${orcData.titulo} (cópia)`,
-      validade_dias: orcData.validade_dias,
-      condicoes_pagamento: orcData.condicoes_pagamento,
-      observacoes: orcData.observacoes,
-    });
+    // 2. Criar novo orçamento (cópia do cabeçalho)
+    const novaPropostaInput: OrcamentoCreateInput = {
+      cliente_id: original.cliente_id,
+      vendedor_id: original.vendedor_id,
+      titulo: `${original.titulo ?? "Orçamento"} (cópia)`,
+      validade_dias: original.validade_dias,
+      condicoes_pagamento: original.condicoes_pagamento,
+      observacoes: original.observacoes,
+    };
+    const novaProposta = await orcamentoService.criar(novaPropostaInput);
 
-    // Duplicar itens
-    for (const item of itens) {
-      const { id: _id, proposta_id: _pid, ...itemData } = item;
-      await orcamentoService.adicionarItem(novo.id, itemData);
+    // 3. Copiar itens COM materiais e acabamentos
+    for (const item of (original.itens ?? [])) {
+      await orcamentoService.adicionarItemDetalhado(novaProposta.id, {
+        proposta_id: novaProposta.id,
+        produto_id: item.produto_id ?? undefined,
+        modelo_id: (item as any).modelo_id ?? undefined,
+        descricao: item.descricao,
+        especificacao: item.especificacao ?? undefined,
+        quantidade: item.quantidade ?? 1,
+        unidade: item.unidade ?? "un",
+        largura_cm: item.largura_cm ?? undefined,
+        altura_cm: item.altura_cm ?? undefined,
+        area_m2: item.area_m2 ?? undefined,
+        custo_mp: item.custo_mp ?? 0,
+        custo_mo: item.custo_mo ?? 0,
+        custo_fixo: item.custo_fixo ?? 0,
+        markup_percentual: item.markup_percentual ?? 40,
+        valor_unitario: item.valor_unitario ?? 0,
+        valor_total: item.valor_total ?? 0,
+        prazo_producao_dias: item.prazo_producao_dias ?? undefined,
+        materiais: (item as any).materiais ?? [],
+        acabamentos: (item as any).acabamentos ?? [],
+      });
     }
 
-    return novo;
+    // 4. Copiar serviços se existirem
+    if (original.servicos && original.servicos.length > 0) {
+      await orcamentoService.salvarServicos(novaProposta.id, original.servicos.map((s) => ({
+        servico_id: s.servico_id ?? undefined,
+        descricao: s.descricao,
+        horas: s.horas ?? 1,
+        valor_unitario: s.valor_unitario ?? 0,
+        valor_total: s.valor_total ?? 0,
+      })));
+    }
+
+    await orcamentoService.recalcularTotais(novaProposta.id);
+    return novaProposta;
   },
 
   // ─── Converter para pedido ───────────────────────────────────────────────
-  async converterParaPedido(orcamentoId: string): Promise<{ pedido_id: string }> {
+  async converterParaPedido(orcamentoId: string, userId?: string): Promise<{ pedido_id: string }> {
     // Atualiza status para aprovada
     await orcamentoService.atualizar(orcamentoId, {
       status: "aprovada",
@@ -560,23 +595,49 @@ export const orcamentoService = {
       .single();
 
     if (error) throw error;
+    const pedidoId = pedido.id;
 
-    // Duplicar itens para o pedido
-    for (const item of orc.itens) {
-      await supabase.from("pedido_itens").insert({
-        pedido_id: pedido.id,
-        proposta_item_id: item.id,
-        produto_id: item.produto_id,
-        descricao: item.descricao,
-        especificacao: item.especificacao,
-        quantidade: item.quantidade,
-        unidade: item.unidade,
-        valor_unitario: item.valor_unitario,
-        valor_total: item.valor_total,
-        status: "pendente",
-      });
+    // Duplicar itens para o pedido com campos técnicos
+    const pedidoItensParaInserir = orc.itens.map((item: any) => ({
+      pedido_id: pedidoId,
+      proposta_item_id: item.id,
+      produto_id: item.produto_id ?? null,
+      modelo_id: item.modelo_id ?? null,
+      descricao: item.descricao,
+      especificacao: item.especificacao ?? null,
+      quantidade: item.quantidade ?? 1,
+      unidade: item.unidade ?? "un",
+      largura_cm: item.largura_cm ?? null,
+      altura_cm: item.altura_cm ?? null,
+      area_m2: item.area_m2 ?? null,
+      valor_unitario: item.valor_unitario ?? 0,
+      valor_total: item.valor_total ?? 0,
+      custo_mp: item.custo_mp ?? 0,
+      custo_mo: item.custo_mo ?? 0,
+      custo_fixo: item.custo_fixo ?? 0,
+      markup_percentual: item.markup_percentual ?? 40,
+      prazo_producao_dias: item.prazo_producao_dias ?? null,
+      status: "pendente",
+    }));
+
+    if (pedidoItensParaInserir.length > 0) {
+      await supabase.from("pedido_itens").insert(pedidoItensParaInserir);
     }
 
-    return { pedido_id: pedido.id };
+    // Calcular custo_total e margem_real do pedido
+    const custoTotal = orc.itens.reduce((s: number, i: any) =>
+      s + ((i.custo_mp ?? 0) + (i.custo_mo ?? 0) + (i.custo_fixo ?? 0)), 0);
+    const valorTotal = orc.total ?? 0;
+    const margemReal = valorTotal > 0 ? ((valorTotal - custoTotal) / valorTotal) * 100 : 0;
+
+    // UPDATE pedido com custo e margem
+    await supabase.from("pedidos").update({
+      custo_total: custoTotal,
+      margem_real: margemReal,
+      aprovado_por: userId ?? null,
+      aprovado_em: new Date().toISOString(),
+    }).eq("id", pedidoId);
+
+    return { pedido_id: pedidoId };
   },
 };

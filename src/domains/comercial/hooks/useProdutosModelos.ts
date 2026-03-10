@@ -1,4 +1,4 @@
-import { useQuery } from "@tanstack/react-query";
+import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 
 export interface Produto {
@@ -140,5 +140,148 @@ export function useServicos() {
       return (data ?? []) as Servico[];
     },
     staleTime: 1000 * 60 * 10,
+  });
+}
+
+// ============================================================
+// MUTATIONS — Produtos
+// ============================================================
+
+export function useCriarProduto() {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: async (dados: { nome: string; categoria: string; unidade_padrao?: string; descricao?: string }) => {
+      const { data, error } = await supabase.from("produtos").insert(dados).select().single();
+      if (error) throw error;
+      return data;
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["produtos"] });
+    },
+    onError: (err: Error) => {
+      console.error("Erro ao criar produto:", err);
+    },
+  });
+}
+
+export function useAtualizarProduto() {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: async ({ id, dados }: { id: string; dados: Partial<Produto> }) => {
+      const { data, error } = await supabase.from("produtos").update(dados).eq("id", id).select().single();
+      if (error) throw error;
+      return data;
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["produtos"] });
+    },
+  });
+}
+
+// ============================================================
+// MUTATIONS — Modelos
+// ============================================================
+
+export function useCriarModelo() {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: async (dados: {
+      produto_id: string;
+      nome: string;
+      largura_cm?: number;
+      altura_cm?: number;
+      markup_padrao?: number;
+      margem_minima?: number;
+      preco_fixo?: number;
+      tempo_producao_min?: number;
+    }) => {
+      const { data, error } = await supabase.from("produto_modelos").insert(dados).select().single();
+      if (error) throw error;
+      return data;
+    },
+    onSuccess: (_, { produto_id }) => {
+      queryClient.invalidateQueries({ queryKey: ["produto_modelos", produto_id] });
+      queryClient.invalidateQueries({ queryKey: ["produtos"] });
+    },
+  });
+}
+
+export function useAtualizarModelo() {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: async ({ id, dados }: { id: string; dados: Partial<ProdutoModelo> }) => {
+      const { data, error } = await supabase.from("produto_modelos").update(dados).eq("id", id).select().single();
+      if (error) throw error;
+      return data;
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["produto_modelos"] });
+    },
+  });
+}
+
+export function useExcluirModelo() {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: async (id: string) => {
+      const { error } = await supabase.from("produto_modelos").delete().eq("id", id);
+      if (error) throw error;
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["produto_modelos"] });
+    },
+  });
+}
+
+// ============================================================
+// MUTATIONS — Materiais e Processos do Modelo
+// ============================================================
+
+export function useSalvarMaterialModelo() {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: async ({
+      modeloId,
+      materiais,
+    }: {
+      modeloId: string;
+      materiais: Array<{ material_id: string; quantidade_por_unidade: number; unidade?: string }>;
+    }) => {
+      // Replace-all: delete existing + insert new
+      await supabase.from("modelo_materiais").delete().eq("modelo_id", modeloId);
+      if (materiais.length > 0) {
+        const { error } = await supabase.from("modelo_materiais").insert(
+          materiais.map((m) => ({ ...m, modelo_id: modeloId }))
+        );
+        if (error) throw error;
+      }
+    },
+    onSuccess: (_, { modeloId }) => {
+      queryClient.invalidateQueries({ queryKey: ["produto_modelos"] });
+    },
+  });
+}
+
+export function useSalvarProcessosModelo() {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: async ({
+      modeloId,
+      processos,
+    }: {
+      modeloId: string;
+      processos: Array<{ etapa: string; tempo_por_unidade_min: number; ordem: number }>;
+    }) => {
+      await supabase.from("modelo_processos").delete().eq("modelo_id", modeloId);
+      if (processos.length > 0) {
+        const { error } = await supabase.from("modelo_processos").insert(
+          processos.map((p) => ({ ...p, modelo_id: modeloId }))
+        );
+        if (error) throw error;
+      }
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["produto_modelos"] });
+    },
   });
 }

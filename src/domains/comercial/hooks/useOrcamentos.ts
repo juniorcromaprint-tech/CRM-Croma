@@ -96,10 +96,14 @@ export function useAdicionarItemOrcamento() {
 export function useAdicionarItemDetalhado() {
   const qc = useQueryClient();
   return useMutation({
-    mutationFn: ({ propostaId, item }: { propostaId: string; item: OrcamentoItemCreateDetalhado }) =>
-      orcamentoService.adicionarItemDetalhado(propostaId, item),
+    mutationFn: async ({ propostaId, item }: { propostaId: string; item: OrcamentoItemCreateDetalhado }) => {
+      const result = await orcamentoService.adicionarItemDetalhado(propostaId, item);
+      await orcamentoService.recalcularTotais(propostaId);
+      return result;
+    },
     onSuccess: (_data, { propostaId }) => {
       qc.invalidateQueries({ queryKey: [ORCAMENTOS_QUERY_KEY, propostaId] });
+      qc.invalidateQueries({ queryKey: [ORCAMENTOS_QUERY_KEY] });
       showSuccess("Item adicionado com sucesso!");
     },
     onError: (err: Error) => showError(err.message || "Erro ao adicionar item"),
@@ -111,10 +115,13 @@ export function useAdicionarItemDetalhado() {
 export function useSalvarServicos() {
   const qc = useQueryClient();
   return useMutation({
-    mutationFn: ({ propostaId, servicos }: { propostaId: string; servicos: OrcamentoServicoCreateInput[] }) =>
-      orcamentoService.salvarServicos(propostaId, servicos),
+    mutationFn: async ({ propostaId, servicos }: { propostaId: string; servicos: OrcamentoServicoCreateInput[] }) => {
+      await orcamentoService.salvarServicos(propostaId, servicos);
+      await orcamentoService.recalcularTotais(propostaId);
+    },
     onSuccess: (_data, { propostaId }) => {
       qc.invalidateQueries({ queryKey: [ORCAMENTOS_QUERY_KEY, propostaId] });
+      qc.invalidateQueries({ queryKey: [ORCAMENTOS_QUERY_KEY] });
     },
     onError: (err: Error) => showError(err.message || "Erro ao salvar serviços"),
   });
@@ -125,10 +132,13 @@ export function useSalvarServicos() {
 export function useRemoverItemOrcamento() {
   const qc = useQueryClient();
   return useMutation({
-    mutationFn: ({ itemId, propostaId: _propostaId }: { itemId: string; propostaId: string }) =>
-      orcamentoService.removerItem(itemId),
+    mutationFn: async ({ itemId, propostaId }: { itemId: string; propostaId: string }) => {
+      await orcamentoService.removerItem(itemId);
+      await orcamentoService.recalcularTotais(propostaId);
+    },
     onSuccess: (_data, { propostaId }) => {
       qc.invalidateQueries({ queryKey: [ORCAMENTOS_QUERY_KEY, propostaId] });
+      qc.invalidateQueries({ queryKey: [ORCAMENTOS_QUERY_KEY] });
     },
     onError: (err: Error) => showError(err.message || "Erro ao remover item"),
   });
