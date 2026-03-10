@@ -1,178 +1,206 @@
-# CROMA PRINT — FLUXO DE NEGOCIO
+# CROMA PRINT — FLUXO DE NEGÓCIO
 
-> Fluxo operacional completo: Cliente → Orcamento → Pedido → Producao → Instalacao → Faturamento
+> Fluxo operacional completo: Lead → Orçamento → Pedido → Produção → Instalação → Faturamento
 > Atualizado: 2026-03-10
 
----
-
-## Visao Geral do Ciclo
-
-```
-  PROSPECAO        VENDA           EXECUCAO          ENTREGA        FINANCEIRO
-  ─────────      ─────────      ─────────────      ──────────      ──────────
-  Lead           Orcamento      Ordem Producao     Instalacao      Faturamento
-    ↓              ↓                ↓                  ↓               ↓
-  Qualificacao   Proposta       Fila → Producao    Agendamento     Contas Receber
-    ↓              ↓            → Acabamento       → Execucao      → Parcelas
-  Oportunidade   Aprovacao      → Conferencia      → Evidencias    → Baixa
-    ↓              ↓                ↓                  ↓               ↓
-  Cliente        Pedido         Liberacao           Conclusao       DRE
-```
+**Documentos relacionados**: [ARCHITECTURE](ARCHITECTURE.md) | [PRICING_ENGINE](PRICING_ENGINE.md) | [FIELD_APP](FIELD_APP.md) | [DATABASE_OVERVIEW](DATABASE_OVERVIEW.md)
 
 ---
 
-## 1. Prospecao e Qualificacao
+## Índice
+
+- [Visão Geral do Ciclo](#visão-geral-do-ciclo)
+- [1. Prospecção e Qualificação](#1-prospecção-e-qualificação)
+- [2. Orçamento e Proposta](#2-orçamento-e-proposta)
+- [3. Pedido](#3-pedido)
+- [4. Produção](#4-produção)
+- [5. Estoque e Materiais](#5-estoque-e-materiais)
+- [6. Instalação](#6-instalação)
+- [7. Faturamento e Financeiro](#7-faturamento-e-financeiro)
+- [8. Qualidade e Ocorrências](#8-qualidade-e-ocorrências)
+- [9. Compras e Suprimentos](#9-compras-e-suprimentos)
+- [10. Diagrama de Integração](#10-diagrama-completo-de-integração)
+- [11. Automações](#11-automações-triggers-e-edge-functions)
+- [12. SLAs por Etapa](#12-slas-por-etapa)
+
+---
+
+## Visão Geral do Ciclo
+
+```
+  PROSPECÇÃO       VENDA           EXECUÇÃO          ENTREGA        FINANCEIRO
+  ─────────       ─────────       ─────────────     ──────────     ──────────
+  Lead            Orçamento       Ordem Produção    Instalação     Faturamento
+    ↓               ↓                 ↓                 ↓              ↓
+  Qualificação    Proposta        Fila → Produção   Agendamento    Contas Receber
+    ↓               ↓             → Acabamento      → Execução     → Parcelas
+  Oportunidade    Aprovação       → Conferência     → Evidências   → Baixa
+    ↓               ↓                 ↓                 ↓              ↓
+  Cliente         Pedido          Liberação          Conclusão      DRE + NF-e
+```
+
+---
+
+## 1. Prospecção e Qualificação
 
 ### Entrada de Leads
 O lead pode entrar por diferentes canais:
-- Prospecao ativa (SDR)
-- Site / formulario
-- Indicacao de cliente
-- Feira / evento
-- Redes sociais
+- **Prospecção ativa (SDR)** — Busca ativa de empresas no perfil ICP
+- **Site / formulário** — Inbound via landing pages
+- **Indicação de cliente** — Referral de clientes ativos
+- **Feira / evento** — Contatos de feiras do varejo
+- **Redes sociais** — Instagram, LinkedIn, Facebook
 
 ### Ciclo do Lead
 ```
 novo → em_contato → qualificando → qualificado → [converte em Cliente + Oportunidade]
-                                               → descartado (com motivo obrigatorio)
+                                                → descartado (motivo obrigatório)
 ```
 
-### Qualificacao BANT
+### Qualificação BANT
 Antes de virar oportunidade, o lead precisa ser qualificado:
-- **B**udget: Tem orcamento para o projeto?
-- **A**uthority: O contato e o decisor?
-- **N**eed: A necessidade e real e urgente?
-- **T**imeline: Ha prazo definido?
+- **B**udget: Tem orçamento para o projeto?
+- **A**uthority: O contato é o decisor?
+- **N**eed: A necessidade é real e urgente?
+- **T**imeline: Há prazo definido?
 
-### Scoring Automatico
-| Criterio | Pontos |
-|----------|--------|
-| Rede/franquia (multiplas unidades) | 90 |
-| Mais de 10 unidades | 85 |
-| Fabricante (PDV para lojistas) | 80 |
-| Loja individual grande | 50 |
+### Scoring Automático
+| Critério | Pontos | Por quê |
+|----------|--------|---------|
+| Rede/franquia (múltiplas unidades) | 90 | Volume recorrente + padronização |
+| Mais de 10 unidades | 85 | Escala nacional |
+| Fabricante (PDV para lojistas) | 80 | Demanda constante de material PDV |
+| Loja individual grande | 50 | Fachada + comunicação interna |
+| Evento/feira pontual | 30 | Projeto único, sem recorrência |
 
-### Conversao
+### Conversão
 Lead qualificado → cria registro de **Cliente** + **Oportunidade** automaticamente.
+O cliente herda: razão social, CNPJ, contato, segmento, vendedor.
 
 ---
 
-## 2. Orcamento e Proposta
+## 2. Orçamento e Proposta
 
-### Criacao do Orcamento
-O vendedor cria um orcamento selecionando:
-1. **Cliente** — empresa e contato
-2. **Produto** — do catalogo (Banner, Fachada ACM, Adesivo, etc.)
-3. **Modelo** — variacao do produto (60x80cm, 100x120cm, etc.)
-4. **Materiais** — auto-carregados do modelo, editaveis
-5. **Acabamentos** — ilhos, bastao, laminacao, etc.
-6. **Servicos** — criacao de arte, instalacao, frete
+### Criação do Orçamento
+O vendedor cria um orçamento selecionando:
+1. **Cliente** — empresa e contato (dropdown com busca)
+2. **Produto** — do catálogo (Banner, Fachada ACM, Adesivo, etc.)
+3. **Modelo** — variação com dimensões pré-definidas (60×80cm, 100×120cm, etc.)
+4. **Materiais** — auto-carregados do modelo, editáveis pelo vendedor
+5. **Acabamentos** — ilhós, bastão, laminação, etc. (seleção com checkbox)
+6. **Serviços** — criação de arte, instalação, frete (por proposta)
 
-### Precificacao Automatica (Mubisys)
-O motor de precificacao calcula automaticamente:
-- Custo de materia-prima (MP) baseado nos materiais selecionados
-- Custo de mao-de-obra (MO) baseado no tempo produtivo
-- Rateio de custos fixos
-- Markup por categoria
-- Impostos, comissao e juros
+### Precificação Automática (Mubisys)
+O motor de precificação calcula automaticamente em tempo real:
+- Custo de matéria-prima (MP) baseado nos materiais selecionados
+- Custo de mão-de-obra (MO) baseado no tempo produtivo
+- Rateio de custos fixos da empresa
+- Markup por categoria do produto
+- Impostos, comissão e juros
 
-> Detalhes completos em `PRICING_ENGINE.md`
+> Detalhes completos dos 9 passos em [PRICING_ENGINE.md](PRICING_ENGINE.md)
 
-### Versoes de Proposta
-Uma oportunidade pode ter **multiplas versoes** de proposta:
+### Versões de Proposta
+Uma oportunidade pode ter **múltiplas versões** de proposta:
 - V1: Proposta inicial
-- V2: Revisao apos negociacao (ajuste de preco/escopo)
+- V2: Revisão após negociação (ajuste de preço/escopo)
 - V3: Proposta final aprovada
+
+Cada versão gera um snapshot JSONB para rastreabilidade.
 
 ### Status da Proposta
 ```
-rascunho → enviada → em_revisao → aprovada → [gera Pedido]
-                                 → recusada (motivo obrigatorio)
-                                 → expirada (apos validade, default 10 dias)
+rascunho → enviada → em_revisão → aprovada → [gera Pedido automaticamente]
+                                  → recusada (motivo obrigatório)
+                                  → expirada (após validade, default 10 dias)
 ```
 
-### Templates de Orcamento
-Para agilizar orcamentos recorrentes, o sistema oferece templates pre-configurados:
-- "Fachada ACM padrao" — itens + materiais pre-definidos
-- "Kit campanha sazonal" — banners + faixas + adesivos
-- "Comunicacao interna basica" — sinalizacao + placas
+### Templates de Orçamento
+Para agilizar orçamentos recorrentes, o sistema oferece templates pré-configurados:
+- **"Fachada ACM padrão"** — ACM + estrutura + vinílico + instalação
+- **"Kit campanha sazonal"** — banners + faixas + adesivos de vitrine
+- **"Comunicação interna básica"** — sinalização + placas + ambientação
 
 ---
 
 ## 3. Pedido
 
-### Geracao do Pedido
-Quando a proposta e **aprovada**, o sistema gera automaticamente:
+### Geração do Pedido
+Quando a proposta é **aprovada**, o sistema gera automaticamente:
 1. Registro de **Pedido** (`PED-YYYY-####`)
-2. **Itens do pedido** copiados da proposta
-3. **Titulos financeiros** (contas a receber)
+2. **Itens do pedido** copiados da proposta (com snapshot de preços)
+3. **Títulos financeiros** (contas a receber com parcelas)
 4. **Reserva de materiais** no estoque
-5. **Ordens de producao** por item
+5. **Ordens de produção** (uma OP por item)
 
 ### Status do Pedido (10 estados)
 ```
-rascunho → aguardando_aprovacao → aprovado → em_producao → produzido →
-aguardando_instalacao → em_instalacao → parcialmente_concluido → concluido → cancelado
+rascunho → aguardando_aprovação → aprovado → em_produção → produzido →
+aguardando_instalação → em_instalação → parcialmente_concluído → concluído
+                                                                → cancelado
 ```
 
-### Prioridades
-| Prioridade | SLA | Custo extra |
-|-----------|-----|-------------|
-| Baixa | 15 dias | - |
-| Normal | 10 dias | - |
-| Alta | 5 dias | - |
-| Urgente | 24-48h | +25% a +50% (taxa urgencia) |
+### Prioridades e SLAs
+| Prioridade | SLA Produção | SLA Total | Custo Extra |
+|-----------|-------------|-----------|-------------|
+| Baixa | 10 dias | 15 dias | — |
+| Normal | 7 dias | 10 dias | — |
+| Alta | 3 dias | 5 dias | — |
+| Urgente | 1 dia | 24-48h | +25% a +50% (taxa urgência) |
 
 ### Rastreamento por Item
 Cada item do pedido tem status independente:
 ```
-pendente → em_producao → produzido → em_instalacao → instalado
+pendente → em_produção → produzido → em_instalação → instalado
+                                                     → cancelado
 ```
-O pedido so fecha quando TODOS os itens estao concluidos.
+O pedido só fecha quando **TODOS** os itens estão concluídos ou cancelados.
 
 ---
 
-## 4. Producao
+## 4. Produção
 
-### Geracao das Ordens de Producao (OP)
+### Geração das Ordens de Produção (OP)
 Pedido aprovado gera uma OP (`OP-YYYY-####`) para cada item:
 - Herda prazo do pedido (pode ter prazo interno menor)
-- Vincula materiais necessarios (reserva de estoque)
-- Define etapas produtivas baseadas no produto
+- Vincula materiais necessários (reserva de estoque)
+- Define etapas produtivas baseadas no produto/modelo
 
-### Pipeline de Producao
+### Pipeline de Produção
 ```
-aguardando_programacao → em_fila → em_producao → em_acabamento →
-em_conferencia → liberado → [expedido]
+aguardando_programação → em_fila → em_produção → em_acabamento →
+em_conferência → liberado → [expedido para instalação]
          ↓
-    retrabalho → volta para em_producao (com ocorrencia)
+    retrabalho → volta para em_produção (com ocorrência automática)
 ```
 
-### Etapas Padrao (configuraveis por produto)
-1. **Criacao/Arte** — Design grafico
-2. **Aprovacao de Arte** — Cliente valida o layout
-3. **Impressao** — Producao no equipamento
-4. **Acabamento** — Acabamentos fisicos (ilhos, corte, laminacao)
-5. **Serralheria** — Se aplicavel (estruturas metalicas)
-6. **Conferencia** — Checklist de qualidade obrigatorio
-7. **Expedicao** — Embalagem para transporte
-8. **Liberacao** — Pronto para instalacao
+### Etapas Padrão (configuráveis por produto)
+| # | Etapa | Responsável | Tempo Típico |
+|---|-------|-------------|-------------|
+| 1 | Criação/Arte | Designer | 30-120 min |
+| 2 | Aprovação de Arte | Cliente (externo) | 1-3 dias |
+| 3 | Impressão | Operador | 5-60 min |
+| 4 | Acabamento | Acabamento | 10-45 min |
+| 5 | Serralheria | Serralheiro | 30-120 min (se aplicável) |
+| 6 | Conferência | Qualidade | 5-15 min |
+| 7 | Expedição | Logística | 10-30 min |
+| 8 | Liberação | Supervisor | 5 min |
 
 ### Apontamentos
 Cada etapa registra:
-- Operador responsavel
-- Hora de inicio e fim
+- Operador responsável
+- Hora de início e fim
 - Tempo real gasto (comparado com estimado)
 - Materiais efetivamente consumidos
 
-### Conferencia de Qualidade
-Antes de liberar, checklist obrigatorio:
-- Dimensoes corretas?
-- Cores fieis ao layout?
-- Acabamento sem defeitos?
-- Quantidade conferida?
+### Conferência de Qualidade
+Antes de liberar, checklist obrigatório:
+- ☐ Dimensões corretas?
+- ☐ Cores fiéis ao layout?
+- ☐ Acabamento sem defeitos?
+- ☐ Quantidade conferida?
 
-Reprovacao na conferencia → status `retrabalho` → gera Ocorrencia de qualidade.
+Reprovação na conferência → status `retrabalho` → gera **Ocorrência de qualidade** automaticamente.
 
 ---
 
@@ -180,150 +208,163 @@ Reprovacao na conferencia → status `retrabalho` → gera Ocorrencia de qualida
 
 ### Fluxo de Materiais
 ```
-Compra → Entrada (estoque) → Reserva (pedido aprovado) → Baixa (inicio producao)
-                                                         → Devolucao (retrabalho)
+Compra → Entrada (estoque) → Reserva (pedido aprovado) → Baixa (início produção)
+                                                          → Devolução (retrabalho)
 ```
 
-### Tipos de Movimentacao
-| Tipo | Quando |
-|------|--------|
-| `entrada_compra` | Recebimento de compra |
-| `entrada_devolucao` | Material devolvido de OP |
-| `saida_producao` | Consumo em producao |
-| `saida_instalacao` | Material para campo |
-| `reserva` | Pedido aprovado |
-| `liberacao_reserva` | Pedido cancelado |
-| `ajuste_positivo` | Inventario (a mais) |
-| `ajuste_negativo` | Inventario (a menos) |
+### Tipos de Movimentação
+| Tipo | Quando | Efeito no Saldo |
+|------|--------|-----------------|
+| `entrada_compra` | Recebimento de compra | +disponível |
+| `entrada_devolucao` | Material devolvido de OP | +disponível |
+| `saida_producao` | Consumo em produção | -disponível |
+| `saida_instalacao` | Material para campo | -disponível |
+| `reserva` | Pedido aprovado | -disponível, +reservado |
+| `liberacao_reserva` | Pedido cancelado | +disponível, -reservado |
+| `ajuste_positivo` | Inventário (a mais) | +disponível |
+| `ajuste_negativo` | Inventário (a menos) | -disponível |
 
-### Alertas Automaticos
-- **Estoque critico**: saldo < estoque_minimo → alerta no dashboard
-- **Ruptura**: saldo = 0 → gera solicitacao de compra automatica
+### Alertas Automáticos
+- 🟡 **Estoque crítico**: saldo < estoque_mínimo → alerta no dashboard de produção
+- 🔴 **Ruptura**: saldo = 0 → gera solicitação de compra automática
 
 ---
 
-## 6. Instalacao
+## 6. Instalação
 
 ### Agendamento
-Quando todas as OPs de um pedido estao "liberadas":
-1. Seleciona equipe disponivel (membros + veiculo)
-2. Define data e horario
+Quando todas as OPs de um pedido estão "liberadas":
+1. Seleciona equipe disponível (membros + veículo)
+2. Define data e horário
 3. Vincula materiais para transporte
-4. Gera ordem de instalacao (`INST-YYYY-####`)
+4. Gera ordem de instalação (`INST-YYYY-####`)
 
-### Status da Instalacao
+### Status da Instalação
 ```
-aguardando_agendamento → agendada → equipe_em_deslocamento → em_execucao →
-concluida | pendente | reagendada | nao_concluida
+aguardando_agendamento → agendada → equipe_em_deslocamento → em_execução →
+concluída | pendente | reagendada | não_concluída
 ```
 
 ### Fluxo no App de Campo
-1. Tecnico recebe tarefa no app mobile
-2. Registra inicio (geolocalizacao)
-3. Executa checklist pre-instalacao
-4. Tira fotos "antes"
-5. Realiza a instalacao
-6. Tira fotos "depois"
-7. Executa checklist pos-instalacao
+1. Técnico recebe tarefa no app mobile
+2. Registra início (geolocalização automática)
+3. Executa checklist pré-instalação
+4. Tira fotos "antes" (com watermark automático)
+5. Realiza a instalação
+6. Tira fotos "depois" (com compressão automática)
+7. Executa checklist pós-instalação
 8. Coleta assinatura digital do cliente
-9. Registra conclusao ou ocorrencia
+9. Registra conclusão ou ocorrência
 
-### Evidencias Obrigatorias
-- Fotos antes/durante/depois
-- Checklist pre e pos
-- Assinatura do cliente
-- Observacoes de campo
+> Detalhes completos do App de Campo em [FIELD_APP.md](FIELD_APP.md)
+
+### Evidências Obrigatórias
+- ✅ Fotos antes/durante/depois (mín. 2 por momento)
+- ✅ Checklist pré e pós
+- ✅ Assinatura do cliente (canvas digital)
+- ✅ Observações de campo
 
 ### Reagendamento
-Se nao concluido, registra motivo e reagenda preservando historico.
+Se não concluído, registra motivo e reagenda preservando histórico completo.
 
 ---
 
 ## 7. Faturamento e Financeiro
 
-### Geracao Automatica de Titulos
+### Geração Automática de Títulos
 Pedido aprovado → gera contas a receber:
 - Valor total do pedido
-- Parcelas conforme condicao de pagamento
+- Parcelas conforme condição de pagamento
 - Vencimentos calculados automaticamente
 
 ### Status Financeiro
 ```
 previsto → faturado → a_vencer → [vencido] → parcial → pago
-                                                       → cancelado
+                                                        → cancelado
 ```
 
-### Condicoes de Pagamento
-- A vista (100% na aprovacao)
-- 30/60 (50% em 30 dias, 50% em 60 dias)
-- 30/60/90 (3 parcelas iguais)
-- Entrada + parcelas (ex: 40% entrada, 2x30%)
+### Condições de Pagamento
+| Condição | Parcelas | Exemplo (R$ 10.000) |
+|----------|---------|---------------------|
+| À vista | 1× | R$ 10.000 na aprovação |
+| 30/60 | 2× | R$ 5.000 em 30d + R$ 5.000 em 60d |
+| 30/60/90 | 3× | 3 × R$ 3.333,33 |
+| Entrada + parcelas | 1+2 | R$ 4.000 entrada + 2 × R$ 3.000 |
 
-### Inadimplencia
-- Titulo vencido > 30 dias → flag automatica no cliente
-- Titulo vencido > 60 dias → bloqueio de novos pedidos
+### Inadimplência
+- Título vencido > 30 dias → ⚠️ flag automática no cadastro do cliente
+- Título vencido > 60 dias → 🔴 bloqueio de novos pedidos
 - Dashboard financeiro mostra indicadores em tempo real
 
-### Comissoes
-- Comissao gerada SOMENTE apos titulo efetivamente pago
-- Percentual configuravel por vendedor (default 5%)
-- Status: `gerada → aprovada → paga`
+### Comissões
+- Comissão gerada **SOMENTE** após título efetivamente pago
+- Percentual configurável por vendedor (default 5%)
+- Fluxo: `gerada → aprovada → paga → [cancelada]`
+
+### Nota Fiscal (NF-e)
+O módulo fiscal permite:
+- Emissão de NF-e vinculada ao pedido/título
+- Certificado digital A1 configurável
+- Fila de emissão com status de transmissão
+- Auditoria de documentos fiscais
+- Consulta de situação na SEFAZ
 
 ### DRE Gerencial
-O DRE (Demonstrativo de Resultado do Exercicio) e montado automaticamente:
+O DRE (Demonstrativo de Resultado do Exercício) é montado automaticamente:
 ```
 (+) Receita Bruta (faturamento)
-(-) Impostos sobre venda
-(=) Receita Liquida
+(-) Impostos sobre venda (12%)
+(=) Receita Líquida
 (-) Custo dos Produtos Vendidos (MP + MO direta)
 (=) Lucro Bruto
 (-) Despesas Operacionais
-    - Comercial (comissoes, marketing)
-    - Administrativa (aluguel, salarios admin)
-    - Logistica (frete, combustivel)
+    - Comercial (comissões, marketing)
+    - Administrativa (aluguel, salários admin)
+    - Logística (frete, combustível)
 (=) Lucro Operacional
 (-) Despesas Financeiras (juros, taxas)
-(=) Lucro Liquido
+(=) Lucro Líquido
 ```
 
 ### Margem Real por Pedido
-Apos conclusao do pedido, o sistema calcula:
+Após conclusão do pedido, o sistema calcula:
 ```
-Margem Real = Preco Venda - (Custo MP real + Tempo Producao real x Cm + Custo Logistica)
+Margem Real = Preço Venda - (Custo MP real + Tempo Produção real × Cm + Custo Logística)
 ```
-Comparacao com margem estimada no orcamento permite melhoria continua.
+Comparação com margem estimada no orçamento permite **melhoria contínua** do pricing.
 
 ---
 
-## 8. Qualidade e Ocorrencias
+## 8. Qualidade e Ocorrências
 
-### Tipos de Ocorrencia
-| Tipo | Origem | Acao |
-|------|--------|------|
-| `reclamacao_cliente` | Cliente | Analise + tratativa |
-| `defeito_producao` | Conferencia | Retrabalho |
-| `problema_instalacao` | Campo | Reagendamento |
-| `material_nao_conforme` | Recebimento | Devolucao fornecedor |
-| `divergencia_pedido` | Qualquer | Investigacao |
-| `atraso_entrega` | Producao/logistica | Escalonamento |
-| `outro` | Qualquer | Analise |
+### Tipos de Ocorrência
+| Tipo | Origem | Ação Típica | Impacto |
+|------|--------|-------------|---------|
+| `reclamacao_cliente` | Cliente | Análise + tratativa + ressarcimento | Alto |
+| `defeito_producao` | Conferência | Retrabalho na OP | Médio |
+| `problema_instalacao` | Campo | Reagendamento | Médio |
+| `material_nao_conforme` | Recebimento | Devolução ao fornecedor | Baixo |
+| `divergencia_pedido` | Qualquer | Investigação | Variável |
+| `atraso_entrega` | Produção/logística | Escalonamento ao gestor | Alto |
+| `outro` | Qualquer | Análise caso a caso | Variável |
 
-### Fluxo da Ocorrencia
+### Fluxo da Ocorrência
 ```
-aberta → em_analise → em_tratamento → verificacao → encerrada
-                                                   → reaberta
+aberta → em_análise → em_tratamento → verificação → encerrada
+                                                    → reaberta (se não resolvido)
 ```
 
-### Campos Obrigatorios
-- **Causa raiz**: erro_arte, erro_producao, material_ruim, instrucao_incorreta, etc.
+### Campos Obrigatórios
+- **Causa raiz**: erro_arte, erro_produção, material_ruim, instrução_incorreta, etc.
 - **Tratativa**: O que foi feito para resolver
 - **Custo**: Material + MO do reprocesso (debita margem do pedido)
 
 ### Indicadores de Qualidade
-- Total de ocorrencias por periodo
+- Total de ocorrências por período
 - Custo total de retrabalhos
 - Top 5 causas mais frequentes
 - Taxa de defeitos por operador/equipamento
+- Tempo médio de resolução
 
 ---
 
@@ -331,28 +372,28 @@ aberta → em_analise → em_tratamento → verificacao → encerrada
 
 ### Fluxo de Compra
 ```
-Necessidade → Solicitacao → Cotacao → Pedido Compra → Recebimento → Estoque
-           (auto ou manual)  (3 cotacoes se > R$5000)              → Contas Pagar
+Necessidade → Solicitação → Cotação → Pedido Compra → Recebimento → Estoque
+           (auto ou manual)  (3 cotações se > R$5.000)              → Contas Pagar
 ```
 
 ### Regras
-- Ruptura de estoque gera solicitacao automatica
-- Compra acima de R$ 5.000 exige 3 cotacoes comparativas
-- Recebimento gera entrada no estoque + titulo a pagar
-- Historico de precos por fornecedor para negociacao
+- **Ruptura de estoque** → gera solicitação automática
+- **Compra > R$ 5.000** → exige 3 cotações comparativas
+- **Recebimento** → gera entrada no estoque + título a pagar
+- **Histórico de preços** → por fornecedor para negociação
 
 ---
 
-## 10. Diagrama Completo de Integracao
+## 10. Diagrama Completo de Integração
 
 ```
-[Lead] ──qualificacao──→ [Cliente] + [Oportunidade]
+[Lead] ──qualificação──→ [Cliente] + [Oportunidade]
                               │
                               ↓
-                         [Orcamento/Proposta]
-                              │ aprovacao
+                         [Orçamento/Proposta] ←── [Template]
+                              │ aprovação
                               ↓
-                          [Pedido] ──────────────→ [Contas Receber]
+                          [Pedido] ──────────────→ [Contas Receber] → [NF-e]
                               │                          │
                     ┌─────────┼─────────┐               │
                     ↓         ↓         ↓               ↓
@@ -362,38 +403,60 @@ Necessidade → Solicitacao → Cotacao → Pedido Compra → Recebimento → Es
             [Reserva Estoque]                      [Recebimento]
                     │                                    │
                     ↓                                    ↓
-              [Producao]                            [Comissao]
+              [Produção]                            [Comissão]
                     │                                    │
                     ↓                                    ↓
-             [Conferencia]                           [DRE]
+             [Conferência] ──falhou──→ [Ocorrência]  [DRE]
                     │
-                    ↓
-              [Instalacao]
+                    ↓ OK
+              [Instalação]
                     │
               ┌─────┴─────┐
               ↓           ↓
-         [App Campo]  [Evidencias]
+         [App Campo]  [Evidências]
+              │         (fotos, assinatura)
+              ↓
+          [Conclusão]
               │
               ↓
-          [Conclusao]
+       [Pedido Concluído]
               │
               ↓
-         [Faturamento]
+       [Margem Real calculada]
 ```
 
 ---
 
-## 11. Automacoes (Triggers e Edge Functions)
+## 11. Automações (Triggers e Edge Functions)
 
-| Trigger | Quando | Acao |
-|---------|--------|------|
-| `proposta-aprovada` | Proposta status = aprovada | Gera pedido + titulos + OPs |
-| `pedido-aprovado` | Pedido status = aprovado | Reserva materiais + gera OPs |
-| `inicio-producao` | OP status = em_producao | Converte reserva em baixa efetiva |
-| `conferencia-reprovada` | OP status = retrabalho | Gera ocorrencia automatica |
-| `ops-liberadas` | Todas OPs do pedido liberadas | Habilita agendamento instalacao |
-| `instalacao-concluida` | Todos itens instalados | Pedido status = concluido |
-| `titulo-vencido` | Data vencimento < hoje | Flag inadimplencia no cliente |
-| `titulo-pago` | Titulo status = pago | Gera comissao do vendedor |
-| `estoque-critico` | Saldo < minimo | Gera alerta + solicitacao compra |
-| `recebimento-compra` | Conferencia OK | Entrada estoque + conta a pagar |
+| Trigger | Quando | Ação | Status |
+|---------|--------|------|--------|
+| `proposta-aprovada` | Proposta status = aprovada | Gera pedido + títulos + OPs | ✅ Código pronto |
+| `pedido-aprovado` | Pedido status = aprovado | Reserva materiais + gera OPs | ✅ Código pronto |
+| `início-produção` | OP status = em_produção | Converte reserva em baixa efetiva | ✅ Código pronto |
+| `conferência-reprovada` | OP status = retrabalho | Gera ocorrência automática | ✅ Código pronto |
+| `ops-liberadas` | Todas OPs do pedido liberadas | Habilita agendamento instalação | ⚠️ Precisa migration 004 |
+| `instalação-concluída` | Todos itens instalados | Pedido status = concluído | ⚠️ Precisa migration 004 |
+| `título-vencido` | Data vencimento < hoje | Flag inadimplência no cliente | ✅ Código pronto |
+| `título-pago` | Título status = pago | Gera comissão do vendedor | ✅ Código pronto |
+| `estoque-crítico` | Saldo < mínimo | Gera alerta + solicitação compra | ✅ Código pronto |
+| `recebimento-compra` | Conferência OK | Entrada estoque + conta a pagar | ✅ Código pronto |
+
+---
+
+## 12. SLAs por Etapa
+
+Tempos médios esperados para cada etapa do ciclo:
+
+| Etapa | SLA Normal | SLA Urgente | Responsável |
+|-------|-----------|-------------|-------------|
+| Lead → Qualificação | 3-5 dias | 1 dia | Comercial/SDR |
+| Orçamento → Envio | 1-2 dias | 4 horas | Comercial |
+| Proposta → Aprovação | 5-10 dias | 1-2 dias | Cliente |
+| Pedido → Início Produção | 1-2 dias | Imediato | Produção |
+| Produção (por item) | 3-7 dias | 1 dia | Produção |
+| Conferência | 1 dia | 2 horas | Qualidade |
+| Agendamento → Instalação | 2-5 dias | 1 dia | Logística |
+| Instalação → Evidências | Mesmo dia | Mesmo dia | Campo |
+| Faturamento → NF-e | 1-2 dias | Mesmo dia | Financeiro |
+| **Ciclo total** | **15-30 dias** | **3-5 dias** | — |

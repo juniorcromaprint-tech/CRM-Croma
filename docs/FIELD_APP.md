@@ -1,118 +1,150 @@
 # CROMA PRINT — APP DE CAMPO
 
-> Integracao entre o CRM/ERP (Produto A) e o App de Campo (Produto B)
+> Integração entre o CRM/ERP (Produto A) e o App de Campo (Produto B)
 > Atualizado: 2026-03-10
 
----
-
-## 1. Visao Geral
-
-O App de Campo e uma aplicacao separada (PWA mobile-first) usada por instaladores e tecnicos em campo. Ele se integra ao CRM/ERP atraves do mesmo backend Supabase.
-
-```
-┌──────────────────────────────────────────────┐
-│               SUPABASE (Backend)              │
-│  PostgreSQL ─ Auth ─ Storage ─ Realtime       │
-└──────────────┬────────────────┬───────────────┘
-               │                │
-     ┌─────────┴──────┐  ┌────┴────────────┐
-     │   CRM/ERP       │  │   App de Campo   │
-     │   (desktop)     │  │   (mobile/PWA)   │
-     │                 │  │                  │
-     │  Gestao:        │  │  Execucao:       │
-     │  - Agenda       │  │  - Minhas tarefas│
-     │  - Equipes      │  │  - Checklist     │
-     │  - Ordens inst. │  │  - Fotos         │
-     │  - Qualidade    │  │  - Assinatura    │
-     │  - Financeiro   │  │  - Ocorrencias   │
-     └────────────────┘  └──────────────────┘
-```
+**Documentos relacionados**: [ARCHITECTURE](ARCHITECTURE.md) | [BUSINESS_FLOW](BUSINESS_FLOW.md) | [DATABASE_OVERVIEW](DATABASE_OVERVIEW.md)
 
 ---
 
-## 2. Arquitetura Tecnica
+## Índice
+
+- [1. Visão Geral](#1-visão-geral)
+- [2. Arquitetura Técnica](#2-arquitetura-técnica)
+- [3. Fluxo de Integração](#3-fluxo-de-integração)
+- [4. Telas do App](#4-telas-do-app-de-campo)
+- [5. Funcionalidades de Mídia](#5-funcionalidades-de-mídia)
+- [6. Tabelas do Banco](#6-tabelas-de-banco-de-dados-campo)
+- [7. Sincronização](#7-sincronização)
+- [8. Segurança e Limites](#8-segurança-e-limites)
+- [9. Métricas de Campo](#9-métricas-de-campo)
+- [10. Exemplo Completo](#10-fluxo-completo-exemplo)
+- [11. Status de Implementação](#11-status-de-implementação)
+
+---
+
+## 1. Visão Geral
+
+O App de Campo é uma aplicação separada (PWA mobile-first) usada por instaladores e técnicos em campo. Ele se integra ao CRM/ERP através do **mesmo backend Supabase**.
+
+```
+┌──────────────────────────────────────────────────┐
+│               SUPABASE (Backend Unificado)        │
+│   PostgreSQL ─ Auth ─ Storage ─ Realtime          │
+└──────────────┬─────────────────┬──────────────────┘
+               │                 │
+     ┌─────────┴──────┐   ┌─────┴──────────────┐
+     │   CRM/ERP       │   │   App de Campo      │
+     │   (desktop)     │   │   (mobile/PWA)      │
+     │                 │   │                     │
+     │  Gestão:        │   │  Execução:          │
+     │  - Agenda       │   │  - Minhas tarefas   │
+     │  - Equipes      │   │  - Checklist        │
+     │  - Ordens inst. │   │  - Fotos + watermark│
+     │  - Qualidade    │   │  - Assinatura digital│
+     │  - Financeiro   │   │  - Ocorrências      │
+     └────────────────┘   └─────────────────────┘
+```
+
+### Diferença Fundamental
+| Aspecto | CRM/ERP | App de Campo |
+|---------|---------|-------------|
+| Propósito | Gerenciar | Executar |
+| Interface | Desktop-first | Mobile-first |
+| Auth | DemoRoute (sem login obrigatório) | ProtectedRoute (login real) |
+| Dados | Todos os módulos | Apenas tarefas próprias |
+| Ações | CRUD completo | Registrar execução |
+
+---
+
+## 2. Arquitetura Técnica
 
 ### Stack do App de Campo
 | Tecnologia | Uso |
 |-----------|-----|
-| React 19 + TypeScript | Framework |
-| Vite | Build |
-| Tailwind + shadcn/ui | UI (mesmo design system do CRM) |
-| React Router | Navegacao |
-| TanStack React Query | Data fetching |
-| Supabase | Backend (mesmo do CRM) |
-| PWA (Service Worker) | Funcionamento offline |
-| Camera API | Captura de fotos |
-| Geolocation API | Rastreamento de posicao |
-| Canvas API | Assinatura digital |
+| React 19 + TypeScript | Framework (mesmo do CRM) |
+| Vite | Build (PWA plugin) |
+| Tailwind + shadcn/ui | UI (mesmo design system) |
+| React Router | Navegação |
+| TanStack React Query | Data fetching + cache offline |
+| Supabase | Backend (mesmo projeto do CRM) |
+| Service Worker (PWA) | Funcionamento offline parcial |
+| Camera API | Captura de fotos nativa |
+| Geolocation API | Rastreamento de posição |
+| Canvas API (react-signature-canvas) | Assinatura digital |
 
-### Localizacao no Repositorio
+### Localização no Repositório
 ```
 CRM-Croma/
-  src/                    # CRM/ERP (Produto A)
-  apps/campo/             # App de Campo (Produto B)
-    src/
-      App.tsx             # Router com ProtectedRoute
-      pages/
-        Login.tsx
-        Index.tsx         # Dashboard/tarefas do dia
-        Jobs.tsx          # Lista de tarefas
-        JobDetail.tsx     # Detalhe da tarefa
-        Clients.tsx
-        StoreMap.tsx      # Mapa de instalacoes
-        Analytics.tsx
-        Settings.tsx
+├── src/                    # CRM/ERP (Produto A)
+├── apps/campo/             # App de Campo (Produto B)
+│   └── src/
+│       ├── App.tsx          # Router com ProtectedRoute
+│       ├── pages/
+│       │   ├── Login.tsx
+│       │   ├── Index.tsx    # Dashboard/tarefas do dia
+│       │   ├── Jobs.tsx     # Lista com infinite scroll
+│       │   ├── JobDetail.tsx # Fotos, assinatura, vídeo, notas
+│       │   ├── Clients.tsx
+│       │   ├── StoreMap.tsx # Mapa Leaflet
+│       │   ├── Analytics.tsx
+│       │   ├── BillingReport.tsx
+│       │   ├── Team.tsx     # Gestão de equipe (admin)
+│       │   └── Settings.tsx
+│       └── ...
 ```
 
 ### Deploy Separado
-| Produto | Dominio | Root dir |
-|---------|---------|----------|
-| CRM/ERP | tender-archimedes.vercel.app | `./` (raiz) |
-| App Campo | campo-croma.vercel.app | `apps/campo/` |
+| Produto | Domínio | Root dir | Vercel |
+|---------|---------|----------|--------|
+| CRM/ERP | tender-archimedes.vercel.app | `./` (raiz) | Auto-deploy |
+| App Campo | campo-croma.vercel.app | `apps/campo/` | Auto-deploy |
 
 ---
 
-## 3. Fluxo de Integracao
+## 3. Fluxo de Integração
 
 ### CRM → App de Campo (dados que descem)
 
 ```
-CRM/ERP                              App de Campo
-────────────────                     ────────────────
+CRM/ERP                                App de Campo
+────────────────                       ────────────────
 Pedido aprovado
   ↓
-Producao concluida
+Produção concluída
   ↓
-Instalacao agendada ─────────────→   Tarefa aparece na lista
-  - Data/horario                     do tecnico
-  - Endereco completo
-  - Materiais necessarios
-  - Instrucoes especificas
+Instalação agendada ──────────────→    Tarefa aparece na lista
+  - Data/horário                       do técnico logado
+  - Endereço completo
+  - Materiais necessários
+  - Instruções específicas
   - Contato do cliente
+  - Arte/layout de referência
 ```
 
 ### App de Campo → CRM (dados que sobem)
 
 ```
-App de Campo                         CRM/ERP
-────────────────                     ────────────────
-Tecnico inicia tarefa ───────────→   Status: em_deslocamento
-  - Geolocalizacao inicio
+App de Campo                           CRM/ERP
+────────────────                       ────────────────
+Técnico inicia tarefa ────────────→    Status: em_deslocamento
+  - Geolocalização início              (realtime via Supabase)
 
-Checklist pre-instalacao ────────→   Registro de conformidade
+Checklist pré-instalação ─────────→    Registro de conformidade
   - Itens verificados
 
-Fotos "antes" ──────────────────→   Storage Supabase
-                                     Vinculadas a tarefa
+Fotos "antes" ───────────────────→    Storage Supabase
+  - Com watermark automático           Vinculadas à tarefa
+  - Com compressão
 
-Instalacao concluida ───────────→   Status: concluida
-  - Fotos "depois"                   Evidencias salvas
-  - Checklist pos
+Instalação concluída ────────────→    Status: concluída
+  - Fotos "depois"                     Evidências salvas
+  - Checklist pós
   - Assinatura cliente
 
-Ocorrencia de campo ────────────→   Registro de qualidade
-  - Descricao do problema            Gera ocorrencia
-  - Fotos da evidencia               no modulo Qualidade
+Ocorrência de campo ─────────────→    Registro no módulo Qualidade
+  - Descrição do problema              Gera ocorrência automática
+  - Fotos de evidência
 ```
 
 ---
@@ -120,210 +152,289 @@ Ocorrencia de campo ────────────→   Registro de qualid
 ## 4. Telas do App de Campo
 
 ### 4.1 Login
-- Autenticacao via Supabase Auth (email/senha)
-- Roles permitidos: `instalador`, `logistica`
-- Sessao persistente (nao precisa logar todo dia)
+- Autenticação via Supabase Auth (email/senha)
+- Roles permitidos: `instalador`, `logística`
+- Sessão persistente (não precisa logar todo dia)
 
 ### 4.2 Minhas Tarefas (Dashboard)
-- Lista de instalacoes do dia ordenadas por horario
+- Lista de instalações do dia ordenadas por horário
 - Cada tarefa mostra:
-  - Cliente e endereco
-  - Horario agendado
+  - Cliente e endereço
+  - Horário agendado
   - Status atual (badge colorida)
-  - Materiais necessarios
+  - Materiais necessários
 - Pull-to-refresh para atualizar
+- Infinite scroll para histórico
 
 ### 4.3 Detalhe da Tarefa
-Informacoes completas para execucao:
-- Dados do pedido (itens, quantidades, especificacoes)
+Informações completas para execução:
+- Dados do pedido (itens, quantidades, especificações)
 - Materiais a transportar
-- Endereco com link para Google Maps
-- Instrucoes especificas do comercial
-- Contato do cliente (telefone direto)
-- Historico de agendamentos (se reagendada)
+- Endereço com link para Google Maps/Waze
+- Instruções específicas do comercial
+- Contato do cliente (telefone direto com botão ligar)
+- Histórico de agendamentos (se reagendada)
+- Arte/layout de referência (se disponível)
 
-### 4.4 Execucao da Tarefa (6 etapas)
+### 4.4 Execução da Tarefa (6 etapas)
 
 **Etapa 1 — Check-in**
-- Tecnico marca chegada ao local
-- Captura geolocalizacao automatica
-- Registra hora de inicio
+- Técnico marca chegada ao local
+- Captura geolocalização automática
+- Registra hora de início
 
-**Etapa 2 — Checklist Pre-Instalacao**
-Lista configuravel de verificacoes:
-- Local limpo e acessivel?
-- Energia eletrica disponivel?
-- Superficies preparadas?
-- Materiais conferidos?
-- Cliente presente/representante?
+**Etapa 2 — Checklist Pré-Instalação**
+Lista configurável de verificações:
+- ☐ Local limpo e acessível?
+- ☐ Energia elétrica disponível?
+- ☐ Superfícies preparadas?
+- ☐ Materiais conferidos?
+- ☐ Cliente presente/representante?
 
 **Etapa 3 — Fotos "Antes"**
-- Camera nativa do dispositivo
-- Minimo 2 fotos obrigatorias
+- Câmera nativa do dispositivo
+- Mínimo 2 fotos obrigatórias
 - Categorias: frente, lateral, detalhe
+- **Watermark automático** com data/hora e coordenadas
+- **Compressão automática** para reduzir upload
 
-**Etapa 4 — Execucao**
-- Registro livre (notas, tempo, dificuldades)
-- Opcao de registrar ocorrencia em campo
+**Etapa 4 — Execução**
+- Registro livre (notas de voz, tempo, dificuldades)
+- Opção de registrar ocorrência em campo
+- Foto durante execução (opcional)
 
 **Etapa 5 — Fotos "Depois"**
-- Mesmos angulos do "antes" para comparacao
+- Mesmos ângulos do "antes" para comparação visual
 - Fotos de detalhe do acabamento
+- Watermark e compressão automáticos
 
-**Etapa 6 — Finalizacao**
-- Checklist pos-instalacao
-- Assinatura digital do cliente (canvas touch)
+**Etapa 6 — Finalização**
+- Checklist pós-instalação
+- Assinatura digital do cliente (canvas touch com react-signature-canvas)
 - Nome e cargo do assinante
-- Observacoes finais
-- Botao "Concluir" envia tudo ao CRM
+- Observações finais
+- Botão "Concluir" envia tudo ao CRM
 
-### 4.5 Registro de Ocorrencia
-Quando algo da errado em campo:
+### 4.5 Registro de Ocorrência
+Quando algo dá errado em campo:
 - Tipo: problema no local, material incorreto, acesso negado, reagendamento
-- Descricao livre
-- Fotos de evidencia
-- Sugestao de acao (reagendar, completar parcial, etc.)
+- Descrição livre
+- Fotos de evidência
+- Sugestão de ação (reagendar, completar parcial, etc.)
 
-### 4.6 Mapa de Instalacoes
-- Mapa com pins de todas as instalacoes
-- Filtro por status, periodo, equipe
-- Rota sugerida para o dia (otimizacao)
+### 4.6 Mapa de Instalações
+- Mapa com pins de todas as instalações (Leaflet)
+- Filtro por status, período, equipe
+- Rota sugerida para o dia
+
+### 4.7 Analytics
+- Gráficos de produtividade por técnico
+- Tarefas concluídas por período
+- Tempo médio de instalação
+
+### 4.8 Relatório de Faturamento
+- Resumo financeiro das instalações concluídas
+- Agrupamento por período/cliente
+
+### 4.9 Gestão de Equipe (admin only)
+- Adicionar/remover membros
+- Atribuir roles (líder/auxiliar)
+- Exclusão via Edge Function (admin)
 
 ---
 
-## 5. Tabelas de Banco de Dados (Campo)
+## 5. Funcionalidades de Mídia
 
-### `tarefas_campo` (field_tasks)
-Tarefa atribuida a um tecnico especifico:
-| Campo | Tipo | Descricao |
+### Fotos
+| Feature | Status | Descrição |
+|---------|--------|-----------|
+| Captura via câmera | ✅ Funcional | Camera API nativa |
+| Upload para Storage | ✅ Funcional | Supabase Storage |
+| Compressão automática | ✅ Funcional | Reduz tamanho antes do upload |
+| Watermark automático | ✅ Funcional | Data/hora + coordenadas GPS |
+| Categorização (antes/depois) | ✅ Funcional | Momento da captura |
+| Galeria por tarefa | ✅ Funcional | Visualização no CRM |
+
+### Vídeo
+| Feature | Status | Descrição |
+|---------|--------|-----------|
+| Captura curta | ✅ Funcional | Vídeos de até 30s |
+| Upload | ✅ Funcional | Supabase Storage |
+
+### Assinatura Digital
+| Feature | Status | Descrição |
+|---------|--------|-----------|
+| Canvas touch | ✅ Funcional | react-signature-canvas |
+| Salvar como imagem | ✅ Funcional | PNG no Storage |
+| Nome + cargo | ✅ Funcional | Campos de texto |
+
+---
+
+## 6. Tabelas de Banco de Dados (Campo)
+
+### `jobs` (tarefas de campo)
+Tarefa atribuída a um técnico específico:
+| Campo | Tipo | Descrição |
 |-------|------|-----------|
 | id | UUID | PK |
-| ordem_instalacao_id | UUID | FK → ordens_instalacao |
+| ordem_instalacao_id | UUID | FK → ordens_instalação |
 | tecnico_id | UUID | FK → profiles |
-| status | TEXT | atribuida, em_deslocamento, em_execucao, concluida, nao_concluida |
-| inicio | TIMESTAMPTZ | Hora que comecou |
+| status | TEXT | Pendente, Em andamento, Concluído, Cancelado |
+| inicio | TIMESTAMPTZ | Hora que começou |
 | fim | TIMESTAMPTZ | Hora que terminou |
 | latitude_inicio | NUMERIC | Geoloc chegada |
 | longitude_inicio | NUMERIC | Geoloc chegada |
-| latitude_fim | NUMERIC | Geoloc saida |
-| longitude_fim | NUMERIC | Geoloc saida |
-| observacoes | TEXT | Notas do tecnico |
+| latitude_fim | NUMERIC | Geoloc saída |
+| longitude_fim | NUMERIC | Geoloc saída |
+| observacoes | TEXT | Notas do técnico |
 
-### `campo_checklists` (field_checklists)
-Itens de verificacao pre e pos instalacao:
-| Campo | Tipo | Descricao |
+### `checklists_campo`
+Itens de verificação pré e pós-instalação:
+| Campo | Tipo | Descrição |
 |-------|------|-----------|
 | id | UUID | PK |
-| field_task_id | UUID | FK → tarefas_campo |
+| job_id | UUID | FK → jobs |
 | tipo | TEXT | pre, pos |
-| item | TEXT | Descricao do item |
+| item | TEXT | Descrição do item |
 | marcado | BOOLEAN | Verificado? |
 | observacao | TEXT | Nota adicional |
 | marcado_em | TIMESTAMPTZ | Quando marcou |
 
-### `campo_midias` (field_media)
-Fotos e videos capturados em campo:
-| Campo | Tipo | Descricao |
+### `midias_campo` (job_photos / job_videos)
+Fotos e vídeos capturados em campo:
+| Campo | Tipo | Descrição |
 |-------|------|-----------|
 | id | UUID | PK |
-| field_task_id | UUID | FK → tarefas_campo |
+| job_id | UUID | FK → jobs |
 | tipo | TEXT | foto, video |
 | momento | TEXT | antes, durante, depois |
 | url | TEXT | URL no Supabase Storage |
 | descricao | TEXT | Legenda |
 
-### `campo_assinaturas` (field_signatures)
+### `assinaturas_campo`
 Assinatura digital do cliente:
-| Campo | Tipo | Descricao |
+| Campo | Tipo | Descrição |
 |-------|------|-----------|
 | id | UUID | PK |
-| field_task_id | UUID | FK → tarefas_campo |
+| job_id | UUID | FK → jobs |
 | assinante_nome | TEXT | Nome de quem assinou |
 | assinante_cargo | TEXT | Cargo |
-| imagem_url | TEXT | Imagem da assinatura |
+| imagem_url | TEXT | Imagem da assinatura (PNG) |
 
 ---
 
-## 6. Sincronizacao
+## 7. Sincronização
 
-### Modo Online (padrao)
+### Modo Online (padrão)
 - POST direto para Supabase via REST API
-- Fotos enviadas para Supabase Storage
+- Fotos enviadas para Supabase Storage (bucket `job_photos`)
 - Status atualizado em tempo real
 
-### Modo Offline (futuro)
-- Dados salvos em IndexedDB local
-- Fila de operacoes pendentes
-- Sync automatico ao reconectar
-- Indicador visual de "pendente de envio"
+### Detecção de Offline
+- ✅ Indicador visual "Sem conexão" implementado
+- ⚠️ Fila de sync offline **não implementada** ainda
 
 ### Realtime (Supabase)
-O CRM pode acompanhar em tempo real:
-- Posicao do tecnico (se compartilhada)
-- Atualizacao de status da tarefa
+O CRM pode acompanhar em tempo real via `useCampoRealtimeGlobal()`:
+- Atualização de status da tarefa
 - Novas fotos adicionadas
-- Conclusao da instalacao
+- Conclusão da instalação
+- Mudanças em qualquer campo do job
 
 ---
 
-## 7. Limites do App de Campo
+## 8. Segurança e Limites
 
-O app de campo **NAO** tem acesso a:
-- Modulos administrativos
-- Financeiro (precos, custos, margens)
-- Edicao de pedidos ou propostas
-- Gestao de estoque
-- Relatorios gerenciais
-- Dados de outros tecnicos
+### O que o App de Campo **NÃO** tem acesso:
+- ❌ Módulos administrativos
+- ❌ Financeiro (preços, custos, margens)
+- ❌ Edição de pedidos ou propostas
+- ❌ Gestão de estoque
+- ❌ Relatórios gerenciais
+- ❌ Dados de outros técnicos (exceto admin)
 
-### Seguranca (RLS)
-- Tecnico so ve suas proprias tarefas
+### Row Level Security (RLS)
+- Técnico só vê **suas próprias tarefas** (⚠️ RLS atualmente mais permissiva — gap identificado)
 - Acesso restrito por `tecnico_id = auth.uid()`
-- Storage isolado por pasta do tecnico
-- Sem permissao de DELETE em nenhuma tabela
+- Storage isolado por pasta do técnico
+- Sem permissão de DELETE em nenhuma tabela
+
+### Storage Security
+- Bucket `job_photos`: acesso privado (não público)
+- RLS no bucket implementada via migration 005
+- Upload apenas por usuários autenticados
 
 ---
 
-## 8. Metricas de Campo
+## 9. Métricas de Campo
 
-Dados capturados automaticamente para analise no CRM:
+Dados capturados automaticamente para análise no CRM:
 
-| Metrica | Calculo | Uso |
+| Métrica | Cálculo | Uso |
 |---------|---------|-----|
-| Tempo medio de instalacao | fim - inicio | Planejamento |
-| Taxa de conclusao | concluidas / total | Performance |
-| Ocorrencias por tecnico | count por tecnico | Qualidade |
-| Km percorrido (estimado) | distancia entre geolocalizacoes | Custo logistico |
-| Fotos por tarefa | media de fotos enviadas | Documentacao |
-| Tempo de deslocamento | checkin - hora agendada | Roteirizacao |
+| Tempo médio de instalação | fim - início | Planejamento de agenda |
+| Taxa de conclusão | concluídas / total | Performance por técnico |
+| Ocorrências por técnico | count agrupado | Qualidade do trabalho |
+| Km percorrido (estimado) | distância entre geolocalizações | Custo logístico |
+| Fotos por tarefa | média de fotos enviadas | Qualidade da documentação |
+| Tempo de deslocamento | check-in - hora agendada | Otimização de rotas |
 
 ---
 
-## 9. Fluxo Completo (Exemplo)
+## 10. Fluxo Completo (Exemplo)
 
 ```
 DIA ANTERIOR (CRM):
-  Gestor agenda 3 instalacoes para tecnico Joao
-  → 3 tarefas criadas em tarefas_campo
+  Gestor agenda 3 instalações para técnico João
+  → 3 tarefas criadas em jobs
 
-MANHA (App Campo):
-  08:00 - Joao abre o app, ve 3 tarefas do dia
+MANHÃ (App Campo):
+  08:00 - João abre o app, vê 3 tarefas do dia
   08:30 - Sai para primeira tarefa → status: em_deslocamento
-  09:00 - Chega no local → check-in com geolocalizacao
-        → Faz checklist pre-instalacao
-        → Tira 3 fotos "antes"
-  09:15 - Inicia instalacao → status: em_execucao
-  10:30 - Finaliza → tira fotos "depois"
-        → Checklist pos-instalacao
-        → Cliente assina no celular
-        → Observacao: "Instalacao OK, parede precisou de limpeza previa"
-  10:35 - Marca concluida → status: concluida
+  09:00 - Chega no local → check-in com geolocalização
+        → Faz checklist pré-instalação (5 itens ✓)
+        → Tira 3 fotos "antes" (com watermark automático)
+  09:15 - Inicia instalação → status: em_execução
+  10:30 - Finaliza → tira 4 fotos "depois"
+        → Checklist pós-instalação
+        → Cliente assina no celular (nome: Maria Silva, Gerente)
+        → Observação: "Instalação OK, parede precisou de limpeza prévia"
+  10:35 - Marca concluída → status: concluída
 
 TEMPO REAL (CRM):
-  Gestor ve no painel: "Tarefa #1 - Concluida as 10:35"
-  Fotos ja disponiveis no detalhe da ordem
+  Gestor vê no painel: "Tarefa #1 - Concluída às 10:35"
+  Fotos já disponíveis no detalhe da ordem
   Assinatura registrada
   → Automaticamente: pedido_item.status = instalado
-  → Se todos itens instalados: pedido.status = concluido
+  → Se todos itens instalados: pedido.status = concluído
   → Trigger: habilita faturamento
 ```
+
+---
+
+## 11. Status de Implementação
+
+### Funcionalidades Prontas ✅
+| Feature | Status |
+|---------|--------|
+| Auth + ProtectedRoute | ✅ Funcional |
+| Jobs (lista, filtros, infinite scroll) | ✅ Funcional |
+| JobDetail (fotos, assinatura, vídeo, notas) | ✅ Funcional |
+| Upload/compressão de fotos | ✅ Funcional |
+| Watermark automático | ✅ Funcional |
+| Assinatura digital (react-signature-canvas) | ✅ Funcional |
+| Mapa de lojas (Leaflet) | ✅ Funcional |
+| Analytics + gráficos | ✅ Funcional |
+| Relatório de faturamento | ✅ Funcional |
+| Gestão de equipe (incluindo delete via Edge Function) | ✅ Funcional |
+| Detecção de offline | ✅ Funcional |
+
+### Gaps Conhecidos ⚠️
+| Feature | Status | Dependência |
+|---------|--------|-------------|
+| Fila de sync offline | ❌ Não implementado | IndexedDB + service worker |
+| Checklists de conclusão | ❌ Não implementado | UI + tabela campo |
+| Notificações push | ❌ Não implementado | FCM ou Web Push API |
+| RLS mais restritiva | ⚠️ Técnico vê todos os jobs | Precisa filtrar por tecnico_id |
+| Bridge ERP↔Campo (triggers) | ⚠️ SQL criado, não executado | Migration 004 pendente |
+| Mapeamento de status ERP↔Campo | ⚠️ Status divergem | ERP: "agendada" vs Campo: "Pendente" |
