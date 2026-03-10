@@ -2,7 +2,7 @@
 
 > Documento de referência arquitetural | Atualizado: 2026-03-10
 
-**Documentos relacionados**: [BUSINESS_FLOW](BUSINESS_FLOW.md) | [PRICING_ENGINE](PRICING_ENGINE.md) | [FIELD_APP](FIELD_APP.md) | [DATABASE_OVERVIEW](DATABASE_OVERVIEW.md)
+**Documentos relacionados**: [BUSINESS_FLOW](BUSINESS_FLOW.md) | [PRICING_ENGINE](PRICING_ENGINE.md) | [FIELD_APP](FIELD_APP.md) | [DATABASE_OVERVIEW](DATABASE_OVERVIEW.md) | [MUBISYS_ANALYSIS](MUBISYS_ANALYSIS.md) | [PROJECT_GOVERNANCE](PROJECT_GOVERNANCE.md)
 
 ---
 
@@ -44,7 +44,7 @@ O sistema da Croma Print é composto por **dois produtos independentes** que com
 - **Interface**: Desktop-first, responsivo para tablet
 - **Rota base**: `/` (raiz)
 - **Deploy**: Vercel (tender-archimedes.vercel.app)
-- **Status**: ✅ 28 páginas implementadas, 12 domínios de negócio
+- **Status**: ✅ 29 páginas implementadas, 12 domínios de negócio
 
 ### Produto B — App de Campo
 - **Público**: Instaladores e equipe externa
@@ -108,9 +108,9 @@ CRM-Croma/
 │   │   ├── constants/               # status.ts (472 linhas), permissions.ts, navigation.ts
 │   │   ├── hooks/                   # useAuth, usePagination, useDebounce
 │   │   ├── schemas/                 # Zod schemas por domínio (7 arquivos)
-│   │   ├── services/                # pricing-engine.ts, orcamento-pricing.service.ts
+│   │   ├── services/                # pricing-engine.ts (Mubisys 9 passos), orcamento-pricing.service.ts
 │   │   ├── types/                   # common.types.ts, database.types.ts
-│   │   └── utils/                   # format.ts (BRL, datas, CNPJ, telefone)
+│   │   └── utils/                   # format.ts (BRL, datas, CNPJ, telefone), toast.ts
 │   │
 │   ├── components/ui/               # shadcn/ui (gerados, não editar manualmente)
 │   ├── contexts/                    # AuthContext.tsx (sessão + permissões)
@@ -189,7 +189,7 @@ Todas as rotas usam `React.lazy()` com code splitting automático.
 |-------|-------|-----------|
 | Dashboard | `/` | Painel por role (diretor/comercial/financeiro/produção) |
 | Comercial | `/leads`, `/pipeline`, `/propostas`, `/clientes`, `/orcamentos` | CRM completo |
-| Orçamentos | `/orcamentos/novo`, `/orcamentos/:id`, `/orcamentos/:id/editar` | CRUD orçamentos |
+| Orçamentos | `/orcamentos/novo`, `/orcamentos/:id`, `/orcamentos/:id/editar`, `/orcamentos/templates` | CRUD orçamentos + templates |
 | Operacional | `/pedidos`, `/producao`, `/instalacoes` | Gestão operacional |
 | Suprimentos | `/estoque`, `/compras`, `/produtos` | Materiais e compras |
 | Financeiro | `/financeiro`, `/dre`, `/comissoes` | Gestão financeira |
@@ -306,9 +306,16 @@ supabase/migrations/
 | Componente | Arquivo | Descrição |
 |-----------|---------|-----------|
 | `KpiCard` | `shared/components/KpiCard.tsx` | Card com sparkline, 11 variantes de cor, skeleton loading |
-| `Breadcrumbs` | `shared/components/Breadcrumbs.tsx` | Auto-gerado, 28 segmentos mapeados |
-| `CommandPalette` | `shared/components/CommandPalette.tsx` | Ctrl+K, busca em 7 grupos |
+| `Breadcrumbs` | `shared/components/Breadcrumbs.tsx` | Auto-gerado, 30 segmentos mapeados |
+| `CommandPalette` | `shared/components/CommandPalette.tsx` | Ctrl+K, busca em 7 grupos (22 atalhos) |
 | `Layout` | `components/Layout.tsx` | Sidebar colapsável, mobile responsive |
+| `ProdutoSelector` | `comercial/components/ProdutoSelector.tsx` | Cascata Produto→Modelo com auto-preenchimento |
+| `MaterialEditor` | `comercial/components/MaterialEditor.tsx` | Editor de materiais por item (add/remove/edit) |
+| `AcabamentoSelector` | `comercial/components/AcabamentoSelector.tsx` | Toggle de acabamentos com custo calculado |
+| `ServicoSelector` | `comercial/components/ServicoSelector.tsx` | Seletor de serviços (horas × custo) |
+| `TemplateSelector` | `comercial/components/TemplateSelector.tsx` | Modal de templates de orçamento |
+| `OrcamentoPDF` | `comercial/components/OrcamentoPDF.tsx` | Layout A4 para impressão/PDF profissional |
+| `PricingCalculator` | `comercial/components/PricingCalculator.tsx` | Painel de precificação Mubisys ao vivo |
 
 ---
 
