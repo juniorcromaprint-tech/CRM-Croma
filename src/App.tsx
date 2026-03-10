@@ -27,8 +27,14 @@ import ComprasPage from "@/domains/compras/pages/ComprasPage";
 import InstalacaoPage from "@/domains/instalacao/pages/InstalacaoPage";
 import OcorrenciasPage from "@/domains/qualidade/pages/OcorrenciasPage";
 
+// ---- Orçamentos Pages ----
+import OrcamentosPage from "@/domains/comercial/pages/OrcamentosPage";
+import OrcamentoEditorPage from "@/domains/comercial/pages/OrcamentoEditorPage";
+import OrcamentoViewPage from "@/domains/comercial/pages/OrcamentoViewPage";
+
 // ---- Phase 6 Admin Pages ----
 import AdminUsuariosPage from "@/domains/admin/pages/AdminUsuariosPage";
+import AdminPrecificacaoPage from "@/domains/admin/pages/AdminPrecificacaoPage";
 
 // ---- Fiscal Domain Pages ----
 import FiscalDashboardPage from "@/domains/fiscal/pages/FiscalDashboardPage";
@@ -84,6 +90,10 @@ const App = () => (
               <Route path="leads" element={<LeadsPage />} />
               <Route path="pipeline" element={<PipelinePage />} />
               <Route path="propostas" element={<PropostasPage />} />
+              <Route path="orcamentos" element={<OrcamentosPage />} />
+              <Route path="orcamentos/novo" element={<OrcamentoEditorPage />} />
+              <Route path="orcamentos/:id" element={<OrcamentoViewPage />} />
+              <Route path="orcamentos/:id/editar" element={<OrcamentoEditorPage />} />
 
               {/* ===== CLIENTES ===== */}
               <Route path="clientes" element={<ClientesPage />} />
@@ -117,6 +127,7 @@ const App = () => (
 
               {/* ===== ADMINISTRAÇÃO ===== */}
               <Route path="admin/usuarios" element={<AdminUsuariosPage />} />
+              <Route path="admin/precificacao" element={<AdminPrecificacaoPage />} />
               <Route path="admin/config" element={<Settings />} />
               <Route path="admin/auditoria" element={<AdminUsuariosPage />} />
 
