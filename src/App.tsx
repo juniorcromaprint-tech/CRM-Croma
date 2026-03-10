@@ -17,6 +17,7 @@ import ClientesPage from "@/domains/clientes/pages/ClientesPage";
 import PedidosPage from "@/domains/pedidos/pages/PedidosPage";
 import FinanceiroPage from "@/domains/financeiro/pages/FinanceiroPage";
 import ComissoesPage from "@/domains/financeiro/pages/ComissoesPage";
+import DrePage from "@/domains/financeiro/pages/DrePage";
 
 // ---- Phase 3 Domain Pages ----
 import ProducaoPage from "@/domains/producao/pages/ProducaoPage";
@@ -111,7 +112,7 @@ const App = () => (
 
               {/* ===== FINANCEIRO ===== */}
               <Route path="financeiro" element={<FinanceiroPage />} />
-              <Route path="dre" element={<PlaceholderPage />} />
+              <Route path="dre" element={<DrePage />} />
               <Route path="comissoes" element={<ComissoesPage />} />
 
               {/* ===== QUALIDADE ===== */}
