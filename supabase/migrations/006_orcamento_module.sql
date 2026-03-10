@@ -67,17 +67,18 @@ CREATE TABLE IF NOT EXISTS proposta_servicos (
   created_at TIMESTAMPTZ DEFAULT NOW()
 );
 
--- Regras de precificação configuráveis (markup por categoria, descontos, etc.)
+-- Regras de precificação configuráveis (markup por categoria)
 CREATE TABLE IF NOT EXISTS regras_precificacao (
   id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
-  nome TEXT NOT NULL,
-  categoria TEXT, -- categoria de produto ou NULL para todas
-  tipo TEXT NOT NULL CHECK (tipo IN ('markup_minimo', 'markup_padrao', 'desconto_maximo', 'preco_m2_minimo', 'taxa_urgencia')),
-  valor NUMERIC(10,4) NOT NULL, -- percentual ou valor fixo
-  ativo BOOLEAN DEFAULT TRUE,
+  categoria TEXT NOT NULL,          -- 'banner', 'fachada', 'pdv', 'adesivo', 'geral', etc.
+  markup_minimo NUMERIC(10,2) NOT NULL DEFAULT 30,
+  markup_sugerido NUMERIC(10,2) NOT NULL DEFAULT 50,
+  markup_maximo NUMERIC(10,2) DEFAULT 200,
+  descricao TEXT,
+  ativo BOOLEAN DEFAULT true,
   criado_por UUID REFERENCES profiles(id),
-  created_at TIMESTAMPTZ DEFAULT NOW(),
-  updated_at TIMESTAMPTZ DEFAULT NOW()
+  created_at TIMESTAMPTZ DEFAULT now(),
+  updated_at TIMESTAMPTZ DEFAULT now()
 );
 
 -- Templates de orçamento (conjunto de itens pré-configurados)
@@ -100,7 +101,7 @@ CREATE INDEX IF NOT EXISTS idx_servicos_ativo ON servicos(ativo);
 CREATE INDEX IF NOT EXISTS idx_proposta_item_materiais_item ON proposta_item_materiais(proposta_item_id);
 CREATE INDEX IF NOT EXISTS idx_proposta_item_acabamentos_item ON proposta_item_acabamentos(proposta_item_id);
 CREATE INDEX IF NOT EXISTS idx_proposta_servicos_proposta ON proposta_servicos(proposta_id);
-CREATE INDEX IF NOT EXISTS idx_regras_precificacao_tipo ON regras_precificacao(tipo, ativo);
+CREATE INDEX IF NOT EXISTS idx_regras_precificacao_categoria ON regras_precificacao(categoria, ativo);
 CREATE INDEX IF NOT EXISTS idx_templates_orcamento_ativo ON templates_orcamento(ativo);
 
 -- ─── RLS ────────────────────────────────────────────────────────────────────
@@ -197,12 +198,11 @@ INSERT INTO servicos (nome, categoria, custo_hora, horas_estimadas, preco_fixo) 
   ('Frete Estado', 'transporte', 0, 0, 250.00)
 ON CONFLICT DO NOTHING;
 
-INSERT INTO regras_precificacao (nome, tipo, valor) VALUES
-  ('Markup mínimo padrão', 'markup_minimo', 30),
-  ('Markup padrão', 'markup_padrao', 45),
-  ('Markup premium (ACM/Letra-caixa)', 'markup_padrao', 55),
-  ('Desconto máximo por volume', 'desconto_maximo', 15),
-  ('Preço m² mínimo (lona)', 'preco_m2_minimo', 18.00),
-  ('Taxa urgência (prazo < 24h)', 'taxa_urgencia', 50),
-  ('Taxa urgência (prazo 24-48h)', 'taxa_urgencia', 25)
+INSERT INTO regras_precificacao (categoria, markup_minimo, markup_sugerido, markup_maximo, descricao) VALUES
+  ('geral', 30, 45, 150, 'Regra padrão para todos os produtos'),
+  ('banner', 35, 50, 150, 'Banners e faixas em lona'),
+  ('fachada', 40, 60, 200, 'Fachadas ACM e letra-caixa'),
+  ('pdv', 35, 55, 180, 'Material de PDV e displays'),
+  ('adesivo', 30, 45, 150, 'Adesivos e plotagem'),
+  ('envelopamento', 40, 65, 200, 'Envelopamento de veículos e ambientes')
 ON CONFLICT DO NOTHING;

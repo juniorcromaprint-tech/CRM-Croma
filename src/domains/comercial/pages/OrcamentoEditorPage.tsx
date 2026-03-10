@@ -1,14 +1,14 @@
 // ============================================================================
-// ORÇAMENTO EDITOR PAGE — v2.0
+// ORÇAMENTO EDITOR PAGE — v3.0
 // Editor completo com seleção de produto → modelo → materiais → acabamentos
-// Layout 2 colunas: formulário + pricing em tempo real
+// Layout 2 colunas: wizard 3 etapas (esquerda) + pricing em tempo real (direita)
 // ============================================================================
 
 import React, { useState, useEffect, useMemo, useCallback } from "react";
 import { useNavigate, useParams, Link } from "react-router-dom";
 import {
   ArrowLeft, Plus, Trash2, Save, Loader2, FileText,
-  ChevronDown, ChevronUp, AlertTriangle,
+  ChevronDown, ChevronUp, AlertTriangle, Package, Layers, CheckCircle,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -27,12 +27,15 @@ import {
   useSalvarServicos,
 } from "../hooks/useOrcamentos";
 import { useOrcamentoPricing } from "../hooks/useOrcamentoPricing";
+import { useOrcamentoAlerts } from "../hooks/useOrcamentoAlerts";
 import PricingCalculator from "../components/PricingCalculator";
 import ProdutoSelector from "../components/ProdutoSelector";
 import MaterialEditor from "../components/MaterialEditor";
 import AcabamentoSelector from "../components/AcabamentoSelector";
 import ServicoSelector from "../components/ServicoSelector";
 import TemplateSelector from "../components/TemplateSelector";
+import AlertasOrcamento from "../components/AlertasOrcamento";
+import ResumoVendedor from "../components/ResumoVendedor";
 import type { OrcamentoServicoItem } from "../components/ServicoSelector";
 import type { OrcamentoTemplate } from "../components/TemplateSelector";
 import type { Produto, ProdutoModelo } from "../hooks/useProdutosModelos";
@@ -80,6 +83,103 @@ const DEFAULT_ITEM: ItemEditorState = {
   categoria: null,
 };
 
+// ─── Step definitions ────────────────────────────────────────────────────────
+
+const WIZARD_STEPS = [
+  { label: "Produto", icon: Package },
+  { label: "Materiais", icon: Layers },
+  { label: "Revisao", icon: CheckCircle },
+] as const;
+
+// ─── StepIndicator component ─────────────────────────────────────────────────
+
+interface StepIndicatorProps {
+  currentStep: number; // 1, 2, or 3
+}
+
+function StepIndicator({ currentStep }: StepIndicatorProps) {
+  return (
+    <div className="flex items-center gap-0 mb-5">
+      {WIZARD_STEPS.map((step, idx) => {
+        const stepNum = idx + 1;
+        const isDone = currentStep > stepNum;
+        const isActive = currentStep === stepNum;
+        const Icon = step.icon;
+
+        return (
+          <React.Fragment key={stepNum}>
+            <div className="flex flex-col items-center gap-1 min-w-[64px]">
+              <div
+                className={`w-8 h-8 rounded-full flex items-center justify-center transition-colors ${
+                  isDone
+                    ? "bg-emerald-500 text-white"
+                    : isActive
+                    ? "bg-blue-600 text-white"
+                    : "bg-slate-200 text-slate-400"
+                }`}
+              >
+                <Icon size={14} />
+              </div>
+              <span
+                className={`text-[10px] font-medium leading-tight text-center ${
+                  isDone
+                    ? "text-emerald-600"
+                    : isActive
+                    ? "text-blue-700"
+                    : "text-slate-400"
+                }`}
+              >
+                {step.label}
+              </span>
+            </div>
+            {idx < WIZARD_STEPS.length - 1 && (
+              <div
+                className={`flex-1 h-0.5 mb-4 transition-colors ${
+                  currentStep > stepNum ? "bg-emerald-400" : "bg-slate-200"
+                }`}
+              />
+            )}
+          </React.Fragment>
+        );
+      })}
+    </div>
+  );
+}
+
+// ─── StepSummaryBadge — compact summary of prior steps ──────────────────────
+
+interface StepSummaryBadgeProps {
+  item: ItemEditorState;
+  visibleFrom: number; // show only when currentStep >= visibleFrom
+  currentStep: number;
+}
+
+function StepSummaryBadge({ item, visibleFrom, currentStep }: StepSummaryBadgeProps) {
+  if (currentStep < visibleFrom) return null;
+
+  const parts: string[] = [];
+  if (item.descricao) parts.push(item.descricao);
+  if (item.quantidade > 1) parts.push(`x${item.quantidade}`);
+  if (item.largura_cm && item.altura_cm) parts.push(`${item.largura_cm}x${item.altura_cm}cm`);
+
+  if (parts.length === 0) return null;
+
+  return (
+    <div className="flex flex-wrap gap-1.5 mb-4">
+      {parts.map((p, i) => (
+        <Badge key={i} variant="secondary" className="text-xs bg-slate-100 text-slate-600 border-slate-200">
+          {p}
+        </Badge>
+      ))}
+      {item.materiais.length > 0 && (
+        <Badge variant="secondary" className="text-xs bg-blue-50 text-blue-700 border-blue-200">
+          {item.materiais.length} {item.materiais.length === 1 ? "material" : "materiais"}
+        </Badge>
+      )}
+    </div>
+  );
+}
+
 // ============================================================================
 // COMPONENT
 // ============================================================================
@@ -108,6 +208,9 @@ export default function OrcamentoEditorPage() {
   const [newItem, setNewItem] = useState<ItemEditorState>(DEFAULT_ITEM);
   const [showItemForm, setShowItemForm] = useState(false);
   const [itemFormExpanded, setItemFormExpanded] = useState(true);
+
+  // ─── Wizard step state ──────────────────────────────────────────────────
+  const [currentStep, setCurrentStep] = useState(1);
 
   // ─── Serviços state ─────────────────────────────────────────────────────
   const [servicos, setServicos] = useState<OrcamentoServicoItem[]>([]);
@@ -169,8 +272,18 @@ export default function OrcamentoEditorPage() {
     };
   }, [newItem]);
 
-  const { resultado: pricingResult, markupSugerido, validacaoMarkup } =
+  const { resultado: pricingResult, markupSugerido, validacaoMarkup, config: pricingConfig } =
     useOrcamentoPricing(pricingInput, newItem.categoria);
+
+  // ─── Alerts ─────────────────────────────────────────────────────────────
+  const alerts = useOrcamentoAlerts({
+    materiais: newItem.materiais,
+    acabamentos: newItem.acabamentos,
+    markup: newItem.markup_percentual,
+    markupMinimo: validacaoMarkup.markup_minimo,
+    resultado: pricingResult,
+    config: pricingConfig,
+  });
 
   // ─── Handlers ───────────────────────────────────────────────────────────
 
@@ -223,6 +336,30 @@ export default function OrcamentoEditorPage() {
   const handleAcabamentosChange = useCallback((acabamentos: OrcamentoAcabamento[]) => {
     setNewItem((s) => ({ ...s, acabamentos }));
   }, []);
+
+  // ─── Step navigation ─────────────────────────────────────────────────────
+
+  const handleNextStep = () => {
+    if (currentStep === 1) {
+      if (!newItem.descricao.trim()) {
+        showError("Informe a descricao do item antes de continuar");
+        return;
+      }
+    }
+    if (currentStep === 2) {
+      const hasMateriais = newItem.materiais.length > 0;
+      const hasDimensoes = newItem.largura_cm !== null && newItem.altura_cm !== null;
+      if (!hasMateriais && !hasDimensoes) {
+        showError("Adicione pelo menos 1 material ou informe as dimensoes (largura x altura)");
+        return;
+      }
+    }
+    setCurrentStep((s) => Math.min(s + 1, 3));
+  };
+
+  const handlePrevStep = () => {
+    setCurrentStep((s) => Math.max(s - 1, 1));
+  };
 
   const handleSave = async () => {
     if (!titulo.trim()) { showError("Informe o titulo do orcamento"); return; }
@@ -312,6 +449,7 @@ export default function OrcamentoEditorPage() {
     await orcamentoService.recalcularTotais(id);
     setNewItem(DEFAULT_ITEM);
     setShowItemForm(false);
+    setCurrentStep(1); // Reset wizard to step 1
   };
 
   const handleRemoveItem = async (itemId: string) => {
@@ -338,6 +476,7 @@ export default function OrcamentoEditorPage() {
         altura_cm: firstItem.altura_cm,
         markup_percentual: firstItem.markup_percentual,
       });
+      setCurrentStep(1);
       setShowItemForm(true);
       setShowTemplateModal(false);
       showSuccess(`Template "${template.nome}" aplicado!`);
@@ -549,7 +688,11 @@ export default function OrcamentoEditorPage() {
               variant="outline"
               size="sm"
               className="rounded-xl h-9 gap-2"
-              onClick={() => { setShowItemForm((s) => !s); setNewItem(DEFAULT_ITEM); }}
+              onClick={() => {
+                setShowItemForm((s) => !s);
+                setNewItem(DEFAULT_ITEM);
+                setCurrentStep(1);
+              }}
             >
               <Plus size={15} /> Adicionar Item
             </Button>
@@ -616,7 +759,7 @@ export default function OrcamentoEditorPage() {
               </div>
             )}
 
-            {/* ══════════ NEW ITEM FORM (2-column layout) ══════════ */}
+            {/* ══════════ NEW ITEM FORM — 3-STEP WIZARD ══════════ */}
             {showItemForm && (
               <div className="border border-blue-200 bg-blue-50/30 rounded-2xl overflow-hidden">
                 {/* Form header */}
@@ -624,7 +767,7 @@ export default function OrcamentoEditorPage() {
                   className="flex items-center justify-between px-5 py-3 bg-blue-50 border-b border-blue-200 cursor-pointer"
                   onClick={() => setItemFormExpanded((e) => !e)}
                 >
-                  <p className="text-sm font-semibold text-blue-800">Novo Item</p>
+                  <p className="text-sm font-semibold text-blue-800">Novo Item — Etapa {currentStep} de 3</p>
                   <div className="flex items-center gap-2">
                     {pricingResult && (
                       <Badge className="bg-blue-100 text-blue-700 border-blue-200 text-xs">
@@ -637,122 +780,226 @@ export default function OrcamentoEditorPage() {
 
                 {itemFormExpanded && (
                   <div className="p-5">
+                    {/* Step Indicator */}
+                    <StepIndicator currentStep={currentStep} />
+
                     <div className="grid grid-cols-1 lg:grid-cols-5 gap-6">
-                      {/* ──── LEFT COLUMN (3/5) — Item details ──── */}
+                      {/* ──── LEFT COLUMN (3/5) — Wizard steps ──── */}
                       <div className="lg:col-span-3 space-y-5">
-                        {/* Produto & Modelo Selector */}
-                        <ProdutoSelector
-                          produtoId={newItem.produto_id}
-                          modeloId={newItem.modelo_id}
-                          onProdutoChange={handleProdutoChange}
-                          onModeloChange={handleModeloChange}
-                        />
 
-                        {/* Descricao manual (caso nao selecione produto) */}
-                        <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
-                          <div className="md:col-span-2">
-                            <Label className="text-xs">Descricao *</Label>
-                            <Input
-                              value={newItem.descricao}
-                              onChange={(e) => setNewItem((s) => ({ ...s, descricao: e.target.value }))}
-                              placeholder="Ex: Banner lona 440g com ilhos"
-                              className="mt-1 rounded-xl h-9 text-sm"
+                        {/* ════ STEP 1: Produto & Cliente ════ */}
+                        {currentStep === 1 && (
+                          <>
+                            {/* Produto & Modelo Selector */}
+                            <ProdutoSelector
+                              produtoId={newItem.produto_id}
+                              modeloId={newItem.modelo_id}
+                              onProdutoChange={handleProdutoChange}
+                              onModeloChange={handleModeloChange}
                             />
-                          </div>
-                          <div>
-                            <Label className="text-xs">Especificacao</Label>
-                            <Input
-                              value={newItem.especificacao}
-                              onChange={(e) => setNewItem((s) => ({ ...s, especificacao: e.target.value }))}
-                              placeholder="Detalhes adicionais..."
-                              className="mt-1 rounded-xl h-9 text-sm"
-                            />
-                          </div>
-                          <div>
-                            <Label className="text-xs">Quantidade</Label>
-                            <Input
-                              type="number"
-                              min={1}
-                              step={1}
-                              value={newItem.quantidade}
-                              onChange={(e) => setNewItem((s) => ({ ...s, quantidade: Number(e.target.value) }))}
-                              className="mt-1 rounded-xl h-9 text-sm"
-                            />
-                          </div>
-                          <div>
-                            <Label className="text-xs">Largura (cm)</Label>
-                            <Input
-                              type="number"
-                              min={1}
-                              value={newItem.largura_cm ?? ""}
-                              onChange={(e) => setNewItem((s) => ({ ...s, largura_cm: e.target.value ? Number(e.target.value) : null }))}
-                              placeholder="Opcional"
-                              className="mt-1 rounded-xl h-9 text-sm"
-                            />
-                          </div>
-                          <div>
-                            <Label className="text-xs">Altura (cm)</Label>
-                            <Input
-                              type="number"
-                              min={1}
-                              value={newItem.altura_cm ?? ""}
-                              onChange={(e) => setNewItem((s) => ({ ...s, altura_cm: e.target.value ? Number(e.target.value) : null }))}
-                              placeholder="Opcional"
-                              className="mt-1 rounded-xl h-9 text-sm"
-                            />
-                          </div>
-                        </div>
 
-                        {/* Materiais */}
-                        <MaterialEditor
-                          materiais={newItem.materiais}
-                          onChange={handleMateriaisChange}
-                        />
+                            {/* Descricao + Especificacao */}
+                            <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+                              <div className="md:col-span-2">
+                                <Label className="text-xs">Descricao *</Label>
+                                <Input
+                                  value={newItem.descricao}
+                                  onChange={(e) => setNewItem((s) => ({ ...s, descricao: e.target.value }))}
+                                  placeholder="Ex: Banner lona 440g com ilhos"
+                                  className="mt-1 rounded-xl h-9 text-sm"
+                                />
+                              </div>
+                              <div className="md:col-span-2">
+                                <Label className="text-xs">Especificacao</Label>
+                                <Input
+                                  value={newItem.especificacao}
+                                  onChange={(e) => setNewItem((s) => ({ ...s, especificacao: e.target.value }))}
+                                  placeholder="Detalhes adicionais..."
+                                  className="mt-1 rounded-xl h-9 text-sm"
+                                />
+                              </div>
+                              <div>
+                                <Label className="text-xs">Quantidade</Label>
+                                <Input
+                                  type="number"
+                                  min={1}
+                                  step={1}
+                                  value={newItem.quantidade}
+                                  onChange={(e) => setNewItem((s) => ({ ...s, quantidade: Number(e.target.value) }))}
+                                  className="mt-1 rounded-xl h-9 text-sm"
+                                />
+                              </div>
+                            </div>
 
-                        {/* Acabamentos */}
-                        <AcabamentoSelector
-                          selected={newItem.acabamentos}
-                          onChange={handleAcabamentosChange}
-                        />
-
-                        {/* Markup */}
-                        <div className="flex items-end gap-4">
-                          <div className="flex-1">
-                            <Label className="text-xs">Markup (%)</Label>
-                            <Input
-                              type="number"
-                              min={0}
-                              step={1}
-                              value={newItem.markup_percentual}
-                              onChange={(e) => setNewItem((s) => ({ ...s, markup_percentual: Number(e.target.value) }))}
-                              className="mt-1 rounded-xl h-9 text-sm"
-                            />
-                          </div>
-                          {markupSugerido !== newItem.markup_percentual && (
-                            <Button
-                              variant="outline"
-                              size="sm"
-                              className="rounded-xl h-9 text-xs"
-                              onClick={() => setNewItem((s) => ({ ...s, markup_percentual: markupSugerido }))}
-                            >
-                              Sugerido: {markupSugerido}%
-                            </Button>
-                          )}
-                        </div>
-                        {!validacaoMarkup.valido && (
-                          <div className="flex items-center gap-2 text-amber-600 text-xs mt-1">
-                            <AlertTriangle size={14} />
-                            {validacaoMarkup.aviso}
-                          </div>
+                            {/* Step 1 — Nav */}
+                            <div className="flex justify-end pt-2">
+                              <Button
+                                onClick={handleNextStep}
+                                className="bg-blue-600 hover:bg-blue-700 text-white rounded-xl px-6"
+                              >
+                                Proximo
+                              </Button>
+                            </div>
+                          </>
                         )}
-                        {validacaoMarkup.valido && newItem.markup_percentual < 30 && (
-                          <p className="text-xs text-amber-600 mt-1">
-                            ⚠️ Markup abaixo de 30% — verifique a rentabilidade
-                          </p>
+
+                        {/* ════ STEP 2: Medidas & Materiais ════ */}
+                        {currentStep === 2 && (
+                          <>
+                            {/* Summary of step 1 selections */}
+                            <StepSummaryBadge item={newItem} visibleFrom={2} currentStep={currentStep} />
+
+                            {/* Dimensoes */}
+                            <div>
+                              <p className="text-xs font-semibold text-slate-500 uppercase tracking-wider mb-2">
+                                Dimensoes (opcional — para calcular area)
+                              </p>
+                              <div className="grid grid-cols-2 gap-3">
+                                <div>
+                                  <Label className="text-xs">Largura (cm)</Label>
+                                  <Input
+                                    type="number"
+                                    min={1}
+                                    value={newItem.largura_cm ?? ""}
+                                    onChange={(e) => setNewItem((s) => ({ ...s, largura_cm: e.target.value ? Number(e.target.value) : null }))}
+                                    placeholder="Opcional"
+                                    className="mt-1 rounded-xl h-9 text-sm"
+                                  />
+                                </div>
+                                <div>
+                                  <Label className="text-xs">Altura (cm)</Label>
+                                  <Input
+                                    type="number"
+                                    min={1}
+                                    value={newItem.altura_cm ?? ""}
+                                    onChange={(e) => setNewItem((s) => ({ ...s, altura_cm: e.target.value ? Number(e.target.value) : null }))}
+                                    placeholder="Opcional"
+                                    className="mt-1 rounded-xl h-9 text-sm"
+                                  />
+                                </div>
+                              </div>
+                              {newItem.largura_cm && newItem.altura_cm && (
+                                <p className="text-[11px] text-slate-400 mt-1.5">
+                                  Area: {((newItem.largura_cm * newItem.altura_cm) / 10000).toFixed(2)} m²
+                                </p>
+                              )}
+                            </div>
+
+                            {/* Materiais */}
+                            <MaterialEditor
+                              materiais={newItem.materiais}
+                              onChange={handleMateriaisChange}
+                            />
+
+                            {/* Acabamentos */}
+                            <AcabamentoSelector
+                              selected={newItem.acabamentos}
+                              onChange={handleAcabamentosChange}
+                            />
+
+                            {/* Step 2 — Nav */}
+                            <div className="flex justify-between pt-2">
+                              <Button
+                                variant="outline"
+                                onClick={handlePrevStep}
+                                className="rounded-xl px-5"
+                              >
+                                Voltar
+                              </Button>
+                              <Button
+                                onClick={handleNextStep}
+                                className="bg-blue-600 hover:bg-blue-700 text-white rounded-xl px-6"
+                              >
+                                Proximo
+                              </Button>
+                            </div>
+                          </>
+                        )}
+
+                        {/* ════ STEP 3: Revisao & Alertas ════ */}
+                        {currentStep === 3 && (
+                          <>
+                            {/* Summary of prior steps */}
+                            <StepSummaryBadge item={newItem} visibleFrom={3} currentStep={currentStep} />
+
+                            {/* Markup com sugestao */}
+                            <div className="flex items-end gap-4">
+                              <div className="flex-1">
+                                <Label className="text-xs">Markup (%)</Label>
+                                <Input
+                                  type="number"
+                                  min={0}
+                                  step={1}
+                                  value={newItem.markup_percentual}
+                                  onChange={(e) => setNewItem((s) => ({ ...s, markup_percentual: Number(e.target.value) }))}
+                                  className="mt-1 rounded-xl h-9 text-sm"
+                                />
+                              </div>
+                              {markupSugerido !== newItem.markup_percentual && (
+                                <Button
+                                  variant="outline"
+                                  size="sm"
+                                  className="rounded-xl h-9 text-xs"
+                                  onClick={() => setNewItem((s) => ({ ...s, markup_percentual: markupSugerido }))}
+                                >
+                                  Sugerido: {markupSugerido}%
+                                </Button>
+                              )}
+                            </div>
+
+                            {/* Validation warnings */}
+                            {!validacaoMarkup.valido && (
+                              <div className="flex items-center gap-2 text-amber-600 text-xs">
+                                <AlertTriangle size={14} />
+                                {validacaoMarkup.aviso}
+                              </div>
+                            )}
+                            {validacaoMarkup.valido && newItem.markup_percentual < 30 && (
+                              <p className="text-xs text-amber-600">
+                                Markup abaixo de 30% — verifique a rentabilidade
+                              </p>
+                            )}
+
+                            {/* Alertas do orcamento */}
+                            <AlertasOrcamento alerts={alerts} />
+
+                            {/* Resumo vendedor (only when pricing is available) */}
+                            {pricingResult && (
+                              <ResumoVendedor
+                                resultado={pricingResult}
+                                quantidade={newItem.quantidade}
+                                markup={newItem.markup_percentual}
+                                markupSugerido={markupSugerido}
+                                markupMinimo={validacaoMarkup.markup_minimo}
+                              />
+                            )}
+
+                            {/* Step 3 — Nav */}
+                            <div className="flex justify-between pt-2">
+                              <Button
+                                variant="outline"
+                                onClick={handlePrevStep}
+                                className="rounded-xl px-5"
+                              >
+                                Voltar
+                              </Button>
+                              <Button
+                                onClick={handleAddItem}
+                                disabled={adicionarItem.isPending || !pricingResult}
+                                className="rounded-xl bg-blue-600 text-white hover:bg-blue-700 px-6"
+                              >
+                                {adicionarItem.isPending
+                                  ? <Loader2 className="animate-spin mr-2" size={14} />
+                                  : <Plus size={14} className="mr-2" />
+                                }
+                                Adicionar Item
+                              </Button>
+                            </div>
+                          </>
                         )}
                       </div>
 
-                      {/* ──── RIGHT COLUMN (2/5) — Pricing sidebar ──── */}
+                      {/* ──── RIGHT COLUMN (2/5) — Pricing sidebar (visible in ALL steps) ──── */}
                       <div className="lg:col-span-2">
                         <div className="sticky top-4 space-y-4">
                           <PricingCalculator resultado={pricingResult} quantidade={newItem.quantidade} />
@@ -785,23 +1032,17 @@ export default function OrcamentoEditorPage() {
                             </div>
                           )}
 
-                          {/* Action buttons */}
-                          <div className="flex flex-col gap-2">
-                            <Button
-                              onClick={handleAddItem}
-                              disabled={adicionarItem.isPending || !pricingResult}
-                              className="rounded-xl bg-blue-600 text-white hover:bg-blue-700 w-full"
-                            >
-                              {adicionarItem.isPending ? <Loader2 className="animate-spin mr-2" size={14} /> : <Plus size={14} className="mr-2" />}
-                              Adicionar Item
-                            </Button>
-                            <Button
-                              variant="ghost" size="sm" className="rounded-xl w-full"
-                              onClick={() => { setShowItemForm(false); setNewItem(DEFAULT_ITEM); }}
-                            >
-                              Cancelar
-                            </Button>
-                          </div>
+                          {/* Cancel button — always visible */}
+                          <Button
+                            variant="ghost" size="sm" className="rounded-xl w-full"
+                            onClick={() => {
+                              setShowItemForm(false);
+                              setNewItem(DEFAULT_ITEM);
+                              setCurrentStep(1);
+                            }}
+                          >
+                            Cancelar
+                          </Button>
                         </div>
                       </div>
                     </div>
