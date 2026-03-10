@@ -459,11 +459,57 @@ export default function ClientesList() {
 
 ---
 
+## ESTADO ATUAL DO DEPLOY (2026-03-10)
+
+### URLs dos Produtos
+| Produto | URL | Status |
+|---|---|---|
+| CRM/ERP (Produto A) | `https://tender-archimedes.vercel.app/` | ✅ Online |
+| App de Campo (Produto B) | `https://campo-croma.vercel.app/` | ✅ Online |
+
+### Migrations Supabase (`djwjmfgplnqyffdcgdaw.supabase.co`)
+| Arquivo | Status |
+|---|---|
+| `001_complete_schema.sql` | ✅ EXECUTADO — 51 tabelas base |
+| `002_schema_corrections.sql` | ✅ EXECUTADO — 14 tabelas novas, RLS granular, audit triggers |
+| `003_campo.sql` | ✅ EXECUTADO |
+| `003_fiscal.sql` | ✅ EXECUTADO — config_fiscal, notas_fiscais |
+| `004_integracao_bridge.sql` | ✅ EXECUTADO — sync CRM ↔ Campo via triggers |
+| `005_*.sql` | ✅ EXECUTADO |
+| `006_orcamento_module.sql` | ✅ EXECUTADO — acabamentos, serviços, regras_precificacao |
+
+### Commits em main (últimos)
+| Commit | Descrição |
+|---|---|
+| `e56374c` | feat(financeiro): implementa DRE gerencial completa + AdminPrecificacao |
+| `484a1d3` | feat: adiciona PROJECT_GOVERNANCE.md + PROJECT_MEMORY.md |
+| `75e0ee3` | feat(fase-fg): App.tsx routes para orçamentos e admin/precificacao |
+
+### Páginas Implementadas no CRM
+| Rota | Página | Status |
+|---|---|---|
+| `/` | Dashboard (4 roles) | ✅ Real |
+| `/clientes` | Lista de clientes | ✅ Real |
+| `/clientes/:id` | Detalhe do cliente | ✅ Real |
+| `/comercial` | Funil + Pipeline | ✅ Real |
+| `/orcamentos` | Lista de orçamentos | ✅ Real |
+| `/orcamentos/novo` | Editor de orçamento | ✅ Real |
+| `/pedidos` | Lista de pedidos | ✅ Real |
+| `/producao` | Fila de produção | ✅ Real |
+| `/estoque` | Materiais e saldos | ✅ Real |
+| `/financeiro` | Contas e DRE | ✅ Real |
+| `/dre` | **DRE Gerencial** | ✅ **NOVO** |
+| `/instalacao` | Agenda de instalação | ✅ Real |
+| `/admin/precificacao` | Config Mubisys | ✅ **NOVO** |
+
+---
+
 ## LOG DE ATUALIZAÇÕES DESTE ARQUIVO
 
 | Data | Agente | O que foi adicionado |
 |---|---|---|
 | 2026-03-10 | ARCHITECT_AGENT | Versão inicial — 12 decisões, padrões de código, glossário |
+| 2026-03-10 | ARCHITECT_AGENT | Estado atual do deploy, URLs, migrations e páginas implementadas |
 
 ---
 
