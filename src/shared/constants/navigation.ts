@@ -8,6 +8,7 @@ export interface NavItem {
   path: string;
   icon: string; // nome do ícone lucide-react
   module: string; // módulo de permissão
+  badgeKey?: string; // optional key for notification badge counts
 }
 
 export interface NavGroup {
@@ -29,6 +30,7 @@ export const NAV_GROUPS: NavGroup[] = [
       { name: 'Pipeline', path: '/pipeline', icon: 'Kanban', module: 'comercial' },
       { name: 'Propostas', path: '/propostas', icon: 'FileText', module: 'comercial' },
       { name: 'Clientes', path: '/clientes', icon: 'Building2', module: 'clientes' },
+      { name: 'Orçamentos', path: '/orcamentos', icon: 'Calculator', module: 'comercial', badgeKey: 'orcamentos_pendentes' },
     ],
   },
   {
@@ -78,6 +80,7 @@ export const NAV_GROUPS: NavGroup[] = [
       { name: 'Usuários', path: '/admin/usuarios', icon: 'Users', module: 'admin' },
       { name: 'Configurações', path: '/admin/config', icon: 'Settings', module: 'admin' },
       { name: 'Auditoria', path: '/admin/auditoria', icon: 'Shield', module: 'admin' },
+      { name: 'Precificação', path: '/admin/precificacao', icon: 'SlidersHorizontal', module: 'admin' },
     ],
   },
 ];

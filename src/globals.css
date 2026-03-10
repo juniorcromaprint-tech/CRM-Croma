@@ -49,6 +49,20 @@
     --sidebar-border: 220 13% 91%;
 
     --sidebar-ring: 217.2 91.2% 59.8%;
+
+    /* Chart color tokens */
+    --chart-1: 217 91% 60%;
+    --chart-2: 142 76% 36%;
+    --chart-3: 38 92% 50%;
+    --chart-4: 262 83% 58%;
+    --chart-5: 0 84% 60%;
+
+    /* KPI semantic colors */
+    --kpi-receita: 142 76% 36%;
+    --kpi-pipeline: 217 91% 60%;
+    --kpi-pendente: 38 92% 50%;
+    --kpi-alerta: 0 84% 60%;
+    --kpi-neutro: 215 16% 47%;
   }
 
   .dark {
@@ -87,6 +101,13 @@
     --sidebar-accent-foreground: 240 4.8% 95.9%;
     --sidebar-border: 240 3.7% 15.9%;
     --sidebar-ring: 217.2 91.2% 59.8%;
+
+    /* Chart color tokens (dark) */
+    --chart-1: 217 91% 60%;
+    --chart-2: 142 76% 36%;
+    --chart-3: 38 92% 50%;
+    --chart-4: 262 83% 58%;
+    --chart-5: 0 84% 60%;
   }
 }
 

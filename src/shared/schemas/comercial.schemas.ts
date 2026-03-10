@@ -209,3 +209,99 @@ export const tarefaComercialSchema = z.object({
 });
 
 export type TarefaComercial = z.infer<typeof tarefaComercialSchema>;
+
+// ─── Acabamento Schemas ──────────────────────────────────────────────────────
+
+export const acabamentoSchema = z.object({
+  id: z.string().uuid().optional(),
+  nome: z.string().min(2, "Nome é obrigatório"),
+  descricao: z.string().optional().nullable(),
+  custo_unitario: z.number().min(0, "Custo deve ser positivo").default(0),
+  unidade: z.string().default("un"),
+  ativo: z.boolean().default(true),
+  ordem: z.number().int().default(0),
+});
+
+export const acabamentoCreateSchema = acabamentoSchema.omit({ id: true });
+
+export type Acabamento = z.infer<typeof acabamentoSchema>;
+export type AcabamentoCreate = z.infer<typeof acabamentoCreateSchema>;
+
+// ─── Serviço Schemas ─────────────────────────────────────────────────────────
+
+export const servicoCategoriaEnum = z.enum([
+  "criacao",
+  "instalacao",
+  "montagem",
+  "transporte",
+  "consultoria",
+  "outro",
+]);
+
+export const servicoSchema = z.object({
+  id: z.string().uuid().optional(),
+  nome: z.string().min(2, "Nome é obrigatório"),
+  descricao: z.string().optional().nullable(),
+  custo_hora: z.number().min(0).default(0),
+  horas_estimadas: z.number().min(0).default(1),
+  preco_fixo: z.number().min(0).optional().nullable(),
+  categoria: servicoCategoriaEnum.default("outro"),
+  ativo: z.boolean().default(true),
+});
+
+export const servicoCreateSchema = servicoSchema.omit({ id: true });
+
+export type Servico = z.infer<typeof servicoSchema>;
+export type ServicoCreate = z.infer<typeof servicoCreateSchema>;
+
+// ─── Regra de Precificação Schemas ───────────────────────────────────────────
+
+export const regraTipoEnum = z.enum([
+  "markup_minimo",
+  "markup_padrao",
+  "desconto_maximo",
+  "preco_m2_minimo",
+  "taxa_urgencia",
+]);
+
+export const regraPrecificacaoSchema = z.object({
+  id: z.string().uuid().optional(),
+  nome: z.string().min(2, "Nome da regra é obrigatório"),
+  categoria: z.string().optional().nullable(),
+  tipo: regraTipoEnum,
+  valor: z.number().min(0, "Valor deve ser positivo"),
+  ativo: z.boolean().default(true),
+  criado_por: z.string().uuid().optional().nullable(),
+});
+
+export const regraPrecificacaoCreateSchema = regraPrecificacaoSchema.omit({ id: true });
+
+export type RegraPrecificacao = z.infer<typeof regraPrecificacaoSchema>;
+export type RegraPrecificacaoCreate = z.infer<typeof regraPrecificacaoCreateSchema>;
+
+// ─── Template de Orçamento Schemas ───────────────────────────────────────────
+
+export const templateItemSchema = z.object({
+  produto_id: z.string().uuid().optional().nullable(),
+  descricao: z.string().min(1),
+  quantidade: z.number().positive().default(1),
+  largura_cm: z.number().positive().optional().nullable(),
+  altura_cm: z.number().positive().optional().nullable(),
+  acabamentos: z.array(z.string().uuid()).default([]),
+});
+
+export const templateOrcamentoSchema = z.object({
+  id: z.string().uuid().optional(),
+  nome: z.string().min(2, "Nome do template é obrigatório"),
+  descricao: z.string().optional().nullable(),
+  categoria: z.string().optional().nullable(),
+  itens: z.array(templateItemSchema).default([]),
+  ativo: z.boolean().default(true),
+  criado_por: z.string().uuid().optional().nullable(),
+});
+
+export const templateOrcamentoCreateSchema = templateOrcamentoSchema.omit({ id: true });
+
+export type TemplateItem = z.infer<typeof templateItemSchema>;
+export type TemplateOrcamento = z.infer<typeof templateOrcamentoSchema>;
+export type TemplateOrcamentoCreate = z.infer<typeof templateOrcamentoCreateSchema>;
