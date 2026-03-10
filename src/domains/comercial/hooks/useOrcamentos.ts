@@ -1,5 +1,12 @@
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
-import { orcamentoService, type OrcamentoFiltros, type OrcamentoCreateInput, type OrcamentoItemCreateInput } from "../services/orcamento.service";
+import {
+  orcamentoService,
+  type OrcamentoFiltros,
+  type OrcamentoCreateInput,
+  type OrcamentoItemCreateInput,
+  type OrcamentoItemCreateDetalhado,
+  type OrcamentoServicoCreateInput,
+} from "../services/orcamento.service";
 import { showSuccess, showError } from "@/utils/toast";
 
 export const ORCAMENTOS_QUERY_KEY = "orcamentos";
@@ -84,15 +91,54 @@ export function useAdicionarItemOrcamento() {
   });
 }
 
+// ─── Adicionar item detalhado (com materiais + acabamentos) ──────────────────
+
+export function useAdicionarItemDetalhado() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: async ({ propostaId, item }: { propostaId: string; item: OrcamentoItemCreateDetalhado }) => {
+      const result = await orcamentoService.adicionarItemDetalhado(propostaId, item);
+      await orcamentoService.recalcularTotais(propostaId);
+      return result;
+    },
+    onSuccess: (_data, { propostaId }) => {
+      qc.invalidateQueries({ queryKey: [ORCAMENTOS_QUERY_KEY, propostaId] });
+      qc.invalidateQueries({ queryKey: [ORCAMENTOS_QUERY_KEY] });
+      showSuccess("Item adicionado com sucesso!");
+    },
+    onError: (err: Error) => showError(err.message || "Erro ao adicionar item"),
+  });
+}
+
+// ─── Salvar serviços do orçamento ────────────────────────────────────────────
+
+export function useSalvarServicos() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: async ({ propostaId, servicos }: { propostaId: string; servicos: OrcamentoServicoCreateInput[] }) => {
+      await orcamentoService.salvarServicos(propostaId, servicos);
+      await orcamentoService.recalcularTotais(propostaId);
+    },
+    onSuccess: (_data, { propostaId }) => {
+      qc.invalidateQueries({ queryKey: [ORCAMENTOS_QUERY_KEY, propostaId] });
+      qc.invalidateQueries({ queryKey: [ORCAMENTOS_QUERY_KEY] });
+    },
+    onError: (err: Error) => showError(err.message || "Erro ao salvar serviços"),
+  });
+}
+
 // ─── Remover item ────────────────────────────────────────────────────────────
 
 export function useRemoverItemOrcamento() {
   const qc = useQueryClient();
   return useMutation({
-    mutationFn: ({ itemId, propostaId: _propostaId }: { itemId: string; propostaId: string }) =>
-      orcamentoService.removerItem(itemId),
+    mutationFn: async ({ itemId, propostaId }: { itemId: string; propostaId: string }) => {
+      await orcamentoService.removerItem(itemId);
+      await orcamentoService.recalcularTotais(propostaId);
+    },
     onSuccess: (_data, { propostaId }) => {
       qc.invalidateQueries({ queryKey: [ORCAMENTOS_QUERY_KEY, propostaId] });
+      qc.invalidateQueries({ queryKey: [ORCAMENTOS_QUERY_KEY] });
     },
     onError: (err: Error) => showError(err.message || "Erro ao remover item"),
   });

@@ -91,46 +91,50 @@ export function calcOrcamentoItem(
   const quantidade = item.quantidade || 1;
   const areaM2 = calcAreaM2(item.largura_cm, item.altura_cm);
 
-  // Combina materiais da DB com acabamentos (são custos de MP)
-  const materiais = [
-    ...item.materiais.map((m) => ({
-      nome: m.descricao,
-      quantidade: m.quantidade,
-      precoUnitario: m.custo_unitario,
-    })),
-    ...item.acabamentos.map((a) => ({
-      nome: a.descricao,
-      quantidade: a.quantidade,
-      precoUnitario: a.custo_unitario,
-    })),
-  ];
+  // Apenas materiais entram no motor Mubisys (acabamentos são calculados separado)
+  const materiaisParaMotor = item.materiais.map((m) => ({
+    nome: m.descricao,
+    quantidade: m.quantidade,
+    precoUnitario: m.custo_unitario,
+  }));
 
   const processos = item.processos.map((p) => ({
     etapa: p.etapa,
     tempoMinutos: p.tempo_minutos,
   }));
 
+  // Motor Mubisys processa APENAS materiais + processos — retorna preço UNITÁRIO
   const pricingResult = calcPricing(
-    { materiais, processos, markupPercentual: item.markup_percentual, quantidade },
+    { materiais: materiaisParaMotor, processos, markupPercentual: item.markup_percentual },
     config,
   );
 
-  const custosAcabamentos = item.acabamentos.reduce(
+  // Acabamentos calculados SEPARADO do motor, sem overhead Mubisys adicional
+  const custoAcabamentos = item.acabamentos.reduce(
     (sum, a) => sum + a.quantidade * a.custo_unitario,
     0,
   );
 
-  const precoTotal = pricingResult.precoVenda * quantidade;
-  const precoM2 = areaM2 && areaM2 > 0 ? pricingResult.precoVenda / areaM2 : null;
+  // Preço unitário = resultado unitário do motor + acabamentos
+  const precoUnitario = pricingResult.precoVenda + custoAcabamentos;
+
+  // Preço total = preço unitário × quantidade (ÚNICA multiplicação por quantidade)
+  const precoTotal = precoUnitario * quantidade;
+
+  const precoM2 = areaM2 && areaM2 > 0 ? precoUnitario / areaM2 : null;
+
+  const custoTotalUnitario = (pricingResult.custoTotal ?? 0) + custoAcabamentos;
 
   return {
-    custoMP: pricingResult.custoMP - custosAcabamentos,
-    custosAcabamentos,
+    custoMP: pricingResult.custoMP,
+    custosAcabamentos: custoAcabamentos,
     custoMO: pricingResult.custoMO,
-    custoTotal: pricingResult.custoTotal,
-    precoUnitario: pricingResult.precoVenda,
+    custoTotal: custoTotalUnitario,
+    precoUnitario,
     precoTotal,
-    margemBruta: pricingResult.margemBruta,
+    margemBruta: precoUnitario > 0
+      ? ((precoUnitario - custoTotalUnitario) / precoUnitario) * 100
+      : 0,
     areaM2,
     precoM2,
     detalhes: pricingResult,

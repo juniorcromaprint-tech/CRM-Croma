@@ -12,6 +12,15 @@ import {
   type PedidoPrioridade,
 } from "@/shared/constants/status";
 import StatusFiscalBadge from "@/domains/fiscal/components/StatusFiscalBadge";
+import { usePedidoItens } from "../hooks/usePedidoItens";
+import {
+  Table,
+  TableBody,
+  TableCell,
+  TableHead,
+  TableHeader,
+  TableRow,
+} from "@/components/ui/table";
 
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
@@ -63,7 +72,7 @@ interface PedidoRow {
   prioridade: PedidoPrioridade;
   valor_total: number;
   custo_total: number;
-  margem_percentual: number;
+  margem_real: number;
   data_prometida: string | null;
   data_conclusao: string | null;
   observacoes: string | null;
@@ -194,6 +203,9 @@ export default function PedidosPage() {
   const [isCreateOpen, setIsCreateOpen] = useState(false);
   const [selectedPedido, setSelectedPedido] = useState<PedidoRow | null>(null);
 
+  // Hook for items of selected pedido (must be called unconditionally at top level)
+  const { data: pedidoItens = [] } = usePedidoItens(selectedPedido?.id);
+
   // --- Create form state ---
   const [formClienteId, setFormClienteId] = useState("");
   const [formPrioridade, setFormPrioridade] = useState<PedidoPrioridade>("normal");
@@ -255,7 +267,7 @@ export default function PedidosPage() {
           observacoes: formObservacoes || null,
           valor_total: 0,
           custo_total: 0,
-          margem_percentual: 0,
+          margem_real: 0,
         })
         .select()
         .single();
@@ -856,7 +868,7 @@ export default function PedidosPage() {
                     Margem
                   </p>
                   <p className="text-xl font-bold text-emerald-600">
-                    {(selectedPedido.margem_percentual ?? 0).toFixed(1).replace(".", ",")}%
+                    {(selectedPedido.margem_real ?? 0).toFixed(1).replace(".", ",")}%
                   </p>
                 </div>
               </div>
@@ -941,22 +953,57 @@ export default function PedidosPage() {
                 </div>
               )}
 
-              {/* Items placeholder */}
+              {/* Itens do pedido */}
               <div className="space-y-2">
                 <p className="text-xs text-slate-400 uppercase tracking-wide font-semibold">
                   Itens do pedido
                 </p>
-                <div className="bg-slate-50 rounded-xl p-6 border border-dashed border-slate-200 text-center">
-                  <FileText
-                    size={32}
-                    className="mx-auto text-slate-300 mb-2"
-                  />
-                  <p className="text-sm text-slate-500">
-                    {getItemCount(selectedPedido)} item(ns) vinculado(s)
-                  </p>
-                  <p className="text-xs text-slate-400 mt-1">
-                    O gerenciamento de itens será disponibilizado em breve.
-                  </p>
+                <div className="rounded-xl border border-slate-100 overflow-hidden">
+                  <Table>
+                    <TableHeader>
+                      <TableRow className="bg-slate-50">
+                        <TableHead className="text-xs font-semibold text-slate-600">Descrição</TableHead>
+                        <TableHead className="text-xs font-semibold text-slate-600">Qtd</TableHead>
+                        <TableHead className="text-xs font-semibold text-slate-600 text-right">Valor Unit.</TableHead>
+                        <TableHead className="text-xs font-semibold text-slate-600 text-right">Total</TableHead>
+                        <TableHead className="text-xs font-semibold text-slate-600">Status</TableHead>
+                      </TableRow>
+                    </TableHeader>
+                    <TableBody>
+                      {pedidoItens.map((item) => (
+                        <TableRow key={item.id}>
+                          <TableCell className="py-2">
+                            <div className="font-medium text-slate-800 text-sm">{item.descricao}</div>
+                            {item.especificacao && (
+                              <div className="text-xs text-slate-400 mt-0.5">{item.especificacao}</div>
+                            )}
+                          </TableCell>
+                          <TableCell className="py-2 text-sm text-slate-700">
+                            {item.quantidade} {item.unidade}
+                          </TableCell>
+                          <TableCell className="py-2 text-sm text-slate-700 text-right">
+                            {brl(item.valor_unitario ?? 0)}
+                          </TableCell>
+                          <TableCell className="py-2 text-sm font-semibold text-slate-800 text-right">
+                            {brl(item.valor_total ?? 0)}
+                          </TableCell>
+                          <TableCell className="py-2">
+                            <Badge variant="outline" className="text-xs">
+                              {item.status}
+                            </Badge>
+                          </TableCell>
+                        </TableRow>
+                      ))}
+                      {pedidoItens.length === 0 && (
+                        <TableRow>
+                          <TableCell colSpan={5} className="text-center text-slate-400 py-8">
+                            <FileText size={28} className="mx-auto text-slate-300 mb-2" />
+                            <span className="text-sm">Nenhum item encontrado</span>
+                          </TableCell>
+                        </TableRow>
+                      )}
+                    </TableBody>
+                  </Table>
                 </div>
               </div>
 

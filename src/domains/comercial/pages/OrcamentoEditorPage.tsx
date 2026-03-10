@@ -1,6 +1,15 @@
-import React, { useState, useEffect } from "react";
+// ============================================================================
+// ORÇAMENTO EDITOR PAGE — v2.0
+// Editor completo com seleção de produto → modelo → materiais → acabamentos
+// Layout 2 colunas: formulário + pricing em tempo real
+// ============================================================================
+
+import React, { useState, useEffect, useMemo, useCallback } from "react";
 import { useNavigate, useParams, Link } from "react-router-dom";
-import { ArrowLeft, Plus, Trash2, Save, Loader2, AlertTriangle } from "lucide-react";
+import {
+  ArrowLeft, Plus, Trash2, Save, Loader2, FileText,
+  ChevronDown, ChevronUp, AlertTriangle,
+} from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
@@ -13,34 +22,67 @@ import {
   useOrcamento,
   useCriarOrcamento,
   useAtualizarOrcamento,
-  useAdicionarItemOrcamento,
+  useAdicionarItemDetalhado,
   useRemoverItemOrcamento,
+  useSalvarServicos,
 } from "../hooks/useOrcamentos";
 import { useOrcamentoPricing } from "../hooks/useOrcamentoPricing";
 import PricingCalculator from "../components/PricingCalculator";
+import ProdutoSelector from "../components/ProdutoSelector";
+import MaterialEditor from "../components/MaterialEditor";
+import AcabamentoSelector from "../components/AcabamentoSelector";
+import ServicoSelector from "../components/ServicoSelector";
+import TemplateSelector from "../components/TemplateSelector";
+import type { OrcamentoServicoItem } from "../components/ServicoSelector";
+import type { OrcamentoTemplate } from "../components/TemplateSelector";
+import type { Produto, ProdutoModelo } from "../hooks/useProdutosModelos";
+import type {
+  OrcamentoMaterial,
+  OrcamentoAcabamento,
+  OrcamentoProcesso,
+  OrcamentoItemInput,
+} from "@/shared/services/orcamento-pricing.service";
 import { brl } from "@/shared/utils/format";
 import { useQuery } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
-import { showError } from "@/utils/toast";
+import { showError, showSuccess } from "@/utils/toast";
 import { orcamentoService } from "../services/orcamento.service";
 
-interface ItemFormState {
+// ─── Item editor state ──────────────────────────────────────────────────────
+
+interface ItemEditorState {
+  produto_id: string | null;
+  modelo_id: string | null;
   descricao: string;
+  especificacao: string;
   quantidade: number;
   largura_cm: number | null;
   altura_cm: number | null;
+  materiais: OrcamentoMaterial[];
+  acabamentos: OrcamentoAcabamento[];
+  processos: OrcamentoProcesso[];
   markup_percentual: number;
-  especificacao: string;
+  categoria: string | null;
 }
 
-const DEFAULT_ITEM: ItemFormState = {
+const DEFAULT_ITEM: ItemEditorState = {
+  produto_id: null,
+  modelo_id: null,
   descricao: "",
+  especificacao: "",
   quantidade: 1,
   largura_cm: null,
   altura_cm: null,
+  materiais: [],
+  acabamentos: [],
+  processos: [],
   markup_percentual: 40,
-  especificacao: "",
+  categoria: null,
 };
+
+// ============================================================================
+// COMPONENT
+// ============================================================================
 
 export default function OrcamentoEditorPage() {
   const { id } = useParams<{ id: string }>();
@@ -50,10 +92,11 @@ export default function OrcamentoEditorPage() {
   const { data: orcamento, isLoading } = useOrcamento(isNew ? undefined : id);
   const criar = useCriarOrcamento();
   const atualizar = useAtualizarOrcamento();
-  const adicionarItem = useAdicionarItemOrcamento();
+  const adicionarItem = useAdicionarItemDetalhado();
   const removerItem = useRemoverItemOrcamento();
+  const salvarServicos = useSalvarServicos();
 
-  // Form state
+  // ─── Form state (header) ────────────────────────────────────────────────
   const [titulo, setTitulo] = useState("");
   const [clienteId, setClienteId] = useState("");
   const [descontoPercentual, setDescontoPercentual] = useState(0);
@@ -61,12 +104,18 @@ export default function OrcamentoEditorPage() {
   const [observacoes, setObservacoes] = useState("");
   const [validadeDias, setValidadeDias] = useState(10);
 
-  // Item being added
-  const [newItem, setNewItem] = useState<ItemFormState>(DEFAULT_ITEM);
+  // ─── Item editor state ──────────────────────────────────────────────────
+  const [newItem, setNewItem] = useState<ItemEditorState>(DEFAULT_ITEM);
   const [showItemForm, setShowItemForm] = useState(false);
-  const [materiaisSemPreco, setMateriaisSemPreco] = useState<string[]>([]);
+  const [itemFormExpanded, setItemFormExpanded] = useState(true);
 
-  // Load clientes for dropdown
+  // ─── Serviços state ─────────────────────────────────────────────────────
+  const [servicos, setServicos] = useState<OrcamentoServicoItem[]>([]);
+
+  // ─── Template modal ─────────────────────────────────────────────────────
+  const [showTemplateModal, setShowTemplateModal] = useState(false);
+
+  // ─── Load clientes for dropdown ─────────────────────────────────────────
   const { data: clientes = [] } = useQuery({
     queryKey: ["clientes-select"],
     queryFn: async () => {
@@ -80,7 +129,7 @@ export default function OrcamentoEditorPage() {
     },
   });
 
-  // Pre-fill form when editing
+  // ─── Pre-fill form when editing ─────────────────────────────────────────
   useEffect(() => {
     if (orcamento) {
       setTitulo(orcamento.titulo || "");
@@ -89,25 +138,94 @@ export default function OrcamentoEditorPage() {
       setCondicoes(orcamento.condicoes_pagamento || "");
       setObservacoes(orcamento.observacoes || "");
       setValidadeDias(orcamento.validade_dias || 10);
+
+      // Load existing servicos
+      if (orcamento.servicos && orcamento.servicos.length > 0) {
+        setServicos(
+          orcamento.servicos.map((s) => ({
+            servico_id: s.servico_id,
+            descricao: s.descricao,
+            horas: s.horas,
+            valor_unitario: s.valor_unitario,
+            valor_total: s.valor_total,
+          })),
+        );
+      }
     }
   }, [orcamento]);
 
-  // Pricing for new item
-  const pricingInput = newItem.descricao ? {
-    descricao: newItem.descricao,
-    quantidade: newItem.quantidade,
-    largura_cm: newItem.largura_cm,
-    altura_cm: newItem.altura_cm,
-    materiais: [],
-    acabamentos: [],
-    processos: [],
-    markup_percentual: newItem.markup_percentual,
-  } : null;
+  // ─── Pricing for the item being edited ──────────────────────────────────
+  const pricingInput: OrcamentoItemInput | null = useMemo(() => {
+    if (!newItem.descricao && !newItem.produto_id) return null;
+    return {
+      descricao: newItem.descricao || "Item",
+      quantidade: newItem.quantidade,
+      largura_cm: newItem.largura_cm,
+      altura_cm: newItem.altura_cm,
+      materiais: newItem.materiais,
+      acabamentos: newItem.acabamentos,
+      processos: newItem.processos,
+      markup_percentual: newItem.markup_percentual,
+    };
+  }, [newItem]);
 
-  const { resultado: pricingResult, validacaoMarkup } = useOrcamentoPricing(pricingInput, null);
+  const { resultado: pricingResult, markupSugerido, validacaoMarkup } =
+    useOrcamentoPricing(pricingInput, newItem.categoria);
+
+  // ─── Handlers ───────────────────────────────────────────────────────────
+
+  const handleProdutoChange = useCallback((produto: Produto | null) => {
+    setNewItem((s) => ({
+      ...s,
+      produto_id: produto?.id ?? null,
+      categoria: produto?.categoria ?? null,
+      descricao: produto?.nome ?? s.descricao,
+    }));
+  }, []);
+
+  const handleModeloChange = useCallback((modelo: ProdutoModelo | null) => {
+    if (!modelo) {
+      setNewItem((s) => ({ ...s, modelo_id: null }));
+      return;
+    }
+
+    // Auto-preenche tudo do modelo selecionado
+    const materiaisFromModelo: OrcamentoMaterial[] = (modelo.materiais ?? []).map((m) => ({
+      material_id: m.material_id,
+      descricao: m.material?.nome ?? `Material ${m.material_id}`,
+      quantidade: m.quantidade_por_unidade,
+      unidade: m.unidade ?? "un",
+      custo_unitario: m.material?.preco_medio ?? 0,
+    }));
+
+    const processosFromModelo: OrcamentoProcesso[] = (modelo.processos ?? []).map((p) => ({
+      etapa: p.etapa,
+      tempo_minutos: p.tempo_por_unidade_min,
+    }));
+
+    setNewItem((s) => ({
+      ...s,
+      modelo_id: modelo.id,
+      descricao: s.descricao || modelo.nome,
+      especificacao: modelo.nome,
+      largura_cm: modelo.largura_cm ?? s.largura_cm,
+      altura_cm: modelo.altura_cm ?? s.altura_cm,
+      markup_percentual: modelo.markup_padrao ?? s.markup_percentual,
+      materiais: materiaisFromModelo,
+      processos: processosFromModelo,
+    }));
+  }, []);
+
+  const handleMateriaisChange = useCallback((materiais: OrcamentoMaterial[]) => {
+    setNewItem((s) => ({ ...s, materiais }));
+  }, []);
+
+  const handleAcabamentosChange = useCallback((acabamentos: OrcamentoAcabamento[]) => {
+    setNewItem((s) => ({ ...s, acabamentos }));
+  }, []);
 
   const handleSave = async () => {
-    if (!titulo.trim()) { showError("Informe o título do orçamento"); return; }
+    if (!titulo.trim()) { showError("Informe o titulo do orcamento"); return; }
     if (!clienteId) { showError("Selecione o cliente"); return; }
 
     if (isNew) {
@@ -131,17 +249,33 @@ export default function OrcamentoEditorPage() {
           validade_dias: validadeDias,
         },
       });
+
+      // Salvar serviços
+      if (servicos.length > 0) {
+        await salvarServicos.mutateAsync({
+          propostaId: id,
+          servicos: servicos.map((s) => ({
+            servico_id: s.servico_id,
+            descricao: s.descricao,
+            horas: s.horas,
+            valor_unitario: s.valor_unitario,
+            valor_total: s.valor_total,
+          })),
+        });
+      }
     }
   };
 
   const handleAddItem = async () => {
-    if (!newItem.descricao.trim()) { showError("Informe a descrição do item"); return; }
-    if (!id || isNew) { showError("Salve o orçamento antes de adicionar itens"); return; }
+    if (!newItem.descricao.trim()) { showError("Informe a descricao do item"); return; }
+    if (!id || isNew) { showError("Salve o orcamento antes de adicionar itens"); return; }
     if (pricingResult === null) { showError("Preencha os dados do item corretamente"); return; }
 
     await adicionarItem.mutateAsync({
       propostaId: id,
       item: {
+        produto_id: newItem.produto_id,
+        modelo_id: newItem.modelo_id ?? undefined,
         descricao: newItem.descricao,
         especificacao: newItem.especificacao || null,
         quantidade: newItem.quantidade,
@@ -155,14 +289,28 @@ export default function OrcamentoEditorPage() {
         markup_percentual: newItem.markup_percentual,
         valor_unitario: pricingResult.precoUnitario,
         valor_total: pricingResult.precoTotal,
-        ordem: ((orcamento as { itens?: unknown[] } | undefined)?.itens?.length ?? 0) + 1,
+        ordem: (orcamentoItens.length ?? 0) + 1,
+        // Detalhes do item
+        materiais: newItem.materiais.map((m) => ({
+          material_id: m.material_id ?? null,
+          descricao: m.descricao,
+          quantidade: m.quantidade,
+          unidade: m.unidade,
+          custo_unitario: m.custo_unitario,
+          custo_total: m.quantidade * m.custo_unitario,
+        })),
+        acabamentos: newItem.acabamentos.map((a) => ({
+          acabamento_id: a.acabamento_id ?? null,
+          descricao: a.descricao,
+          quantidade: a.quantidade,
+          custo_unitario: a.custo_unitario,
+          custo_total: a.quantidade * a.custo_unitario,
+        })),
       },
     });
 
-    // Recalculate totals
     await orcamentoService.recalcularTotais(id);
     setNewItem(DEFAULT_ITEM);
-    setMateriaisSemPreco([]);
     setShowItemForm(false);
   };
 
@@ -172,19 +320,89 @@ export default function OrcamentoEditorPage() {
     await orcamentoService.recalcularTotais(id);
   };
 
+  const handleTemplateSelect = async (template: OrcamentoTemplate) => {
+    if (!template.itens || template.itens.length === 0) {
+      setShowTemplateModal(false);
+      return;
+    }
+
+    if (template.itens.length === 1) {
+      // Single item: populate the editor form
+      const firstItem = template.itens[0];
+      setNewItem({
+        ...DEFAULT_ITEM,
+        descricao: firstItem.descricao,
+        especificacao: firstItem.especificacao || "",
+        quantidade: firstItem.quantidade,
+        largura_cm: firstItem.largura_cm,
+        altura_cm: firstItem.altura_cm,
+        markup_percentual: firstItem.markup_percentual,
+      });
+      setShowItemForm(true);
+      setShowTemplateModal(false);
+      showSuccess(`Template "${template.nome}" aplicado!`);
+    } else {
+      // Multiple items: add all directly to the budget
+      if (!id || isNew) {
+        showError("Salve o orcamento antes de aplicar templates com multiplos itens");
+        setShowTemplateModal(false);
+        return;
+      }
+      try {
+        for (const item of template.itens) {
+          const largura = item.largura_cm ?? undefined;
+          const altura = item.altura_cm ?? undefined;
+          await adicionarItem.mutateAsync({
+            propostaId: id,
+            item: {
+              descricao: item.descricao,
+              especificacao: item.especificacao || "",
+              quantidade: item.quantidade ?? 1,
+              largura_cm: largura ?? null,
+              altura_cm: altura ?? null,
+              area_m2: (largura && altura) ? (largura * altura) / 10000 : undefined,
+              markup_percentual: item.markup_percentual ?? 40,
+              valor_unitario: 0,
+              valor_total: 0,
+              materiais: [],
+              acabamentos: [],
+            },
+          });
+        }
+        await orcamentoService.recalcularTotais(id);
+        showSuccess(`${template.itens.length} itens do template "${template.nome}" adicionados`);
+      } catch {
+        showError("Erro ao aplicar template");
+      }
+      setShowTemplateModal(false);
+    }
+  };
+
+  // ─── Derived data ───────────────────────────────────────────────────────
+
   const isSaving = criar.isPending || atualizar.isPending;
 
-  // Access itens from orcamento via type assertion since the hook returns Orcamento with optional itens
-  const orcamentoItens = (orcamento as { itens?: Array<{
-    id: string;
-    descricao: string;
-    especificacao: string | null;
-    quantidade: number;
-    largura_cm: number | null;
-    altura_cm: number | null;
-    valor_unitario: number;
-    valor_total: number;
-  }> } | undefined)?.itens ?? [];
+  const orcamentoItens = (orcamento as {
+    itens?: Array<{
+      id: string;
+      descricao: string;
+      especificacao: string | null;
+      quantidade: number;
+      largura_cm: number | null;
+      altura_cm: number | null;
+      valor_unitario: number;
+      valor_total: number;
+      custo_mp?: number;
+      custo_mo?: number;
+      markup_percentual?: number;
+      materiais?: Array<{ descricao: string; quantidade: number; custo_unitario: number; custo_total: number }>;
+      acabamentos?: Array<{ descricao: string; quantidade: number; custo_unitario: number; custo_total: number }>;
+    }>;
+  } | undefined)?.itens ?? [];
+
+  const totalServicos = servicos.reduce((sum, s) => sum + s.valor_total, 0);
+
+  // ─── Loading state ──────────────────────────────────────────────────────
 
   if (!isNew && isLoading) {
     return (
@@ -194,9 +412,11 @@ export default function OrcamentoEditorPage() {
     );
   }
 
+  // ─── RENDER ─────────────────────────────────────────────────────────────
+
   return (
-    <div className="space-y-6 pb-16 max-w-4xl">
-      {/* Header */}
+    <div className="space-y-6 pb-16">
+      {/* ══════════ HEADER ══════════ */}
       <div className="flex items-center gap-4">
         <Link to="/orcamentos">
           <Button variant="ghost" size="icon" className="rounded-xl">
@@ -205,7 +425,7 @@ export default function OrcamentoEditorPage() {
         </Link>
         <div className="flex-1">
           <h1 className="text-2xl font-bold text-slate-800">
-            {isNew ? "Novo Orçamento" : `Editar ${orcamento?.numero || "Orçamento"}`}
+            {isNew ? "Novo Orcamento" : `Editar ${orcamento?.numero || "Orcamento"}`}
           </h1>
           {!isNew && orcamento && (
             <p className="text-slate-500 text-sm mt-0.5">
@@ -213,25 +433,37 @@ export default function OrcamentoEditorPage() {
             </p>
           )}
         </div>
-        <Button
-          onClick={handleSave}
-          disabled={isSaving}
-          className="bg-blue-600 hover:bg-blue-700 text-white rounded-xl h-10 px-5"
-        >
-          {isSaving ? <Loader2 className="animate-spin mr-2" size={16} /> : <Save size={16} className="mr-2" />}
-          Salvar
-        </Button>
+        <div className="flex items-center gap-2">
+          {!isNew && (
+            <Button
+              variant="outline"
+              size="sm"
+              className="rounded-xl gap-1.5"
+              onClick={() => setShowTemplateModal(true)}
+            >
+              <FileText size={14} /> Template
+            </Button>
+          )}
+          <Button
+            onClick={handleSave}
+            disabled={isSaving}
+            className="bg-blue-600 hover:bg-blue-700 text-white rounded-xl h-10 px-5"
+          >
+            {isSaving ? <Loader2 className="animate-spin mr-2" size={16} /> : <Save size={16} className="mr-2" />}
+            Salvar
+          </Button>
+        </div>
       </div>
 
-      {/* Main form */}
+      {/* ══════════ DADOS DO ORCAMENTO ══════════ */}
       <Card className="rounded-2xl border-none shadow-sm">
         <CardHeader className="pb-4">
-          <CardTitle className="text-base font-semibold text-slate-800">Dados do Orçamento</CardTitle>
+          <CardTitle className="text-base font-semibold text-slate-800">Dados do Orcamento</CardTitle>
         </CardHeader>
         <CardContent className="space-y-4">
           <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
             <div className="md:col-span-2">
-              <Label htmlFor="titulo">Título *</Label>
+              <Label htmlFor="titulo">Titulo *</Label>
               <Input
                 id="titulo"
                 value={titulo}
@@ -278,7 +510,7 @@ export default function OrcamentoEditorPage() {
               />
             </div>
             <div>
-              <Label htmlFor="condicoes">Condições de Pagamento</Label>
+              <Label htmlFor="condicoes">Condicoes de Pagamento</Label>
               <Input
                 id="condicoes"
                 value={condicoes}
@@ -288,12 +520,12 @@ export default function OrcamentoEditorPage() {
               />
             </div>
             <div className="md:col-span-2">
-              <Label htmlFor="obs">Observações</Label>
+              <Label htmlFor="obs">Observacoes</Label>
               <Textarea
                 id="obs"
                 value={observacoes}
                 onChange={(e) => setObservacoes(e.target.value)}
-                placeholder="Observações adicionais para o cliente..."
+                placeholder="Observacoes adicionais para o cliente..."
                 className="mt-1.5 rounded-xl min-h-[80px]"
               />
             </div>
@@ -301,12 +533,12 @@ export default function OrcamentoEditorPage() {
         </CardContent>
       </Card>
 
-      {/* Items */}
+      {/* ══════════ ITENS DO ORCAMENTO ══════════ */}
       {!isNew && (
         <Card className="rounded-2xl border-none shadow-sm">
           <CardHeader className="flex flex-row items-center justify-between pb-4">
             <CardTitle className="text-base font-semibold text-slate-800">
-              Itens do Orçamento
+              Itens do Orcamento
               {orcamentoItens.length > 0 && (
                 <span className="ml-2 text-xs font-normal text-slate-500">
                   ({orcamentoItens.length} {orcamentoItens.length === 1 ? "item" : "itens"})
@@ -317,19 +549,19 @@ export default function OrcamentoEditorPage() {
               variant="outline"
               size="sm"
               className="rounded-xl h-9 gap-2"
-              onClick={() => setShowItemForm((s) => !s)}
+              onClick={() => { setShowItemForm((s) => !s); setNewItem(DEFAULT_ITEM); }}
             >
               <Plus size={15} /> Adicionar Item
             </Button>
           </CardHeader>
-          <CardContent className="space-y-3">
-            {/* Existing items */}
+          <CardContent className="space-y-4">
+            {/* ──── Existing items table ──── */}
             {orcamentoItens.length > 0 ? (
               <div className="rounded-xl border border-slate-200 overflow-hidden">
                 <table className="w-full text-sm">
                   <thead>
                     <tr className="bg-slate-50 border-b border-slate-200">
-                      <th className="text-left py-2.5 px-3 text-xs font-semibold text-slate-400 uppercase tracking-wider">Descrição</th>
+                      <th className="text-left py-2.5 px-3 text-xs font-semibold text-slate-400 uppercase tracking-wider">Descricao</th>
                       <th className="text-right py-2.5 px-3 text-xs font-semibold text-slate-400 uppercase tracking-wider hidden md:table-cell">Qtd</th>
                       <th className="text-right py-2.5 px-3 text-xs font-semibold text-slate-400 uppercase tracking-wider hidden md:table-cell">Unit</th>
                       <th className="text-right py-2.5 px-3 text-xs font-semibold text-slate-400 uppercase tracking-wider">Total</th>
@@ -343,13 +575,23 @@ export default function OrcamentoEditorPage() {
                           <p className="font-medium text-slate-800">{item.descricao}</p>
                           {item.especificacao && <p className="text-xs text-slate-400 mt-0.5">{item.especificacao}</p>}
                           {item.largura_cm && item.altura_cm && (
-                            <p className="text-xs text-slate-400 mt-0.5">{item.largura_cm}×{item.altura_cm}cm</p>
+                            <p className="text-xs text-slate-400 mt-0.5">{item.largura_cm}x{item.altura_cm}cm</p>
                           )}
-                          {item.valor_total === 0 && (
-                            <Badge variant="outline" className="text-[10px] h-5 border-amber-300 text-amber-600 bg-amber-50 mt-1">
-                              Precificação Pendente
-                            </Badge>
-                          )}
+                          {/* Material/acabamento badges */}
+                          {(item.materiais?.length || item.acabamentos?.length) ? (
+                            <div className="flex flex-wrap gap-1 mt-1">
+                              {item.materiais?.map((m, i) => (
+                                <Badge key={i} variant="secondary" className="text-[10px] h-5 bg-blue-50 text-blue-700 border-blue-200">
+                                  {m.descricao}
+                                </Badge>
+                              ))}
+                              {item.acabamentos?.map((a, i) => (
+                                <Badge key={i} variant="secondary" className="text-[10px] h-5 bg-amber-50 text-amber-700 border-amber-200">
+                                  {a.descricao}
+                                </Badge>
+                              ))}
+                            </div>
+                          ) : null}
                         </td>
                         <td className="py-3 px-3 text-right text-slate-600 tabular-nums hidden md:table-cell">{item.quantidade}</td>
                         <td className="py-3 px-3 text-right text-slate-600 tabular-nums hidden md:table-cell">{brl(item.valor_unitario)}</td>
@@ -374,130 +616,238 @@ export default function OrcamentoEditorPage() {
               </div>
             )}
 
-            {/* New item form */}
+            {/* ══════════ NEW ITEM FORM (2-column layout) ══════════ */}
             {showItemForm && (
-              <div className="border border-blue-200 bg-blue-50/40 rounded-xl p-4 space-y-4">
-                <p className="text-sm font-semibold text-blue-800">Novo Item</p>
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
-                  <div className="md:col-span-2">
-                    <Label className="text-xs">Descrição *</Label>
-                    <Input
-                      value={newItem.descricao}
-                      onChange={(e) => setNewItem((s) => ({ ...s, descricao: e.target.value }))}
-                      placeholder="Ex: Banner lona 440g"
-                      className="mt-1 rounded-xl h-9 text-sm"
-                    />
-                  </div>
-                  <div>
-                    <Label className="text-xs">Especificação</Label>
-                    <Input
-                      value={newItem.especificacao}
-                      onChange={(e) => setNewItem((s) => ({ ...s, especificacao: e.target.value }))}
-                      placeholder="Material, acabamento..."
-                      className="mt-1 rounded-xl h-9 text-sm"
-                    />
-                  </div>
-                  <div>
-                    <Label className="text-xs">Quantidade</Label>
-                    <Input
-                      type="number"
-                      min={1}
-                      step={1}
-                      value={newItem.quantidade}
-                      onChange={(e) => setNewItem((s) => ({ ...s, quantidade: Number(e.target.value) }))}
-                      className="mt-1 rounded-xl h-9 text-sm"
-                    />
-                  </div>
-                  <div>
-                    <Label className="text-xs">Largura (cm)</Label>
-                    <Input
-                      type="number"
-                      min={1}
-                      value={newItem.largura_cm ?? ""}
-                      onChange={(e) => setNewItem((s) => ({ ...s, largura_cm: e.target.value ? Number(e.target.value) : null }))}
-                      placeholder="Opcional"
-                      className="mt-1 rounded-xl h-9 text-sm"
-                    />
-                  </div>
-                  <div>
-                    <Label className="text-xs">Altura (cm)</Label>
-                    <Input
-                      type="number"
-                      min={1}
-                      value={newItem.altura_cm ?? ""}
-                      onChange={(e) => setNewItem((s) => ({ ...s, altura_cm: e.target.value ? Number(e.target.value) : null }))}
-                      placeholder="Opcional"
-                      className="mt-1 rounded-xl h-9 text-sm"
-                    />
-                  </div>
-                  <div>
-                    <Label className="text-xs">Markup (%)</Label>
-                    <Input
-                      type="number"
-                      min={0}
-                      step={1}
-                      value={newItem.markup_percentual}
-                      onChange={(e) => setNewItem((s) => ({ ...s, markup_percentual: Number(e.target.value) }))}
-                      className="mt-1 rounded-xl h-9 text-sm"
-                    />
-                    {!validacaoMarkup.valido && (
-                      <p className="text-xs text-amber-600 mt-1">{validacaoMarkup.aviso}</p>
+              <div className="border border-blue-200 bg-blue-50/30 rounded-2xl overflow-hidden">
+                {/* Form header */}
+                <div
+                  className="flex items-center justify-between px-5 py-3 bg-blue-50 border-b border-blue-200 cursor-pointer"
+                  onClick={() => setItemFormExpanded((e) => !e)}
+                >
+                  <p className="text-sm font-semibold text-blue-800">Novo Item</p>
+                  <div className="flex items-center gap-2">
+                    {pricingResult && (
+                      <Badge className="bg-blue-100 text-blue-700 border-blue-200 text-xs">
+                        {brl(pricingResult.precoUnitario)}/un
+                      </Badge>
                     )}
+                    {itemFormExpanded ? <ChevronUp size={16} className="text-blue-500" /> : <ChevronDown size={16} className="text-blue-500" />}
                   </div>
                 </div>
 
-                {/* Pricing Calculator */}
-                <PricingCalculator resultado={pricingResult} quantidade={newItem.quantidade} />
+                {itemFormExpanded && (
+                  <div className="p-5">
+                    <div className="grid grid-cols-1 lg:grid-cols-5 gap-6">
+                      {/* ──── LEFT COLUMN (3/5) — Item details ──── */}
+                      <div className="lg:col-span-3 space-y-5">
+                        {/* Produto & Modelo Selector */}
+                        <ProdutoSelector
+                          produtoId={newItem.produto_id}
+                          modeloId={newItem.modelo_id}
+                          onProdutoChange={handleProdutoChange}
+                          onModeloChange={handleModeloChange}
+                        />
 
-                {materiaisSemPreco.length > 0 && (
-                  <div className="flex items-start gap-2 bg-amber-50 border border-amber-200 rounded-xl p-3 text-xs text-amber-800">
-                    <AlertTriangle size={14} className="mt-0.5 shrink-0 text-amber-500" />
-                    <span>
-                      <strong>{materiaisSemPreco.length} material(is) sem preço:</strong>{' '}
-                      {materiaisSemPreco.join(', ')}.{' '}
-                      Configure em <strong>Admin → Produtos</strong>.
-                    </span>
+                        {/* Descricao manual (caso nao selecione produto) */}
+                        <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+                          <div className="md:col-span-2">
+                            <Label className="text-xs">Descricao *</Label>
+                            <Input
+                              value={newItem.descricao}
+                              onChange={(e) => setNewItem((s) => ({ ...s, descricao: e.target.value }))}
+                              placeholder="Ex: Banner lona 440g com ilhos"
+                              className="mt-1 rounded-xl h-9 text-sm"
+                            />
+                          </div>
+                          <div>
+                            <Label className="text-xs">Especificacao</Label>
+                            <Input
+                              value={newItem.especificacao}
+                              onChange={(e) => setNewItem((s) => ({ ...s, especificacao: e.target.value }))}
+                              placeholder="Detalhes adicionais..."
+                              className="mt-1 rounded-xl h-9 text-sm"
+                            />
+                          </div>
+                          <div>
+                            <Label className="text-xs">Quantidade</Label>
+                            <Input
+                              type="number"
+                              min={1}
+                              step={1}
+                              value={newItem.quantidade}
+                              onChange={(e) => setNewItem((s) => ({ ...s, quantidade: Number(e.target.value) }))}
+                              className="mt-1 rounded-xl h-9 text-sm"
+                            />
+                          </div>
+                          <div>
+                            <Label className="text-xs">Largura (cm)</Label>
+                            <Input
+                              type="number"
+                              min={1}
+                              value={newItem.largura_cm ?? ""}
+                              onChange={(e) => setNewItem((s) => ({ ...s, largura_cm: e.target.value ? Number(e.target.value) : null }))}
+                              placeholder="Opcional"
+                              className="mt-1 rounded-xl h-9 text-sm"
+                            />
+                          </div>
+                          <div>
+                            <Label className="text-xs">Altura (cm)</Label>
+                            <Input
+                              type="number"
+                              min={1}
+                              value={newItem.altura_cm ?? ""}
+                              onChange={(e) => setNewItem((s) => ({ ...s, altura_cm: e.target.value ? Number(e.target.value) : null }))}
+                              placeholder="Opcional"
+                              className="mt-1 rounded-xl h-9 text-sm"
+                            />
+                          </div>
+                        </div>
+
+                        {/* Materiais */}
+                        <MaterialEditor
+                          materiais={newItem.materiais}
+                          onChange={handleMateriaisChange}
+                        />
+
+                        {/* Acabamentos */}
+                        <AcabamentoSelector
+                          selected={newItem.acabamentos}
+                          onChange={handleAcabamentosChange}
+                        />
+
+                        {/* Markup */}
+                        <div className="flex items-end gap-4">
+                          <div className="flex-1">
+                            <Label className="text-xs">Markup (%)</Label>
+                            <Input
+                              type="number"
+                              min={0}
+                              step={1}
+                              value={newItem.markup_percentual}
+                              onChange={(e) => setNewItem((s) => ({ ...s, markup_percentual: Number(e.target.value) }))}
+                              className="mt-1 rounded-xl h-9 text-sm"
+                            />
+                          </div>
+                          {markupSugerido !== newItem.markup_percentual && (
+                            <Button
+                              variant="outline"
+                              size="sm"
+                              className="rounded-xl h-9 text-xs"
+                              onClick={() => setNewItem((s) => ({ ...s, markup_percentual: markupSugerido }))}
+                            >
+                              Sugerido: {markupSugerido}%
+                            </Button>
+                          )}
+                        </div>
+                        {!validacaoMarkup.valido && (
+                          <div className="flex items-center gap-2 text-amber-600 text-xs mt-1">
+                            <AlertTriangle size={14} />
+                            {validacaoMarkup.aviso}
+                          </div>
+                        )}
+                        {validacaoMarkup.valido && newItem.markup_percentual < 30 && (
+                          <p className="text-xs text-amber-600 mt-1">
+                            ⚠️ Markup abaixo de 30% — verifique a rentabilidade
+                          </p>
+                        )}
+                      </div>
+
+                      {/* ──── RIGHT COLUMN (2/5) — Pricing sidebar ──── */}
+                      <div className="lg:col-span-2">
+                        <div className="sticky top-4 space-y-4">
+                          <PricingCalculator resultado={pricingResult} quantidade={newItem.quantidade} />
+
+                          {/* Quick summary */}
+                          {pricingResult && (
+                            <div className="bg-slate-50 rounded-xl p-4 space-y-2 text-xs">
+                              <p className="font-semibold text-slate-700 text-sm">Resumo do Item</p>
+                              <div className="flex justify-between">
+                                <span className="text-slate-500">Quantidade</span>
+                                <span className="font-medium tabular-nums">{newItem.quantidade}</span>
+                              </div>
+                              <div className="flex justify-between">
+                                <span className="text-slate-500">Materiais</span>
+                                <span className="font-medium tabular-nums">{newItem.materiais.length}</span>
+                              </div>
+                              <div className="flex justify-between">
+                                <span className="text-slate-500">Acabamentos</span>
+                                <span className="font-medium tabular-nums">{newItem.acabamentos.length}</span>
+                              </div>
+                              <div className="flex justify-between">
+                                <span className="text-slate-500">Processos</span>
+                                <span className="font-medium tabular-nums">{newItem.processos.length}</span>
+                              </div>
+                              <Separator />
+                              <div className="flex justify-between">
+                                <span className="font-semibold text-slate-700">Preco Total</span>
+                                <span className="font-bold text-blue-700 tabular-nums">{brl(pricingResult.precoTotal)}</span>
+                              </div>
+                            </div>
+                          )}
+
+                          {/* Action buttons */}
+                          <div className="flex flex-col gap-2">
+                            <Button
+                              onClick={handleAddItem}
+                              disabled={adicionarItem.isPending || !pricingResult}
+                              className="rounded-xl bg-blue-600 text-white hover:bg-blue-700 w-full"
+                            >
+                              {adicionarItem.isPending ? <Loader2 className="animate-spin mr-2" size={14} /> : <Plus size={14} className="mr-2" />}
+                              Adicionar Item
+                            </Button>
+                            <Button
+                              variant="ghost" size="sm" className="rounded-xl w-full"
+                              onClick={() => { setShowItemForm(false); setNewItem(DEFAULT_ITEM); }}
+                            >
+                              Cancelar
+                            </Button>
+                          </div>
+                        </div>
+                      </div>
+                    </div>
                   </div>
                 )}
-
-                <div className="flex justify-end gap-2">
-                  <Button
-                    variant="ghost" size="sm" className="rounded-xl"
-                    onClick={() => { setShowItemForm(false); setNewItem(DEFAULT_ITEM); setMateriaisSemPreco([]); }}
-                  >
-                    Cancelar
-                  </Button>
-                  <Button
-                    size="sm"
-                    onClick={handleAddItem}
-                    disabled={adicionarItem.isPending}
-                    className="rounded-xl bg-blue-600 text-white hover:bg-blue-700"
-                  >
-                    {adicionarItem.isPending ? <Loader2 className="animate-spin mr-1" size={14} /> : <Plus size={14} className="mr-1" />}
-                    Adicionar
-                  </Button>
-                </div>
               </div>
             )}
 
-            {/* Summary */}
+            {/* ══════════ SERVICOS ══════════ */}
+            {!isNew && (
+              <div className="mt-6">
+                <ServicoSelector
+                  servicos={servicos}
+                  onChange={setServicos}
+                />
+              </div>
+            )}
+
+            {/* ══════════ RESUMO FINANCEIRO ══════════ */}
             {!isNew && orcamento && (
-              <div className="mt-4 pt-4 border-t border-slate-200">
-                <div className="flex flex-col items-end gap-1 text-sm">
-                  <div className="flex gap-8">
-                    <span className="text-slate-500">Subtotal</span>
-                    <span className="font-medium tabular-nums w-28 text-right">{brl(orcamento.subtotal)}</span>
+              <div className="mt-6 pt-6 border-t border-slate-200">
+                <div className="flex flex-col items-end gap-1.5 text-sm">
+                  <div className="flex gap-8 w-72">
+                    <span className="text-slate-500 flex-1">Subtotal Itens</span>
+                    <span className="font-medium tabular-nums text-right">{brl(orcamento.subtotal - totalServicos)}</span>
                   </div>
-                  {orcamento.desconto_percentual > 0 && (
-                    <div className="flex gap-8">
-                      <span className="text-red-500">Desconto ({orcamento.desconto_percentual}%)</span>
-                      <span className="font-medium tabular-nums text-red-600 w-28 text-right">-{brl(orcamento.desconto_valor)}</span>
+                  {totalServicos > 0 && (
+                    <div className="flex gap-8 w-72">
+                      <span className="text-slate-500 flex-1">Servicos</span>
+                      <span className="font-medium tabular-nums text-right">{brl(totalServicos)}</span>
                     </div>
                   )}
-                  <Separator className="my-2 w-64" />
-                  <div className="flex gap-8">
-                    <span className="font-bold text-slate-800 text-base">Total</span>
-                    <span className="font-bold text-blue-700 text-base tabular-nums w-28 text-right">{brl(orcamento.total)}</span>
+                  <div className="flex gap-8 w-72">
+                    <span className="text-slate-500 flex-1">Subtotal</span>
+                    <span className="font-medium tabular-nums text-right">{brl(orcamento.subtotal)}</span>
+                  </div>
+                  {orcamento.desconto_percentual > 0 && (
+                    <div className="flex gap-8 w-72">
+                      <span className="text-red-500 flex-1">Desconto ({orcamento.desconto_percentual}%)</span>
+                      <span className="font-medium tabular-nums text-red-600 text-right">-{brl(orcamento.desconto_valor)}</span>
+                    </div>
+                  )}
+                  <Separator className="my-2 w-72" />
+                  <div className="flex gap-8 w-72">
+                    <span className="font-bold text-slate-800 text-base flex-1">Total</span>
+                    <span className="font-bold text-blue-700 text-base tabular-nums text-right">{brl(orcamento.total)}</span>
                   </div>
                 </div>
               </div>
@@ -508,9 +858,16 @@ export default function OrcamentoEditorPage() {
 
       {isNew && (
         <div className="bg-amber-50 border border-amber-200 rounded-xl p-4 text-sm text-amber-800">
-          Salve o orçamento primeiro para poder adicionar itens com precificação automática.
+          Salve o orcamento primeiro para poder adicionar itens com precificacao automatica.
         </div>
       )}
+
+      {/* Template modal */}
+      <TemplateSelector
+        open={showTemplateModal}
+        onClose={() => setShowTemplateModal(false)}
+        onSelect={handleTemplateSelect}
+      />
     </div>
   );
 }

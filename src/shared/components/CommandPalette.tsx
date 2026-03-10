@@ -14,7 +14,7 @@ import {
   LayoutDashboard, UserPlus, Kanban, FileText, Calculator,
   Building2, ClipboardList, Factory, Wrench, Warehouse,
   ShoppingCart, Package, Wallet, BarChart3, BadgeDollarSign,
-  AlertTriangle, Users, Settings, Shield, Receipt,
+  AlertTriangle, Users, Settings, Shield, Receipt, BookOpen,
 } from "lucide-react";
 
 interface CommandEntry {
@@ -33,6 +33,8 @@ const COMMANDS: CommandEntry[] = [
   { label: "Pipeline", path: "/pipeline", group: "Comercial", icon: <Kanban size={16} /> },
   { label: "Propostas", path: "/propostas", group: "Comercial", icon: <FileText size={16} /> },
   { label: "Orçamentos", path: "/orcamentos", group: "Comercial", icon: <Calculator size={16} /> },
+  { label: "Novo Orçamento", path: "/orcamentos/novo", group: "Comercial", icon: <Calculator size={16} /> },
+  { label: "Templates", path: "/orcamentos/templates", group: "Comercial", icon: <BookOpen size={16} /> },
   { label: "Clientes", path: "/clientes", group: "Comercial", icon: <Building2 size={16} /> },
   // Operacional
   { label: "Pedidos", path: "/pedidos", group: "Operacional", icon: <ClipboardList size={16} /> },

@@ -59,9 +59,12 @@ interface RegrasPrecificacao {
   categoria: string;
   markup_minimo: number;
   markup_sugerido: number;
-  descricao: string | null;
+  desconto_maximo: number | null;
+  preco_m2_minimo: number | null;
+  taxa_urgencia: number | null;
   ativo: boolean;
   created_at: string;
+  updated_at: string;
 }
 
 // ----------------------------------------------------------------------------
@@ -92,7 +95,7 @@ function formatMoney(value: number): string {
 // ----------------------------------------------------------------------------
 
 interface NovaRegraFormProps {
-  onSave: (values: Omit<RegrasPrecificacao, "id" | "created_at">) => void;
+  onSave: (values: Omit<RegrasPrecificacao, "id" | "created_at" | "updated_at">) => void;
   onCancel: () => void;
   isSaving: boolean;
 }
@@ -101,7 +104,9 @@ function NovaRegraForm({ onSave, onCancel, isSaving }: NovaRegraFormProps) {
   const [categoria, setCategoria] = useState("");
   const [markupMinimo, setMarkupMinimo] = useState("");
   const [markupSugerido, setMarkupSugerido] = useState("");
-  const [descricao, setDescricao] = useState("");
+  const [descontoMaximo, setDescontoMaximo] = useState("");
+  const [precoM2Minimo, setPrecoM2Minimo] = useState("");
+  const [taxaUrgencia, setTaxaUrgencia] = useState("");
   const [ativo, setAtivo] = useState(true);
 
   function handleSubmit() {
@@ -119,7 +124,9 @@ function NovaRegraForm({ onSave, onCancel, isSaving }: NovaRegraFormProps) {
       categoria: categoria.trim(),
       markup_minimo: min,
       markup_sugerido: sug,
-      descricao: descricao.trim() || null,
+      desconto_maximo: descontoMaximo ? parseFloat(descontoMaximo) : null,
+      preco_m2_minimo: precoM2Minimo ? parseFloat(precoM2Minimo) : null,
+      taxa_urgencia: taxaUrgencia ? parseFloat(taxaUrgencia) : null,
       ativo,
     });
   }
@@ -141,7 +148,7 @@ function NovaRegraForm({ onSave, onCancel, isSaving }: NovaRegraFormProps) {
           value={markupMinimo}
           onChange={(e) => setMarkupMinimo(e.target.value)}
           placeholder="30"
-          className="h-9 w-24"
+          className="h-9 w-20"
         />
       </td>
       <td className="px-4 py-2">
@@ -150,8 +157,38 @@ function NovaRegraForm({ onSave, onCancel, isSaving }: NovaRegraFormProps) {
           step="0.01"
           value={markupSugerido}
           onChange={(e) => setMarkupSugerido(e.target.value)}
+          placeholder="45"
+          className="h-9 w-20"
+        />
+      </td>
+      <td className="px-4 py-2">
+        <Input
+          type="number"
+          step="0.01"
+          value={descontoMaximo}
+          onChange={(e) => setDescontoMaximo(e.target.value)}
+          placeholder="15"
+          className="h-9 w-20"
+        />
+      </td>
+      <td className="px-4 py-2">
+        <Input
+          type="number"
+          step="0.01"
+          value={precoM2Minimo}
+          onChange={(e) => setPrecoM2Minimo(e.target.value)}
+          placeholder="18"
+          className="h-9 w-20"
+        />
+      </td>
+      <td className="px-4 py-2">
+        <Input
+          type="number"
+          step="0.01"
+          value={taxaUrgencia}
+          onChange={(e) => setTaxaUrgencia(e.target.value)}
           placeholder="50"
-          className="h-9 w-24"
+          className="h-9 w-20"
         />
       </td>
       <td className="px-4 py-2">
@@ -186,7 +223,9 @@ function EditRegraRow({ regra, onSave, onCancel, isSaving }: EditRegraRowProps) 
   const [categoria, setCategoria] = useState(regra.categoria);
   const [markupMinimo, setMarkupMinimo] = useState(String(regra.markup_minimo));
   const [markupSugerido, setMarkupSugerido] = useState(String(regra.markup_sugerido));
-  const [descricao, setDescricao] = useState(regra.descricao ?? "");
+  const [descontoMaximo, setDescontoMaximo] = useState(regra.desconto_maximo != null ? String(regra.desconto_maximo) : "");
+  const [precoM2Minimo, setPrecoM2Minimo] = useState(regra.preco_m2_minimo != null ? String(regra.preco_m2_minimo) : "");
+  const [taxaUrgencia, setTaxaUrgencia] = useState(regra.taxa_urgencia != null ? String(regra.taxa_urgencia) : "");
   const [ativo, setAtivo] = useState(regra.ativo);
 
   function handleSubmit() {
@@ -195,7 +234,9 @@ function EditRegraRow({ regra, onSave, onCancel, isSaving }: EditRegraRowProps) 
       categoria: categoria.trim(),
       markup_minimo: parseFloat(markupMinimo) || regra.markup_minimo,
       markup_sugerido: parseFloat(markupSugerido) || regra.markup_sugerido,
-      descricao: descricao.trim() || null,
+      desconto_maximo: descontoMaximo ? parseFloat(descontoMaximo) : null,
+      preco_m2_minimo: precoM2Minimo ? parseFloat(precoM2Minimo) : null,
+      taxa_urgencia: taxaUrgencia ? parseFloat(taxaUrgencia) : null,
       ativo,
     });
   }
@@ -211,7 +252,7 @@ function EditRegraRow({ regra, onSave, onCancel, isSaving }: EditRegraRowProps) 
           step="0.01"
           value={markupMinimo}
           onChange={(e) => setMarkupMinimo(e.target.value)}
-          className="h-9 w-24"
+          className="h-9 w-20"
         />
       </td>
       <td className="px-4 py-2">
@@ -220,7 +261,37 @@ function EditRegraRow({ regra, onSave, onCancel, isSaving }: EditRegraRowProps) 
           step="0.01"
           value={markupSugerido}
           onChange={(e) => setMarkupSugerido(e.target.value)}
-          className="h-9 w-24"
+          className="h-9 w-20"
+        />
+      </td>
+      <td className="px-4 py-2">
+        <Input
+          type="number"
+          step="0.01"
+          value={descontoMaximo}
+          onChange={(e) => setDescontoMaximo(e.target.value)}
+          placeholder="—"
+          className="h-9 w-20"
+        />
+      </td>
+      <td className="px-4 py-2">
+        <Input
+          type="number"
+          step="0.01"
+          value={precoM2Minimo}
+          onChange={(e) => setPrecoM2Minimo(e.target.value)}
+          placeholder="—"
+          className="h-9 w-20"
+        />
+      </td>
+      <td className="px-4 py-2">
+        <Input
+          type="number"
+          step="0.01"
+          value={taxaUrgencia}
+          onChange={(e) => setTaxaUrgencia(e.target.value)}
+          placeholder="—"
+          className="h-9 w-20"
         />
       </td>
       <td className="px-4 py-2">
@@ -273,7 +344,7 @@ export function AdminPrecificacaoPage() {
     queryFn: async () => {
       const { data, error } = await (supabase as unknown as any)
         .from("regras_precificacao")
-        .select("*")
+        .select("id, categoria, markup_minimo, markup_sugerido, desconto_maximo, preco_m2_minimo, taxa_urgencia, ativo, created_at, updated_at")
         .order("categoria");
       if (error) throw error;
       return (data || []) as RegrasPrecificacao[];
@@ -409,10 +480,18 @@ export function AdminPrecificacaoPage() {
   // --------------------------------------------------------------------------
 
   const insertRegraMutation = useMutation({
-    mutationFn: async (values: Omit<RegrasPrecificacao, "id" | "created_at">) => {
+    mutationFn: async (values: Omit<RegrasPrecificacao, "id" | "created_at" | "updated_at">) => {
       const { error } = await (supabase as unknown as any)
         .from("regras_precificacao")
-        .insert(values);
+        .insert({
+          categoria: values.categoria,
+          markup_minimo: values.markup_minimo,
+          markup_sugerido: values.markup_sugerido,
+          desconto_maximo: values.desconto_maximo ?? null,
+          preco_m2_minimo: values.preco_m2_minimo ?? null,
+          taxa_urgencia: values.taxa_urgencia ?? null,
+          ativo: values.ativo,
+        });
       if (error) throw error;
     },
     onSuccess: () => {
@@ -760,7 +839,10 @@ export function AdminPrecificacaoPage() {
                       <th className="px-4 py-3 text-left font-semibold text-slate-600">Categoria</th>
                       <th className="px-4 py-3 text-left font-semibold text-slate-600">Markup Mín.</th>
                       <th className="px-4 py-3 text-left font-semibold text-slate-600">Markup Sug.</th>
-                      <th className="px-4 py-3 text-left font-semibold text-slate-600">Ativo</th>
+                      <th className="px-4 py-3 text-left font-semibold text-slate-600">Desc. Máx.</th>
+                      <th className="px-4 py-3 text-left font-semibold text-slate-600">Preço Mín./m²</th>
+                      <th className="px-4 py-3 text-left font-semibold text-slate-600">Taxa Urgência</th>
+                      <th className="px-4 py-3 text-left font-semibold text-slate-600">Status</th>
                       <th className="px-4 py-3 text-left font-semibold text-slate-600">Ações</th>
                     </tr>
                   </thead>
@@ -776,7 +858,7 @@ export function AdminPrecificacaoPage() {
 
                     {regras.length === 0 && !addingNew ? (
                       <tr>
-                        <td colSpan={5} className="px-4 py-10 text-center text-slate-400">
+                        <td colSpan={8} className="px-4 py-10 text-center text-slate-400">
                           Nenhuma regra de markup configurada. Clique em "Nova Regra" para adicionar.
                         </td>
                       </tr>
@@ -797,9 +879,6 @@ export function AdminPrecificacaoPage() {
                           >
                             <td className="px-4 py-3">
                               <div className="font-medium text-slate-800">{regra.categoria}</div>
-                              {regra.descricao && (
-                                <div className="text-xs text-slate-400 mt-0.5">{regra.descricao}</div>
-                              )}
                             </td>
                             <td className="px-4 py-3">
                               <span className="font-mono tabular-nums text-slate-700">
@@ -813,6 +892,21 @@ export function AdminPrecificacaoPage() {
                               >
                                 {formatPct(regra.markup_sugerido)}
                               </Badge>
+                            </td>
+                            <td className="px-4 py-3">
+                              <span className="font-mono tabular-nums text-slate-600 text-xs">
+                                {regra.desconto_maximo != null ? formatPct(regra.desconto_maximo) : "—"}
+                              </span>
+                            </td>
+                            <td className="px-4 py-3">
+                              <span className="font-mono tabular-nums text-slate-600 text-xs">
+                                {regra.preco_m2_minimo != null ? `R$ ${formatMoney(regra.preco_m2_minimo)}` : "—"}
+                              </span>
+                            </td>
+                            <td className="px-4 py-3">
+                              <span className="font-mono tabular-nums text-slate-600 text-xs">
+                                {regra.taxa_urgencia != null ? formatPct(regra.taxa_urgencia) : "—"}
+                              </span>
                             </td>
                             <td className="px-4 py-3">
                               <Switch
