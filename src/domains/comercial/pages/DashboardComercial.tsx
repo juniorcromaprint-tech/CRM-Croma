@@ -1,11 +1,80 @@
 import React from "react";
 import { Link } from "react-router-dom";
-import { UserPlus, FileText, TrendingUp, Building2, Clock, ArrowRight, Calculator } from "lucide-react";
-import KpiCard from "@/shared/components/KpiCard";
+import {
+  UserPlus, FileText, TrendingUp, Building2, Clock, ArrowRight,
+  Calculator, Plus, Target, Phone, Calendar, Zap, BarChart3,
+} from "lucide-react";
 import { brl as formatBRL } from "@/shared/utils/format";
 import { useDashComercial } from "../hooks/useDashboardStats";
 import { useQuery } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
+
+/* ──────────────────────────────────────────────────────────────────────── */
+/*  Helpers                                                                 */
+/* ──────────────────────────────────────────────────────────────────────── */
+
+function getGreeting() {
+  const h = new Date().getHours();
+  if (h < 12) return "Bom dia";
+  if (h < 18) return "Boa tarde";
+  return "Boa noite";
+}
+
+function formatDate() {
+  return new Date().toLocaleDateString("pt-BR", {
+    weekday: "long",
+    day: "numeric",
+    month: "long",
+  });
+}
+
+/* ──────────────────────────────────────────────────────────────────────── */
+/*  KPI Ring — circular progress indicator                                 */
+/* ──────────────────────────────────────────────────────────────────────── */
+
+function KpiRing({ label, value, subtitle, color, icon }: {
+  label: string;
+  value: string | number;
+  subtitle?: string;
+  color: string;
+  icon: React.ReactNode;
+}) {
+  return (
+    <div className="bg-white rounded-2xl border border-slate-100 p-5 hover:shadow-sm transition-all">
+      <div className="flex items-center gap-3 mb-3">
+        <div className={`w-10 h-10 rounded-xl flex items-center justify-center ${color}`}>
+          {icon}
+        </div>
+        <span className="text-sm text-slate-500 font-medium">{label}</span>
+      </div>
+      <p className="text-2xl font-bold text-slate-800 tabular-nums">{value}</p>
+      {subtitle && <p className="text-xs text-slate-400 mt-1">{subtitle}</p>}
+    </div>
+  );
+}
+
+/* ──────────────────────────────────────────────────────────────────────── */
+/*  Status Colors                                                          */
+/* ──────────────────────────────────────────────────────────────────────── */
+
+const statusColors: Record<string, string> = {
+  rascunho: "bg-slate-100 text-slate-600",
+  enviada: "bg-blue-100 text-blue-700",
+  em_revisao: "bg-amber-100 text-amber-700",
+  aprovada: "bg-emerald-100 text-emerald-700",
+  recusada: "bg-red-100 text-red-700",
+};
+
+const prioridadeColors: Record<string, string> = {
+  urgente: "bg-red-500",
+  alta: "bg-amber-500",
+  normal: "bg-blue-500",
+  baixa: "bg-slate-300",
+};
+
+/* ──────────────────────────────────────────────────────────────────────── */
+/*  MAIN                                                                   */
+/* ──────────────────────────────────────────────────────────────────────── */
 
 export default function DashboardComercial() {
   const { data: comercial, isLoading } = useDashComercial();
@@ -37,90 +106,163 @@ export default function DashboardComercial() {
     },
   });
 
-  const statusColors: Record<string, string> = {
-    rascunho: "bg-slate-100 text-slate-600",
-    enviada: "bg-blue-100 text-blue-700",
-    em_revisao: "bg-amber-100 text-amber-700",
-    aprovada: "bg-emerald-100 text-emerald-700",
-    recusada: "bg-red-100 text-red-700",
-  };
-
   return (
-    <div className="space-y-8">
-      <div className="flex items-center justify-between">
+    <div className="space-y-6 max-w-[1200px]">
+
+      {/* ─── Header ─── */}
+      <div className="flex flex-col sm:flex-row sm:items-end justify-between gap-4">
         <div>
-          <h1 className="text-2xl font-bold text-slate-800">Meu Painel Comercial</h1>
-          <p className="text-slate-500 mt-1">Pipeline, propostas e tarefas do dia</p>
+          <h1 className="text-2xl font-bold text-slate-800">{getGreeting()}, Comercial 🎯</h1>
+          <p className="text-sm text-slate-400 mt-0.5 flex items-center gap-1.5">
+            <Calendar size={13} />
+            {formatDate()}
+          </p>
         </div>
-        <div className="flex gap-2">
-          <Link to="/leads" className="text-sm text-blue-600 hover:text-blue-700 flex items-center gap-1 font-medium">
-            Leads <ArrowRight size={14} />
+        <div className="flex flex-wrap gap-2">
+          <Link to="/leads" className="flex items-center gap-2 px-4 py-2.5 bg-blue-600 text-white rounded-xl text-sm font-medium hover:bg-blue-700 transition-colors">
+            <Plus size={15} /> Novo Lead
           </Link>
-          <Link to="/orcamentos" className="text-sm text-blue-600 hover:text-blue-700 flex items-center gap-1 font-medium ml-4">
-            Orçamentos <ArrowRight size={14} />
+          <Link to="/orcamentos" className="flex items-center gap-2 px-4 py-2.5 bg-white border border-slate-200 rounded-xl text-sm font-medium text-slate-600 hover:bg-blue-50 hover:text-blue-600 hover:border-blue-200 transition-all">
+            <FileText size={15} /> Nova Proposta
           </Link>
         </div>
       </div>
 
-      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
-        <KpiCard title="Clientes" value={comercial?.totalClientes ?? "—"} subtitle={`+${comercial?.novosClientes30d ?? 0} este mês`} icon={<Building2 size={20} />} color="blue" loading={isLoading} />
-        <KpiCard title="Leads ativos" value={comercial?.leadsAtivos ?? "—"} icon={<UserPlus size={20} />} color="green" loading={isLoading} />
-        <KpiCard title="Pipeline" value={comercial?.pipeline ? formatBRL(comercial.pipeline) : "—"} icon={<TrendingUp size={20} />} color="purple" loading={isLoading} />
-        <KpiCard title="Propostas pendentes" value={comercial?.propostasPendentes ?? "—"} subtitle={`${comercial?.propostasAprovadas ?? 0} aprovadas`} icon={<Calculator size={20} />} color="amber" loading={isLoading} />
+      {/* ─── KPIs ─── */}
+      <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
+        <KpiRing
+          label="Clientes ativos"
+          value={isLoading ? "—" : (comercial?.totalClientes ?? 0)}
+          subtitle={`+${comercial?.novosClientes30d ?? 0} este mês`}
+          color="bg-blue-50 text-blue-500"
+          icon={<Building2 size={20} />}
+        />
+        <KpiRing
+          label="Leads ativos"
+          value={isLoading ? "—" : (comercial?.leadsAtivos ?? 0)}
+          color="bg-emerald-50 text-emerald-500"
+          icon={<UserPlus size={20} />}
+        />
+        <KpiRing
+          label="Pipeline"
+          value={isLoading ? "—" : (comercial?.pipeline ? formatBRL(comercial.pipeline) : "R$ 0")}
+          subtitle="Valor total estimado"
+          color="bg-purple-50 text-purple-500"
+          icon={<TrendingUp size={20} />}
+        />
+        <KpiRing
+          label="Propostas pendentes"
+          value={isLoading ? "—" : (comercial?.propostasPendentes ?? 0)}
+          subtitle={`${comercial?.propostasAprovadas ?? 0} aprovadas`}
+          color="bg-amber-50 text-amber-500"
+          icon={<Calculator size={20} />}
+        />
       </div>
 
-      <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-        {/* Propostas em aberto */}
-        <div className="bg-white rounded-2xl border border-slate-200 p-6">
-          <div className="flex items-center justify-between mb-4">
-            <div className="flex items-center gap-2">
-              <FileText size={16} className="text-blue-500" />
-              <h2 className="font-semibold text-slate-800 text-sm">Propostas em aberto</h2>
+      {/* ─── Conversion funnel mini */}
+      {comercial && (comercial.totalClientes > 0 || comercial.leadsAtivos > 0) && (
+        <div className="bg-white rounded-2xl border border-slate-100 p-5">
+          <div className="flex items-center gap-2.5 mb-4">
+            <div className="w-8 h-8 rounded-lg bg-purple-50 flex items-center justify-center">
+              <BarChart3 size={16} className="text-purple-500" />
             </div>
-            <Link to="/orcamentos" className="text-xs text-blue-600 hover:underline">Ver todas</Link>
+            <h2 className="font-semibold text-slate-800">Funil resumido</h2>
           </div>
-          <div className="space-y-2">
+          <div className="flex items-center gap-2 overflow-x-auto pb-1">
+            {[
+              { label: "Leads", value: comercial.leadsAtivos, color: "bg-emerald-500" },
+              { label: "Propostas", value: comercial.totalPropostas, color: "bg-blue-500" },
+              { label: "Pendentes", value: comercial.propostasPendentes, color: "bg-amber-500" },
+              { label: "Aprovadas", value: comercial.propostasAprovadas, color: "bg-green-500" },
+            ].map((step, i) => (
+              <React.Fragment key={step.label}>
+                {i > 0 && <ArrowRight size={16} className="text-slate-300 shrink-0" />}
+                <div className="flex items-center gap-2 bg-slate-50 rounded-xl px-4 py-2.5 shrink-0">
+                  <div className={`w-2.5 h-2.5 rounded-full ${step.color}`} />
+                  <span className="text-sm font-bold text-slate-700 tabular-nums">{step.value}</span>
+                  <span className="text-xs text-slate-400">{step.label}</span>
+                </div>
+              </React.Fragment>
+            ))}
+          </div>
+        </div>
+      )}
+
+      {/* ─── Content: Propostas + Tarefas ─── */}
+      <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+
+        {/* Propostas */}
+        <div className="bg-white rounded-2xl border border-slate-100 p-6">
+          <div className="flex items-center justify-between mb-5">
+            <div className="flex items-center gap-2.5">
+              <div className="w-8 h-8 rounded-lg bg-blue-50 flex items-center justify-center">
+                <FileText size={16} className="text-blue-500" />
+              </div>
+              <h2 className="font-semibold text-slate-800">Propostas em aberto</h2>
+            </div>
+            <Link to="/orcamentos" className="text-xs text-blue-600 hover:text-blue-700 font-medium flex items-center gap-1">
+              Ver todas <ArrowRight size={12} />
+            </Link>
+          </div>
+          <div className="space-y-1">
             {propostasRecentes && propostasRecentes.length > 0 ? (
               propostasRecentes.map((p: any) => (
-                <div key={p.id} className="flex items-center justify-between py-2 border-b border-slate-100 last:border-0">
+                <div key={p.id} className="flex items-center justify-between py-3 border-b border-slate-50 last:border-0">
                   <div className="min-w-0 flex-1">
                     <p className="text-sm font-medium text-slate-700 truncate">{p.titulo || p.numero}</p>
                     <p className="text-xs text-slate-400">{p.clientes?.nome_fantasia || "—"}</p>
                   </div>
                   <div className="flex items-center gap-2 ml-3 shrink-0">
-                    <span className="text-sm font-semibold tabular-nums text-slate-700">{formatBRL(Number(p.total) || 0)}</span>
-                    <span className={`text-xs px-2 py-0.5 rounded-full font-medium ${statusColors[p.status] || "bg-slate-100 text-slate-600"}`}>
+                    <span className="text-sm font-bold tabular-nums text-slate-700">{formatBRL(Number(p.total) || 0)}</span>
+                    <span className={`text-[10px] px-2 py-0.5 rounded-full font-semibold ${statusColors[p.status] || "bg-slate-100 text-slate-600"}`}>
                       {p.status.replace(/_/g, " ")}
                     </span>
                   </div>
                 </div>
               ))
             ) : (
-              <p className="text-sm text-slate-400 py-6 text-center">Nenhuma proposta pendente</p>
+              <div className="text-center py-8">
+                <FileText size={32} className="text-slate-200 mx-auto mb-3" />
+                <p className="text-sm text-slate-400">Nenhuma proposta pendente</p>
+                <Link to="/orcamentos" className="text-xs text-blue-500 hover:underline mt-1 inline-block">
+                  Criar proposta
+                </Link>
+              </div>
             )}
           </div>
         </div>
 
-        {/* Tarefas pendentes */}
-        <div className="bg-white rounded-2xl border border-slate-200 p-6">
-          <div className="flex items-center gap-2 mb-4">
-            <Clock size={16} className="text-amber-500" />
-            <h2 className="font-semibold text-slate-800 text-sm">Próximas tarefas</h2>
+        {/* Tarefas */}
+        <div className="bg-white rounded-2xl border border-slate-100 p-6">
+          <div className="flex items-center justify-between mb-5">
+            <div className="flex items-center gap-2.5">
+              <div className="w-8 h-8 rounded-lg bg-amber-50 flex items-center justify-center">
+                <Clock size={16} className="text-amber-500" />
+              </div>
+              <h2 className="font-semibold text-slate-800">Tarefas do dia</h2>
+            </div>
           </div>
           {tarefas && tarefas.length > 0 ? (
-            <div className="space-y-2">
+            <div className="space-y-1">
               {tarefas.map((t: any) => (
-                <div key={t.id} className="flex items-center gap-3 py-2 border-b border-slate-100 last:border-0">
-                  <div className={`w-2 h-2 rounded-full shrink-0 ${t.prioridade === "urgente" ? "bg-red-500" : t.prioridade === "alta" ? "bg-amber-500" : "bg-blue-500"}`} />
+                <div key={t.id} className="flex items-center gap-3 py-3 border-b border-slate-50 last:border-0">
+                  <div className={`w-2 h-2 rounded-full shrink-0 ${prioridadeColors[t.prioridade] || "bg-blue-500"}`} />
                   <div className="flex-1 min-w-0">
                     <p className="text-sm font-medium text-slate-700 truncate">{t.titulo}</p>
-                    <p className="text-xs text-slate-400">{t.data_prevista} · {t.tipo?.replace(/_/g, " ")}</p>
+                    <p className="text-xs text-slate-400 flex items-center gap-1">
+                      {t.tipo === "ligacao" ? <Phone size={10} /> : t.tipo === "visita" ? <Target size={10} /> : <Clock size={10} />}
+                      {t.data_prevista} · {t.tipo?.replace(/_/g, " ")}
+                    </p>
                   </div>
                 </div>
               ))}
             </div>
           ) : (
-            <p className="text-sm text-slate-400 py-8 text-center">Nenhuma tarefa pendente</p>
+            <div className="text-center py-8">
+              <Zap size={32} className="text-slate-200 mx-auto mb-3" />
+              <p className="text-sm text-slate-400">Nenhuma tarefa pendente</p>
+              <p className="text-xs text-slate-300 mt-1">Suas tarefas aparecerão aqui</p>
+            </div>
           )}
         </div>
       </div>
