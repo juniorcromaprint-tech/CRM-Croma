@@ -31,6 +31,7 @@ export const NAV_GROUPS: NavGroup[] = [
       { name: 'Propostas', path: '/propostas', icon: 'FileText', module: 'comercial' },
       { name: 'Clientes', path: '/clientes', icon: 'Building2', module: 'clientes' },
       { name: 'Orçamentos', path: '/orcamentos', icon: 'Calculator', module: 'comercial', badgeKey: 'orcamentos_pendentes' },
+      { name: 'Templates', path: '/orcamentos/templates', icon: 'BookOpen', module: 'comercial' },
     ],
   },
   {

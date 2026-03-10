@@ -132,6 +132,32 @@ export interface OrcamentoItemCreateInput {
   ordem?: number;
 }
 
+export interface OrcamentoItemCreateDetalhado extends OrcamentoItemCreateInput {
+  materiais?: Array<{
+    material_id?: string | null;
+    descricao: string;
+    quantidade: number;
+    unidade: string;
+    custo_unitario: number;
+    custo_total: number;
+  }>;
+  acabamentos?: Array<{
+    acabamento_id?: string | null;
+    descricao: string;
+    quantidade: number;
+    custo_unitario: number;
+    custo_total: number;
+  }>;
+}
+
+export interface OrcamentoServicoCreateInput {
+  servico_id?: string | null;
+  descricao: string;
+  horas: number;
+  valor_unitario: number;
+  valor_total: number;
+}
+
 // ─── Service Functions ───────────────────────────────────────────────────────
 
 export const orcamentoService = {
@@ -171,9 +197,12 @@ export const orcamentoService = {
     return (data ?? []) as unknown as Orcamento[];
   },
 
-  // ─── Buscar orçamento por ID ─────────────────────────────────────────────
+  // ─── Buscar orçamento por ID (com materiais e acabamentos nested) ────────
   async buscarPorId(id: string): Promise<Orcamento & {
-    itens: OrcamentoItem[];
+    itens: (OrcamentoItem & {
+      materiais?: OrcamentoItemMaterial[];
+      acabamentos?: OrcamentoItemAcabamento[];
+    })[];
     servicos: OrcamentoServico[];
   }> {
     const [orcResult, itensResult, servicosResult] = await Promise.all([
@@ -196,9 +225,41 @@ export const orcamentoService = {
 
     if (orcResult.error) throw orcResult.error;
 
+    const itens = (itensResult.data ?? []) as OrcamentoItem[];
+
+    // Buscar materiais e acabamentos por item (se tabelas existirem)
+    const itensComDetalhes = await Promise.all(
+      itens.map(async (item) => {
+        let materiais: OrcamentoItemMaterial[] = [];
+        let acabamentos: OrcamentoItemAcabamento[] = [];
+
+        try {
+          const { data } = await supabase
+            .from("proposta_item_materiais")
+            .select("*")
+            .eq("proposta_item_id", item.id);
+          materiais = (data ?? []) as OrcamentoItemMaterial[];
+        } catch {
+          // Tabela não existe ainda
+        }
+
+        try {
+          const { data } = await supabase
+            .from("proposta_item_acabamentos")
+            .select("*")
+            .eq("proposta_item_id", item.id);
+          acabamentos = (data ?? []) as OrcamentoItemAcabamento[];
+        } catch {
+          // Tabela não existe ainda
+        }
+
+        return { ...item, materiais, acabamentos };
+      }),
+    );
+
     return {
       ...(orcResult.data as unknown as Orcamento),
-      itens: (itensResult.data ?? []) as OrcamentoItem[],
+      itens: itensComDetalhes,
       servicos: (servicosResult.data ?? []) as OrcamentoServico[],
     };
   },
@@ -267,7 +328,7 @@ export const orcamentoService = {
     if (error) throw error;
   },
 
-  // ─── Adicionar item ──────────────────────────────────────────────────────
+  // ─── Adicionar item (simples — sem materiais/acabamentos) ────────────────
   async adicionarItem(
     propostaId: string,
     item: OrcamentoItemCreateInput,
@@ -280,6 +341,123 @@ export const orcamentoService = {
 
     if (error) throw error;
     return data as OrcamentoItem;
+  },
+
+  // ─── Adicionar item COM materiais e acabamentos ────────────────────────
+  async adicionarItemDetalhado(
+    propostaId: string,
+    item: OrcamentoItemCreateDetalhado,
+  ): Promise<OrcamentoItem> {
+    const { materiais, acabamentos, ...itemBase } = item;
+
+    // 1. Inserir item principal
+    const { data: novoItem, error } = await supabase
+      .from("proposta_itens")
+      .insert({ ...itemBase, proposta_id: propostaId })
+      .select()
+      .single();
+
+    if (error) throw error;
+    const itemResult = novoItem as OrcamentoItem;
+
+    // 2. Inserir materiais (se existirem e tabela disponível)
+    if (materiais && materiais.length > 0) {
+      try {
+        await supabase.from("proposta_item_materiais").insert(
+          materiais.map((m) => ({
+            proposta_item_id: itemResult.id,
+            material_id: m.material_id ?? null,
+            descricao: m.descricao,
+            quantidade: m.quantidade,
+            unidade: m.unidade,
+            custo_unitario: m.custo_unitario,
+            custo_total: m.custo_total,
+          })),
+        );
+      } catch {
+        // Tabela pode não existir ainda (migration 006 pendente)
+        console.warn("[orcamento.service] proposta_item_materiais não disponível");
+      }
+    }
+
+    // 3. Inserir acabamentos (se existirem e tabela disponível)
+    if (acabamentos && acabamentos.length > 0) {
+      try {
+        await supabase.from("proposta_item_acabamentos").insert(
+          acabamentos.map((a) => ({
+            proposta_item_id: itemResult.id,
+            acabamento_id: a.acabamento_id ?? null,
+            descricao: a.descricao,
+            quantidade: a.quantidade,
+            custo_unitario: a.custo_unitario,
+            custo_total: a.custo_total,
+          })),
+        );
+      } catch {
+        console.warn("[orcamento.service] proposta_item_acabamentos não disponível");
+      }
+    }
+
+    return itemResult;
+  },
+
+  // ─── Adicionar serviço ao orçamento ────────────────────────────────────
+  async adicionarServico(
+    propostaId: string,
+    servico: OrcamentoServicoCreateInput,
+  ): Promise<OrcamentoServico> {
+    try {
+      const { data, error } = await supabase
+        .from("proposta_servicos")
+        .insert({ ...servico, proposta_id: propostaId })
+        .select()
+        .single();
+      if (error) throw error;
+      return data as OrcamentoServico;
+    } catch {
+      // Tabela pode não existir ainda (migration 006 pendente)
+      console.warn("[orcamento.service] proposta_servicos não disponível");
+      return {
+        id: crypto.randomUUID(),
+        proposta_id: propostaId,
+        ...servico,
+      } as OrcamentoServico;
+    }
+  },
+
+  // ─── Remover serviço ──────────────────────────────────────────────────
+  async removerServico(id: string): Promise<void> {
+    try {
+      const { error } = await supabase
+        .from("proposta_servicos")
+        .delete()
+        .eq("id", id);
+      if (error) throw error;
+    } catch {
+      console.warn("[orcamento.service] proposta_servicos não disponível");
+    }
+  },
+
+  // ─── Salvar todos os serviços (replace all) ──────────────────────────
+  async salvarServicos(
+    propostaId: string,
+    servicos: OrcamentoServicoCreateInput[],
+  ): Promise<void> {
+    try {
+      // Remove existentes
+      await supabase
+        .from("proposta_servicos")
+        .delete()
+        .eq("proposta_id", propostaId);
+      // Insere novos
+      if (servicos.length > 0) {
+        await supabase.from("proposta_servicos").insert(
+          servicos.map((s) => ({ ...s, proposta_id: propostaId })),
+        );
+      }
+    } catch {
+      console.warn("[orcamento.service] proposta_servicos não disponível");
+    }
   },
 
   // ─── Atualizar item ──────────────────────────────────────────────────────

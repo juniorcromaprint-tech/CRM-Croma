@@ -1,5 +1,12 @@
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
-import { orcamentoService, type OrcamentoFiltros, type OrcamentoCreateInput, type OrcamentoItemCreateInput } from "../services/orcamento.service";
+import {
+  orcamentoService,
+  type OrcamentoFiltros,
+  type OrcamentoCreateInput,
+  type OrcamentoItemCreateInput,
+  type OrcamentoItemCreateDetalhado,
+  type OrcamentoServicoCreateInput,
+} from "../services/orcamento.service";
 import { showSuccess, showError } from "@/utils/toast";
 
 export const ORCAMENTOS_QUERY_KEY = "orcamentos";
@@ -81,6 +88,35 @@ export function useAdicionarItemOrcamento() {
       qc.invalidateQueries({ queryKey: [ORCAMENTOS_QUERY_KEY, propostaId] });
     },
     onError: (err: Error) => showError(err.message || "Erro ao adicionar item"),
+  });
+}
+
+// ─── Adicionar item detalhado (com materiais + acabamentos) ──────────────────
+
+export function useAdicionarItemDetalhado() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: ({ propostaId, item }: { propostaId: string; item: OrcamentoItemCreateDetalhado }) =>
+      orcamentoService.adicionarItemDetalhado(propostaId, item),
+    onSuccess: (_data, { propostaId }) => {
+      qc.invalidateQueries({ queryKey: [ORCAMENTOS_QUERY_KEY, propostaId] });
+      showSuccess("Item adicionado com sucesso!");
+    },
+    onError: (err: Error) => showError(err.message || "Erro ao adicionar item"),
+  });
+}
+
+// ─── Salvar serviços do orçamento ────────────────────────────────────────────
+
+export function useSalvarServicos() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: ({ propostaId, servicos }: { propostaId: string; servicos: OrcamentoServicoCreateInput[] }) =>
+      orcamentoService.salvarServicos(propostaId, servicos),
+    onSuccess: (_data, { propostaId }) => {
+      qc.invalidateQueries({ queryKey: [ORCAMENTOS_QUERY_KEY, propostaId] });
+    },
+    onError: (err: Error) => showError(err.message || "Erro ao salvar serviços"),
   });
 }
 
