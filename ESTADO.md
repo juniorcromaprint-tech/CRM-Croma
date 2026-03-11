@@ -76,6 +76,9 @@ Supabase (Postgres + Auth + Storage + Edge Functions)
 | `src/domains/comercial/pages/OrcamentoEditorPage.tsx` | Wizard 3 passos, auto-popula materiais do modelo |
 | `src/domains/admin/pages/AdminProdutosPage.tsx` | CRUD completo (não é mais read-only) |
 | `src/domains/comercial/hooks/useProdutosModelos.ts` | CRUD + salvar materiais/processos do modelo |
+| `src/domains/comercial/pages/OrcamentosPage.tsx` | KPI cards (total, pendentes, aprovados, valor em aberto) + botão delete admin override |
+| `src/domains/pedidos/pages/PedidosPage.tsx` | Botão delete admin (Trash2) com AlertDialog + soft delete |
+| `src/domains/estoque/pages/EstoquePage.tsx` | Semáforo: filtro por status (🔴Crítico/🟡Baixo/🟢OK), KPI Críticos separado |
 
 ### Páginas do ERP (tender-archimedes.vercel.app)
 | Rota | Página | Status |
@@ -166,3 +169,4 @@ src/domains/{dominio}/
 | 2026-03-10 | Criado este arquivo ESTADO.md para controle de sessões |
 | 2026-03-10 | Implementado plano completo: pricing bugs corrigidos, orcamento.service, editor wizard, AdminProdutos CRUD, migrations 010-014 commitadas |
 | 2026-03-11 | Executadas todas as migrations 010-014 no Supabase. Patch centros_custo/plano_contas. Fix enum linha_qualidade na 014. Banco 100% populado. |
+| 2026-03-11 | Melhorias Mubisys Layer 3: KPI cards em OrcamentosPage, botão delete admin em PedidosPage, semáforo de estoque (filtro 🔴🟡🟢 + KPI Críticos) em EstoquePage. TSC limpo. |

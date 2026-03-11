@@ -1,6 +1,6 @@
-import React, { useState } from "react";
+import React, { useState, useMemo } from "react";
 import { Link, useNavigate } from "react-router-dom";
-import { Plus, Search, FileText, Copy, Trash2, ArrowRight, Loader2, Eye } from "lucide-react";
+import { Plus, Search, FileText, Copy, Trash2, ArrowRight, Loader2, Eye, TrendingUp, CheckCircle2, Clock, DollarSign } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
@@ -37,8 +37,19 @@ export default function OrcamentosPage() {
   };
 
   const { data: orcamentos = [], isLoading } = useOrcamentos(filtros);
+  const { data: todos = [] } = useOrcamentos();
   const excluir = useExcluirOrcamento();
   const duplicar = useDuplicarOrcamento();
+
+  const kpis = useMemo(() => {
+    const total = todos.length;
+    const pendentes = todos.filter((o) => o.status === "enviada" || o.status === "em_revisao").length;
+    const aprovados = todos.filter((o) => o.status === "aprovada").length;
+    const valorAberto = todos
+      .filter((o) => o.status === "enviada" || o.status === "em_revisao")
+      .reduce((acc, o) => acc + (o.total ?? 0), 0);
+    return { total, pendentes, aprovados, valorAberto };
+  }, [todos]);
 
   const handleNovo = () => {
     navigate("/orcamentos/novo");
@@ -68,6 +79,54 @@ export default function OrcamentosPage() {
         >
           <Plus size={20} className="mr-2" /> Novo Orçamento
         </Button>
+      </div>
+
+      {/* KPIs */}
+      <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+        <div className="bg-white rounded-2xl p-4 shadow-sm border border-slate-100">
+          <div className="flex items-center gap-3">
+            <div className="w-10 h-10 bg-blue-50 rounded-xl flex items-center justify-center">
+              <FileText size={20} className="text-blue-600" />
+            </div>
+            <div>
+              <p className="text-2xl font-bold text-slate-800">{isLoading ? "..." : kpis.total}</p>
+              <p className="text-xs text-slate-500">Total de orçamentos</p>
+            </div>
+          </div>
+        </div>
+        <div className="bg-white rounded-2xl p-4 shadow-sm border border-slate-100">
+          <div className="flex items-center gap-3">
+            <div className="w-10 h-10 bg-amber-50 rounded-xl flex items-center justify-center">
+              <Clock size={20} className="text-amber-600" />
+            </div>
+            <div>
+              <p className="text-2xl font-bold text-slate-800">{isLoading ? "..." : kpis.pendentes}</p>
+              <p className="text-xs text-slate-500">Aguardando resposta</p>
+            </div>
+          </div>
+        </div>
+        <div className="bg-white rounded-2xl p-4 shadow-sm border border-slate-100">
+          <div className="flex items-center gap-3">
+            <div className="w-10 h-10 bg-emerald-50 rounded-xl flex items-center justify-center">
+              <CheckCircle2 size={20} className="text-emerald-600" />
+            </div>
+            <div>
+              <p className="text-2xl font-bold text-slate-800">{isLoading ? "..." : kpis.aprovados}</p>
+              <p className="text-xs text-slate-500">Aprovados</p>
+            </div>
+          </div>
+        </div>
+        <div className="bg-white rounded-2xl p-4 shadow-sm border border-slate-100">
+          <div className="flex items-center gap-3">
+            <div className="w-10 h-10 bg-indigo-50 rounded-xl flex items-center justify-center">
+              <DollarSign size={20} className="text-indigo-600" />
+            </div>
+            <div>
+              <p className="text-xl font-bold text-slate-800 leading-tight">{isLoading ? "..." : brl(kpis.valorAberto)}</p>
+              <p className="text-xs text-slate-500">Valor em aberto</p>
+            </div>
+          </div>
+        </div>
       </div>
 
       {/* Filters */}

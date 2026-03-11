@@ -290,6 +290,7 @@ export default function EstoquePage() {
   // ─── Material state ─────────────────────────────────────────────────────
   const [searchMat, setSearchMat] = useState("");
   const [filterCategoria, setFilterCategoria] = useState<string>("todas");
+  const [filterStatus, setFilterStatus] = useState<"todos" | "ok" | "baixo" | "critico">("todos");
   const [sortKey, setSortKey] = useState<SortKey>("nome");
   const [sortAsc, setSortAsc] = useState(true);
   const [createDialogOpen, setCreateDialogOpen] = useState(false);
@@ -552,6 +553,10 @@ export default function EstoquePage() {
     if (filterCategoria !== "todas") {
       list = list.filter((m) => m.categoria === filterCategoria);
     }
+    // Semáforo filter
+    if (filterStatus !== "todos") {
+      list = list.filter((m) => getStatus(m) === filterStatus);
+    }
     // Sort
     list.sort((a, b) => {
       if (sortKey === "nome") {
@@ -563,7 +568,7 @@ export default function EstoquePage() {
       return sortAsc ? cmp : -cmp;
     });
     return list;
-  }, [materiais, searchMat, filterCategoria, sortKey, sortAsc]);
+  }, [materiais, searchMat, filterCategoria, filterStatus, sortKey, sortAsc]);
 
   const filteredMovimentacoes = useMemo(() => {
     let list = [...movimentacoes];
@@ -591,13 +596,10 @@ export default function EstoquePage() {
       const preco = Number(m.preco_medio) || 0;
       return acc + saldo * preco;
     }, 0);
-    const abaixoMinimo = ativos.filter((m) => {
-      const saldo = getSaldo(m);
-      const min = Number(m.estoque_minimo) || 0;
-      return min > 0 && saldo < min;
-    }).length;
+    const criticos = ativos.filter((m) => getStatus(m) === "critico").length;
+    const abaixoMinimo = ativos.filter((m) => getStatus(m) === "baixo").length;
     const comReserva = ativos.filter((m) => getReservado(m) > 0).length;
-    return { totalMat, valorTotal, abaixoMinimo, comReserva };
+    return { totalMat, valorTotal, criticos, abaixoMinimo, comReserva };
   }, [materiais]);
 
   // ==========================================================================
@@ -863,21 +865,22 @@ export default function EstoquePage() {
                 sub="custo medio x saldo"
               />
               <KpiCard
-                label="Abaixo do Minimo"
-                value={String(kpis.abaixoMinimo)}
+                label="Criticos (Sem Estoque)"
+                value={String(kpis.criticos)}
                 icon={AlertTriangle}
-                iconBg={kpis.abaixoMinimo > 0 ? "bg-red-50" : "bg-slate-50"}
-                iconColor={kpis.abaixoMinimo > 0 ? "text-red-600" : "text-slate-400"}
-                sub={kpis.abaixoMinimo > 0 ? "Requer atencao!" : "Tudo em dia"}
-                subColor={kpis.abaixoMinimo > 0 ? "text-red-600" : "text-emerald-600"}
+                iconBg={kpis.criticos > 0 ? "bg-red-50" : "bg-slate-50"}
+                iconColor={kpis.criticos > 0 ? "text-red-600" : "text-slate-400"}
+                sub={kpis.criticos > 0 ? "Sem estoque!" : "Tudo em dia"}
+                subColor={kpis.criticos > 0 ? "text-red-600" : "text-emerald-600"}
               />
               <KpiCard
-                label="Itens Reservados"
-                value={String(kpis.comReserva)}
+                label="Abaixo do Minimo"
+                value={String(kpis.abaixoMinimo)}
                 icon={BookmarkCheck}
-                iconBg="bg-amber-50"
-                iconColor="text-amber-600"
-                sub="com reserva ativa"
+                iconBg={kpis.abaixoMinimo > 0 ? "bg-amber-50" : "bg-slate-50"}
+                iconColor={kpis.abaixoMinimo > 0 ? "text-amber-600" : "text-slate-400"}
+                sub={kpis.abaixoMinimo > 0 ? "Repor em breve" : "Acima do minimo"}
+                subColor={kpis.abaixoMinimo > 0 ? "text-amber-600" : "text-emerald-600"}
               />
             </div>
           )}
@@ -909,6 +912,17 @@ export default function EstoquePage() {
                       {c.label}
                     </SelectItem>
                   ))}
+                </SelectContent>
+              </Select>
+              <Select value={filterStatus} onValueChange={(v) => setFilterStatus(v as typeof filterStatus)}>
+                <SelectTrigger className="w-[150px] rounded-xl border-slate-200">
+                  <SelectValue placeholder="Semaforo" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="todos">🔵 Todos</SelectItem>
+                  <SelectItem value="critico">🔴 Critico</SelectItem>
+                  <SelectItem value="baixo">🟡 Baixo</SelectItem>
+                  <SelectItem value="ok">🟢 OK</SelectItem>
                 </SelectContent>
               </Select>
               <Button
