@@ -51,6 +51,17 @@ import FiscalConfiguracaoPage from "@/domains/fiscal/pages/FiscalConfiguracaoPag
 import FiscalCertificadoPage from "@/domains/fiscal/pages/FiscalCertificadoPage";
 import FiscalAuditoriaPage from "@/domains/fiscal/pages/FiscalAuditoriaPage";
 
+// ---- Fase 1-3 Domain Pages ----
+import FaturamentoLotePage from "@/domains/financeiro/pages/FaturamentoLotePage";
+import AlmoxarifePage from "@/domains/producao/pages/AlmoxarifePage";
+import DiarioBordoPage from "@/domains/producao/pages/DiarioBordoPage";
+import TvPage from "@/domains/producao/pages/TvPage";
+import RelatoriosPage from "@/domains/admin/pages/RelatoriosPage";
+import ConciliacaoPage from "@/domains/financeiro/pages/ConciliacaoPage";
+import CalendarioPage from "@/domains/comercial/pages/CalendarioPage";
+import CampanhasPage from "@/domains/comercial/pages/CampanhasPage";
+import ProgressoPage from "@/domains/admin/pages/ProgressoPage";
+
 // ---- Legacy pages (still usable) ----
 import ClienteDetailPage from "@/domains/clientes/pages/ClienteDetailPage";
 import Produtos from "./pages/Produtos";
@@ -81,6 +92,9 @@ const App = () => (
         <Sonner />
         <BrowserRouter>
           <Routes>
+            {/* ===== TV — fullscreen sem sidebar ===== */}
+            <Route path="/tv" element={<TvPage />} />
+
             {/* Layout com sidebar — todas as rotas dentro */}
             <Route
               path="/"
@@ -101,6 +115,8 @@ const App = () => (
               <Route path="orcamentos/:id" element={<OrcamentoViewPage />} />
               <Route path="orcamentos/:id/editar" element={<OrcamentoEditorPage />} />
               <Route path="propostas" element={<PropostasPage />} />
+              <Route path="calendario" element={<CalendarioPage />} />
+              <Route path="campanhas" element={<CampanhasPage />} />
 
               {/* ===== CLIENTES ===== */}
               <Route path="clientes" element={<ClientesPage />} />
@@ -111,6 +127,8 @@ const App = () => (
               <Route path="pedidos/:id" element={<PedidoDetailPage />} />
               <Route path="producao" element={<ProducaoPage />} />
               <Route path="instalacoes" element={<InstalacaoPage />} />
+              <Route path="almoxarife" element={<AlmoxarifePage />} />
+              <Route path="producao/diario-bordo" element={<DiarioBordoPage />} />
 
               {/* ===== SUPRIMENTOS ===== */}
               <Route path="estoque" element={<EstoquePage />} />
@@ -121,6 +139,8 @@ const App = () => (
               <Route path="financeiro" element={<FinanceiroPage />} />
               <Route path="dre" element={<DrePage />} />
               <Route path="comissoes" element={<ComissoesPage />} />
+              <Route path="financeiro/faturamento" element={<FaturamentoLotePage />} />
+              <Route path="financeiro/conciliacao" element={<ConciliacaoPage />} />
 
               {/* ===== QUALIDADE ===== */}
               <Route path="ocorrencias" element={<OcorrenciasPage />} />
@@ -142,6 +162,8 @@ const App = () => (
               <Route path="admin/setup" element={<AdminSetupPage />} />
               <Route path="admin/centros-custo" element={<AdminCentrosCustoPage />} />
               <Route path="admin/plano-contas" element={<AdminPlanoContasPage />} />
+              <Route path="relatorios" element={<RelatoriosPage />} />
+              <Route path="admin/progresso" element={<ProgressoPage />} />
 
               {/* ===== SETTINGS ===== */}
               <Route path="settings" element={<Settings />} />
