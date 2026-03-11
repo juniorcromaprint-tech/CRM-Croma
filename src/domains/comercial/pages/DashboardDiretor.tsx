@@ -1,5 +1,6 @@
 import React from "react";
 import { Link } from "react-router-dom";
+import { ProgressTracker } from "@/shared/components/ProgressTracker";
 import {
   Building2, UserPlus, TrendingUp, FileText, Package, Factory,
   Truck, Wallet, DollarSign, AlertTriangle, Wrench,
@@ -331,6 +332,9 @@ export default function DashboardDiretor() {
         <MetricPill label="Estoque" value={estoque?.total ?? 0} icon={<ShoppingCart size={16} />} alert={(estoque?.criticos ?? 0) > 0} to="/estoque" />
         <MetricPill label="Ocorrências" value={qual?.abertas ?? 0} icon={<Wrench size={16} />} color={qual?.criticas ? "text-red-600" : "text-slate-600"} alert={(qual?.criticas ?? 0) > 0} to="/ocorrencias" />
       </div>
+
+      {/* ─── ERP Progress Widget ─── */}
+      <ProgressTracker compact />
 
       {/* ─── Main Content: 2 columns ─── */}
       <div className="grid grid-cols-1 lg:grid-cols-5 gap-6">
