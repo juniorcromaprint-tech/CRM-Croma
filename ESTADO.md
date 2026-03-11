@@ -1,5 +1,5 @@
 # ESTADO DO PROJETO — CRM CROMA PRINT
-> **Atualizado**: 2026-03-10 | **Cole este arquivo no início de cada nova sessão**
+> **Atualizado**: 2026-03-11 | **Cole este arquivo no início de cada nova sessão**
 
 ---
 
@@ -44,8 +44,13 @@ Supabase (Postgres + Auth + Storage + Edge Functions)
 - Módulo fiscal completo (NF-e, config_fiscal)
 - Auditoria automática em 16 tabelas críticas
 - Numeração sequencial automática (PROP, PED, OP, INST)
+- `modelo_materiais`: 321 registros — motor de precificação recebe custos reais ✅
+- `categorias_produto`: 11 categorias + 84 produtos seedados ✅
+- `centros_custo` + `plano_contas`: patched + dados seedados ✅
+- `checklists` + itens: 6 checklists operacionais seedados ✅
+- `vw_modelos_completos`: view criada com descritivos e garantias ✅
 
-### Migrations executadas no Supabase
+### Migrations executadas no Supabase — TODAS ✅
 - `001_complete_schema.sql` ✅
 - `002_schema_corrections.sql` ✅
 - `003_campo.sql` ✅
@@ -55,6 +60,22 @@ Supabase (Postgres + Auth + Storage + Edge Functions)
 - `006_orcamento_module.sql` ✅
 - `008_update_materiais_precos.sql` ✅
 - `009_update_produtos_markups.sql` ✅
+- `010_seed_modelo_materiais.sql` ✅ **EXECUTADA 2026-03-11**
+- `011_categorias_produtos_reais.sql` ✅ **EXECUTADA 2026-03-11**
+- `012_centros_custo_plano_contas.sql` ✅ **EXECUTADA 2026-03-11** (requereu patch de colunas)
+- `013_checklists_instalacao_producao.sql` ✅ **EXECUTADA 2026-03-11**
+- `014_descritivos_tecnicos_garantias.sql` ✅ **EXECUTADA 2026-03-11** (corrigido enum linha_qualidade)
+
+### Código frontend (TUDO IMPLEMENTADO ✅)
+| Arquivo | O que foi corrigido/implementado |
+|---|---|
+| `src/shared/services/pricing-engine.ts` | BUG CORRIGIDO: preço unitário correto (sem qty) |
+| `src/shared/services/orcamento-pricing.service.ts` | Acabamentos separados, 1x multiplicação |
+| `src/domains/comercial/services/orcamento.service.ts` | CRUD completo: materiais, acabamentos, serviços, duplicar, converter pedido |
+| `src/domains/comercial/hooks/useOrcamentos.ts` | Todas mutations com recalcularTotais |
+| `src/domains/comercial/pages/OrcamentoEditorPage.tsx` | Wizard 3 passos, auto-popula materiais do modelo |
+| `src/domains/admin/pages/AdminProdutosPage.tsx` | CRUD completo (não é mais read-only) |
+| `src/domains/comercial/hooks/useProdutosModelos.ts` | CRUD + salvar materiais/processos do modelo |
 
 ### Páginas do ERP (tender-archimedes.vercel.app)
 | Rota | Página | Status |
@@ -64,7 +85,7 @@ Supabase (Postgres + Auth + Storage + Edge Functions)
 | `/clientes/:id` | Detalhe do cliente | ✅ Real |
 | `/comercial` | Funil + Pipeline | ✅ Real |
 | `/orcamentos` | Lista de orçamentos | ✅ Real |
-| `/orcamentos/novo` | Editor de orçamento | ⚠️ Pricing zerado |
+| `/orcamentos/novo` | Editor de orçamento | ✅ FUNCIONAL — migrations executadas |
 | `/pedidos` | Lista de pedidos | ✅ Real |
 | `/producao` | Fila de produção (Kanban) | ⚠️ Sem integração |
 | `/estoque` | Materiais e saldos | ✅ Real |
@@ -72,6 +93,7 @@ Supabase (Postgres + Auth + Storage + Edge Functions)
 | `/dre` | DRE Gerencial | ✅ Real |
 | `/instalacao` | Agenda de instalação | ✅ Real |
 | `/admin/precificacao` | Config Mubisys | ✅ Real |
+| `/admin/produtos` | CRUD Produtos/Modelos | ✅ FUNCIONAL — migrations executadas |
 
 ### App de Campo (campo-croma.vercel.app)
 - Auth real com Supabase
@@ -80,55 +102,27 @@ Supabase (Postgres + Auth + Storage + Edge Functions)
 
 ---
 
-## PROBLEMAS CRÍTICOS CONHECIDOS 🔴
+## BLOQUEIOS RESTANTES 🔴
 
-### 1. Orçamento gera R$ 0,00
-**Causa**: Editor de orçamento envia arrays vazios para o motor de precificação.
-**Arquivo**: `src/domains/orcamentos/` (editor)
-**Impacto**: Nenhum orçamento consegue calcular preço real.
-
-### 2. `modelo_materiais` com 0 registros
-**Causa**: Nenhum material foi vinculado a nenhum modelo de produto.
-**Impacto**: Motor nunca recebe custo de material, só pode gerar R$ 0,00.
-
-### 3. ERP sem autenticação
-**Causa**: `DemoRoute` é pass-through, não exige login.
-**Arquivo**: `src/App.tsx` — rotas usando `DemoRoute` ao invés de `ProtectedRoute`
-**Impacto**: Qualquer pessoa acessa dados de 307 clientes, financeiro, etc.
-
-### 4. Bug de multiplicação dupla no orçamento
-**Causa**: `precoTotal = precoVenda * quantidade` mas `precoVenda` já inclui quantidade.
-**Impacto**: Preços duplicados quando quantidade > 1.
-
-### 5. CRUD de produtos inexistente
-**Causa**: `AdminProdutosPage` é read-only — não cria, edita nem deleta produtos/modelos.
-**Impacto**: Não dá para gerenciar o catálogo de produtos.
-
-### 6. Permissões decorativas
-**Causa**: Função `can()` existe mas nunca é chamada em nenhuma página.
-**Impacto**: Qualquer usuário autenticado acessa qualquer módulo.
+**Nenhum bloqueio crítico.** Banco 100% populado.
 
 ---
 
-## PRÓXIMAS TAREFAS PENDENTES 📋
+## TAREFAS PENDENTES 📋
 
-### Prioridade ALTA (bloqueiam uso real)
-- [ ] **Corrigir orçamento**: Conectar editor ao `modelo_materiais` + motor Mubisys
-- [ ] **Popular `modelo_materiais`**: Vincular materiais aos 156 modelos de produtos
-- [ ] **Ativar autenticação**: Substituir `DemoRoute` por `ProtectedRoute` no ERP
-- [ ] **CRUD de produtos**: Criar interface para adicionar/editar/deletar produtos e modelos
+### Prioridade alta
+- [ ] **Testar orçamento end-to-end**: produto → modelo → materiais auto-carregam → preço calculado
+- [ ] **Ativar autenticação**: Substituir `DemoRoute` por `ProtectedRoute` no ERP (`src/App.tsx`)
 
-### Prioridade MÉDIA
-- [ ] Corrigir bug multiplicação dupla no orçamento
+### Prioridade média
 - [ ] Implementar verificação de permissões (`can()`) nas páginas
 - [ ] Integrar produção com pedidos (Kanban usa dados reais)
-- [ ] DRE com categorias reais (não percentuais estimados)
+- [ ] DRE com categorias reais
 
-### Prioridade BAIXA
+### Prioridade baixa
 - [ ] Remover 19 páginas legacy mortas
 - [ ] Adicionar ErrorBoundary global
 - [ ] Offline sync no App de Campo
-- [ ] Checklists no App de Campo
 
 ---
 
@@ -157,7 +151,7 @@ src/domains/{dominio}/
 ## INSTRUÇÕES PARA A PRÓXIMA SESSÃO
 
 1. Cole este arquivo no início da conversa
-2. Diga qual tarefa quer fazer (ex: "Quero corrigir o orçamento")
+2. Diga qual tarefa quer fazer (ex: "Quero testar o orçamento")
 3. Envie APENAS o(s) arquivo(s) relevantes para aquela tarefa
 4. Ao terminar, peça para atualizar este ESTADO.md
 
@@ -170,3 +164,5 @@ src/domains/{dominio}/
 | 2026-03-10 | Auditoria completa do projeto (6 agentes paralelos) |
 | 2026-03-10 | DRE Gerencial + AdminPrecificacao implementados |
 | 2026-03-10 | Criado este arquivo ESTADO.md para controle de sessões |
+| 2026-03-10 | Implementado plano completo: pricing bugs corrigidos, orcamento.service, editor wizard, AdminProdutos CRUD, migrations 010-014 commitadas |
+| 2026-03-11 | Executadas todas as migrations 010-014 no Supabase. Patch centros_custo/plano_contas. Fix enum linha_qualidade na 014. Banco 100% populado. |

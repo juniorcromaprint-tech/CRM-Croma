@@ -22,7 +22,7 @@ UPDATE produto_modelos pm SET
   descritivo_nf        = 'Adesivo RE 1ª linha Oracal p/ Vinil colorido polimérico c/ RE em plotter',
   garantia_meses       = 24,
   garantia_descricao   = '2 anos da cola e desbotamento',
-  linha_qualidade      = '1a'
+  linha_qualidade      = 'primeira'
 FROM produtos p
 WHERE pm.produto_id = p.id
   AND p.codigo      = 'ADRE-001'
@@ -34,7 +34,7 @@ UPDATE produto_modelos pm SET
   descritivo_nf        = 'Adesivo RE 2ª linha Goldmax vinil colorido opaco c/ RE em plotter',
   garantia_meses       = 6,
   garantia_descricao   = '6 meses da cola e desbotamento',
-  linha_qualidade      = '2a'
+  linha_qualidade      = 'segunda'
 FROM produtos p
 WHERE pm.produto_id = p.id
   AND p.codigo      = 'ADRE-001'
@@ -63,7 +63,7 @@ UPDATE produto_modelos pm SET
   descritivo_nf        = 'Placa ACM 3mm poliéster + imp. solvente 720dpi + película Oracal 651',
   garantia_meses       = 18,
   garantia_descricao   = '18 meses da cola e desbotamento (via QR CODE)',
-  linha_qualidade      = '1a'
+  linha_qualidade      = 'primeira'
 FROM produtos p
 WHERE pm.produto_id = p.id
   AND p.codigo      = 'PACM-001'
@@ -75,7 +75,7 @@ UPDATE produto_modelos pm SET
   descritivo_nf        = 'Placa ACM 3mm poliéster + impressão digital solvente 720dpi',
   garantia_meses       = 6,
   garantia_descricao   = '6 meses da cola e desbotamento (via QR CODE)',
-  linha_qualidade      = '2a'
+  linha_qualidade      = 'segunda'
 FROM produtos p
 WHERE pm.produto_id = p.id
   AND p.codigo      = 'PACM-001'
@@ -92,7 +92,7 @@ UPDATE produto_modelos pm SET
   descritivo_nf        = 'Placa PVC expandido 3mm + imp.solvente 720dpi + película Oracal 651',
   garantia_meses       = 18,
   garantia_descricao   = '18 meses da cola e desbotamento (via QR CODE)',
-  linha_qualidade      = '1a'
+  linha_qualidade      = 'primeira'
 FROM produtos p
 WHERE pm.produto_id = p.id
   AND p.codigo      = 'PPVC-001'
@@ -104,7 +104,7 @@ UPDATE produto_modelos pm SET
   descritivo_nf        = 'Placa PVC expandido 3mm + impressão digital solvente 720dpi',
   garantia_meses       = 6,
   garantia_descricao   = '6 meses da cola e desbotamento (via QR CODE)',
-  linha_qualidade      = '2a'
+  linha_qualidade      = 'segunda'
 FROM produtos p
 WHERE pm.produto_id = p.id
   AND p.codigo      = 'PPVC-001'
@@ -121,7 +121,7 @@ UPDATE produto_modelos pm SET
   descritivo_nf        = 'Revestimento ACM Poliéster 3mm c/ estrutura galv.20x20mm e fixação VHB 3M',
   garantia_meses       = 24,
   garantia_descricao   = '2 anos da estrutura e comunicação',
-  linha_qualidade      = '1a'
+  linha_qualidade      = 'primeira'
 FROM produtos p
 WHERE pm.produto_id = p.id
   AND p.codigo      = 'FACM-001'
@@ -150,7 +150,7 @@ UPDATE produto_modelos pm SET
   descritivo_nf        = 'Lona Front 380g UV LED 1440dpi + ilhós latão',
   garantia_meses       = 24,
   garantia_descricao   = '2 anos de desbotamento (garantia externa)',
-  linha_qualidade      = '1a'
+  linha_qualidade      = 'primeira'
 FROM produtos p
 WHERE pm.produto_id = p.id
   AND p.codigo      = 'LONIH-001'
@@ -162,7 +162,7 @@ UPDATE produto_modelos pm SET
   descritivo_nf        = 'Lona Front 440g solvente 720dpi + ilhós metálico',
   garantia_meses       = 6,
   garantia_descricao   = '6 meses de desbotamento (garantia externa)',
-  linha_qualidade      = '2a'
+  linha_qualidade      = 'segunda'
 FROM produtos p
 WHERE pm.produto_id = p.id
   AND p.codigo      = 'LONIH-001'
@@ -179,7 +179,7 @@ UPDATE produto_modelos pm SET
   descritivo_nf        = 'Banner lona 440g solvente 720dpi c/ madeirite, ponteira e corda',
   garantia_meses       = 6,
   garantia_descricao   = '6 meses de desbotamento',
-  linha_qualidade      = '2a'
+  linha_qualidade      = 'segunda'
 FROM produtos p
 WHERE pm.produto_id = p.id
   AND p.codigo      = 'BAN-001';
@@ -196,7 +196,7 @@ UPDATE produto_modelos pm SET
   descritivo_nf        = 'Letreiro acrílico cristal <esp>mm c/ imp.solvente transparente e calço',
   garantia_meses       = 24,
   garantia_descricao   = '2 anos da fixação e comunicação',
-  linha_qualidade      = '1a'
+  linha_qualidade      = 'primeira'
 FROM produtos p
 WHERE pm.produto_id = p.id
   AND p.codigo      = 'LETAC-001';
@@ -214,7 +214,7 @@ UPDATE produto_modelos pm SET
   descritivo_nf        = 'Cartão visitas 300g couché + lam.BOPP fosca + verniz UV loc. 4x4',
   garantia_meses       = 0,
   garantia_descricao   = NULL,
-  linha_qualidade      = '1a'
+  linha_qualidade      = 'primeira'
 FROM produtos p
 WHERE pm.produto_id = p.id
   AND p.codigo      = 'CTV-001'
@@ -226,7 +226,7 @@ UPDATE produto_modelos pm SET
   descritivo_nf        = 'Cartão visitas 250g couché + verniz UV 4x4',
   garantia_meses       = 0,
   garantia_descricao   = NULL,
-  linha_qualidade      = '2a'
+  linha_qualidade      = 'segunda'
 FROM produtos p
 WHERE pm.produto_id = p.id
   AND p.codigo      = 'CTV-001'
@@ -255,7 +255,7 @@ UPDATE produto_modelos pm SET
   descritivo_nf        = 'Cavalete metálico galv.20x20mm pintado + lona 440g solvente 720dpi',
   garantia_meses       = 12,
   garantia_descricao   = '12 meses da estrutura e comunicação',
-  linha_qualidade      = '1a'
+  linha_qualidade      = 'primeira'
 FROM produtos p
 WHERE pm.produto_id = p.id
   AND p.codigo      = 'CAV-001';
@@ -272,7 +272,7 @@ UPDATE produto_modelos pm SET
   descritivo_nf        = 'Totem ACM Poliéster 3mm + estrutura galv. + LED LightForce + relé fotoelét.',
   garantia_meses       = 18,
   garantia_descricao   = '18 meses da comunicação e estrutura',
-  linha_qualidade      = '1a'
+  linha_qualidade      = 'primeira'
 FROM produtos p
 WHERE pm.produto_id = p.id
   AND p.codigo      = 'TOT-001';
@@ -289,7 +289,7 @@ UPDATE produto_modelos pm SET
   descritivo_nf        = 'Urna acrílico cristal c/ corte laser, Sinteglass, dobradiças e trava',
   garantia_meses       = 12,
   garantia_descricao   = '12 meses do produto',
-  linha_qualidade      = '1a'
+  linha_qualidade      = 'primeira'
 FROM produtos p
 WHERE pm.produto_id = p.id
   AND p.codigo      = 'URNA-001';
@@ -305,7 +305,7 @@ UPDATE produto_modelos pm SET
   descritivo_nf        = 'KIT Refletor LED 6500k + haste galv. pintada + fiação + acend.automático',
   garantia_meses       = 12,
   garantia_descricao   = '12 meses do produto',
-  linha_qualidade      = '1a'
+  linha_qualidade      = 'primeira'
 FROM produtos p
 WHERE pm.produto_id = p.id
   AND p.codigo      = 'KLED-001';
