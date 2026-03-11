@@ -25,6 +25,7 @@ const STATUS_CONFIG: Record<OrcamentoStatus, { label: string; cls: string }> = {
 export default function OrcamentosPage() {
   const navigate = useNavigate();
   const { profile } = useAuth();
+  const isAdmin = !profile?.role || profile.role === 'admin';
   const [search, setSearch] = useState("");
   const [statusFilter, setStatusFilter] = useState<OrcamentoStatus | "todos">("todos");
   const [deleteId, setDeleteId] = useState<string | null>(null);
@@ -173,12 +174,12 @@ export default function OrcamentosPage() {
                           >
                             <Copy size={15} />
                           </Button>
-                          {canDelete(orc.status) && (
+                          {(canDelete(orc.status) || isAdmin) && (
                             <Button
                               variant="ghost" size="icon"
                               className="h-8 w-8 rounded-xl text-slate-400 hover:text-red-600 hover:bg-red-50"
                               onClick={() => { setDeleteId(orc.id); setDeleteName(orc.titulo || orc.numero); }}
-                              title="Excluir"
+                              title={canDelete(orc.status) ? "Excluir" : "Excluir (Admin)"}
                             >
                               <Trash2 size={15} />
                             </Button>

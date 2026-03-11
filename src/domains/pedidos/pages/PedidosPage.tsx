@@ -58,7 +58,13 @@ import {
   ArrowRight,
   XCircle,
   ClipboardList,
+  Trash2,
 } from "lucide-react";
+import {
+  AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent,
+  AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle,
+} from "@/components/ui/alert-dialog";
+import { useAuth } from "@/contexts/AuthContext";
 
 // ---------------------------------------------------------------------------
 // TYPES
@@ -195,6 +201,8 @@ function SkeletonRow() {
 
 export default function PedidosPage() {
   const queryClient = useQueryClient();
+  const { profile } = useAuth();
+  const isAdmin = !profile?.role || profile.role === 'admin';
 
   // --- State ---
   const [searchTerm, setSearchTerm] = useState("");
@@ -202,6 +210,8 @@ export default function PedidosPage() {
   const [prioridadeFilter, setPrioridadeFilter] = useState<string>("all");
   const [isCreateOpen, setIsCreateOpen] = useState(false);
   const [selectedPedido, setSelectedPedido] = useState<PedidoRow | null>(null);
+  const [deleteId, setDeleteId] = useState<string | null>(null);
+  const [deleteName, setDeleteName] = useState("");
 
   // Hook for items of selected pedido (must be called unconditionally at top level)
   const { data: pedidoItens = [] } = usePedidoItens(selectedPedido?.id);
@@ -316,6 +326,22 @@ export default function PedidosPage() {
     onError: (err: Error) => {
       showError(`Erro ao atualizar status: ${err.message}`);
     },
+  });
+
+  const deleteMutation = useMutation({
+    mutationFn: async (id: string) => {
+      const { error } = await supabase
+        .from("pedidos")
+        .update({ excluido_em: new Date().toISOString(), excluido_por: profile?.id ?? null })
+        .eq("id", id);
+      if (error) throw error;
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["pedidos"] });
+      showSuccess("Pedido excluído!");
+      setDeleteId(null);
+    },
+    onError: (err: Error) => showError(`Erro ao excluir: ${err.message}`),
   });
 
   // =========================================================================
@@ -643,13 +669,22 @@ export default function PedidosPage() {
                       </div>
                     </div>
 
-                    {/* Right side: value + chevron */}
+                    {/* Right side: value + actions */}
                     <div className="flex items-center gap-3 flex-shrink-0">
                       <div className="text-right">
                         <p className="font-bold text-slate-800 text-lg">
                           {brl(pedido.valor_total ?? 0)}
                         </p>
                       </div>
+                      {isAdmin && (
+                        <button
+                          onClick={(e) => { e.stopPropagation(); setDeleteId(pedido.id); setDeleteName(pedido.numero); }}
+                          title="Excluir (Admin)"
+                          className="p-1.5 rounded-lg text-slate-300 hover:text-red-600 hover:bg-red-50 transition-colors opacity-0 group-hover:opacity-100"
+                        >
+                          <Trash2 size={16} />
+                        </button>
+                      )}
                       <ChevronRight
                         className="text-slate-300 group-hover:text-blue-600 transition-colors"
                         size={20}
@@ -1034,6 +1069,31 @@ export default function PedidosPage() {
           </DialogContent>
         )}
       </Dialog>
+
+      {/* ================================================================= */}
+      {/* DELETE DIALOG (Admin)                                             */}
+      {/* ================================================================= */}
+      <AlertDialog open={!!deleteId} onOpenChange={(open) => !open && setDeleteId(null)}>
+        <AlertDialogContent className="rounded-2xl max-w-md mx-4">
+          <AlertDialogHeader>
+            <AlertDialogTitle>Excluir Pedido</AlertDialogTitle>
+            <AlertDialogDescription>
+              Tem certeza que deseja excluir o pedido <strong>{deleteName}</strong>? Esta ação não pode ser desfeita.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter className="gap-2">
+            <AlertDialogCancel className="rounded-xl">Cancelar</AlertDialogCancel>
+            <AlertDialogAction
+              onClick={() => deleteId && deleteMutation.mutate(deleteId)}
+              disabled={deleteMutation.isPending}
+              className="rounded-xl bg-red-600 hover:bg-red-700 text-white"
+            >
+              {deleteMutation.isPending ? <Loader2 className="animate-spin mr-2" size={16} /> : null}
+              Excluir
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </div>
   );
 }
