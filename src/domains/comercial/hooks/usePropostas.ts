@@ -25,17 +25,12 @@ export interface Proposta {
   descricao: string | null
   observacoes: string | null
   excluido_em: string | null
+  excluido_por: string | null
   created_at: string
-  clientes?: { nome_fantasia: string | null; razao_social: string } | null
-}
-
-export interface PropostaCreateInput {
-  titulo: string
-  cliente_id?: string
-  valor_estimado?: number
-  probabilidade?: number
-  descricao?: string
-  observacoes?: string
+  updated_at: string
+  // joined
+  clientes?: { nome_fantasia: string | null; razao_social: string | null } | null
+  profiles?: { full_name: string | null } | null
 }
 
 export interface PropostaFilters {
@@ -43,27 +38,32 @@ export interface PropostaFilters {
   search?: string
 }
 
-// ─── Query Keys ─────────────────────────────────────────────────────────────
+// ─── Keys ────────────────────────────────────────────────────────────────────
 
 const KEY = 'propostas'
 
 // ─── Hooks ──────────────────────────────────────────────────────────────────
 
+/**
+ * Lista propostas com filtros opcionais. Exclui soft-deleted.
+ */
 export function usePropostas(filtros?: PropostaFilters) {
   return useQuery({
     queryKey: [KEY, filtros],
     queryFn: async (): Promise<Proposta[]> => {
       let q = supabase
         .from('propostas')
-        .select('*, clientes(nome_fantasia, razao_social)')
+        .select('*, clientes(nome_fantasia, razao_social), profiles(full_name)')
         .is('excluido_em', null)
         .order('created_at', { ascending: false })
+
       if (filtros?.status && filtros.status !== 'todos') {
         q = q.eq('status', filtros.status)
       }
       if (filtros?.search) {
         q = q.ilike('titulo', `%${filtros.search}%`)
       }
+
       const { data, error } = await q
       if (error) throw new Error(error.message)
       return (data ?? []) as Proposta[]
@@ -72,10 +72,19 @@ export function usePropostas(filtros?: PropostaFilters) {
   })
 }
 
+/**
+ * Cria nova proposta.
+ */
 export function useCriarProposta() {
   const qc = useQueryClient()
   return useMutation({
-    mutationFn: async (input: PropostaCreateInput) => {
+    mutationFn: async (input: {
+      titulo: string
+      cliente_id?: string
+      valor_estimado?: number
+      probabilidade?: number
+      descricao?: string
+    }) => {
       const { data, error } = await supabase
         .from('propostas')
         .insert(input)
@@ -86,19 +95,25 @@ export function useCriarProposta() {
     },
     onSuccess: () => {
       qc.invalidateQueries({ queryKey: [KEY] })
-      showSuccess('Proposta criada com sucesso!')
+      showSuccess('Proposta criada!')
     },
     onError: (e: Error) => showError(e.message),
   })
 }
 
+/**
+ * Soft-delete de proposta.
+ */
 export function useExcluirProposta() {
   const qc = useQueryClient()
   return useMutation({
     mutationFn: async ({ id, userId }: { id: string; userId?: string }) => {
       const { error } = await supabase
         .from('propostas')
-        .update({ excluido_em: new Date().toISOString(), excluido_por: userId ?? null })
+        .update({
+          excluido_em: new Date().toISOString(),
+          excluido_por: userId ?? null,
+        })
         .eq('id', id)
       if (error) throw new Error(error.message)
     },
