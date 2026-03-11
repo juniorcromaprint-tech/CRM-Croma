@@ -2,7 +2,7 @@ import React, { useState, useMemo } from "react";
 import {
   Package, Plus, Search, Edit, Trash2, Tag, Layers, Box, Ruler,
   DollarSign, Clock, Settings, ChevronDown, ChevronUp, Loader2,
-  List, FlaskConical, Workflow, AlertTriangle,
+  List, FlaskConical, Workflow, AlertTriangle, Scissors,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
@@ -60,6 +60,8 @@ function margemColor(m: number) {
 // Types
 // ─────────────────────────────────────────────
 interface Material { id: string; nome: string; unidade: string; preco_medio: number | null; }
+type TipoMaterial = "material" | "acabamento";
+type ModeloMaterialEx = ModeloMaterial & { tipo: TipoMaterial };
 
 // ─────────────────────────────────────────────
 // Hook: materiais catalog
@@ -87,9 +89,14 @@ function ModeloDetalhePanel({ modeloId }: { modeloId: string }) {
   const { data: mMateriais = [], isLoading: loadMat } = useQuery({
     queryKey: ["modelo-materiais", modeloId],
     queryFn: async () => {
-      const { data, error } = await supabase.from("modelo_materiais").select("*, material:materiais(nome, preco_medio)").eq("modelo_id", modeloId);
+      const { data, error } = await supabase
+        .from("modelo_materiais")
+        .select("*, material:materiais(nome, preco_medio)")
+        .eq("modelo_id", modeloId)
+        .order("tipo")
+        .order("created_at");
       if (error) throw error;
-      return data as ModeloMaterial[];
+      return (data ?? []).map((d) => ({ ...d, tipo: (d.tipo ?? "material") as TipoMaterial })) as ModeloMaterialEx[];
     },
   });
 
@@ -109,6 +116,7 @@ function ModeloDetalhePanel({ modeloId }: { modeloId: string }) {
   const [matQtd, setMatQtd] = useState("");
   const [matUnd, setMatUnd] = useState("m²");
   const [showSuggestions, setShowSuggestions] = useState(false);
+  const [matTipo, setMatTipo] = useState<TipoMaterial>("material");
 
   // Add processo state
   const [etapa, setEtapa] = useState("");
@@ -121,13 +129,13 @@ function ModeloDetalhePanel({ modeloId }: { modeloId: string }) {
       if (!matId) throw new Error("Selecione um material");
       const qtd = parseFloat(matQtd);
       if (isNaN(qtd) || qtd <= 0) throw new Error("Quantidade inválida");
-      const { error } = await supabase.from("modelo_materiais").insert({ modelo_id: modeloId, material_id: matId, quantidade_por_unidade: qtd, unidade: matUnd || null });
+      const { error } = await supabase.from("modelo_materiais").insert({ modelo_id: modeloId, material_id: matId, quantidade_por_unidade: qtd, unidade: matUnd || null, tipo: matTipo });
       if (error) throw error;
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["modelo-materiais", modeloId] });
       queryClient.invalidateQueries({ queryKey: ["produto_modelos"] });
-      setMatId(""); setMatQtd(""); setMatSearch("");
+      setMatId(""); setMatQtd(""); setMatSearch(""); setMatTipo("material");
       showSuccess("Material adicionado!");
     },
     onError: (e: Error) => showError(e.message),
@@ -166,6 +174,10 @@ function ModeloDetalhePanel({ modeloId }: { modeloId: string }) {
     return <div className="flex items-center gap-2 py-3 px-4 text-slate-400 text-xs"><Loader2 size={12} className="animate-spin" /> Carregando...</div>;
   }
 
+  // Grouped materials
+  const materiaisBase = mMateriais.filter((mm) => mm.tipo !== "acabamento");
+  const acabamentos   = mMateriais.filter((mm) => mm.tipo === "acabamento");
+
   // Calculate total cost from materials
   const custoMateriais = mMateriais.reduce((sum, mm) => sum + (mm.material?.preco_medio ?? 0) * mm.quantidade_por_unidade, 0);
   const tempoTotal = mProcessos.reduce((sum, p) => sum + p.tempo_por_unidade_min, 0);
@@ -179,8 +191,8 @@ function ModeloDetalhePanel({ modeloId }: { modeloId: string }) {
           {mMateriais.length > 0 && (
             <div className="flex items-center gap-1.5 text-xs bg-blue-50 text-blue-700 border border-blue-100 rounded-lg px-2.5 py-1.5">
               <FlaskConical size={11} />
-              <span>{mMateriais.length} material{mMateriais.length !== 1 ? "is" : ""}</span>
-              {custoMateriais > 0 && <span className="font-semibold">• R$ {custoMateriais.toFixed(2)}/un custo MP</span>}
+              <span>{materiaisBase.length} base{acabamentos.length > 0 ? ` • ${acabamentos.length} acabamento${acabamentos.length !== 1 ? "s" : ""}` : ""}</span>
+              {custoMateriais > 0 && <span className="font-semibold">• R$ {custoMateriais.toFixed(2)}/un</span>}
             </div>
           )}
           {mProcessos.length > 0 && (
@@ -193,20 +205,19 @@ function ModeloDetalhePanel({ modeloId }: { modeloId: string }) {
         </div>
       )}
 
-      {/* ── MATERIAIS ── */}
+      {/* ── MATERIAL BASE ── */}
       <div>
         <p className="text-[11px] font-bold text-slate-500 uppercase tracking-wider mb-2 flex items-center gap-1.5">
-          <FlaskConical size={12} /> Materiais do Modelo
+          <FlaskConical size={12} /> Material Base / Substrato
         </p>
-
-        {mMateriais.length === 0 ? (
+        {materiaisBase.length === 0 ? (
           <div className="flex items-center gap-2 text-xs text-amber-600 bg-amber-50 border border-amber-200 rounded-lg px-3 py-2 mb-2">
-            <AlertTriangle size={12} /> Sem materiais — o motor de precificação não calculará custo de MP.
+            <AlertTriangle size={12} /> Sem material base — o custo de MP não será calculado.
           </div>
         ) : (
           <div className="space-y-1 mb-2">
-            {mMateriais.map((mm) => (
-              <div key={mm.id} className="flex items-center justify-between gap-2 bg-white border border-slate-100 rounded-lg px-3 py-2">
+            {materiaisBase.map((mm) => (
+              <div key={mm.id} className="flex items-center justify-between gap-2 bg-white border border-blue-100 rounded-lg px-3 py-2">
                 <div className="flex-1 min-w-0">
                   <span className="text-sm font-medium text-slate-700 truncate">{mm.material?.nome ?? "Material"}</span>
                   {mm.material?.preco_medio && (
@@ -214,7 +225,7 @@ function ModeloDetalhePanel({ modeloId }: { modeloId: string }) {
                   )}
                 </div>
                 <div className="flex items-center gap-3 shrink-0">
-                  <span className="text-xs text-slate-500 font-mono bg-slate-50 rounded px-1.5 py-0.5 border border-slate-100">
+                  <span className="text-xs text-slate-500 font-mono bg-blue-50 rounded px-1.5 py-0.5 border border-blue-100">
                     {mm.quantidade_por_unidade} {mm.unidade ?? ""}
                   </span>
                   <Button size="icon" variant="ghost" className="h-6 w-6 text-red-400 hover:text-red-600 hover:bg-red-50 rounded-md"
@@ -226,44 +237,93 @@ function ModeloDetalhePanel({ modeloId }: { modeloId: string }) {
             ))}
           </div>
         )}
+      </div>
 
-        {/* Add material form */}
-        <div className="bg-white border border-slate-100 rounded-xl p-3 space-y-2">
-          <p className="text-[11px] font-semibold text-slate-400 uppercase tracking-wider">Adicionar Material</p>
-          <div className="flex gap-2 flex-wrap relative">
-            <div className="flex-1 min-w-40 relative">
-              <Input
-                placeholder="Buscar no catálogo de materiais..."
-                value={matSearch}
-                onChange={(e) => { setMatSearch(e.target.value); setMatId(""); setShowSuggestions(true); }}
-                onFocus={() => setShowSuggestions(true)}
-                onBlur={() => setTimeout(() => setShowSuggestions(false), 150)}
-                className="h-8 text-xs rounded-lg"
-              />
-              {showSuggestions && matSearch.length > 1 && filteredMat.length > 0 && !matId && (
-                <div className="absolute z-20 top-9 left-0 right-0 bg-white border border-slate-200 rounded-lg shadow-lg max-h-44 overflow-y-auto">
-                  {filteredMat.slice(0, 20).map((m) => (
-                    <button key={m.id} className="w-full text-left px-3 py-2 text-xs hover:bg-slate-50 flex justify-between gap-2"
-                      onMouseDown={() => { setMatId(m.id); setMatSearch(m.nome); setMatUnd(m.unidade); setShowSuggestions(false); }}>
-                      <span className="font-medium text-slate-700">{m.nome}</span>
-                      <span className="text-slate-400 shrink-0">{m.preco_medio ? `R$ ${m.preco_medio.toFixed(2)}/${m.unidade}` : m.unidade}</span>
-                    </button>
-                  ))}
+      {/* ── ACABAMENTOS ── */}
+      <div>
+        <p className="text-[11px] font-bold text-slate-500 uppercase tracking-wider mb-2 flex items-center gap-1.5">
+          <Scissors size={12} /> Materiais de Acabamento
+        </p>
+        {acabamentos.length === 0 ? (
+          <p className="text-xs text-slate-400 mb-2 italic">Nenhum acabamento cadastrado.</p>
+        ) : (
+          <div className="space-y-1 mb-2">
+            {acabamentos.map((mm) => (
+              <div key={mm.id} className="flex items-center justify-between gap-2 bg-white border border-amber-100 rounded-lg px-3 py-2">
+                <div className="flex-1 min-w-0">
+                  <span className="text-sm font-medium text-slate-700 truncate">{mm.material?.nome ?? "Material"}</span>
+                  {mm.material?.preco_medio && (
+                    <span className="text-xs text-slate-400 ml-2">R$ {mm.material.preco_medio.toFixed(2)}/{mm.unidade}</span>
+                  )}
                 </div>
-              )}
-            </div>
-            <Input type="number" step="0.001" placeholder="Qtd" value={matQtd} onChange={(e) => setMatQtd(e.target.value)} className="h-8 w-20 text-xs rounded-lg" />
-            <Select value={matUnd} onValueChange={setMatUnd}>
-              <SelectTrigger className="h-8 w-20 text-xs rounded-lg"><SelectValue /></SelectTrigger>
-              <SelectContent>
-                {["m²", "m", "un", "ml", "kg", "l", "m²/h"].map((u) => <SelectItem key={u} value={u}>{u}</SelectItem>)}
-              </SelectContent>
-            </Select>
-            <Button size="sm" onClick={() => addMat.mutate()} disabled={addMat.isPending || !matId || !matQtd}
-              className="h-8 text-xs bg-blue-600 hover:bg-blue-700 text-white rounded-lg px-3">
-              {addMat.isPending ? <Loader2 size={11} className="animate-spin" /> : <Plus size={11} className="mr-1" />} Add
-            </Button>
+                <div className="flex items-center gap-3 shrink-0">
+                  <span className="text-xs text-slate-500 font-mono bg-amber-50 rounded px-1.5 py-0.5 border border-amber-100">
+                    {mm.quantidade_por_unidade} {mm.unidade ?? ""}
+                  </span>
+                  <Button size="icon" variant="ghost" className="h-6 w-6 text-red-400 hover:text-red-600 hover:bg-red-50 rounded-md"
+                    onClick={() => removeMat.mutate(mm.id)} disabled={removeMat.isPending}>
+                    <Trash2 size={12} />
+                  </Button>
+                </div>
+              </div>
+            ))}
           </div>
+        )}
+      </div>
+
+      {/* ── ADD MATERIAL FORM ── */}
+      <div className="bg-white border border-slate-100 rounded-xl p-3 space-y-2">
+        <div className="flex items-center justify-between">
+          <p className="text-[11px] font-semibold text-slate-400 uppercase tracking-wider">Adicionar Material</p>
+          {/* Toggle tipo */}
+          <div className="flex rounded-lg overflow-hidden border border-slate-200 text-[11px] font-medium">
+            <button
+              className={`px-3 py-1 flex items-center gap-1 transition-colors ${matTipo === "material" ? "bg-blue-600 text-white" : "bg-white text-slate-500 hover:bg-slate-50"}`}
+              onClick={() => setMatTipo("material")}
+            >
+              <FlaskConical size={10} /> Base
+            </button>
+            <button
+              className={`px-3 py-1 flex items-center gap-1 transition-colors ${matTipo === "acabamento" ? "bg-amber-500 text-white" : "bg-white text-slate-500 hover:bg-slate-50"}`}
+              onClick={() => setMatTipo("acabamento")}
+            >
+              <Scissors size={10} /> Acabamento
+            </button>
+          </div>
+        </div>
+        <div className="flex gap-2 flex-wrap relative">
+          <div className="flex-1 min-w-40 relative">
+            <Input
+              placeholder="Buscar no catálogo de materiais..."
+              value={matSearch}
+              onChange={(e) => { setMatSearch(e.target.value); setMatId(""); setShowSuggestions(true); }}
+              onFocus={() => setShowSuggestions(true)}
+              onBlur={() => setTimeout(() => setShowSuggestions(false), 150)}
+              className="h-8 text-xs rounded-lg"
+            />
+            {showSuggestions && matSearch.length > 1 && filteredMat.length > 0 && !matId && (
+              <div className="absolute z-20 top-9 left-0 right-0 bg-white border border-slate-200 rounded-lg shadow-lg max-h-44 overflow-y-auto">
+                {filteredMat.slice(0, 20).map((m) => (
+                  <button key={m.id} className="w-full text-left px-3 py-2 text-xs hover:bg-slate-50 flex justify-between gap-2"
+                    onMouseDown={() => { setMatId(m.id); setMatSearch(m.nome); setMatUnd(m.unidade); setShowSuggestions(false); }}>
+                    <span className="font-medium text-slate-700">{m.nome}</span>
+                    <span className="text-slate-400 shrink-0">{m.preco_medio ? `R$ ${m.preco_medio.toFixed(2)}/${m.unidade}` : m.unidade}</span>
+                  </button>
+                ))}
+              </div>
+            )}
+          </div>
+          <Input type="number" step="0.001" placeholder="Qtd" value={matQtd} onChange={(e) => setMatQtd(e.target.value)} className="h-8 w-20 text-xs rounded-lg" />
+          <Select value={matUnd} onValueChange={setMatUnd}>
+            <SelectTrigger className="h-8 w-20 text-xs rounded-lg"><SelectValue /></SelectTrigger>
+            <SelectContent>
+              {["m²", "m", "un", "ml", "kg", "l", "m²/h"].map((u) => <SelectItem key={u} value={u}>{u}</SelectItem>)}
+            </SelectContent>
+          </Select>
+          <Button size="sm" onClick={() => addMat.mutate()} disabled={addMat.isPending || !matId || !matQtd}
+            className={`h-8 text-xs rounded-lg px-3 text-white ${matTipo === "acabamento" ? "bg-amber-500 hover:bg-amber-600" : "bg-blue-600 hover:bg-blue-700"}`}>
+            {addMat.isPending ? <Loader2 size={11} className="animate-spin" /> : <Plus size={11} className="mr-1" />} Add
+          </Button>
         </div>
       </div>
 
