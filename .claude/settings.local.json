@@ -1,10 +1,37 @@
 {
   "permissions": {
     "allow": [
-      "Bash(python3:*)",
+      "Bash(npm run build:*)",
+      "Bash(npm run dev:*)",
+      "Bash(npm run lint:*)",
+      "Bash(npm install:*)",
+      "Bash(npx:*)",
+      "Bash(pnpm build:*)",
       "Bash(pnpm tsc:*)",
+      "Bash(pnpm install:*)",
+      "Bash(pnpm run:*)",
       "Bash(node:*)",
-      "Bash(pnpm build:*)"
+      "Bash(python3:*)",
+      "Bash(git status:*)",
+      "Bash(git log:*)",
+      "Bash(git diff:*)",
+      "Bash(git add:*)",
+      "Bash(git commit:*)",
+      "Bash(git push:*)",
+      "Bash(git pull:*)",
+      "Bash(git checkout:*)",
+      "Bash(git branch:*)",
+      "Bash(git merge:*)",
+      "Bash(git worktree:*)",
+      "Bash(ls:*)",
+      "Bash(cp:*)",
+      "Bash(mkdir:*)",
+      "Bash(find:*)",
+      "Bash(grep:*)",
+      "Bash(wc:*)",
+      "Bash(head:*)",
+      "Bash(tail:*)",
+      "Bash(cat:*)"
     ]
   }
 }

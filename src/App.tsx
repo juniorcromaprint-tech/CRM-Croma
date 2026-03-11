@@ -10,7 +10,6 @@ import Layout from "./components/Layout";
 import DashboardPage from "@/domains/comercial/pages/DashboardPage";
 import LeadsPage from "@/domains/comercial/pages/LeadsPage";
 import PipelinePage from "@/domains/comercial/pages/PipelinePage";
-import PropostasPage from "@/domains/comercial/pages/PropostasPage";
 import ClientesPage from "@/domains/clientes/pages/ClientesPage";
 
 // ---- Phase 2 Domain Pages ----
@@ -95,7 +94,6 @@ const App = () => (
               {/* ===== COMERCIAL ===== */}
               <Route path="leads" element={<LeadsPage />} />
               <Route path="pipeline" element={<PipelinePage />} />
-              <Route path="propostas" element={<PropostasPage />} />
               <Route path="orcamentos" element={<OrcamentosPage />} />
               <Route path="orcamentos/novo" element={<OrcamentoEditorPage />} />
               <Route path="orcamentos/:id" element={<OrcamentoViewPage />} />
