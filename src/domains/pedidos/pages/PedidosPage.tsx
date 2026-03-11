@@ -1,4 +1,5 @@
 import React, { useState, useMemo } from "react";
+import { useNavigate } from "react-router-dom";
 import { supabase } from "@/integrations/supabase/client";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { showSuccess, showError } from "@/utils/toast";
@@ -201,6 +202,7 @@ function SkeletonRow() {
 
 export default function PedidosPage() {
   const queryClient = useQueryClient();
+  const navigate = useNavigate();
   const { profile } = useAuth();
   const isAdmin = !profile?.role || profile.role === 'admin';
 
@@ -607,7 +609,7 @@ export default function PedidosPage() {
               return (
                 <div
                   key={pedido.id}
-                  onClick={() => setSelectedPedido(pedido)}
+                  onClick={() => navigate(`/pedidos/${pedido.id}`)}
                   className="bg-white rounded-2xl p-5 shadow-sm border border-slate-100 hover:shadow-md transition-all hover:-translate-y-0.5 cursor-pointer group"
                 >
                   <div className="flex items-center justify-between gap-4">

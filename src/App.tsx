@@ -31,6 +31,8 @@ import OcorrenciasPage from "@/domains/qualidade/pages/OcorrenciasPage";
 import OrcamentosPage from "@/domains/comercial/pages/OrcamentosPage";
 import OrcamentoEditorPage from "@/domains/comercial/pages/OrcamentoEditorPage";
 import OrcamentoViewPage from "@/domains/comercial/pages/OrcamentoViewPage";
+import PropostasPage from "@/domains/comercial/pages/PropostasPage";
+import PedidoDetailPage from "@/domains/pedidos/pages/PedidoDetailPage";
 
 // ---- Phase 6 Admin Pages ----
 import AdminUsuariosPage from "@/domains/admin/pages/AdminUsuariosPage";
@@ -98,6 +100,7 @@ const App = () => (
               <Route path="orcamentos/novo" element={<OrcamentoEditorPage />} />
               <Route path="orcamentos/:id" element={<OrcamentoViewPage />} />
               <Route path="orcamentos/:id/editar" element={<OrcamentoEditorPage />} />
+              <Route path="propostas" element={<PropostasPage />} />
 
               {/* ===== CLIENTES ===== */}
               <Route path="clientes" element={<ClientesPage />} />
@@ -105,6 +108,7 @@ const App = () => (
 
               {/* ===== OPERACIONAL ===== */}
               <Route path="pedidos" element={<PedidosPage />} />
+              <Route path="pedidos/:id" element={<PedidoDetailPage />} />
               <Route path="producao" element={<ProducaoPage />} />
               <Route path="instalacoes" element={<InstalacaoPage />} />
 
