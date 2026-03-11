@@ -44,6 +44,7 @@ import AdminProdutosPage from "@/domains/admin/pages/AdminProdutosPage";
 import AdminSetupPage from "@/domains/admin/pages/AdminSetupPage";
 import AdminCentrosCustoPage from "@/domains/admin/pages/AdminCentrosCustoPage";
 import AdminPlanoContasPage from "@/domains/admin/pages/AdminPlanoContasPage";
+import AdminMateriaisPage from "@/domains/admin/pages/AdminMateriaisPage";
 
 // ---- Fiscal Domain Pages ----
 import FiscalDashboardPage from "@/domains/fiscal/pages/FiscalDashboardPage";
@@ -181,6 +182,7 @@ const App = () => (
               <Route path="admin/setup" element={<AdminSetupPage />} />
               <Route path="admin/centros-custo" element={<AdminCentrosCustoPage />} />
               <Route path="admin/plano-contas" element={<AdminPlanoContasPage />} />
+              <Route path="admin/materiais" element={<AdminMateriaisPage />} />
               <Route path="relatorios" element={<RelatoriosPage />} />
               <Route path="admin/progresso" element={<ProgressoPage />} />
 

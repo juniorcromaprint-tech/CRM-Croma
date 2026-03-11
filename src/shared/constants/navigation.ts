@@ -52,6 +52,7 @@ export const NAV_GROUPS: NavGroup[] = [
       { name: 'Estoque', path: '/estoque', icon: 'Warehouse', module: 'estoque' },
       { name: 'Compras', path: '/compras', icon: 'ShoppingCart', module: 'compras' },
       { name: 'Produtos', path: '/produtos', icon: 'Package', module: 'producao' },
+      { name: 'Matéria Prima', path: '/admin/materiais', icon: 'Package', module: 'admin' },
     ],
   },
   {
