@@ -34,15 +34,19 @@ ALTER TABLE produtos
 -- 3. Adicionar colunas na tabela produto_modelos
 -- -----------------------------------------------------------------------------
 ALTER TABLE produto_modelos
-  ADD COLUMN IF NOT EXISTS linha_qualidade VARCHAR DEFAULT '1a'
-    CHECK (linha_qualidade IN ('1a','2a','premium')),
+  ADD COLUMN IF NOT EXISTS linha_qualidade VARCHAR DEFAULT 'segunda'
+    CHECK (linha_qualidade IN ('primeira','segunda','premium')),
   ADD COLUMN IF NOT EXISTS descritivo_tecnico TEXT,
-  ADD COLUMN IF NOT EXISTS descritivo_nf VARCHAR(120),
+  ADD COLUMN IF NOT EXISTS descritivo_nf VARCHAR(500),
   ADD COLUMN IF NOT EXISTS garantia_meses INTEGER DEFAULT 6,
   ADD COLUMN IF NOT EXISTS garantia_descricao TEXT,
   ADD COLUMN IF NOT EXISTS unidade_venda VARCHAR DEFAULT 'm2'
     CHECK (unidade_venda IN ('m2','unidade','metro_linear','hora','kit')),
   ADD COLUMN IF NOT EXISTS updated_at TIMESTAMPTZ DEFAULT NOW();
+
+-- Unique constraint necessário para ON CONFLICT (produto_id, nome)
+CREATE UNIQUE INDEX IF NOT EXISTS idx_produto_modelos_produto_nome
+  ON produto_modelos (produto_id, nome);
 
 -- -----------------------------------------------------------------------------
 -- 4. Seed das 11 categorias reais
@@ -775,16 +779,16 @@ BEGIN
   -- -----------------------------------------------
   INSERT INTO produto_modelos (produto_id, nome, markup_padrao, garantia_meses, linha_qualidade, unidade_venda, ativo)
   VALUES
-    (pid_ban, '40x60cm',           45, 6, '2a', 'm2', TRUE),
-    (pid_ban, '80x60cm',           45, 6, '2a', 'm2', TRUE),
-    (pid_ban, '60x100cm',          45, 6, '2a', 'm2', TRUE),
-    (pid_ban, '80x100cm',          45, 6, '2a', 'm2', TRUE),
-    (pid_ban, '80x120cm',          45, 6, '2a', 'm2', TRUE),
-    (pid_ban, '100x120cm',         45, 6, '2a', 'm2', TRUE),
-    (pid_ban, '100x150cm',         45, 6, '2a', 'm2', TRUE),
-    (pid_ban, '100x200cm',         45, 6, '2a', 'm2', TRUE),
-    (pid_ban, '120x200cm',         45, 6, '2a', 'm2', TRUE),
-    (pid_ban, 'Por m²_Personalizado', 45, 6, '2a', 'm2', TRUE)
+    (pid_ban, '40x60cm',           45, 6, 'segunda', 'm2', TRUE),
+    (pid_ban, '80x60cm',           45, 6, 'segunda', 'm2', TRUE),
+    (pid_ban, '60x100cm',          45, 6, 'segunda', 'm2', TRUE),
+    (pid_ban, '80x100cm',          45, 6, 'segunda', 'm2', TRUE),
+    (pid_ban, '80x120cm',          45, 6, 'segunda', 'm2', TRUE),
+    (pid_ban, '100x120cm',         45, 6, 'segunda', 'm2', TRUE),
+    (pid_ban, '100x150cm',         45, 6, 'segunda', 'm2', TRUE),
+    (pid_ban, '100x200cm',         45, 6, 'segunda', 'm2', TRUE),
+    (pid_ban, '120x200cm',         45, 6, 'segunda', 'm2', TRUE),
+    (pid_ban, 'Por m²_Personalizado', 45, 6, 'segunda', 'm2', TRUE)
   ON CONFLICT (produto_id, nome) DO UPDATE SET
     markup_padrao   = EXCLUDED.markup_padrao,
     garantia_meses  = EXCLUDED.garantia_meses,
@@ -796,13 +800,13 @@ BEGIN
   -- -----------------------------------------------
   INSERT INTO produto_modelos (produto_id, nome, markup_padrao, garantia_meses, linha_qualidade, unidade_venda, ativo)
   VALUES
-    (pid_fai, 'P-200x60cm',           45, 6, '2a', 'm2', TRUE),
-    (pid_fai, 'P-200x100cm',          45, 6, '2a', 'm2', TRUE),
-    (pid_fai, 'M-300x80cm',           45, 6, '2a', 'm2', TRUE),
-    (pid_fai, 'M-300x120cm',          45, 6, '2a', 'm2', TRUE),
-    (pid_fai, 'G-400x80cm',           45, 6, '2a', 'm2', TRUE),
-    (pid_fai, 'G-400x120cm',          45, 6, '2a', 'm2', TRUE),
-    (pid_fai, 'Por m²_Personalizado', 45, 6, '2a', 'm2', TRUE)
+    (pid_fai, 'P-200x60cm',           45, 6, 'segunda', 'm2', TRUE),
+    (pid_fai, 'P-200x100cm',          45, 6, 'segunda', 'm2', TRUE),
+    (pid_fai, 'M-300x80cm',           45, 6, 'segunda', 'm2', TRUE),
+    (pid_fai, 'M-300x120cm',          45, 6, 'segunda', 'm2', TRUE),
+    (pid_fai, 'G-400x80cm',           45, 6, 'segunda', 'm2', TRUE),
+    (pid_fai, 'G-400x120cm',          45, 6, 'segunda', 'm2', TRUE),
+    (pid_fai, 'Por m²_Personalizado', 45, 6, 'segunda', 'm2', TRUE)
   ON CONFLICT (produto_id, nome) DO UPDATE SET
     markup_padrao   = EXCLUDED.markup_padrao,
     garantia_meses  = EXCLUDED.garantia_meses,
@@ -814,10 +818,10 @@ BEGIN
   -- -----------------------------------------------
   INSERT INTO produto_modelos (produto_id, nome, markup_padrao, garantia_meses, linha_qualidade, unidade_venda, ativo)
   VALUES
-    (pid_adre, '1ª linha: Oracal/Similar_1cor',      55, 24, '1a', 'm2', TRUE),
-    (pid_adre, '1ª linha: Oracal/Similar_2cores',     55, 24, '1a', 'm2', TRUE),
-    (pid_adre, '2ª linha: Color_Goldmax_1cor',        40,  6, '2a', 'm2', TRUE),
-    (pid_adre, '2ª linha: Color_Goldmax_2cores',      40,  6, '2a', 'm2', TRUE)
+    (pid_adre, '1ª linha: Oracal/Similar_1cor',      55, 24, 'primeira', 'm2', TRUE),
+    (pid_adre, '1ª linha: Oracal/Similar_2cores',     55, 24, 'primeira', 'm2', TRUE),
+    (pid_adre, '2ª linha: Color_Goldmax_1cor',        40,  6, 'segunda', 'm2', TRUE),
+    (pid_adre, '2ª linha: Color_Goldmax_2cores',      40,  6, 'segunda', 'm2', TRUE)
   ON CONFLICT (produto_id, nome) DO UPDATE SET
     markup_padrao   = EXCLUDED.markup_padrao,
     garantia_meses  = EXCLUDED.garantia_meses,
@@ -830,8 +834,8 @@ BEGIN
   INSERT INTO produto_modelos (produto_id, nome, markup_padrao, garantia_meses, linha_qualidade, unidade_venda, ativo)
   VALUES
     (pid_pacm, 'Premium: RE Oracal + Película',              65, 36, 'premium', 'm2', TRUE),
-    (pid_pacm, '1ª linha: Adesivo Solvente + Película',      55, 18, '1a',      'm2', TRUE),
-    (pid_pacm, '2ª linha: Adesivo Solvente',                 40,  6, '2a',      'm2', TRUE)
+    (pid_pacm, '1ª linha: Adesivo Solvente + Película',      55, 18, 'primeira',      'm2', TRUE),
+    (pid_pacm, '2ª linha: Adesivo Solvente',                 40,  6, 'segunda',      'm2', TRUE)
   ON CONFLICT (produto_id, nome) DO UPDATE SET
     markup_padrao   = EXCLUDED.markup_padrao,
     garantia_meses  = EXCLUDED.garantia_meses,
@@ -843,12 +847,12 @@ BEGIN
   -- -----------------------------------------------
   INSERT INTO produto_modelos (produto_id, nome, markup_padrao, garantia_meses, linha_qualidade, unidade_venda, ativo)
   VALUES
-    (pid_ppvc, 'P - 2mm_1ª linha: Solvente+Película (até 1,5m²)', 50, 18, '1a', 'm2', TRUE),
-    (pid_ppvc, 'P - 2mm_2ª linha: Solvente (até 1,5m²)',          40,  6, '2a', 'm2', TRUE),
-    (pid_ppvc, 'M - 3mm_1ª linha: Solvente+Película (até 1,5m²)', 50, 18, '1a', 'm2', TRUE),
-    (pid_ppvc, 'M - 3mm_2ª linha: Solvente (até 1,5m²)',          40,  6, '2a', 'm2', TRUE),
-    (pid_ppvc, 'G - 5mm_1ª linha: Solvente+Película (até 3m²)',   50, 18, '1a', 'm2', TRUE),
-    (pid_ppvc, 'G - 5mm_2ª linha: Solvente (até 3m²)',            40,  6, '2a', 'm2', TRUE)
+    (pid_ppvc, 'P - 2mm_1ª linha: Solvente+Película (até 1,5m²)', 50, 18, 'primeira', 'm2', TRUE),
+    (pid_ppvc, 'P - 2mm_2ª linha: Solvente (até 1,5m²)',          40,  6, 'segunda', 'm2', TRUE),
+    (pid_ppvc, 'M - 3mm_1ª linha: Solvente+Película (até 1,5m²)', 50, 18, 'primeira', 'm2', TRUE),
+    (pid_ppvc, 'M - 3mm_2ª linha: Solvente (até 1,5m²)',          40,  6, 'segunda', 'm2', TRUE),
+    (pid_ppvc, 'G - 5mm_1ª linha: Solvente+Película (até 3m²)',   50, 18, 'primeira', 'm2', TRUE),
+    (pid_ppvc, 'G - 5mm_2ª linha: Solvente (até 3m²)',            40,  6, 'segunda', 'm2', TRUE)
   ON CONFLICT (produto_id, nome) DO UPDATE SET
     markup_padrao   = EXCLUDED.markup_padrao,
     garantia_meses  = EXCLUDED.garantia_meses,
@@ -860,8 +864,8 @@ BEGIN
   -- -----------------------------------------------
   INSERT INTO produto_modelos (produto_id, nome, markup_padrao, garantia_meses, linha_qualidade, unidade_venda, ativo)
   VALUES
-    (pid_facm, 'Estrutura 20x20 + ACM 3mm Poliéster', 60, 24, '1a',     'm2', TRUE),
-    (pid_facm, 'Estrutura 30x30 + ACM 3mm Poliéster', 60, 24, '1a',     'm2', TRUE),
+    (pid_facm, 'Estrutura 20x20 + ACM 3mm Poliéster', 60, 24, 'primeira',     'm2', TRUE),
+    (pid_facm, 'Estrutura 30x30 + ACM 3mm Poliéster', 60, 24, 'primeira',     'm2', TRUE),
     (pid_facm, 'Estrutura 30x30 + ACM 4mm Kynar',     70, 36, 'premium', 'm2', TRUE)
   ON CONFLICT (produto_id, nome) DO UPDATE SET
     markup_padrao   = EXCLUDED.markup_padrao,
@@ -874,8 +878,8 @@ BEGIN
   -- -----------------------------------------------
   INSERT INTO produto_modelos (produto_id, nome, markup_padrao, garantia_meses, linha_qualidade, unidade_venda, ativo)
   VALUES
-    (pid_ctv, '1ª linha: 300g+Lam.Fosca+Verniz loc.+4x4',  45, 0, '1a',     'unidade', TRUE),
-    (pid_ctv, '2ª linha: 300g+Verniz+4x4',                 35, 0, '2a',      'unidade', TRUE),
+    (pid_ctv, '1ª linha: 300g+Lam.Fosca+Verniz loc.+4x4',  45, 0, 'primeira',     'unidade', TRUE),
+    (pid_ctv, '2ª linha: 300g+Verniz+4x4',                 35, 0, 'segunda',      'unidade', TRUE),
     (pid_ctv, 'Premium: 300g+Lam.Fosca+hot Stamping+4x4',  60, 0, 'premium', 'unidade', TRUE)
   ON CONFLICT (produto_id, nome) DO UPDATE SET
     markup_padrao   = EXCLUDED.markup_padrao,
@@ -888,10 +892,10 @@ BEGIN
   -- -----------------------------------------------
   INSERT INTO produto_modelos (produto_id, nome, markup_padrao, garantia_meses, linha_qualidade, unidade_venda, ativo)
   VALUES
-    (pid_letac, '10mm + Adesivo Faceado', 60, 24, '1a', 'unidade', TRUE),
-    (pid_letac, '10mm + Adesivo Verso',   60, 24, '1a', 'unidade', TRUE),
-    (pid_letac, '10mm + Pintura',         65, 24, '1a', 'unidade', TRUE),
-    (pid_letac, '10mm + Impressão',       60, 24, '1a', 'unidade', TRUE)
+    (pid_letac, '10mm + Adesivo Faceado', 60, 24, 'primeira', 'unidade', TRUE),
+    (pid_letac, '10mm + Adesivo Verso',   60, 24, 'primeira', 'unidade', TRUE),
+    (pid_letac, '10mm + Pintura',         65, 24, 'primeira', 'unidade', TRUE),
+    (pid_letac, '10mm + Impressão',       60, 24, 'primeira', 'unidade', TRUE)
   ON CONFLICT (produto_id, nome) DO UPDATE SET
     markup_padrao   = EXCLUDED.markup_padrao,
     garantia_meses  = EXCLUDED.garantia_meses,
@@ -903,9 +907,9 @@ BEGIN
   -- -----------------------------------------------
   INSERT INTO produto_modelos (produto_id, nome, markup_padrao, garantia_meses, linha_qualidade, unidade_venda, ativo)
   VALUES
-    (pid_lcgv, 'Sem iluminação',                       65, 18, '1a',     'metro_linear', TRUE),
-    (pid_lcgv, 'Face com Acrílico branco e LED',       70, 18, '1a',     'metro_linear', TRUE),
-    (pid_lcgv, 'Face com Acrílico impresso e LED',     70, 18, '1a',     'metro_linear', TRUE),
+    (pid_lcgv, 'Sem iluminação',                       65, 18, 'primeira',     'metro_linear', TRUE),
+    (pid_lcgv, 'Face com Acrílico branco e LED',       70, 18, 'primeira',     'metro_linear', TRUE),
+    (pid_lcgv, 'Face com Acrílico impresso e LED',     70, 18, 'primeira',     'metro_linear', TRUE),
     (pid_lcgv, 'Retroiluminado',                       75, 18, 'premium', 'metro_linear', TRUE)
   ON CONFLICT (produto_id, nome) DO UPDATE SET
     markup_padrao   = EXCLUDED.markup_padrao,
@@ -918,10 +922,10 @@ BEGIN
   -- -----------------------------------------------
   INSERT INTO produto_modelos (produto_id, nome, markup_padrao, garantia_meses, linha_qualidade, unidade_venda, ativo)
   VALUES
-    (pid_lum1, 'P - 100x60cm_4x4',     65, 18, '1a', 'unidade', TRUE),
-    (pid_lum1, 'M - 120x80cm_4x4',     65, 18, '1a', 'unidade', TRUE),
-    (pid_lum1, 'G - 150x100cm_4x4',    65, 18, '1a', 'unidade', TRUE),
-    (pid_lum1, 'Por m²_Personalizado', 65, 18, '1a', 'm2',      TRUE)
+    (pid_lum1, 'P - 100x60cm_4x4',     65, 18, 'primeira', 'unidade', TRUE),
+    (pid_lum1, 'M - 120x80cm_4x4',     65, 18, 'primeira', 'unidade', TRUE),
+    (pid_lum1, 'G - 150x100cm_4x4',    65, 18, 'primeira', 'unidade', TRUE),
+    (pid_lum1, 'Por m²_Personalizado', 65, 18, 'primeira', 'm2',      TRUE)
   ON CONFLICT (produto_id, nome) DO UPDATE SET
     markup_padrao   = EXCLUDED.markup_padrao,
     garantia_meses  = EXCLUDED.garantia_meses,
@@ -933,12 +937,12 @@ BEGIN
   -- -----------------------------------------------
   INSERT INTO produto_modelos (produto_id, nome, markup_padrao, garantia_meses, linha_qualidade, unidade_venda, ativo)
   VALUES
-    (pid_urna, 'P - 10x10x10cm_Cristal', 60, 12, '1a', 'unidade', TRUE),
-    (pid_urna, 'P - 10x10x10cm_Cores',   60, 12, '1a', 'unidade', TRUE),
-    (pid_urna, 'M - 20x20x20cm_Cristal', 60, 12, '1a', 'unidade', TRUE),
-    (pid_urna, 'M - 20x20x20cm_Cores',   60, 12, '1a', 'unidade', TRUE),
-    (pid_urna, 'G - 30x30x30cm_Cristal', 60, 12, '1a', 'unidade', TRUE),
-    (pid_urna, 'G - 30x30x30cm_Cores',   60, 12, '1a', 'unidade', TRUE)
+    (pid_urna, 'P - 10x10x10cm_Cristal', 60, 12, 'primeira', 'unidade', TRUE),
+    (pid_urna, 'P - 10x10x10cm_Cores',   60, 12, 'primeira', 'unidade', TRUE),
+    (pid_urna, 'M - 20x20x20cm_Cristal', 60, 12, 'primeira', 'unidade', TRUE),
+    (pid_urna, 'M - 20x20x20cm_Cores',   60, 12, 'primeira', 'unidade', TRUE),
+    (pid_urna, 'G - 30x30x30cm_Cristal', 60, 12, 'primeira', 'unidade', TRUE),
+    (pid_urna, 'G - 30x30x30cm_Cores',   60, 12, 'primeira', 'unidade', TRUE)
   ON CONFLICT (produto_id, nome) DO UPDATE SET
     markup_padrao   = EXCLUDED.markup_padrao,
     garantia_meses  = EXCLUDED.garantia_meses,
@@ -950,9 +954,9 @@ BEGIN
   -- -----------------------------------------------
   INSERT INTO produto_modelos (produto_id, nome, markup_padrao, garantia_meses, linha_qualidade, unidade_venda, ativo)
   VALUES
-    (pid_kled, '10W 6500k + Suporte + Fiação (1,2x1,2m)', 50, 12, '1a', 'kit', TRUE),
-    (pid_kled, '30W 6500k + Suporte + Fiação (1,5x1,5m)', 50, 12, '1a', 'kit', TRUE),
-    (pid_kled, '50W 6500k + Suporte + Fiação (2x2m)',     50, 12, '1a', 'kit', TRUE)
+    (pid_kled, '10W 6500k + Suporte + Fiação (1,2x1,2m)', 50, 12, 'primeira', 'kit', TRUE),
+    (pid_kled, '30W 6500k + Suporte + Fiação (1,5x1,5m)', 50, 12, 'primeira', 'kit', TRUE),
+    (pid_kled, '50W 6500k + Suporte + Fiação (2x2m)',     50, 12, 'primeira', 'kit', TRUE)
   ON CONFLICT (produto_id, nome) DO UPDATE SET
     markup_padrao   = EXCLUDED.markup_padrao,
     garantia_meses  = EXCLUDED.garantia_meses,
@@ -964,10 +968,10 @@ BEGIN
   -- -----------------------------------------------
   INSERT INTO produto_modelos (produto_id, nome, markup_padrao, garantia_meses, linha_qualidade, unidade_venda, ativo)
   VALUES
-    (pid_lonih, 'Front 380g Fosca + Ilhós Latão',   45, 24, '1a', 'm2', TRUE),
-    (pid_lonih, 'Front 380g Brilho + Ilhós Latão',  45, 24, '1a', 'm2', TRUE),
-    (pid_lonih, 'Front 440g Fosca + Ilhós Latão',   40,  6, '2a', 'm2', TRUE),
-    (pid_lonih, 'Front 440g Brilho + Ilhós Latão',  40,  6, '2a', 'm2', TRUE)
+    (pid_lonih, 'Front 380g Fosca + Ilhós Latão',   45, 24, 'primeira', 'm2', TRUE),
+    (pid_lonih, 'Front 380g Brilho + Ilhós Latão',  45, 24, 'primeira', 'm2', TRUE),
+    (pid_lonih, 'Front 440g Fosca + Ilhós Latão',   40,  6, 'segunda', 'm2', TRUE),
+    (pid_lonih, 'Front 440g Brilho + Ilhós Latão',  40,  6, 'segunda', 'm2', TRUE)
   ON CONFLICT (produto_id, nome) DO UPDATE SET
     markup_padrao   = EXCLUDED.markup_padrao,
     garantia_meses  = EXCLUDED.garantia_meses,
@@ -979,12 +983,12 @@ BEGIN
   -- -----------------------------------------------
   INSERT INTO produto_modelos (produto_id, nome, markup_padrao, garantia_meses, linha_qualidade, unidade_venda, ativo)
   VALUES
-    (pid_cav, 'P - 60x80cm_1 face',    55, 12, '1a', 'unidade', TRUE),
-    (pid_cav, 'P - 60x80cm_2 faces',   60, 12, '1a', 'unidade', TRUE),
-    (pid_cav, 'M - 80x120cm_1 face',   55, 12, '1a', 'unidade', TRUE),
-    (pid_cav, 'M - 80x120cm_2 faces',  60, 12, '1a', 'unidade', TRUE),
-    (pid_cav, 'G - 100x150cm_1 face',  55, 12, '1a', 'unidade', TRUE),
-    (pid_cav, 'G - 100x150cm_2 faces', 60, 12, '1a', 'unidade', TRUE)
+    (pid_cav, 'P - 60x80cm_1 face',    55, 12, 'primeira', 'unidade', TRUE),
+    (pid_cav, 'P - 60x80cm_2 faces',   60, 12, 'primeira', 'unidade', TRUE),
+    (pid_cav, 'M - 80x120cm_1 face',   55, 12, 'primeira', 'unidade', TRUE),
+    (pid_cav, 'M - 80x120cm_2 faces',  60, 12, 'primeira', 'unidade', TRUE),
+    (pid_cav, 'G - 100x150cm_1 face',  55, 12, 'primeira', 'unidade', TRUE),
+    (pid_cav, 'G - 100x150cm_2 faces', 60, 12, 'primeira', 'unidade', TRUE)
   ON CONFLICT (produto_id, nome) DO UPDATE SET
     markup_padrao   = EXCLUDED.markup_padrao,
     garantia_meses  = EXCLUDED.garantia_meses,
@@ -996,11 +1000,11 @@ BEGIN
   -- -----------------------------------------------
   INSERT INTO produto_modelos (produto_id, nome, markup_padrao, garantia_meses, linha_qualidade, unidade_venda, ativo)
   VALUES
-    (pid_disp, 'A3 parede (42x30cm)',       55, 12, '1a', 'unidade', TRUE),
-    (pid_disp, 'A4 parede (30x21cm)',       55, 12, '1a', 'unidade', TRUE),
-    (pid_disp, 'A5 parede (21x15cm)',       55, 12, '1a', 'unidade', TRUE),
-    (pid_disp, 'A6 parede Simples (15x10cm)', 55, 12, '1a', 'unidade', TRUE),
-    (pid_disp, 'Projeto Personalizado',     55, 12, '1a', 'unidade', TRUE)
+    (pid_disp, 'A3 parede (42x30cm)',       55, 12, 'primeira', 'unidade', TRUE),
+    (pid_disp, 'A4 parede (30x21cm)',       55, 12, 'primeira', 'unidade', TRUE),
+    (pid_disp, 'A5 parede (21x15cm)',       55, 12, 'primeira', 'unidade', TRUE),
+    (pid_disp, 'A6 parede Simples (15x10cm)', 55, 12, 'primeira', 'unidade', TRUE),
+    (pid_disp, 'Projeto Personalizado',     55, 12, 'primeira', 'unidade', TRUE)
   ON CONFLICT (produto_id, nome) DO UPDATE SET
     markup_padrao   = EXCLUDED.markup_padrao,
     garantia_meses  = EXCLUDED.garantia_meses,
@@ -1012,10 +1016,10 @@ BEGIN
   -- -----------------------------------------------
   INSERT INTO produto_modelos (produto_id, nome, markup_padrao, garantia_meses, linha_qualidade, unidade_venda, ativo)
   VALUES
-    (pid_iman04, 'Adesivo impresso fosco',                45,  6, '2a', 'm2', TRUE),
-    (pid_iman04, 'Adesivo impresso brilho',               45,  6, '2a', 'm2', TRUE),
-    (pid_iman04, 'Adesivo impresso + Laminação fosco',    50, 18, '1a', 'm2', TRUE),
-    (pid_iman04, 'Adesivo impresso + Laminação brilho',   50, 18, '1a', 'm2', TRUE)
+    (pid_iman04, 'Adesivo impresso fosco',                45,  6, 'segunda', 'm2', TRUE),
+    (pid_iman04, 'Adesivo impresso brilho',               45,  6, 'segunda', 'm2', TRUE),
+    (pid_iman04, 'Adesivo impresso + Laminação fosco',    50, 18, 'primeira', 'm2', TRUE),
+    (pid_iman04, 'Adesivo impresso + Laminação brilho',   50, 18, 'primeira', 'm2', TRUE)
   ON CONFLICT (produto_id, nome) DO UPDATE SET
     markup_padrao   = EXCLUDED.markup_padrao,
     garantia_meses  = EXCLUDED.garantia_meses,
@@ -1027,8 +1031,8 @@ BEGIN
   -- -----------------------------------------------
   INSERT INTO produto_modelos (produto_id, nome, markup_padrao, garantia_meses, linha_qualidade, unidade_venda, ativo)
   VALUES
-    (pid_tot, 'Projeto personalizado_Front Light', 70, 18, '1a', 'unidade', TRUE),
-    (pid_tot, 'Projeto personalizado_Back Light',  70, 18, '1a', 'unidade', TRUE)
+    (pid_tot, 'Projeto personalizado_Front Light', 70, 18, 'primeira', 'unidade', TRUE),
+    (pid_tot, 'Projeto personalizado_Back Light',  70, 18, 'primeira', 'unidade', TRUE)
   ON CONFLICT (produto_id, nome) DO UPDATE SET
     markup_padrao   = EXCLUDED.markup_padrao,
     garantia_meses  = EXCLUDED.garantia_meses,
@@ -1040,9 +1044,9 @@ BEGIN
   -- -----------------------------------------------
   INSERT INTO produto_modelos (produto_id, nome, markup_padrao, garantia_meses, linha_qualidade, unidade_venda, ativo)
   VALUES
-    (pid_rout, 'Área quadrada 3 a 5mm', 50, 0, '1a', 'm2', TRUE),
-    (pid_rout, 'Área quadrada 10mm',    50, 0, '1a', 'm2', TRUE),
-    (pid_rout, 'Área quadrada 20mm',    50, 0, '1a', 'm2', TRUE)
+    (pid_rout, 'Área quadrada 3 a 5mm', 50, 0, 'primeira', 'm2', TRUE),
+    (pid_rout, 'Área quadrada 10mm',    50, 0, 'primeira', 'm2', TRUE),
+    (pid_rout, 'Área quadrada 20mm',    50, 0, 'primeira', 'm2', TRUE)
   ON CONFLICT (produto_id, nome) DO UPDATE SET
     markup_padrao   = EXCLUDED.markup_padrao,
     garantia_meses  = EXCLUDED.garantia_meses,
@@ -1052,9 +1056,9 @@ BEGIN
   -- Corte em Router — ROUTM-001 (mesmos modelos)
   INSERT INTO produto_modelos (produto_id, nome, markup_padrao, garantia_meses, linha_qualidade, unidade_venda, ativo)
   VALUES
-    (pid_routm, 'Área quadrada 3 a 5mm', 50, 0, '1a', 'm2', TRUE),
-    (pid_routm, 'Área quadrada 10mm',    50, 0, '1a', 'm2', TRUE),
-    (pid_routm, 'Área quadrada 20mm',    50, 0, '1a', 'm2', TRUE)
+    (pid_routm, 'Área quadrada 3 a 5mm', 50, 0, 'primeira', 'm2', TRUE),
+    (pid_routm, 'Área quadrada 10mm',    50, 0, 'primeira', 'm2', TRUE),
+    (pid_routm, 'Área quadrada 20mm',    50, 0, 'primeira', 'm2', TRUE)
   ON CONFLICT (produto_id, nome) DO UPDATE SET
     markup_padrao   = EXCLUDED.markup_padrao,
     garantia_meses  = EXCLUDED.garantia_meses,
@@ -1066,7 +1070,7 @@ BEGIN
   -- -----------------------------------------------
   INSERT INTO produto_modelos (produto_id, nome, markup_padrao, garantia_meses, linha_qualidade, unidade_venda, ativo)
   VALUES
-    (pid_art, 'Hora homem', 60, 0, '1a', 'hora', TRUE)
+    (pid_art, 'Hora homem', 60, 0, 'primeira', 'hora', TRUE)
   ON CONFLICT (produto_id, nome) DO UPDATE SET
     markup_padrao   = EXCLUDED.markup_padrao,
     garantia_meses  = EXCLUDED.garantia_meses,
