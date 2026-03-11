@@ -1,11 +1,22 @@
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 
+export interface CategoriaProduto {
+  id: string;
+  nome: string;
+  slug: string;
+  descricao: string | null;
+  icone: string | null;
+  ordem_exibicao: number;
+  ativo: boolean;
+}
+
 export interface Produto {
   id: string;
   codigo: string | null;
   nome: string;
   categoria: string;
+  categoria_id: string | null;
   descricao: string | null;
   unidade_padrao: string;
   ativo: boolean;
@@ -23,6 +34,13 @@ export interface ProdutoModelo {
   preco_fixo: number | null;
   tempo_producao_min: number | null;
   ativo: boolean;
+  // Campos adicionados em migration 011
+  linha_qualidade: 'primeira' | 'segunda' | null;
+  descritivo_tecnico: string | null;
+  descritivo_nf: string | null;
+  garantia_meses: number | null;
+  garantia_descricao: string | null;
+  unidade_venda: string | null;
   materiais?: ModeloMaterial[];
   processos?: ModeloProcesso[];
 }
@@ -64,6 +82,22 @@ export interface Servico {
 }
 
 // ─── Hooks ──────────────────────────────────────────────────────────────────
+
+export function useCategorias() {
+  return useQuery({
+    queryKey: ["categorias_produto"],
+    queryFn: async () => {
+      const { data, error } = await supabase
+        .from("categorias_produto")
+        .select("*")
+        .eq("ativo", true)
+        .order("ordem_exibicao");
+      if (error) throw error;
+      return (data ?? []) as CategoriaProduto[];
+    },
+    staleTime: 1000 * 60 * 10,
+  });
+}
 
 export function useProdutos() {
   return useQuery({

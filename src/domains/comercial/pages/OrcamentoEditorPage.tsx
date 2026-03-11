@@ -316,11 +316,14 @@ export default function OrcamentoEditorPage() {
       tempo_minutos: p.tempo_por_unidade_min,
     }));
 
+    // Usa descritivo_nf como especificacao para NF (fallback para nome do modelo)
+    const especificacaoNF = modelo.descritivo_nf ?? modelo.nome;
+
     setNewItem((s) => ({
       ...s,
       modelo_id: modelo.id,
       descricao: s.descricao || modelo.nome,
-      especificacao: modelo.nome,
+      especificacao: especificacaoNF,
       largura_cm: modelo.largura_cm ?? s.largura_cm,
       altura_cm: modelo.altura_cm ?? s.altura_cm,
       markup_percentual: modelo.markup_padrao ?? s.markup_percentual,

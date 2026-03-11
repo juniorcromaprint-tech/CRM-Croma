@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useMemo } from "react";
-import { Loader2, Ruler, Package, Cog, Percent } from "lucide-react";
+import { Loader2, Ruler, Package, Cog, Percent, ShieldCheck, Star } from "lucide-react";
 import { Label } from "@/components/ui/label";
 import { Badge } from "@/components/ui/badge";
 import {
@@ -10,6 +10,7 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import {
+  useCategorias,
   useProdutos,
   useProdutoModelos,
   type Produto,
@@ -63,13 +64,22 @@ export default function ProdutoSelector({
   onProdutoChange,
   onModeloChange,
 }: ProdutoSelectorProps) {
+  const { data: categorias = [], isLoading: categoriasLoading } = useCategorias();
   const { data: produtos = [], isLoading: produtosLoading } = useProdutos();
   const { data: modelos = [], isLoading: modelosLoading } = useProdutoModelos(
     produtoId ?? undefined,
   );
 
+  const [categoriaId, setCategoriaId] = useState<string>("");
   const [produtoFilter, setProdutoFilter] = useState("");
   const [modeloFilter, setModeloFilter] = useState("");
+
+  // Reset produto + modelo when categoria changes
+  const handleCategoriaChange = (value: string) => {
+    setCategoriaId(value);
+    onProdutoChange(null);
+    onModeloChange(null);
+  };
 
   // Reset modelo when produto changes
   useEffect(() => {
@@ -77,7 +87,7 @@ export default function ProdutoSelector({
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [produtoId]);
 
-  // Clear filters when selects close (new selection)
+  // Clear filters when selects close
   const handleProdutoOpenChange = (open: boolean) => {
     if (!open) setProdutoFilter("");
   };
@@ -87,16 +97,21 @@ export default function ProdutoSelector({
 
   // ─── Filtered lists ─────────────────────────────────────────────────────
 
+  const produtosPorCategoria = useMemo(() => {
+    if (!categoriaId) return produtos;
+    return produtos.filter((p) => p.categoria_id === categoriaId);
+  }, [produtos, categoriaId]);
+
   const filteredProdutos = useMemo(() => {
-    if (!produtoFilter.trim()) return produtos;
+    if (!produtoFilter.trim()) return produtosPorCategoria;
     const term = produtoFilter.toLowerCase();
-    return produtos.filter(
+    return produtosPorCategoria.filter(
       (p) =>
         p.nome.toLowerCase().includes(term) ||
         p.categoria.toLowerCase().includes(term) ||
         (p.codigo && p.codigo.toLowerCase().includes(term)),
     );
-  }, [produtos, produtoFilter]);
+  }, [produtosPorCategoria, produtoFilter]);
 
   const filteredModelos = useMemo(() => {
     if (!modeloFilter.trim()) return modelos;
@@ -122,10 +137,44 @@ export default function ProdutoSelector({
     ? modelos.find((m) => m.id === modeloId) ?? null
     : null;
 
+  const isLoading = categoriasLoading || produtosLoading;
+
   // ─── Render ─────────────────────────────────────────────────────────────
 
   return (
     <div className="space-y-3">
+      {/* Categoria select */}
+      <div>
+        <Label className="text-xs text-slate-500">Categoria</Label>
+        <Select
+          value={categoriaId}
+          onValueChange={handleCategoriaChange}
+          disabled={isLoading}
+        >
+          <SelectTrigger className="mt-1.5 rounded-xl">
+            {isLoading ? (
+              <span className="flex items-center gap-2 text-slate-400">
+                <Loader2 className="animate-spin" size={14} />
+                Carregando...
+              </span>
+            ) : (
+              <SelectValue placeholder="Todas as categorias" />
+            )}
+          </SelectTrigger>
+          <SelectContent>
+            <SelectItem value="">Todas as categorias</SelectItem>
+            {categorias.map((c) => (
+              <SelectItem key={c.id} value={c.id}>
+                <span className="flex items-center gap-2">
+                  {c.icone && <span>{c.icone}</span>}
+                  {c.nome}
+                </span>
+              </SelectItem>
+            ))}
+          </SelectContent>
+        </Select>
+      </div>
+
       {/* Produto select */}
       <div>
         <Label className="text-xs text-slate-500">Produto *</Label>
@@ -133,8 +182,9 @@ export default function ProdutoSelector({
           value={produtoId ?? ""}
           onValueChange={handleProdutoChange}
           onOpenChange={handleProdutoOpenChange}
+          disabled={isLoading}
         >
-          <SelectTrigger className="mt-1.5 rounded-xl" disabled={produtosLoading}>
+          <SelectTrigger className="mt-1.5 rounded-xl">
             {produtosLoading ? (
               <span className="flex items-center gap-2 text-slate-400">
                 <Loader2 className="animate-spin" size={14} />
@@ -159,9 +209,9 @@ export default function ProdutoSelector({
                 <SelectItem key={p.id} value={p.id}>
                   <span className="flex items-center gap-2">
                     <span>{p.nome}</span>
-                    <span className="text-xs text-slate-400">
-                      {p.categoria}
-                    </span>
+                    {!categoriaId && (
+                      <span className="text-xs text-slate-400">{p.categoria}</span>
+                    )}
                   </span>
                 </SelectItem>
               ))
@@ -210,7 +260,12 @@ export default function ProdutoSelector({
             ) : (
               filteredModelos.map((m) => (
                 <SelectItem key={m.id} value={m.id}>
-                  {m.nome}
+                  <span className="flex items-center gap-2">
+                    <span>{m.nome}</span>
+                    {m.linha_qualidade === 'primeira' && (
+                      <span className="text-[10px] text-amber-600 font-medium">★ 1ª linha</span>
+                    )}
+                  </span>
                 </SelectItem>
               ))
             )}
@@ -218,10 +273,36 @@ export default function ProdutoSelector({
         </Select>
       </div>
 
-      {/* Modelo metadata badges */}
+      {/* Modelo metadata badges + descritivo */}
       {selectedModelo && (
-        <div className="bg-blue-50 border border-blue-200 rounded-xl p-3">
+        <div className="bg-blue-50 border border-blue-200 rounded-xl p-3 space-y-2.5">
           <div className="flex flex-wrap items-center gap-2">
+            {/* Linha de qualidade */}
+            {selectedModelo.linha_qualidade === 'primeira' && (
+              <Badge className="bg-amber-100 text-amber-700 border-amber-200 rounded-lg gap-1.5 font-medium">
+                <Star size={11} />
+                1ª Linha
+              </Badge>
+            )}
+            {selectedModelo.linha_qualidade === 'segunda' && (
+              <Badge variant="secondary" className="bg-slate-100 text-slate-600 border-slate-200 rounded-lg gap-1.5 font-medium">
+                2ª Linha
+              </Badge>
+            )}
+
+            {/* Garantia */}
+            {selectedModelo.garantia_meses != null && (
+              <Badge
+                variant="secondary"
+                className="bg-emerald-100 text-emerald-700 border-emerald-200 rounded-lg gap-1.5 font-medium"
+              >
+                <ShieldCheck size={11} />
+                {selectedModelo.garantia_meses < 12
+                  ? `${selectedModelo.garantia_meses} meses`
+                  : `${selectedModelo.garantia_meses / 12} ano${selectedModelo.garantia_meses >= 24 ? 's' : ''}`}
+              </Badge>
+            )}
+
             {/* Dimensions */}
             {selectedModelo.largura_cm != null &&
               selectedModelo.altura_cm != null && (
@@ -267,6 +348,30 @@ export default function ProdutoSelector({
               Markup: {selectedModelo.markup_padrao}%
             </Badge>
           </div>
+
+          {/* Descritivo técnico */}
+          {selectedModelo.descritivo_tecnico && (
+            <div className="border-t border-blue-200 pt-2">
+              <p className="text-[10px] font-semibold text-blue-500 uppercase tracking-wider mb-1">
+                Descritivo Técnico
+              </p>
+              <p className="text-xs text-slate-700 leading-relaxed">
+                {selectedModelo.descritivo_tecnico}
+              </p>
+            </div>
+          )}
+
+          {/* Garantia descrição */}
+          {selectedModelo.garantia_descricao && (
+            <div className="border-t border-blue-200 pt-2">
+              <p className="text-[10px] font-semibold text-emerald-600 uppercase tracking-wider mb-1">
+                Garantia
+              </p>
+              <p className="text-xs text-slate-600">
+                {selectedModelo.garantia_descricao}
+              </p>
+            </div>
+          )}
         </div>
       )}
     </div>

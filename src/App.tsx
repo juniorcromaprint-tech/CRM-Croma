@@ -39,6 +39,8 @@ import AdminPrecificacaoPage from "@/domains/admin/pages/AdminPrecificacaoPage";
 import AdminConfigPage from "@/domains/admin/pages/AdminConfigPage";
 import AdminProdutosPage from "@/domains/admin/pages/AdminProdutosPage";
 import AdminSetupPage from "@/domains/admin/pages/AdminSetupPage";
+import AdminCentrosCustoPage from "@/domains/admin/pages/AdminCentrosCustoPage";
+import AdminPlanoContasPage from "@/domains/admin/pages/AdminPlanoContasPage";
 
 // ---- Fiscal Domain Pages ----
 import FiscalDashboardPage from "@/domains/fiscal/pages/FiscalDashboardPage";
@@ -136,6 +138,8 @@ const App = () => (
               <Route path="admin/produtos" element={<AdminProdutosPage />} />
               <Route path="admin/auditoria" element={<AdminUsuariosPage />} />
               <Route path="admin/setup" element={<AdminSetupPage />} />
+              <Route path="admin/centros-custo" element={<AdminCentrosCustoPage />} />
+              <Route path="admin/plano-contas" element={<AdminPlanoContasPage />} />
 
               {/* ===== SETTINGS ===== */}
               <Route path="settings" element={<Settings />} />

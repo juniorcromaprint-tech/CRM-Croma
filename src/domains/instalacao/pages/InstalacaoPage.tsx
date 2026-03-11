@@ -41,6 +41,7 @@ import {
   Wifi,
   FileText,
   Image,
+  ClipboardList,
 } from "lucide-react";
 
 import {
@@ -49,6 +50,7 @@ import {
   type CampoFoto,
 } from "../services/instalacao.service";
 import { useCampoRealtimeGlobal } from "../hooks/useCampoRealtime";
+import ChecklistSheet from "../components/ChecklistSheet";
 
 // ============================================================
 // STATUS CONFIG (Campo)
@@ -195,9 +197,11 @@ function StatusBadge({ status }: { status: string }) {
 function JobCard({
   job,
   onVerFotos,
+  onChecklist,
 }: {
   job: CampoInstalacao;
   onVerFotos: (job: CampoInstalacao) => void;
+  onChecklist: (job: CampoInstalacao) => void;
 }) {
   const temFotos = (job.fotos_antes ?? 0) + (job.fotos_depois ?? 0) > 0;
   const temProblema = !!job.issues;
@@ -289,8 +293,8 @@ function JobCard({
           </div>
         )}
 
-        {/* Mídia */}
-        <div className="flex items-center gap-3 mt-3">
+        {/* Mídia + Checklist */}
+        <div className="flex items-center gap-2 mt-3 flex-wrap">
           <button
             onClick={() => onVerFotos(job)}
             disabled={!temFotos}
@@ -302,6 +306,13 @@ function JobCard({
           >
             <Camera size={12} />
             {job.fotos_antes ?? 0} antes / {job.fotos_depois ?? 0} depois
+          </button>
+          <button
+            onClick={() => onChecklist(job)}
+            className="inline-flex items-center gap-1.5 text-xs font-medium px-3 py-1.5 rounded-lg border border-violet-200 bg-violet-50 text-violet-700 hover:bg-violet-100 transition-colors"
+          >
+            <ClipboardList size={12} />
+            Checklist
           </button>
           {(job.total_videos ?? 0) > 0 && (
             <span className="inline-flex items-center gap-1 text-xs text-slate-500">
@@ -471,6 +482,8 @@ export default function InstalacaoPage() {
   const [abaAtiva, setAbaAtiva] = useState<"hoje" | "todas">("hoje");
   const [jobSelecionado, setJobSelecionado] = useState<CampoInstalacao | null>(null);
   const [sheetFotosAberta, setSheetFotosAberta] = useState(false);
+  const [jobChecklist, setJobChecklist] = useState<CampoInstalacao | null>(null);
+  const [sheetChecklistAberta, setSheetChecklistAberta] = useState(false);
 
   // Realtime global — invalida queries automaticamente
   useCampoRealtimeGlobal();
@@ -546,6 +559,11 @@ export default function InstalacaoPage() {
   function abrirFotos(job: CampoInstalacao) {
     setJobSelecionado(job);
     setSheetFotosAberta(true);
+  }
+
+  function abrirChecklist(job: CampoInstalacao) {
+    setJobChecklist(job);
+    setSheetChecklistAberta(true);
   }
 
   const isLoading = abaAtiva === "hoje" ? loadingHoje : loadingTodos;
@@ -751,7 +769,7 @@ export default function InstalacaoPage() {
           ) : (
             <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-4">
               {jobsHojeFiltrados.map((job) => (
-                <JobCard key={job.job_id} job={job} onVerFotos={abrirFotos} />
+                <JobCard key={job.job_id} job={job} onVerFotos={abrirFotos} onChecklist={abrirChecklist} />
               ))}
             </div>
           )}
@@ -772,7 +790,7 @@ export default function InstalacaoPage() {
           ) : (
             <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-4">
               {jobsTodosFiltrados.map((job) => (
-                <JobCard key={job.job_id} job={job} onVerFotos={abrirFotos} />
+                <JobCard key={job.job_id} job={job} onVerFotos={abrirFotos} onChecklist={abrirChecklist} />
               ))}
             </div>
           )}
@@ -784,6 +802,13 @@ export default function InstalacaoPage() {
         job={jobSelecionado}
         open={sheetFotosAberta}
         onClose={() => setSheetFotosAberta(false)}
+      />
+
+      {/* Sheet de Checklist */}
+      <ChecklistSheet
+        job={jobChecklist}
+        open={sheetChecklistAberta}
+        onClose={() => setSheetChecklistAberta(false)}
       />
     </div>
   );
