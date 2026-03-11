@@ -4,6 +4,49 @@
 // ============================================================================
 
 import { supabase } from "@/integrations/supabase/client";
+import { DEFAULT_PRICING_CONFIG, type PricingConfig } from "@/shared/services/pricing-engine";
+
+// ─── Helper: buscar config de precificação ativa e gerar snapshot ────────────
+
+async function buildConfigSnapshot(): Promise<Record<string, unknown>> {
+  try {
+    const { data } = await supabase
+      .from("config_precificacao")
+      .select("*")
+      .eq("ativo", true)
+      .order("updated_at", { ascending: false })
+      .limit(1)
+      .maybeSingle();
+
+    if (data) {
+      return {
+        faturamento_medio: (data as any).faturamento_medio,
+        custo_operacional: (data as any).custo_operacional,
+        custo_produtivo: (data as any).custo_produtivo,
+        qtd_funcionarios: (data as any).qtd_funcionarios,
+        horas_mes: (data as any).horas_mes,
+        percentual_comissao: (data as any).percentual_comissao,
+        percentual_impostos: (data as any).percentual_impostos,
+        percentual_juros: (data as any).percentual_juros,
+        snapshot_em: new Date().toISOString(),
+      };
+    }
+  } catch {
+    console.warn("[orcamento.service] config_precificacao não disponível — usando defaults");
+  }
+  // Fallback: salva DEFAULT_PRICING_CONFIG como snapshot
+  return {
+    faturamento_medio: DEFAULT_PRICING_CONFIG.faturamentoMedio,
+    custo_operacional: DEFAULT_PRICING_CONFIG.custoOperacional,
+    custo_produtivo: DEFAULT_PRICING_CONFIG.custoProdutivo,
+    qtd_funcionarios: DEFAULT_PRICING_CONFIG.qtdFuncionarios,
+    horas_mes: DEFAULT_PRICING_CONFIG.horasMes,
+    percentual_comissao: DEFAULT_PRICING_CONFIG.percentualComissao,
+    percentual_impostos: DEFAULT_PRICING_CONFIG.percentualImpostos,
+    percentual_juros: DEFAULT_PRICING_CONFIG.percentualJuros,
+    snapshot_em: new Date().toISOString(),
+  };
+}
 
 // ─── Types ──────────────────────────────────────────────────────────────────
 
@@ -150,6 +193,11 @@ export interface OrcamentoItemCreateDetalhado extends OrcamentoItemCreateInput {
     custo_unitario: number;
     custo_total: number;
   }>;
+  processos?: Array<{
+    etapa: string;
+    tempo_minutos: number;
+    ordem?: number;
+  }>;
 }
 
 export interface OrcamentoServicoCreateInput {
@@ -277,6 +325,9 @@ export const orcamentoService = {
 
     const numero = `PROP-${ano}-${String((count ?? 0) + 1).padStart(3, "0")}`;
 
+    // Snapshot dos custos fixos no momento da criação (imutabilidade)
+    const configSnapshot = await buildConfigSnapshot();
+
     const { data, error } = await supabase
       .from("propostas")
       .insert({
@@ -288,6 +339,7 @@ export const orcamentoService = {
         desconto_valor: 0,
         total: 0,
         validade_dias: input.validade_dias ?? 10,
+        config_snapshot: configSnapshot,
       })
       .select()
       .single();
@@ -350,7 +402,7 @@ export const orcamentoService = {
     propostaId: string,
     item: OrcamentoItemCreateDetalhado,
   ): Promise<OrcamentoItem> {
-    const { materiais, acabamentos, ...itemBase } = item;
+    const { materiais, acabamentos, processos, ...itemBase } = item;
 
     // 1. Inserir item principal
     const { data: novoItem, error } = await supabase
@@ -397,6 +449,22 @@ export const orcamentoService = {
         );
       } catch {
         console.warn("[orcamento.service] proposta_item_acabamentos não disponível");
+      }
+    }
+
+    // 4. Inserir processos (se existirem e tabela disponível — migration 018)
+    if (processos && processos.length > 0) {
+      try {
+        await supabase.from("proposta_item_processos").insert(
+          processos.map((p, idx) => ({
+            proposta_item_id: itemResult.id,
+            etapa: p.etapa,
+            tempo_minutos: p.tempo_minutos,
+            ordem: p.ordem ?? idx,
+          })),
+        );
+      } catch {
+        console.warn("[orcamento.service] proposta_item_processos não disponível (migration 018 pendente?)");
       }
     }
 

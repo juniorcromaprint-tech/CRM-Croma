@@ -26,7 +26,7 @@ import {
   useRemoverItemOrcamento,
   useSalvarServicos,
 } from "../hooks/useOrcamentos";
-import { useOrcamentoPricing } from "../hooks/useOrcamentoPricing";
+import { useOrcamentoPricing, useRegrasPrecificacao } from "../hooks/useOrcamentoPricing";
 import { useOrcamentoAlerts } from "../hooks/useOrcamentoAlerts";
 import PricingCalculator from "../components/PricingCalculator";
 import ProdutoSelector from "../components/ProdutoSelector";
@@ -44,7 +44,9 @@ import type {
   OrcamentoAcabamento,
   OrcamentoProcesso,
   OrcamentoItemInput,
+  RegraPrecificacao,
 } from "@/shared/services/orcamento-pricing.service";
+import { validarDesconto } from "@/shared/services/orcamento-pricing.service";
 import { brl } from "@/shared/utils/format";
 import { useQuery } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
@@ -285,6 +287,20 @@ export default function OrcamentoEditorPage() {
     config: pricingConfig,
   });
 
+  // ─── Desconto validation ────────────────────────────────────────────────
+  const { data: regrasDesconto = [] } = useRegrasPrecificacao();
+
+  const descontoValidation = useMemo(() => {
+    if (descontoPercentual <= 0) return { valido: true, desconto_maximo: 10, requer_aprovacao: false, aviso: null };
+    const subtotal = orcamento?.subtotal ?? 0;
+    return validarDesconto(
+      descontoPercentual,
+      null, // categoria geral
+      regrasDesconto as RegraPrecificacao[],
+      subtotal,
+    );
+  }, [descontoPercentual, regrasDesconto, orcamento?.subtotal]);
+
   // ─── Handlers ───────────────────────────────────────────────────────────
 
   const handleProdutoChange = useCallback((produto: Produto | null) => {
@@ -367,6 +383,10 @@ export default function OrcamentoEditorPage() {
   const handleSave = async () => {
     if (!titulo.trim()) { showError("Informe o titulo do orcamento"); return; }
     if (!clienteId) { showError("Selecione o cliente"); return; }
+    if (!descontoValidation.valido) {
+      showError(`Desconto de ${descontoPercentual}% excede o máximo permitido (${descontoValidation.desconto_maximo}%). Reduza ou solicite aprovação.`);
+      return;
+    }
 
     if (isNew) {
       const orc = await criar.mutateAsync({
@@ -446,6 +466,11 @@ export default function OrcamentoEditorPage() {
           custo_unitario: a.custo_unitario,
           custo_total: a.quantidade * a.custo_unitario,
         })),
+        processos: newItem.processos.map((p, idx) => ({
+          etapa: p.etapa,
+          tempo_minutos: p.tempo_minutos,
+          ordem: idx,
+        })),
       },
     });
 
@@ -506,13 +531,17 @@ export default function OrcamentoEditorPage() {
               markup_percentual: item.markup_percentual ?? 40,
               valor_unitario: 0,
               valor_total: 0,
+              // Templates não carregam materiais/processos — itens ficam como rascunho
               materiais: [],
               acabamentos: [],
+              processos: [],
             },
           });
         }
         await orcamentoService.recalcularTotais(id);
-        showSuccess(`${template.itens.length} itens do template "${template.nome}" adicionados`);
+        showSuccess(
+          `${template.itens.length} itens adicionados. Abra cada item para selecionar produto/modelo e calcular o preço.`,
+        );
       } catch {
         showError("Erro ao aplicar template");
       }
@@ -648,8 +677,26 @@ export default function OrcamentoEditorPage() {
                 step={0.5}
                 value={descontoPercentual}
                 onChange={(e) => setDescontoPercentual(Number(e.target.value))}
-                className="mt-1.5 rounded-xl"
+                className={`mt-1.5 rounded-xl ${
+                  !descontoValidation.valido
+                    ? "border-red-400 focus-visible:ring-red-400"
+                    : descontoValidation.aviso
+                      ? "border-amber-400 focus-visible:ring-amber-400"
+                      : ""
+                }`}
               />
+              {!descontoValidation.valido && (
+                <p className="mt-1 text-xs text-red-600 flex items-center gap-1">
+                  <AlertTriangle size={12} />
+                  {descontoValidation.aviso}
+                </p>
+              )}
+              {descontoValidation.valido && descontoValidation.aviso && (
+                <p className="mt-1 text-xs text-amber-600 flex items-center gap-1">
+                  <AlertTriangle size={12} />
+                  {descontoValidation.aviso}
+                </p>
+              )}
             </div>
             <div>
               <Label htmlFor="condicoes">Condicoes de Pagamento</Label>

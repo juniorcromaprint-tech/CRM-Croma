@@ -203,8 +203,9 @@ function SkeletonRow() {
 export default function PedidosPage() {
   const queryClient = useQueryClient();
   const navigate = useNavigate();
-  const { profile } = useAuth();
+  const { profile, can } = useAuth();
   const isAdmin = !profile?.role || profile.role === 'admin';
+  const canCriarPedido = can('pedidos', 'criar');
 
   // --- State ---
   const [searchTerm, setSearchTerm] = useState("");
@@ -431,15 +432,17 @@ export default function PedidosPage() {
             Gerenciamento de pedidos e acompanhamento de produção
           </p>
         </div>
-        <Button
-          onClick={() => {
-            resetCreateForm();
-            setIsCreateOpen(true);
-          }}
-          className="bg-blue-600 hover:bg-blue-700 text-white rounded-xl h-11 px-5 shadow-sm w-full md:w-auto"
-        >
-          <Plus size={20} className="mr-2" /> Novo Pedido
-        </Button>
+        {canCriarPedido && (
+          <Button
+            onClick={() => {
+              resetCreateForm();
+              setIsCreateOpen(true);
+            }}
+            className="bg-blue-600 hover:bg-blue-700 text-white rounded-xl h-11 px-5 shadow-sm w-full md:w-auto"
+          >
+            <Plus size={20} className="mr-2" /> Novo Pedido
+          </Button>
+        )}
       </div>
 
       {/* ----------------------------------------------------------------- */}

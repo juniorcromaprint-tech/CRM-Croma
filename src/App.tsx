@@ -3,8 +3,10 @@ import { Toaster as Sonner } from "@/components/ui/sonner";
 import { TooltipProvider } from "@/components/ui/tooltip";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { BrowserRouter, Routes, Route, Navigate } from "react-router-dom";
+import { Loader2 } from "lucide-react";
 import { AuthProvider, useAuth } from "./contexts/AuthContext";
 import Layout from "./components/Layout";
+import LoginPage from "@/shared/pages/LoginPage";
 
 // ---- Domain Pages (real) ----
 import DashboardPage from "@/domains/comercial/pages/DashboardPage";
@@ -79,8 +81,22 @@ const queryClient = new QueryClient({
   },
 });
 
-// Wrapper que permite acesso sem login (para protótipo/demo)
-const DemoRoute = ({ children }: { children: React.ReactNode }) => {
+// Wrapper de autenticação — exige login
+const ProtectedRoute = ({ children }: { children: React.ReactNode }) => {
+  const { session, isLoading } = useAuth();
+
+  if (isLoading) {
+    return (
+      <div className="flex h-screen items-center justify-center bg-slate-50">
+        <Loader2 className="h-8 w-8 animate-spin text-blue-600" />
+      </div>
+    );
+  }
+
+  if (!session) {
+    return <Navigate to="/login" replace />;
+  }
+
   return <>{children}</>;
 };
 
@@ -92,6 +108,9 @@ const App = () => (
         <Sonner />
         <BrowserRouter>
           <Routes>
+            {/* ===== LOGIN ===== */}
+            <Route path="/login" element={<LoginPage />} />
+
             {/* ===== TV — fullscreen sem sidebar ===== */}
             <Route path="/tv" element={<TvPage />} />
 
@@ -99,9 +118,9 @@ const App = () => (
             <Route
               path="/"
               element={
-                <DemoRoute>
+                <ProtectedRoute>
                   <Layout />
-                </DemoRoute>
+                </ProtectedRoute>
               }
             >
               {/* ===== PAINEL ===== */}

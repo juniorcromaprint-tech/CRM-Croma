@@ -24,8 +24,10 @@ const STATUS_CONFIG: Record<OrcamentoStatus, { label: string; cls: string }> = {
 
 export default function OrcamentosPage() {
   const navigate = useNavigate();
-  const { profile } = useAuth();
+  const { profile, can } = useAuth();
   const isAdmin = !profile?.role || profile.role === 'admin';
+  const canCriar = can('comercial', 'criar');
+  const canExcluir = can('comercial', 'excluir');
   const [search, setSearch] = useState("");
   const [statusFilter, setStatusFilter] = useState<OrcamentoStatus | "todos">("todos");
   const [deleteId, setDeleteId] = useState<string | null>(null);
@@ -73,12 +75,14 @@ export default function OrcamentosPage() {
           <h1 className="text-2xl md:text-3xl font-bold text-slate-800">Orçamentos</h1>
           <p className="text-slate-500 mt-1">Gerencie propostas comerciais com precificação automática</p>
         </div>
-        <Button
-          onClick={handleNovo}
-          className="bg-blue-600 hover:bg-blue-700 text-white rounded-xl h-11 px-5 shadow-sm w-full md:w-auto"
-        >
-          <Plus size={20} className="mr-2" /> Novo Orçamento
-        </Button>
+        {canCriar && (
+          <Button
+            onClick={handleNovo}
+            className="bg-blue-600 hover:bg-blue-700 text-white rounded-xl h-11 px-5 shadow-sm w-full md:w-auto"
+          >
+            <Plus size={20} className="mr-2" /> Novo Orçamento
+          </Button>
+        )}
       </div>
 
       {/* KPIs */}
@@ -167,7 +171,7 @@ export default function OrcamentosPage() {
               ? "Tente ajustar os filtros de busca"
               : "Crie seu primeiro orçamento com precificação automática"}
           </p>
-          {!search && statusFilter === "todos" && (
+          {canCriar && !search && statusFilter === "todos" && (
             <Button onClick={handleNovo} className="mt-6 bg-blue-600 hover:bg-blue-700 text-white rounded-xl">
               <Plus size={16} className="mr-2" /> Criar Orçamento
             </Button>
@@ -233,7 +237,7 @@ export default function OrcamentosPage() {
                           >
                             <Copy size={15} />
                           </Button>
-                          {(canDelete(orc.status) || isAdmin) && (
+                          {canExcluir && (canDelete(orc.status) || isAdmin) && (
                             <Button
                               variant="ghost" size="icon"
                               className="h-8 w-8 rounded-xl text-slate-400 hover:text-red-600 hover:bg-red-50"

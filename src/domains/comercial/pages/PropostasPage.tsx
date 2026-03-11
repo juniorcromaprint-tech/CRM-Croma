@@ -36,8 +36,10 @@ const STATUS_CONFIG: Record<PropostaStatus, { label: string; cls: string }> = {
 // ─── Component ───────────────────────────────────────────────────────────────
 
 export default function PropostasPage() {
-  const { profile } = useAuth()
+  const { profile, can } = useAuth()
   const isAdmin = !profile?.role || profile.role === 'admin'
+  const canCriar = can('comercial', 'criar')
+  const canExcluir = can('comercial', 'excluir')
 
   // Filters
   const [search, setSearch] = useState('')
@@ -121,12 +123,14 @@ export default function PropostasPage() {
           <h1 className="text-2xl md:text-3xl font-bold text-slate-800">Propostas</h1>
           <p className="text-slate-500 mt-1">Gerencie oportunidades comerciais no pipeline de vendas</p>
         </div>
-        <Button
-          onClick={() => { resetForm(); setIsCreateOpen(true) }}
-          className="bg-blue-600 hover:bg-blue-700 text-white rounded-xl h-11 px-5 shadow-sm w-full md:w-auto"
-        >
-          <Plus size={20} className="mr-2" /> Nova Proposta
-        </Button>
+        {canCriar && (
+          <Button
+            onClick={() => { resetForm(); setIsCreateOpen(true) }}
+            className="bg-blue-600 hover:bg-blue-700 text-white rounded-xl h-11 px-5 shadow-sm w-full md:w-auto"
+          >
+            <Plus size={20} className="mr-2" /> Nova Proposta
+          </Button>
+        )}
       </div>
 
       {/* KPIs */}
@@ -215,7 +219,7 @@ export default function PropostasPage() {
               ? 'Tente ajustar os filtros de busca'
               : 'Crie sua primeira proposta para começar'}
           </p>
-          {!search && statusFilter === 'todos' && (
+          {canCriar && !search && statusFilter === 'todos' && (
             <Button
               onClick={() => { resetForm(); setIsCreateOpen(true) }}
               className="mt-6 bg-blue-600 hover:bg-blue-700 text-white rounded-xl"
@@ -268,7 +272,7 @@ export default function PropostasPage() {
                       </td>
                       <td className="py-3.5 px-4">
                         <div className="flex items-center justify-end gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
-                          {(canDelete(p.status) || isAdmin) && (
+                          {canExcluir && (canDelete(p.status) || isAdmin) && (
                             <Button
                               variant="ghost" size="icon"
                               className="h-8 w-8 rounded-xl text-slate-400 hover:text-red-600 hover:bg-red-50"

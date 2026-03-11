@@ -192,3 +192,48 @@ export function validarMarkup(
 
   return { valido, markup_minimo, aviso };
 }
+
+/**
+ * Valida desconto contra a regra da categoria.
+ * Retorna se é válido + info para workflow de aprovação.
+ */
+export function validarDesconto(
+  desconto_percentual: number,
+  categoria: string | null | undefined,
+  regras: RegraPrecificacao[],
+  subtotal: number,
+): {
+  valido: boolean;
+  desconto_maximo: number;
+  requer_aprovacao: boolean;
+  aviso: string | null;
+} {
+  const ativas = regras.filter(r => r.ativo !== false);
+  const regra = ativas.find(r => r.categoria === categoria) ?? ativas.find(r => r.categoria === 'geral');
+  const desconto_maximo = regra?.desconto_maximo ?? 10;
+
+  if (desconto_percentual <= 0) {
+    return { valido: true, desconto_maximo, requer_aprovacao: false, aviso: null };
+  }
+
+  if (desconto_percentual > desconto_maximo) {
+    return {
+      valido: false,
+      desconto_maximo,
+      requer_aprovacao: true,
+      aviso: `Desconto de ${desconto_percentual}% excede o máximo permitido (${desconto_maximo}%). Requer aprovação do gestor.`,
+    };
+  }
+
+  // Desconto alto mas dentro do limite — alerta informativo
+  if (desconto_percentual > desconto_maximo * 0.7) {
+    return {
+      valido: true,
+      desconto_maximo,
+      requer_aprovacao: false,
+      aviso: `Desconto próximo do máximo (${desconto_maximo}%). Valor economizado: R$ ${(subtotal * desconto_percentual / 100).toFixed(2)}`,
+    };
+  }
+
+  return { valido: true, desconto_maximo, requer_aprovacao: false, aviso: null };
+}
