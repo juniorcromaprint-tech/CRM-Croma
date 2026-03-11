@@ -73,4 +73,11 @@ export default defineConfig(() => ({
       "@": path.resolve(__dirname, "./src"),
     },
   },
+  optimizeDeps: {
+    esbuildOptions: {
+      define: {
+        "process.env.NODE_ENV": JSON.stringify("development"),
+      },
+    },
+  },
 }));

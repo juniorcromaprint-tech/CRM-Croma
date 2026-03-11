@@ -1,5 +1,6 @@
 import React, { useState, useMemo } from "react";
 import {
+  type LucideProps,
   Package, Plus, Search, Edit, Trash2, Tag, Layers, Box, Ruler,
   DollarSign, Clock, Settings, ChevronDown, ChevronUp, Loader2,
   List, FlaskConical, Workflow, AlertTriangle, Scissors,
@@ -33,22 +34,24 @@ import { showSuccess, showError } from "@/utils/toast";
 
 // ─────────────────────────────────────────────
 // Category visual config
+// Use component references (not JSX) at module level to avoid
+// "_jsxDEV is not a function" crash from module-init-order issues.
 // ─────────────────────────────────────────────
-const CAT_STYLE: Record<string, { color: string; bgIcon: string; icon: React.ReactNode }> = {
-  adesivos:      { color: "bg-blue-100 text-blue-700 border-blue-200",     bgIcon: "bg-blue-50 text-blue-600",     icon: <Tag size={14} /> },
-  banners_lonas: { color: "bg-purple-100 text-purple-700 border-purple-200", bgIcon: "bg-purple-50 text-purple-600", icon: <Layers size={14} /> },
-  placas:        { color: "bg-teal-100 text-teal-700 border-teal-200",     bgIcon: "bg-teal-50 text-teal-600",     icon: <Box size={14} /> },
-  fachadas:      { color: "bg-amber-100 text-amber-700 border-amber-200",  bgIcon: "bg-amber-50 text-amber-600",   icon: <Package size={14} /> },
-  letreiros:     { color: "bg-orange-100 text-orange-700 border-orange-200", bgIcon: "bg-orange-50 text-orange-600", icon: <Package size={14} /> },
-  luminosos:     { color: "bg-yellow-100 text-yellow-700 border-yellow-200", bgIcon: "bg-yellow-50 text-yellow-600", icon: <Package size={14} /> },
-  grafica:       { color: "bg-green-100 text-green-700 border-green-200",  bgIcon: "bg-green-50 text-green-600",   icon: <Package size={14} /> },
-  estruturas:    { color: "bg-stone-100 text-stone-700 border-stone-200",  bgIcon: "bg-stone-50 text-stone-600",   icon: <Package size={14} /> },
-  displays:      { color: "bg-rose-100 text-rose-700 border-rose-200",     bgIcon: "bg-rose-50 text-rose-600",     icon: <Package size={14} /> },
-  iluminacao:    { color: "bg-cyan-100 text-cyan-700 border-cyan-200",     bgIcon: "bg-cyan-50 text-cyan-600",     icon: <Package size={14} /> },
-  servicos:      { color: "bg-slate-100 text-slate-600 border-slate-200",  bgIcon: "bg-slate-50 text-slate-500",   icon: <Settings size={14} /> },
+const CAT_STYLE: Record<string, { color: string; bgIcon: string; Icon: React.ComponentType<LucideProps> }> = {
+  adesivos:      { color: "bg-blue-100 text-blue-700 border-blue-200",     bgIcon: "bg-blue-50 text-blue-600",     Icon: Tag },
+  banners_lonas: { color: "bg-purple-100 text-purple-700 border-purple-200", bgIcon: "bg-purple-50 text-purple-600", Icon: Layers },
+  placas:        { color: "bg-teal-100 text-teal-700 border-teal-200",     bgIcon: "bg-teal-50 text-teal-600",     Icon: Box },
+  fachadas:      { color: "bg-amber-100 text-amber-700 border-amber-200",  bgIcon: "bg-amber-50 text-amber-600",   Icon: Package },
+  letreiros:     { color: "bg-orange-100 text-orange-700 border-orange-200", bgIcon: "bg-orange-50 text-orange-600", Icon: Package },
+  luminosos:     { color: "bg-yellow-100 text-yellow-700 border-yellow-200", bgIcon: "bg-yellow-50 text-yellow-600", Icon: Package },
+  grafica:       { color: "bg-green-100 text-green-700 border-green-200",  bgIcon: "bg-green-50 text-green-600",   Icon: Package },
+  estruturas:    { color: "bg-stone-100 text-stone-700 border-stone-200",  bgIcon: "bg-stone-50 text-stone-600",   Icon: Package },
+  displays:      { color: "bg-rose-100 text-rose-700 border-rose-200",     bgIcon: "bg-rose-50 text-rose-600",     Icon: Package },
+  iluminacao:    { color: "bg-cyan-100 text-cyan-700 border-cyan-200",     bgIcon: "bg-cyan-50 text-cyan-600",     Icon: Package },
+  servicos:      { color: "bg-slate-100 text-slate-600 border-slate-200",  bgIcon: "bg-slate-50 text-slate-500",   Icon: Settings },
 };
 function getCatStyle(slug: string) {
-  return CAT_STYLE[slug] ?? { color: "bg-slate-100 text-slate-600 border-slate-200", bgIcon: "bg-slate-50 text-slate-500", icon: <Package size={14} /> };
+  return CAT_STYLE[slug] ?? { color: "bg-slate-100 text-slate-600 border-slate-200", bgIcon: "bg-slate-50 text-slate-500", Icon: Package };
 }
 function margemColor(m: number) {
   if (m >= 25) return "text-emerald-600 bg-emerald-50 border-emerald-200";
@@ -849,7 +852,7 @@ export default function ProdutosPage() {
             <button key={cat.slug} onClick={() => setFilterCat(cat.slug)}
               className={`flex-shrink-0 text-xs font-semibold px-3 py-1.5 rounded-lg border transition-all whitespace-nowrap flex items-center gap-1.5 ${
                 filterCat === cat.slug ? style.color + " ring-2 ring-offset-1 ring-blue-400 shadow-sm" : "bg-white text-slate-500 border-slate-200 hover:border-slate-300"}`}>
-              {style.icon} {cat.nome} <span className="opacity-70">({count})</span>
+              <style.Icon size={14} /> {cat.nome} <span className="opacity-70">({count})</span>
             </button>
           );
         })}
