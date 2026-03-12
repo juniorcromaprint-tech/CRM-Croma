@@ -1,5 +1,6 @@
 import React, { useState, useMemo, useCallback, useRef, type DragEvent } from "react";
 import { supabase } from "@/integrations/supabase/client";
+import { criarOrdemInstalacao } from "@/domains/instalacao/services/instalacao-criacao.service";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { showSuccess, showError } from "@/utils/toast";
 import { brl, formatDate, formatDateTime } from "@/shared/utils/format";
@@ -385,11 +386,14 @@ export default function ProducaoPage() {
   const { data: pedidoItens = [] } = useQuery({
     queryKey: ["producao", "pedido-itens-select"],
     queryFn: async () => {
+      // Busca apenas itens que pertencem a um pedido existente (!inner garante o join)
+      // e cujo pedido_id não é nulo — evita itens órfãos no dropdown
       const { data, error } = await supabase
         .from("pedido_itens")
         .select(
-          "id, descricao, especificacao, quantidade, pedido_id, pedidos(numero, clientes(nome_fantasia, razao_social))"
+          "id, descricao, especificacao, quantidade, pedido_id, pedidos!inner(numero, clientes(nome_fantasia, razao_social))"
         )
+        .not("pedido_id", "is", null)
         .order("created_at", { ascending: false })
         .limit(100);
 
@@ -484,9 +488,11 @@ export default function ProducaoPage() {
     mutationFn: async ({
       etapaId,
       newStatus,
+      opId,
     }: {
       etapaId: string;
       newStatus: string;
+      opId?: string;
     }) => {
       const updates: Record<string, unknown> = { status: newStatus };
       if (newStatus === "em_andamento") {
@@ -502,9 +508,54 @@ export default function ProducaoPage() {
         .eq("id", etapaId);
 
       if (error) throw error;
+
+      // Auto-advance OP to "liberado" when all etapas are concluded
+      if (newStatus === "concluida" && opId) {
+        const { data: etapas } = await supabase
+          .from("producao_etapas")
+          .select("status, inicio, fim")
+          .eq("ordem_producao_id", opId);
+
+        // Recalculate cumulative real time from all completed etapas
+        const tempoReal = (etapas ?? []).reduce((acc, e) => {
+          if (e.inicio && e.fim) {
+            return acc + Math.round((new Date(e.fim).getTime() - new Date(e.inicio).getTime()) / 60000);
+          }
+          return acc;
+        }, 0);
+        if (tempoReal > 0) {
+          await supabase
+            .from("ordens_producao")
+            .update({ tempo_real_min: tempoReal })
+            .eq("id", opId);
+        }
+
+        const allDone = etapas?.every((e) => e.status === "concluida");
+        if (allDone) {
+          await supabase
+            .from("ordens_producao")
+            .update({ status: "liberado" })
+            .eq("id", opId);
+          // Auto-advance pedido to "produzido" and create OS de instalação
+          const { data: op } = await supabase
+            .from("ordens_producao")
+            .select("pedido_id")
+            .eq("id", opId)
+            .single();
+          if (op?.pedido_id) {
+            await supabase
+              .from("pedidos")
+              .update({ status: "produzido" })
+              .eq("id", op.pedido_id);
+          }
+          await criarOrdemInstalacao(opId);
+        }
+      }
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["producao"] });
+      queryClient.invalidateQueries({ queryKey: ["pedidos"] });
+      queryClient.invalidateQueries({ queryKey: ["instalacoes"] });
       showSuccess("Etapa atualizada!");
     },
     onError: (err: Error) => {
@@ -1437,6 +1488,7 @@ export default function ProducaoPage() {
                                       updateEtapaMutation.mutate({
                                         etapaId: etapa.id,
                                         newStatus: "em_andamento",
+                                        opId: selectedOP.id,
                                       });
                                     }}
                                   >
@@ -1455,6 +1507,7 @@ export default function ProducaoPage() {
                                       updateEtapaMutation.mutate({
                                         etapaId: etapa.id,
                                         newStatus: "concluida",
+                                        opId: selectedOP.id,
                                       });
                                     }}
                                   >

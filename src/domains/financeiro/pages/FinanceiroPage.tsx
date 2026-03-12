@@ -341,6 +341,8 @@ function TabContasReceber() {
   const [showCreateDialog, setShowCreateDialog] = useState(false);
   const [baixaTarget, setBaixaTarget] = useState<ContaReceber | null>(null);
   const [baixaValor, setBaixaValor] = useState("");
+  const [baixaData, setBaixaData] = useState(localDateStr());
+  const [baixaComprovante, setBaixaComprovante] = useState("");
 
   // ── Queries ──
   const {
@@ -376,19 +378,46 @@ function TabContasReceber() {
     },
   });
 
+  const { data: pedidosOptions = [] } = useQuery({
+    queryKey: ["financeiro", "pedidos_options"],
+    queryFn: async (): Promise<{ id: string; numero: string }[]> => {
+      const { data, error } = await supabase
+        .from("pedidos")
+        .select("id, numero")
+        .not("status", "eq", "cancelado")
+        .order("created_at", { ascending: false })
+        .limit(100);
+      if (error) throw new Error(error.message);
+      return (data ?? []) as { id: string; numero: string }[];
+    },
+    staleTime: 2 * 60 * 1000,
+  });
+
   // ── Mutations ──
   const createMutation = useMutation({
     mutationFn: async (payload: {
       cliente_id: string;
+      pedido_id?: string | null;
       valor_original: number;
       data_vencimento: string;
       forma_pagamento?: string;
       observacoes?: string;
     }) => {
+      // Gerar número sequencial automático no formato CR-AAAA-NNNN
+      const year = new Date().getFullYear();
+      const { count } = await supabase
+        .from("contas_receber")
+        .select("*", { count: "exact", head: true })
+        .like("numero_titulo", `CR-${year}-%`);
+      const seq = String((count ?? 0) + 1).padStart(4, "0");
+      const numero_titulo = `CR-${year}-${seq}`;
+
       const { data, error } = await supabase
         .from("contas_receber")
         .insert({
           cliente_id: payload.cliente_id,
+          pedido_id: payload.pedido_id || null,
+          numero_titulo,
           valor_original: payload.valor_original,
           data_vencimento: payload.data_vencimento,
           forma_pagamento: payload.forma_pagamento || null,
@@ -401,21 +430,29 @@ function TabContasReceber() {
       if (error) throw new Error(error.message);
       return data;
     },
-    onSuccess: () => {
+    onSettled: (_data, err) => {
+      if (err) {
+        showError((err as Error).message);
+        return;
+      }
       queryClient.invalidateQueries({ queryKey: ["financeiro"] });
       showSuccess("Conta a receber criada com sucesso");
       setShowCreateDialog(false);
+      setFormCR({ cliente_id: "", pedido_id: "", valor_original: "", data_vencimento: "", forma_pagamento: "", observacoes: "" });
     },
-    onError: (err: Error) => showError(err.message),
   });
 
   const baixaMutation = useMutation({
     mutationFn: async ({
       id,
       valor_pago,
+      data_pagamento,
+      comprovante,
     }: {
       id: string;
       valor_pago: number;
+      data_pagamento: string;
+      comprovante: string;
     }) => {
       const { data: conta, error: fetchErr } = await supabase
         .from("contas_receber")
@@ -436,7 +473,8 @@ function TabContasReceber() {
           valor_pago: novoValorPago,
           saldo,
           status: novoStatus,
-          data_pagamento: localDateStr(),
+          data_pagamento: data_pagamento || localDateStr(),
+          observacoes: comprovante ? `Comprovante: ${comprovante}` : undefined,
           updated_at: new Date().toISOString(),
         })
         .eq("id", id);
@@ -447,6 +485,8 @@ function TabContasReceber() {
       showSuccess("Pagamento registrado com sucesso");
       setBaixaTarget(null);
       setBaixaValor("");
+      setBaixaData(localDateStr());
+      setBaixaComprovante("");
     },
     onError: (err: Error) => showError(err.message),
   });
@@ -476,12 +516,11 @@ function TabContasReceber() {
     for (const c of contas) {
       const val = Number(c.valor_original) || 0;
       const pago = Number(c.valor_pago) || 0;
-      if (c.status === "pago") {
-        recebido += val;
-      } else if (c.status === "vencido") {
+      recebido += pago; // soma todos os pagamentos, incluindo parciais
+      if (c.status === "vencido") {
         vencido += val - pago;
         totalReceber += val - pago;
-      } else if (c.status !== "cancelado") {
+      } else if (c.status !== "cancelado" && c.status !== "pago") {
         emDia += val - pago;
         totalReceber += val - pago;
       }
@@ -492,6 +531,7 @@ function TabContasReceber() {
   // ── Create Dialog State ──
   const [formCR, setFormCR] = useState({
     cliente_id: "",
+    pedido_id: "",
     valor_original: "",
     data_vencimento: "",
     forma_pagamento: "",
@@ -505,6 +545,7 @@ function TabContasReceber() {
     }
     createMutation.mutate({
       cliente_id: formCR.cliente_id,
+      pedido_id: formCR.pedido_id || null,
       valor_original: parseFloat(formCR.valor_original),
       data_vencimento: formCR.data_vencimento,
       forma_pagamento: formCR.forma_pagamento,
@@ -519,7 +560,12 @@ function TabContasReceber() {
       showError("Informe um valor valido");
       return;
     }
-    baixaMutation.mutate({ id: baixaTarget.id, valor_pago: valor });
+    baixaMutation.mutate({
+      id: baixaTarget.id,
+      valor_pago: valor,
+      data_pagamento: baixaData || localDateStr(),
+      comprovante: baixaComprovante,
+    });
   };
 
   if (error) {
@@ -669,7 +715,7 @@ function TabContasReceber() {
                     Status
                   </th>
                   <th className="text-right px-6 py-3 text-xs font-bold text-slate-500 uppercase tracking-wide">
-                    Acao
+                    Ação
                   </th>
                 </tr>
               </thead>
@@ -725,6 +771,8 @@ function TabContasReceber() {
                             variant="outline"
                             onClick={() => {
                               setBaixaTarget(conta);
+                              setBaixaData(localDateStr());
+                              setBaixaComprovante("");
                               const remaining =
                                 Number(conta.valor_original) -
                                 (Number(conta.valor_pago) || 0);
@@ -811,23 +859,53 @@ function TabContasReceber() {
               </div>
             </div>
             <div className="space-y-2">
-              <Label>Forma de Pagamento</Label>
-              <Input
-                placeholder="Ex: Boleto, PIX, Transferencia..."
-                value={formCR.forma_pagamento}
-                onChange={(e) =>
-                  setFormCR((p) => ({
-                    ...p,
-                    forma_pagamento: e.target.value,
-                  }))
+              <Label>Pedido (opcional)</Label>
+              <Select
+                value={formCR.pedido_id || "__none__"}
+                onValueChange={(v) =>
+                  setFormCR((p) => ({ ...p, pedido_id: v === "__none__" ? "" : v }))
                 }
-                className="rounded-xl"
-              />
+              >
+                <SelectTrigger className="rounded-xl">
+                  <SelectValue placeholder="Vincular a um pedido..." />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="__none__">— Nenhum —</SelectItem>
+                  {pedidosOptions.map((p) => (
+                    <SelectItem key={p.id} value={p.id}>
+                      {p.numero}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
             </div>
             <div className="space-y-2">
-              <Label>Observacoes</Label>
+              <Label>Forma de Pagamento</Label>
+              <Select
+                value={formCR.forma_pagamento || "__none__"}
+                onValueChange={(v) =>
+                  setFormCR((p) => ({ ...p, forma_pagamento: v === "__none__" ? "" : v }))
+                }
+              >
+                <SelectTrigger className="rounded-xl">
+                  <SelectValue placeholder="Selecione..." />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="__none__">— Selecione —</SelectItem>
+                  <SelectItem value="Boleto">Boleto</SelectItem>
+                  <SelectItem value="PIX">PIX</SelectItem>
+                  <SelectItem value="Transferência">Transferência</SelectItem>
+                  <SelectItem value="Cartão de Crédito">Cartão de Crédito</SelectItem>
+                  <SelectItem value="Cartão de Débito">Cartão de Débito</SelectItem>
+                  <SelectItem value="Dinheiro">Dinheiro</SelectItem>
+                  <SelectItem value="Cheque">Cheque</SelectItem>
+                </SelectContent>
+              </Select>
+            </div>
+            <div className="space-y-2">
+              <Label>Observações</Label>
               <Textarea
-                placeholder="Observacoes adicionais..."
+                placeholder="Observações adicionais..."
                 value={formCR.observacoes}
                 onChange={(e) =>
                   setFormCR((p) => ({ ...p, observacoes: e.target.value }))
@@ -863,6 +941,8 @@ function TabContasReceber() {
           if (!open) {
             setBaixaTarget(null);
             setBaixaValor("");
+            setBaixaData(localDateStr());
+            setBaixaComprovante("");
           }
         }}
       >
@@ -916,6 +996,24 @@ function TabContasReceber() {
                   value={baixaValor}
                   onChange={(e) => setBaixaValor(e.target.value)}
                   className="rounded-xl font-mono text-lg"
+                />
+              </div>
+              <div className="space-y-2">
+                <Label>Data do Pagamento</Label>
+                <Input
+                  type="date"
+                  value={baixaData}
+                  onChange={(e) => setBaixaData(e.target.value)}
+                  className="rounded-xl"
+                />
+              </div>
+              <div className="space-y-2">
+                <Label>Nº Comprovante / Referência</Label>
+                <Input
+                  placeholder="Ex: 123456, PIX-abc123..."
+                  value={baixaComprovante}
+                  onChange={(e) => setBaixaComprovante(e.target.value)}
+                  className="rounded-xl"
                 />
               </div>
             </div>
@@ -1233,7 +1331,7 @@ function TabContasPagar() {
                     Status
                   </th>
                   <th className="text-right px-6 py-3 text-xs font-bold text-slate-500 uppercase tracking-wide">
-                    Acao
+                    Ação
                   </th>
                 </tr>
               </thead>
@@ -1373,9 +1471,9 @@ function TabContasPagar() {
               />
             </div>
             <div className="space-y-2">
-              <Label>Observacoes</Label>
+              <Label>Observações</Label>
               <Textarea
-                placeholder="Observacoes adicionais..."
+                placeholder="Observações adicionais..."
                 value={formCP.observacoes}
                 onChange={(e) =>
                   setFormCP((p) => ({ ...p, observacoes: e.target.value }))

@@ -93,21 +93,22 @@ export default function ClienteFormSheet({ isOpen, onClose, clienteToEdit, onSav
     if (!form.razao_social.trim()) return;
 
     // Build only the fields that exist in the DB schema
+    // DB columns: site (not website), endereco/cidade/estado/cep (not endereco_*)
     const input: ClienteInput = {
       razao_social: form.razao_social.trim(),
       nome_fantasia: form.nome_fantasia.trim() || null,
       cnpj: form.cnpj.trim() || null,
       telefone: form.telefone.trim() || null,
       email: form.email.trim() || null,
-      website: form.website.trim() || null,
+      site: form.website.trim() || null,
       segmento: form.segmento || null,
       classificacao: form.classificacao || null,
       origem: form.origem || null,
       observacoes: form.observacoes.trim() || null,
-      endereco_rua: form.endereco_rua.trim() || null,
-      endereco_cidade: form.endereco_cidade.trim() || null,
-      endereco_estado: form.endereco_estado.trim().toUpperCase().slice(0, 2) || null,
-      endereco_cep: form.endereco_cep.trim() || null,
+      endereco: form.endereco_rua.trim() || null,
+      cidade: form.endereco_cidade.trim() || null,
+      estado: form.endereco_estado.trim().toUpperCase().slice(0, 2) || null,
+      cep: form.endereco_cep.trim() || null,
     };
 
     if (isEditing && clienteToEdit?.id) {

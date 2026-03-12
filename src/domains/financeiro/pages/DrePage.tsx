@@ -129,26 +129,27 @@ function useDRE(periodo: string) {
   return useQuery<DREData>({
     queryKey: ["dre", periodo],
     queryFn: async () => {
-      // 1. Contas a receber pagas no período (= Receita Bruta)
+      // 1. Contas a receber do período — inclui pendentes, parciais e pagas
+      //    Usa data_vencimento como referência temporal; fallback: sem filtro de status
       const { data: receber, error: errReceber } = await supabase
         .from("contas_receber")
-        .select("valor_original, valor_pago, status, data_pagamento")
-        .eq("status", "pago")
-        .gte("data_pagamento", inicio)
-        .lte("data_pagamento", fim);
+        .select("valor_original, valor_pago, status, data_pagamento, data_vencimento")
+        .neq("status", "cancelado")
+        .gte("data_vencimento", inicio)
+        .lte("data_vencimento", fim);
 
       if (errReceber) {
         showError("Erro ao buscar contas a receber");
         throw errReceber;
       }
 
-      // 2. Contas a pagar pagas no período (= Custos)
+      // 2. Contas a pagar do período
       const { data: pagar, error: errPagar } = await supabase
         .from("contas_pagar")
-        .select("valor_original, valor_pago, status, data_pagamento, categoria")
-        .eq("status", "pago")
-        .gte("data_pagamento", inicio)
-        .lte("data_pagamento", fim);
+        .select("valor_original, valor_pago, status, data_pagamento, data_vencimento, categoria")
+        .neq("status", "cancelado")
+        .gte("data_vencimento", inicio)
+        .lte("data_vencimento", fim);
 
       if (errPagar) {
         showError("Erro ao buscar contas a pagar");
@@ -169,9 +170,10 @@ function useDRE(periodo: string) {
 
       // ── Cálculos ─────────────────────────────────────────────────────────
 
-      // Receita Bruta = soma dos valores recebidos
+      // Receita Bruta = soma dos valores faturados (emitidos) no período
+      // Inclui contas pendentes, parciais e pagas
       const receitaBruta = (receber ?? []).reduce(
-        (acc, r) => acc + (Number(r.valor_pago) || Number(r.valor_original) || 0),
+        (acc, r) => acc + (Number(r.valor_original) || 0),
         0,
       );
 
@@ -286,23 +288,23 @@ function useDREGrafico() {
           supabase
             .from("contas_receber")
             .select("valor_pago, valor_original")
-            .eq("status", "pago")
-            .gte("data_pagamento", inicio)
-            .lte("data_pagamento", fim),
+            .neq("status", "cancelado")
+            .gte("data_vencimento", inicio)
+            .lte("data_vencimento", fim),
           supabase
             .from("contas_pagar")
             .select("valor_pago, valor_original")
-            .eq("status", "pago")
-            .gte("data_pagamento", inicio)
-            .lte("data_pagamento", fim),
+            .neq("status", "cancelado")
+            .gte("data_vencimento", inicio)
+            .lte("data_vencimento", fim),
         ]);
 
         const receita = (receber ?? []).reduce(
-          (acc, r) => acc + (Number(r.valor_pago) || Number(r.valor_original) || 0),
+          (acc, r) => acc + (Number(r.valor_original) || 0),
           0,
         );
         const custos = (pagar ?? []).reduce(
-          (acc, p) => acc + (Number(p.valor_pago) || Number(p.valor_original) || 0),
+          (acc, p) => acc + (Number(p.valor_original) || 0),
           0,
         );
 

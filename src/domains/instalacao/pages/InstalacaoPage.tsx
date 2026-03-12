@@ -1,7 +1,8 @@
 import React, { useState, useMemo } from "react";
-import { useQuery } from "@tanstack/react-query";
+import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
-import { showError } from "@/utils/toast";
+import { showError, showSuccess } from "@/utils/toast";
+import { gerarContasReceber } from "@/domains/financeiro/services/financeiro-automation.service";
 
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
@@ -479,7 +480,7 @@ export default function InstalacaoPage() {
   const [filtroStatus, setFiltroStatus] = useState("todos");
   const [filtroDataInicio, setFiltroDataInicio] = useState("");
   const [filtroDataFim, setFiltroDataFim] = useState("");
-  const [abaAtiva, setAbaAtiva] = useState<"hoje" | "todas">("hoje");
+  const [abaAtiva, setAbaAtiva] = useState<"hoje" | "todas" | "ordens">("hoje");
   const [jobSelecionado, setJobSelecionado] = useState<CampoInstalacao | null>(null);
   const [sheetFotosAberta, setSheetFotosAberta] = useState(false);
   const [jobChecklist, setJobChecklist] = useState<CampoInstalacao | null>(null);
@@ -487,6 +488,8 @@ export default function InstalacaoPage() {
 
   // Realtime global — invalida queries automaticamente
   useCampoRealtimeGlobal();
+
+  const queryClient = useQueryClient();
 
   // Query: OS de hoje
   const {
@@ -520,6 +523,52 @@ export default function InstalacaoPage() {
       }),
     enabled: abaAtiva === "todas",
     staleTime: 30_000,
+  });
+
+  // Query: Ordens de Instalação ERP (tabela ordens_instalacao)
+  const {
+    data: ordensErp = [],
+    isLoading: loadingOrdens,
+    refetch: refetchOrdens,
+  } = useQuery({
+    queryKey: ["ordens-instalacao-erp"],
+    queryFn: async () => {
+      const { data, error } = await supabase
+        .from("ordens_instalacao")
+        .select("id, status, data_agendada, pedido_id, created_at, pedidos(numero, status)")
+        .order("created_at", { ascending: false })
+        .limit(200);
+      if (error) throw error;
+      return (data ?? []) as Array<{
+        id: string;
+        status: string;
+        data_agendada: string | null;
+        pedido_id: string | null;
+        created_at: string;
+        pedidos: { numero: string; status: string } | null;
+      }>;
+    },
+    enabled: abaAtiva === "ordens",
+    staleTime: 30_000,
+  });
+
+  const concluirInstalacao = useMutation({
+    mutationFn: async (os: (typeof ordensErp)[0]) => {
+      const { error } = await supabase
+        .from("ordens_instalacao")
+        .update({ status: "concluida" })
+        .eq("id", os.id);
+      if (error) throw error;
+      if (os.pedido_id && os.pedidos?.status === "em_instalacao") {
+        await supabase.from("pedidos").update({ status: "concluido" }).eq("id", os.pedido_id);
+        await gerarContasReceber(os.pedido_id);
+      }
+    },
+    onSuccess: () => {
+      showSuccess("Instalação concluída com sucesso");
+      queryClient.invalidateQueries({ queryKey: ["ordens-instalacao-erp"] });
+    },
+    onError: () => showError("Erro ao concluir instalação"),
   });
 
   // KPIs baseados em "hoje"
@@ -592,7 +641,7 @@ export default function InstalacaoPage() {
           variant="outline"
           size="sm"
           className="rounded-xl h-9 gap-2"
-          onClick={() => (abaAtiva === "hoje" ? refetchHoje() : refetchTodos())}
+          onClick={() => abaAtiva === "hoje" ? refetchHoje() : abaAtiva === "todas" ? refetchTodos() : refetchOrdens()}
         >
           <RefreshCw size={14} />
           Atualizar
@@ -731,7 +780,7 @@ export default function InstalacaoPage() {
       {/* Abas: Hoje / Todas */}
       <Tabs
         value={abaAtiva}
-        onValueChange={(v) => setAbaAtiva(v as "hoje" | "todas")}
+        onValueChange={(v) => setAbaAtiva(v as "hoje" | "todas" | "ordens")}
       >
         <div className="flex items-center justify-between flex-wrap gap-3">
           <TabsList className="rounded-xl bg-slate-100 p-1">
@@ -745,6 +794,14 @@ export default function InstalacaoPage() {
             </TabsTrigger>
             <TabsTrigger value="todas" className="rounded-lg text-sm px-4">
               Todas
+            </TabsTrigger>
+            <TabsTrigger value="ordens" className="rounded-lg text-sm px-4">
+              Ordens ERP
+              {ordensErp.filter((o) => o.status !== "concluida" && o.status !== "cancelada").length > 0 && (
+                <span className="ml-2 inline-flex items-center justify-center w-5 h-5 rounded-full bg-orange-500 text-white text-[10px] font-bold">
+                  {ordensErp.filter((o) => o.status !== "concluida" && o.status !== "cancelada").length}
+                </span>
+              )}
             </TabsTrigger>
           </TabsList>
 
@@ -792,6 +849,74 @@ export default function InstalacaoPage() {
               {jobsTodosFiltrados.map((job) => (
                 <JobCard key={job.job_id} job={job} onVerFotos={abrirFotos} onChecklist={abrirChecklist} />
               ))}
+            </div>
+          )}
+        </TabsContent>
+
+        {/* ABA: ORDENS ERP */}
+        <TabsContent value="ordens" className="mt-4">
+          {loadingOrdens ? (
+            <LoadingState />
+          ) : ordensErp.length === 0 ? (
+            <EmptyState mensagem="Nenhuma ordem de instalação registrada no ERP" />
+          ) : (
+            <div className="space-y-3">
+              {ordensErp.map((os) => {
+                const isConcluida = os.status === "concluida";
+                const isCancelada = os.status === "cancelada";
+                const statusConfig: Record<string, { label: string; cls: string }> = {
+                  aguardando_agendamento: { label: "Aguardando Agendamento", cls: "bg-yellow-50 text-yellow-700 border-yellow-200" },
+                  agendada:               { label: "Agendada",               cls: "bg-blue-50 text-blue-700 border-blue-200" },
+                  em_execucao:            { label: "Em Execução",            cls: "bg-cyan-50 text-cyan-700 border-cyan-200" },
+                  concluida:              { label: "Concluída",              cls: "bg-emerald-50 text-emerald-700 border-emerald-200" },
+                  cancelada:              { label: "Cancelada",              cls: "bg-slate-50 text-slate-500 border-slate-200" },
+                };
+                const sc = statusConfig[os.status] ?? { label: os.status, cls: "bg-slate-50 text-slate-600 border-slate-200" };
+
+                return (
+                  <Card key={os.id} className="border-none shadow-sm rounded-2xl bg-white">
+                    <CardContent className="p-4 flex items-center justify-between gap-4 flex-wrap">
+                      <div className="flex items-center gap-3 min-w-0">
+                        <div className="w-9 h-9 rounded-xl bg-orange-100 flex items-center justify-center shrink-0">
+                          <Wrench size={16} className="text-orange-600" />
+                        </div>
+                        <div className="min-w-0">
+                          <p className="font-semibold text-slate-800 text-sm">
+                            Pedido {os.pedidos?.numero ?? "—"}
+                          </p>
+                          <p className="text-xs text-slate-500 mt-0.5 flex items-center gap-2">
+                            {os.data_agendada && (
+                              <span className="flex items-center gap-1">
+                                <CalendarDays size={11} />
+                                {new Date(os.data_agendada + "T00:00:00").toLocaleDateString("pt-BR")}
+                              </span>
+                            )}
+                            <span className="text-slate-300">·</span>
+                            <span>Status pedido: {os.pedidos?.status ?? "—"}</span>
+                          </p>
+                        </div>
+                      </div>
+
+                      <div className="flex items-center gap-3 shrink-0">
+                        <span className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium border ${sc.cls}`}>
+                          {sc.label}
+                        </span>
+                        {!isConcluida && !isCancelada && (
+                          <Button
+                            size="sm"
+                            className="h-8 rounded-xl bg-emerald-600 hover:bg-emerald-700 text-white text-xs gap-1.5"
+                            disabled={concluirInstalacao.isPending}
+                            onClick={() => concluirInstalacao.mutate(os)}
+                          >
+                            <CheckCircle2 size={13} />
+                            Concluir
+                          </Button>
+                        )}
+                      </div>
+                    </CardContent>
+                  </Card>
+                );
+              })}
             </div>
           )}
         </TabsContent>

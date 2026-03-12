@@ -11,6 +11,7 @@ import LoginPage from "@/shared/pages/LoginPage";
 // ---- Domain Pages (real) ----
 import DashboardPage from "@/domains/comercial/pages/DashboardPage";
 import LeadsPage from "@/domains/comercial/pages/LeadsPage";
+import LeadDetailPage from "@/domains/comercial/pages/LeadDetailPage";
 import PipelinePage from "@/domains/comercial/pages/PipelinePage";
 import ClientesPage from "@/domains/clientes/pages/ClientesPage";
 
@@ -129,6 +130,7 @@ const App = () => (
 
               {/* ===== COMERCIAL ===== */}
               <Route path="leads" element={<LeadsPage />} />
+              <Route path="leads/:id" element={<LeadDetailPage />} />
               <Route path="pipeline" element={<PipelinePage />} />
               <Route path="orcamentos" element={<OrcamentosPage />} />
               <Route path="orcamentos/novo" element={<OrcamentoEditorPage />} />

@@ -1,5 +1,6 @@
 import { useState } from "react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
+import { useNavigate } from "react-router-dom";
 import { supabase } from "@/integrations/supabase/client";
 import { showSuccess, showError } from "@/utils/toast";
 import { brl as formatBRL } from "@/shared/utils/format";
@@ -35,6 +36,7 @@ const TEMP_CONFIG: Record<string, { label: string; color: string }> = {
 };
 
 export default function LeadsPage() {
+  const navigate = useNavigate();
   const queryClient = useQueryClient();
   const [search, setSearch] = useState("");
   const [statusFilter, setStatusFilter] = useState<string>("all");
@@ -166,7 +168,7 @@ export default function LeadsPage() {
           </div>
         ) : leads && leads.length > 0 ? (
           leads.map((lead) => (
-            <div key={lead.id} className="bg-white rounded-2xl border border-slate-200 p-5 hover:shadow-md transition-shadow group cursor-pointer">
+            <div key={lead.id} className="bg-white rounded-2xl border border-slate-200 p-5 hover:shadow-md transition-shadow group cursor-pointer" onClick={() => navigate(`/leads/${lead.id}`)}>
               <div className="flex items-start justify-between">
                 <div className="flex-1 min-w-0">
                   <div className="flex items-center gap-2 mb-1">

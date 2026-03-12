@@ -36,6 +36,7 @@ import ServicoSelector from "../components/ServicoSelector";
 import TemplateSelector from "../components/TemplateSelector";
 import AlertasOrcamento from "../components/AlertasOrcamento";
 import ResumoVendedor from "../components/ResumoVendedor";
+import ClienteCombobox from "@/shared/components/ClienteCombobox";
 import type { OrcamentoServicoItem } from "../components/ServicoSelector";
 import type { OrcamentoTemplate } from "../components/TemplateSelector";
 import type { Produto, ProdutoModelo } from "../hooks/useProdutosModelos";
@@ -48,8 +49,6 @@ import type {
 } from "@/shared/services/orcamento-pricing.service";
 import { validarDesconto } from "@/shared/services/orcamento-pricing.service";
 import { brl } from "@/shared/utils/format";
-import { useQuery } from "@tanstack/react-query";
-import { supabase } from "@/integrations/supabase/client";
 import { showError, showSuccess } from "@/utils/toast";
 import { orcamentoService } from "../services/orcamento.service";
 
@@ -219,20 +218,6 @@ export default function OrcamentoEditorPage() {
 
   // ─── Template modal ─────────────────────────────────────────────────────
   const [showTemplateModal, setShowTemplateModal] = useState(false);
-
-  // ─── Load clientes for dropdown ─────────────────────────────────────────
-  const { data: clientes = [] } = useQuery({
-    queryKey: ["clientes-select"],
-    queryFn: async () => {
-      const { data } = await supabase
-        .from("clientes")
-        .select("id, razao_social, nome_fantasia")
-        .eq("ativo", true)
-        .order("razao_social")
-        .limit(200);
-      return data ?? [];
-    },
-  });
 
   // ─── Pre-fill form when editing ─────────────────────────────────────────
   useEffect(() => {
@@ -645,23 +630,11 @@ export default function OrcamentoEditorPage() {
             </div>
             <div>
               <Label>Cliente *</Label>
-              <Select
-                value={clienteId || "__none__"}
-                onValueChange={(v) => setClienteId(v === "__none__" ? "" : v)}
-              >
-                <SelectTrigger className="mt-1.5 rounded-xl">
-                  <SelectValue placeholder="Selecionar cliente" />
-                </SelectTrigger>
-                <SelectContent>
-                  {/* Sentinel item so Radix never sees value="" in the list */}
-                  <SelectItem value="__none__" className="hidden" aria-hidden>&nbsp;</SelectItem>
-                  {(clientes as Array<{ id: string; razao_social: string; nome_fantasia: string | null }>)
-                    .filter((c) => c.id)
-                    .map((c) => (
-                      <SelectItem key={c.id} value={c.id}>{c.nome_fantasia || c.razao_social}</SelectItem>
-                    ))}
-                </SelectContent>
-              </Select>
+              <ClienteCombobox
+                value={clienteId}
+                onValueChange={setClienteId}
+                className="mt-1.5"
+              />
             </div>
             <div>
               <Label htmlFor="validade">Validade (dias)</Label>

@@ -4,9 +4,21 @@ import { showSuccess, showError } from '@/utils/toast';
 
 // ─── Helpers ─────────────────────────────────────────────────────────────────
 
-/** Returns today's date as "yyyy-MM-dd" in local timezone (avoids UTC offset bug). */
+/**
+ * Returns a date as "yyyy-MM-dd" anchored to America/Sao_Paulo timezone.
+ * Using Intl.DateTimeFormat ensures correctness regardless of the browser/OS
+ * timezone setting — critical for users in UTC-3 (Brazil Standard Time) or
+ * UTC-2 (Brasília Summer Time).
+ */
 function localDateStr(d: Date = new Date()): string {
-  return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
+  const parts = new Intl.DateTimeFormat('en-CA', {
+    timeZone: 'America/Sao_Paulo',
+    year: 'numeric',
+    month: '2-digit',
+    day: '2-digit',
+  }).formatToParts(d);
+  const get = (type: string) => parts.find((p) => p.type === type)?.value ?? '00';
+  return `${get('year')}-${get('month')}-${get('day')}`;
 }
 
 // ─── Types ──────────────────────────────────────────────────────────────────

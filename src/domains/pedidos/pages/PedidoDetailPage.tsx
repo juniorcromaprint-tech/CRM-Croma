@@ -1,11 +1,30 @@
 import React from 'react'
 import { useParams, useNavigate } from 'react-router-dom'
-import { ArrowLeft, FolderOpen, ExternalLink, Loader2 } from 'lucide-react'
+import {
+  ArrowLeft, FolderOpen, ExternalLink, Loader2,
+  Play, CheckCircle, Truck, Wrench, Award, FileText,
+} from 'lucide-react'
+import { useMutation, useQueryClient } from '@tanstack/react-query'
 import { Button } from '@/components/ui/button'
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs'
-import { usePedido } from '../hooks/usePedidos'
+import { usePedido, useUpdatePedido } from '../hooks/usePedidos'
 import { useCriarPastaOneDrive } from '../hooks/useOneDrive'
 import { brl } from '@/shared/utils/format'
+import { criarOrdemProducao } from '@/domains/producao/services/producao.service'
+import { criarNFeFromPedido } from '@/domains/fiscal/services/nfe-creation.service'
+import { gerarContasReceber } from '@/domains/financeiro/services/financeiro-automation.service'
+import { showError, showSuccess } from '@/utils/toast'
+import { supabase } from '@/integrations/supabase/client'
+
+// Map of current status → next status action
+const FLOW_ACTIONS: Record<string, { label: string; next: string; icon: React.ReactNode; cls: string }> = {
+  aguardando_aprovacao:  { label: 'Aprovar Pedido',       next: 'aprovado',               icon: <Award size={14} />,       cls: 'bg-blue-600 hover:bg-blue-700' },
+  aprovado:              { label: 'Iniciar Produção',     next: 'em_producao',            icon: <Play size={14} />,        cls: 'bg-orange-600 hover:bg-orange-700' },
+  em_producao:           { label: 'Marcar Produzido',     next: 'produzido',              icon: <CheckCircle size={14} />, cls: 'bg-teal-600 hover:bg-teal-700' },
+  produzido:             { label: 'Aguardar Instalação',  next: 'aguardando_instalacao',  icon: <Truck size={14} />,       cls: 'bg-purple-600 hover:bg-purple-700' },
+  aguardando_instalacao: { label: 'Iniciar Instalação',   next: 'em_instalacao',          icon: <Wrench size={14} />,      cls: 'bg-indigo-600 hover:bg-indigo-700' },
+  em_instalacao:         { label: 'Concluir Pedido',      next: 'concluido',              icon: <Award size={14} />,       cls: 'bg-emerald-600 hover:bg-emerald-700' },
+}
 
 const STATUS_CONFIG: Record<string, { label: string; cls: string }> = {
   rascunho:                { label: 'Rascunho',               cls: 'bg-slate-100 text-slate-600' },
@@ -24,7 +43,45 @@ export default function PedidoDetailPage() {
   const { id } = useParams<{ id: string }>()
   const navigate = useNavigate()
   const { data: pedido, isLoading } = usePedido(id)
+  const updatePedido = useUpdatePedido()
   const criarPasta = useCriarPastaOneDrive()
+  const queryClient = useQueryClient()
+
+  const gerarNfe = useMutation({
+    mutationFn: async (pedidoId: string) => criarNFeFromPedido(pedidoId),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['fiscal'] })
+      showSuccess('NF-e criada como rascunho!')
+    },
+    onError: (err: any) => showError(err.message || 'Erro ao gerar NF-e'),
+  })
+
+  const iniciarProducao = useMutation({
+    mutationFn: async (pedidoId: string) => {
+      await supabase.from('pedidos').update({ status: 'em_producao' }).eq('id', pedidoId)
+      await criarOrdemProducao(pedidoId)
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['pedidos'] })
+      queryClient.invalidateQueries({ queryKey: ['producao'] })
+      queryClient.invalidateQueries({ queryKey: ['dashboard'] })
+    },
+    onError: (err: any) => showError(err.message || 'Erro ao iniciar produção'),
+  })
+
+  const handleAdvanceStatus = () => {
+    if (!id || !pedido) return
+    const action = FLOW_ACTIONS[pedido.status]
+    if (!action) return
+    if (pedido.status === 'aprovado') {
+      iniciarProducao.mutate(id)
+    } else if (action.next === 'concluido') {
+      updatePedido.mutate({ id, status: 'concluido' as any })
+      gerarContasReceber(id).catch((err) => showError(err.message || 'Erro ao gerar conta a receber'))
+    } else {
+      updatePedido.mutate({ id, status: action.next as any })
+    }
+  }
 
   if (isLoading) {
     return (
@@ -60,9 +117,36 @@ export default function PedidoDetailPage() {
           </div>
           <p className="text-slate-500 mt-0.5">{clienteNome}</p>
         </div>
-        <div className="text-right">
-          <p className="text-2xl font-bold text-slate-800">{brl(pedido.valor_total)}</p>
-          <p className="text-xs text-slate-500">Valor total</p>
+        <div className="flex items-center gap-3">
+          <div className="text-right">
+            <p className="text-2xl font-bold text-slate-800">{brl(pedido.valor_total)}</p>
+            <p className="text-xs text-slate-500">Valor total</p>
+          </div>
+          {['produzido', 'aguardando_instalacao', 'em_instalacao', 'concluido'].includes(pedido.status) && (
+            <Button
+              size="sm"
+              variant="outline"
+              className="rounded-xl gap-1.5"
+              onClick={() => id && gerarNfe.mutate(id)}
+              disabled={gerarNfe.isPending}
+            >
+              {gerarNfe.isPending ? <Loader2 size={14} className="animate-spin" /> : <FileText size={14} />}
+              Gerar NF-e
+            </Button>
+          )}
+          {FLOW_ACTIONS[pedido.status] && (
+            <Button
+              size="sm"
+              className={`rounded-xl gap-1.5 text-white ${FLOW_ACTIONS[pedido.status].cls}`}
+              onClick={handleAdvanceStatus}
+              disabled={updatePedido.isPending || iniciarProducao.isPending}
+            >
+              {(updatePedido.isPending || iniciarProducao.isPending)
+                ? <Loader2 size={14} className="animate-spin" />
+                : FLOW_ACTIONS[pedido.status].icon}
+              {FLOW_ACTIONS[pedido.status].label}
+            </Button>
+          )}
         </div>
       </div>
 

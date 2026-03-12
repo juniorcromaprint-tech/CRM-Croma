@@ -20,18 +20,18 @@ export interface ClienteInput {
   inscricao_estadual?: string | null;
   segmento?: string | null;
   classificacao?: string | null;
+  tipo_cliente?: string | null;
   origem?: string | null;
   vendedor_id?: string | null;
   email?: string | null;
   telefone?: string | null;
-  website?: string | null;
-  endereco_rua?: string | null;
-  endereco_numero?: string | null;
-  endereco_complemento?: string | null;
-  endereco_bairro?: string | null;
-  endereco_cidade?: string | null;
-  endereco_estado?: string | null;
-  endereco_cep?: string | null;
+  // DB column name is `site`, not `website`
+  site?: string | null;
+  // DB address columns are flat: endereco, cidade, estado, cep
+  endereco?: string | null;
+  cidade?: string | null;
+  estado?: string | null;
+  cep?: string | null;
   observacoes?: string | null;
   ativo?: boolean;
 }
