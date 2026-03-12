@@ -85,18 +85,23 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
     await supabase.auth.signOut();
   };
 
-  /** Verifica permissão: sem role = demo mode (tudo liberado) */
+  /** Verifica permissão: sem role = demo mode (DEV only) ou deny (PROD) */
   const can = useMemo(() => {
     return (module: Module, action: Action): boolean => {
-      if (!profile?.role) return true; // demo: tudo liberado
+      if (!profile?.role) {
+        // Demo mode: allow everything in development, deny in production
+        return import.meta.env.DEV;
+      }
       const rolePerms = ROLE_PERMISSIONS[profile.role];
       return rolePerms?.[module]?.includes(action) ?? false;
     };
   }, [profile?.role]);
 
-  /** Módulos acessíveis: null = todos (demo mode) */
+  /** Módulos acessíveis: null = todos (demo/dev), [] = nenhum (prod sem role) */
   const accessibleModules = useMemo<string[] | null>(() => {
-    if (!profile?.role) return null;
+    if (!profile?.role) {
+      return import.meta.env.DEV ? null : [];
+    }
     return getAccessibleModules(profile.role);
   }, [profile?.role]);
 
