@@ -9,6 +9,11 @@ import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { showSuccess, showError } from "@/utils/toast";
 import { brl, formatDate } from "@/shared/utils/format";
 
+/** Returns today's date as "yyyy-MM-dd" in local timezone (avoids UTC offset bug). */
+function localDateStr(d: Date = new Date()): string {
+  return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`;
+}
+
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Input } from "@/components/ui/input";
@@ -196,7 +201,7 @@ const CATEGORIAS_PAGAR = [
 const MESES_PT = [
   "Janeiro",
   "Fevereiro",
-  "Marco",
+  "Março",
   "Abril",
   "Maio",
   "Junho",
@@ -431,7 +436,7 @@ function TabContasReceber() {
           valor_pago: novoValorPago,
           saldo,
           status: novoStatus,
-          data_pagamento: new Date().toISOString().split("T")[0],
+          data_pagamento: localDateStr(),
           updated_at: new Date().toISOString(),
         })
         .eq("id", id);
@@ -884,7 +889,7 @@ function TabContasReceber() {
                   </span>
                 </div>
                 <div className="flex justify-between text-sm">
-                  <span className="text-slate-500">Ja Pago</span>
+                  <span className="text-slate-500">Já Pago</span>
                   <span className="font-mono text-emerald-600">
                     {brl(Number(baixaTarget.valor_pago) || 0)}
                   </span>
@@ -1017,7 +1022,7 @@ function TabContasPagar() {
           valor_pago: Number(conta.valor_original),
           saldo: 0,
           status: "pago" as ContaPagarStatus,
-          data_pagamento: new Date().toISOString().split("T")[0],
+          data_pagamento: localDateStr(),
           updated_at: new Date().toISOString(),
         })
         .eq("id", id);
@@ -1560,7 +1565,7 @@ function TabDRE() {
           subColor="text-red-500"
         />
         <KpiCard
-          label="= Resultado Liquido"
+          label="= Resultado Líquido"
           value={brl(summary.resultado)}
           icon={CircleDollarSign}
           iconBg={summary.resultado >= 0 ? "bg-emerald-50" : "bg-red-50"}
@@ -1583,7 +1588,7 @@ function TabDRE() {
         <div className="px-6 py-4 border-b border-slate-100 flex items-center justify-between">
           <h3 className="font-bold text-slate-800 text-base flex items-center gap-2">
             <BarChart3 size={18} className="text-blue-600" />
-            DRE Mensal — Ultimos 6 Meses
+            DRE Mensal — Últimos 6 Meses
           </h3>
           <span className="text-xs text-slate-400 font-medium">
             Base: contas pagas (baixadas)

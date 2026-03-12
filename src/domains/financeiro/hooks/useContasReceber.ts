@@ -2,6 +2,13 @@ import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { supabase } from '@/integrations/supabase/client';
 import { showSuccess, showError } from '@/utils/toast';
 
+// ─── Helpers ─────────────────────────────────────────────────────────────────
+
+/** Returns today's date as "yyyy-MM-dd" in local timezone (avoids UTC offset bug). */
+function localDateStr(d: Date = new Date()): string {
+  return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
+}
+
 // ─── Types ──────────────────────────────────────────────────────────────────
 
 export type ContaReceberStatus =
@@ -99,7 +106,7 @@ export function useContasReceberStats() {
       let totalPago = 0;
       let totalVencido = 0;
       let totalAVencer = 0;
-      const today = new Date().toISOString().split('T')[0];
+      const today = localDateStr();
 
       for (const c of contas) {
         const valor = Number(c.valor_original) || 0;
@@ -153,7 +160,7 @@ export function useBaixaConta() {
           valor_pago: novoValorPago,
           saldo,
           status: novoStatus,
-          data_pagamento: data_pagamento || new Date().toISOString().split('T')[0],
+          data_pagamento: data_pagamento || localDateStr(),
           updated_at: new Date().toISOString(),
         })
         .eq('id', id)
