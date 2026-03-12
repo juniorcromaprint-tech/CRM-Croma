@@ -181,7 +181,7 @@ const KANBAN_COLUMNS: KanbanColumn[] = [
   },
   {
     key: "producao",
-    label: "Em Producao",
+    label: "Em Produção",
     statuses: ["em_producao"],
     color: "bg-amber-50 border-amber-200",
     dotColor: "bg-amber-500",
@@ -197,7 +197,7 @@ const KANBAN_COLUMNS: KanbanColumn[] = [
   },
   {
     key: "conferencia",
-    label: "Conferencia",
+    label: "Conferência",
     statuses: ["em_conferencia"],
     color: "bg-cyan-50 border-cyan-200",
     dotColor: "bg-cyan-500",
@@ -225,12 +225,12 @@ const KANBAN_DROP_STATUS: Record<string, ProducaoStatus> = {
 const ETAPA_NOMES = ["criacao", "impressao", "acabamento", "conferencia", "expedicao"] as const;
 
 const ETAPA_LABELS: Record<string, string> = {
-  criacao: "Criacao",
-  impressao: "Impressao",
+  criacao: "Criação",
+  impressao: "Impressão",
   acabamento: "Acabamento",
   serralheria: "Serralheria",
-  conferencia: "Conferencia",
-  expedicao: "Expedicao",
+  conferencia: "Conferência",
+  expedicao: "Expedição",
 };
 
 const ETAPA_ICONS: Record<string, typeof Factory> = {
@@ -278,7 +278,7 @@ function getEtapaAtual(etapas: EtapaRow[]): string {
   if (emAndamento) return ETAPA_LABELS[emAndamento.nome] ?? emAndamento.nome;
   const pendente = sorted.find((e) => e.status === "pendente");
   if (pendente) return ETAPA_LABELS[pendente.nome] ?? pendente.nome;
-  return "Concluido";
+  return "Concluído";
 }
 
 function getProgressPercent(etapas: EtapaRow[]): number {
@@ -443,7 +443,7 @@ export default function ProducaoPage() {
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["producao"] });
-      showSuccess("Ordem de producao criada com sucesso!");
+      showSuccess("Ordem de produção criada com sucesso!");
       resetCreateForm();
       setIsCreateOpen(false);
     },
@@ -654,7 +654,7 @@ export default function ProducaoPage() {
         const fromLabel = PRODUCAO_STATUS_CONFIG[op.status]?.label ?? op.status;
         const toLabel = PRODUCAO_STATUS_CONFIG[targetStatus]?.label ?? targetStatus;
         showError(
-          `Transicao invalida: ${fromLabel} -> ${toLabel}. Verifique o fluxo de producao.`
+          `Transição inválida: ${fromLabel} -> ${toLabel}. Verifique o fluxo de produção.`
         );
         return;
       }
@@ -676,13 +676,13 @@ export default function ProducaoPage() {
       <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
         <div>
           <h1 className="text-2xl md:text-3xl font-bold text-slate-800">
-            Producao
+            Produção
           </h1>
           <p className="text-slate-500 mt-1">
-            {ordens.length} ordem{ordens.length !== 1 ? "ns" : ""} de producao
+            {ordens.length} ordem{ordens.length !== 1 ? "ns" : ""} de produção
             {" \u2022 "}
-            {stats.emFila} em fila, {stats.emProducao} em producao,{" "}
-            {stats.emConferencia} em conferencia
+            {stats.emFila} em fila, {stats.emProducao} em produção,{" "}
+            {stats.emConferencia} em conferência
           </p>
         </div>
         <div className="flex items-center gap-3">
@@ -751,7 +751,7 @@ export default function ProducaoPage() {
               <p className="text-2xl font-bold text-slate-800">
                 {isLoading ? "..." : stats.emProducao}
               </p>
-              <p className="text-xs text-slate-500">Em Producao</p>
+              <p className="text-xs text-slate-500">Em Produção</p>
             </div>
           </div>
         </div>
@@ -765,7 +765,7 @@ export default function ProducaoPage() {
               <p className="text-2xl font-bold text-slate-800">
                 {isLoading ? "..." : stats.emConferencia}
               </p>
-              <p className="text-xs text-slate-500">Em Conferencia</p>
+              <p className="text-xs text-slate-500">Em Conferência</p>
             </div>
           </div>
         </div>
@@ -872,10 +872,10 @@ export default function ProducaoPage() {
         <div className="text-center py-16 bg-white rounded-2xl border border-slate-100 shadow-sm">
           <XCircle className="mx-auto h-12 w-12 text-red-300 mb-3" />
           <h3 className="text-lg font-semibold text-slate-700">
-            Erro ao carregar ordens de producao
+            Erro ao carregar ordens de produção
           </h3>
           <p className="text-slate-500 mt-1 text-sm">
-            Verifique a conexao com o banco de dados.
+            Verifique a conexão com o banco de dados.
           </p>
           <Button
             variant="outline"
@@ -891,10 +891,10 @@ export default function ProducaoPage() {
         <div className="text-center py-16 bg-white rounded-2xl border border-slate-100 shadow-sm">
           <Factory className="mx-auto h-12 w-12 text-slate-300 mb-3" />
           <h3 className="text-lg font-semibold text-slate-700">
-            Nenhuma ordem de producao
+            Nenhuma ordem de produção
           </h3>
           <p className="text-slate-500 mt-1 text-sm">
-            Crie a primeira OP para comecar a gerenciar a producao.
+            Crie a primeira OP para começar a gerenciar a produção.
           </p>
           <Button
             onClick={() => {
@@ -1154,7 +1154,7 @@ export default function ProducaoPage() {
           <DialogHeader>
             <DialogTitle className="text-xl font-bold text-slate-800 flex items-center gap-2">
               <Factory size={22} className="text-blue-600" />
-              Nova Ordem de Producao
+              Nova Ordem de Produção
             </DialogTitle>
           </DialogHeader>
 
@@ -1355,7 +1355,7 @@ export default function ProducaoPage() {
               {/* Etapas Timeline (Stepper) */}
               <div className="space-y-3">
                 <p className="text-xs text-slate-400 uppercase tracking-wide font-semibold">
-                  Etapas da Producao
+                  Etapas da Produção
                 </p>
                 <div className="space-y-0">
                   {[...(selectedOP.producao_etapas ?? [])]
