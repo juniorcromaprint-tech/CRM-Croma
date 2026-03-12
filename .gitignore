@@ -1,27 +1,45 @@
-# Logs
-logs
-*.log
-npm-debug.log*
-yarn-debug.log*
-yarn-error.log*
-pnpm-debug.log*
-lerna-debug.log*
+# Dependencies
+node_modules/
+APP-Campo/node_modules/
 
-node_modules
-dist
-dist-ssr
-*.local
+# Build output
+dist/
+dist-ssr/
+APP-Campo/dist/
 
-# Editor directories and files
+# Environment variables
+.env
+.env.*
+!.env.example
+
+# Editor directories
 .vscode/*
 !.vscode/extensions.json
-.idea
-.DS_Store
+.idea/
 *.suo
 *.ntvs*
 *.njsproj
 *.sln
 *.sw?
-.dyad/
+.DS_Store
 
-.vercel
+# Tooling caches
+.dyad/
+.claude/worktrees/
+*.local
+tmp/
+logs/
+
+# Vercel
+.vercel/
+
+# Lock files (pnpm only)
+package-lock.json
+yarn.lock
+
+# Business documents (should not be in repo)
+Arquivo_uteis_para_croma_CRM/
+Arquivo_ uteis_ para_croma_CRM/
+
+# PWA generated
+dev-dist/
