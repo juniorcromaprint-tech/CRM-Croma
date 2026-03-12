@@ -1,5 +1,4 @@
 import { defineConfig } from "vite";
-import dyadComponentTagger from "@dyad-sh/react-vite-component-tagger";
 import react from "@vitejs/plugin-react-swc";
 import path from "path";
 import { VitePWA } from 'vite-plugin-pwa';
@@ -10,7 +9,6 @@ export default defineConfig(() => ({
     port: parseInt(process.env.PORT || "8080"),
   },
   plugins: [
-    dyadComponentTagger(),
     react(),
     VitePWA({
       registerType: 'autoUpdate',
@@ -51,22 +49,33 @@ export default defineConfig(() => ({
         clientsClaim: true,
         runtimeCaching: [
           {
-            urlPattern: /^https:\/\/djwjmfgplnqyffdcgdaw\.supabase\.co\/rest\/v1\/.*/i,
+            // Cache Supabase REST API with short TTL
+            urlPattern: /^https:\/\/.*\.supabase\.co\/rest\/v1\/.*/i,
             handler: 'NetworkFirst',
             options: {
               cacheName: 'supabase-api-cache',
               expiration: {
-                maxEntries: 100,
-                maxAgeSeconds: 60 * 60 * 24 * 7
+                maxEntries: 50,
+                maxAgeSeconds: 60 * 5, // 5 minutes, not 7 days
               },
               cacheableResponse: {
-                statuses: [0, 200]
-              }
-            }
-          }
-        ]
-      }
-    })
+                statuses: [0, 200],
+              },
+            },
+          },
+          {
+            // Never cache auth endpoints
+            urlPattern: /^https:\/\/.*\.supabase\.co\/auth\/.*/i,
+            handler: 'NetworkOnly',
+          },
+          {
+            // Never cache realtime
+            urlPattern: /^https:\/\/.*\.supabase\.co\/realtime\/.*/i,
+            handler: 'NetworkOnly',
+          },
+        ],
+      },
+    }),
   ],
   resolve: {
     alias: {
