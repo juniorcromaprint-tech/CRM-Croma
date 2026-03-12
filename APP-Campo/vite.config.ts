@@ -49,19 +49,27 @@ export default defineConfig(() => ({
         clientsClaim: true,
         runtimeCaching: [
           {
-            urlPattern: /^https:\/\/djwjmfgplnqyffdcgdaw\.supabase\.co\/rest\/v1\/.*/i,
+            urlPattern: /^https:\/\/.*\.supabase\.co\/rest\/v1\/.*/i,
             handler: 'NetworkFirst',
             options: {
               cacheName: 'supabase-api-cache',
               expiration: {
-                maxEntries: 100,
-                maxAgeSeconds: 60 * 60 * 24 * 7
+                maxEntries: 50,
+                maxAgeSeconds: 60 * 5,
               },
               cacheableResponse: {
-                statuses: [0, 200]
-              }
-            }
-          }
+                statuses: [0, 200],
+              },
+            },
+          },
+          {
+            urlPattern: /^https:\/\/.*\.supabase\.co\/auth\/.*/i,
+            handler: 'NetworkOnly',
+          },
+          {
+            urlPattern: /^https:\/\/.*\.supabase\.co\/realtime\/.*/i,
+            handler: 'NetworkOnly',
+          },
         ]
       }
     })
