@@ -645,14 +645,21 @@ export default function OrcamentoEditorPage() {
             </div>
             <div>
               <Label>Cliente *</Label>
-              <Select value={clienteId} onValueChange={setClienteId}>
+              <Select
+                value={clienteId || "__none__"}
+                onValueChange={(v) => setClienteId(v === "__none__" ? "" : v)}
+              >
                 <SelectTrigger className="mt-1.5 rounded-xl">
                   <SelectValue placeholder="Selecionar cliente" />
                 </SelectTrigger>
                 <SelectContent>
-                  {(clientes as Array<{ id: string; razao_social: string; nome_fantasia: string | null }>).map((c) => (
-                    <SelectItem key={c.id} value={c.id}>{c.nome_fantasia || c.razao_social}</SelectItem>
-                  ))}
+                  {/* Sentinel item so Radix never sees value="" in the list */}
+                  <SelectItem value="__none__" className="hidden" aria-hidden>&nbsp;</SelectItem>
+                  {(clientes as Array<{ id: string; razao_social: string; nome_fantasia: string | null }>)
+                    .filter((c) => c.id)
+                    .map((c) => (
+                      <SelectItem key={c.id} value={c.id}>{c.nome_fantasia || c.razao_social}</SelectItem>
+                    ))}
                 </SelectContent>
               </Select>
             </div>
