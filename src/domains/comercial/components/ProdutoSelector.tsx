@@ -75,8 +75,9 @@ export default function ProdutoSelector({
   const [modeloFilter, setModeloFilter] = useState("");
 
   // Reset produto + modelo when categoria changes
+  // "__all__" is the sentinel for "Todas as categorias" — Radix does not allow value=""
   const handleCategoriaChange = (value: string) => {
-    setCategoriaId(value);
+    setCategoriaId(value === "__all__" ? "" : value);
     onProdutoChange(null);
     onModeloChange(null);
   };
@@ -147,7 +148,7 @@ export default function ProdutoSelector({
       <div>
         <Label className="text-xs text-slate-500">Categoria</Label>
         <Select
-          value={categoriaId}
+          value={categoriaId || "__all__"}
           onValueChange={handleCategoriaChange}
           disabled={isLoading}
         >
@@ -162,7 +163,7 @@ export default function ProdutoSelector({
             )}
           </SelectTrigger>
           <SelectContent>
-            <SelectItem value="">Todas as categorias</SelectItem>
+            <SelectItem value="__all__">Todas as categorias</SelectItem>
             {categorias.map((c) => (
               <SelectItem key={c.id} value={c.id}>
                 <span className="flex items-center gap-2">

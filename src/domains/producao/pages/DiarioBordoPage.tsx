@@ -216,14 +216,14 @@ export default function DiarioBordoPage() {
             Filtrar por equipamento:
           </Label>
           <Select
-            value={selectedFerramenta}
-            onValueChange={setSelectedFerramenta}
+            value={selectedFerramenta || "__all__"}
+            onValueChange={(v) => setSelectedFerramenta(v === "__all__" ? "" : v)}
           >
             <SelectTrigger className="w-72">
               <SelectValue placeholder="Todos os equipamentos" />
             </SelectTrigger>
             <SelectContent>
-              <SelectItem value="">Todos os equipamentos</SelectItem>
+              <SelectItem value="__all__">Todos os equipamentos</SelectItem>
               {ferramentas.map((f) => (
                 <SelectItem key={f.id} value={f.id}>
                   {f.nome}
