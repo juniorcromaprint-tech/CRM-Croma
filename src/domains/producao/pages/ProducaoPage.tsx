@@ -1,6 +1,7 @@
 import React, { useState, useMemo, useCallback, useRef, type DragEvent } from "react";
 import { supabase } from "@/integrations/supabase/client";
 import { criarOrdemInstalacao } from "@/domains/instalacao/services/instalacao-criacao.service";
+import { finalizarCustosOP } from "@/domains/producao/services/producao.service";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { showSuccess, showError } from "@/utils/toast";
 import { brl, formatDate, formatDateTime } from "@/shared/utils/format";
@@ -119,6 +120,8 @@ interface PedidoItemOption {
   descricao: string | null;
   especificacao: string | null;
   quantidade: number | null;
+  custo_mp: number | null;
+  custo_mo: number | null;
   pedido_id: string;
   pedidos: {
     numero: string;
@@ -391,7 +394,7 @@ export default function ProducaoPage() {
       const { data, error } = await supabase
         .from("pedido_itens")
         .select(
-          "id, descricao, especificacao, quantidade, pedido_id, pedidos!inner(numero, clientes(nome_fantasia, razao_social))"
+          "id, descricao, especificacao, quantidade, custo_mp, custo_mo, pedido_id, pedidos!inner(numero, clientes(nome_fantasia, razao_social))"
         )
         .not("pedido_id", "is", null)
         .order("created_at", { ascending: false })
@@ -423,6 +426,8 @@ export default function ProducaoPage() {
           prazo_interno: formPrazoInterno || null,
           tempo_estimado_min: formTempoEstimado ? parseInt(formTempoEstimado, 10) : null,
           observacoes: formObservacoes || null,
+          custo_mp_estimado: Number(selectedItem?.custo_mp) || 0,
+          custo_mo_estimado: Number(selectedItem?.custo_mo) || 0,
         })
         .select()
         .single();
@@ -536,6 +541,8 @@ export default function ProducaoPage() {
             .from("ordens_producao")
             .update({ status: "liberado" })
             .eq("id", opId);
+          // Finalizar custos reais da OP
+          await finalizarCustosOP(opId);
           // Auto-advance pedido to "produzido" and create OS de instalação
           const { data: op } = await supabase
             .from("ordens_producao")

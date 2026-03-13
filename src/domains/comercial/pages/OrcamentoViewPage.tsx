@@ -78,7 +78,16 @@ export default function OrcamentoViewPage() {
   };
 
   const handleAprovar = () => {
-    if (!id) return;
+    if (!id || !orc) return;
+    const itens = (orc as any).itens ?? [];
+    if (itens.length === 0) {
+      showError("Orçamento precisa de pelo menos 1 item para ser aprovado.");
+      return;
+    }
+    if ((orc.valor_total ?? 0) <= 0) {
+      showError("Orçamento precisa ter valor maior que R$ 0,00 para ser aprovado.");
+      return;
+    }
     atualizar.mutate({ id, updates: { status: "aprovada", aprovado_em: new Date().toISOString() } });
   };
 
@@ -88,7 +97,16 @@ export default function OrcamentoViewPage() {
   };
 
   const handleConverterParaPedido = async () => {
-    if (!id) return;
+    if (!id || !orc) return;
+    const itens = (orc as any).itens ?? [];
+    if (itens.length === 0) {
+      showError("Orçamento precisa de itens para gerar pedido.");
+      return;
+    }
+    if ((orc.valor_total ?? 0) <= 0) {
+      showError("Orçamento com valor R$ 0,00 não pode gerar pedido.");
+      return;
+    }
     await converter.mutateAsync(id);
     navigate("/pedidos");
   };
