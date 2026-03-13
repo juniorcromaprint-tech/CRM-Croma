@@ -33,6 +33,9 @@ import {
 import { brl } from "@/shared/utils/format";
 import { showError } from "@/utils/toast";
 import type { OrcamentoStatus } from "../services/orcamento.service";
+import { TrackingPanel } from '../components/TrackingPanel';
+import { SharePropostaModal } from '../components/SharePropostaModal';
+import { CondicoesPagamentoView } from '../components/CondicoesPagamentoView';
 
 const STATUS_CONFIG: Record<OrcamentoStatus, { label: string; cls: string }> = {
   rascunho:   { label: "Rascunho",   cls: "bg-slate-100 text-slate-600" },
@@ -53,6 +56,7 @@ export default function OrcamentoViewPage() {
 
   const [expandedItems, setExpandedItems] = useState<Set<string>>(new Set());
   const [approveOpen, setApproveOpen] = useState(false);
+  const [shareOpen, setShareOpen] = useState(false);
 
   const toggleItem = (itemId: string) => {
     setExpandedItems((prev) => {
@@ -195,6 +199,13 @@ export default function OrcamentoViewPage() {
               <Edit size={14} /> Editar
             </Button>
           </Link>
+          <Button
+            size="sm"
+            className="rounded-xl bg-blue-600 text-white hover:bg-blue-700 gap-1.5"
+            onClick={() => setShareOpen(true)}
+          >
+            <Send size={14} /> Enviar Proposta
+          </Button>
           {orc.status === "rascunho" && (
             <Button
               size="sm"
@@ -505,6 +516,32 @@ export default function OrcamentoViewPage() {
           <p>Proposta valida por {orc.validade_dias} dias a partir de {new Date(orc.created_at).toLocaleDateString("pt-BR")}</p>
         </div>
       </div>
+
+      {/* ══════════ TRACKING + PAYMENT (hidden on print) ══════════ */}
+      <div className="print:hidden space-y-4">
+        {(orc as any).forma_pagamento && (
+          <CondicoesPagamentoView
+            conditions={{
+              forma_pagamento: (orc as any).forma_pagamento,
+              parcelas_count: (orc as any).parcelas_count ?? 1,
+              entrada_percentual: (orc as any).entrada_percentual ?? 0,
+              prazo_dias: (orc as any).prazo_dias ?? [],
+            }}
+            valorTotal={orc.total}
+          />
+        )}
+        <TrackingPanel propostaId={orc.id} />
+      </div>
+
+      <SharePropostaModal
+        open={shareOpen}
+        onClose={() => setShareOpen(false)}
+        propostaId={orc.id}
+        propostaNumero={orc.numero}
+        shareToken={(orc as any).share_token ?? ''}
+        clienteTelefone={(orc.cliente as any)?.telefone}
+        clienteEmail={(orc.cliente as any)?.email}
+      />
     </div>
   );
 }
