@@ -63,6 +63,8 @@ export const NAV_GROUPS: NavGroup[] = [
       { name: 'Comissões', path: '/comissoes', icon: 'BadgeDollarSign', module: 'financeiro' },
       { name: 'Faturamento em Lote', path: '/financeiro/faturamento', icon: 'FileCheck', module: 'financeiro' },
       { name: 'Conciliação Bancária', path: '/financeiro/conciliacao', icon: 'ArrowLeftRight', module: 'financeiro' },
+      { name: 'Boletos', path: '/financeiro/boletos', icon: 'Receipt', module: 'financeiro' },
+      { name: 'Config. Bancária', path: '/financeiro/config-bancaria', icon: 'Building', module: 'financeiro' },
       { name: 'Centros de Custo', path: '/admin/centros-custo', icon: 'Layers', module: 'financeiro' },
       { name: 'Plano de Contas', path: '/admin/plano-contas', icon: 'BookOpen', module: 'financeiro' },
     ],

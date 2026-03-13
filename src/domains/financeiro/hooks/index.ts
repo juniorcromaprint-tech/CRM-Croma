@@ -28,3 +28,23 @@ export type {
   ContaPagarCreate,
   ContaPagarStatus,
 } from './useContasPagar';
+
+// Boletos e Remessas
+export {
+  useBankAccounts,
+  useBankAccount,
+  useCreateBankAccount,
+  useUpdateBankAccount,
+  useBoletos,
+  useBoleto,
+  useBoletoStats,
+  useCreateBoleto,
+  useUpdateBoleto,
+  useEmitirBoleto,
+  useMarcarProntoRemessa,
+  useCancelBoleto,
+  useRemessas,
+  useGerarRemessa,
+  useDownloadRemessa,
+  useMarcarRemessaEnviada,
+} from './useBoletos';
