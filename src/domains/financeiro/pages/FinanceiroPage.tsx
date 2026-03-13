@@ -665,6 +665,7 @@ function TabContasReceber() {
             onClick={() => {
               setFormCR({
                 cliente_id: "",
+                pedido_id: "",
                 valor_original: "",
                 data_vencimento: "",
                 forma_pagamento: "",
@@ -820,7 +821,7 @@ function TabContasReceber() {
                   <SelectValue placeholder="Selecione o cliente" />
                 </SelectTrigger>
                 <SelectContent>
-                  {clientes.map((c) => (
+                  {clientes.filter((c) => c.id).map((c) => (
                     <SelectItem key={c.id} value={c.id}>
                       {c.nome_fantasia || c.razao_social}
                     </SelectItem>
@@ -871,7 +872,7 @@ function TabContasReceber() {
                 </SelectTrigger>
                 <SelectContent>
                   <SelectItem value="__none__">— Nenhum —</SelectItem>
-                  {pedidosOptions.map((p) => (
+                  {pedidosOptions.filter((p) => p.id).map((p) => (
                     <SelectItem key={p.id} value={p.id}>
                       {p.numero}
                     </SelectItem>

@@ -525,7 +525,7 @@ export default function AdminSetupPage() {
         <div className="flex items-start gap-3 bg-green-50 border border-green-200 rounded-xl px-4 py-4">
           <CheckCircle2 className="h-5 w-5 text-green-500 flex-shrink-0 mt-0.5" />
           <div>
-            <p className="font-bold text-green-700">Sistema pronto para producao!</p>
+            <p className="font-bold text-green-700">Sistema pronto para produção!</p>
             <p className="text-sm text-green-600 mt-0.5">
               Todos os 7 itens de configuração estão corretos. O sistema está pronto para uso em
               produção.

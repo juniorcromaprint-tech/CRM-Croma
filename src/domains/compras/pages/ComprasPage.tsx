@@ -719,11 +719,11 @@ function TabFornecedores() {
 
             {/* Observacoes */}
             <div className="space-y-2">
-              <Label className="text-slate-700 font-medium">Observacoes</Label>
+              <Label className="text-slate-700 font-medium">Observações</Label>
               <Textarea
                 value={formObservacoes}
                 onChange={(e) => setFormObservacoes(e.target.value)}
-                placeholder="Informacoes adicionais sobre o fornecedor..."
+                placeholder="Informações adicionais sobre o fornecedor..."
                 className="rounded-xl border-slate-200 min-h-[80px]"
               />
             </div>
@@ -1391,11 +1391,11 @@ function TabPedidosCompra() {
 
             {/* Observacoes */}
             <div className="space-y-2">
-              <Label className="text-slate-700 font-medium">Observacoes</Label>
+              <Label className="text-slate-700 font-medium">Observações</Label>
               <Textarea
                 value={formObservacoes}
                 onChange={(e) => setFormObservacoes(e.target.value)}
-                placeholder="Informacoes adicionais..."
+                placeholder="Informações adicionais..."
                 className="rounded-xl border-slate-200 min-h-[80px]"
               />
             </div>

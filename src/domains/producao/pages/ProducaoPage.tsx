@@ -208,6 +208,14 @@ const KANBAN_COLUMNS: KanbanColumn[] = [
     bgActive: "ring-cyan-400 bg-cyan-50/50",
   },
   {
+    key: "retrabalho",
+    label: "Retrabalho",
+    statuses: ["retrabalho"],
+    color: "bg-red-50 border-red-200",
+    dotColor: "bg-red-500",
+    bgActive: "ring-red-400 bg-red-50/50",
+  },
+  {
     key: "liberado",
     label: "Liberado",
     statuses: ["liberado"],
@@ -223,6 +231,7 @@ const KANBAN_DROP_STATUS: Record<string, ProducaoStatus> = {
   producao: "em_producao",
   acabamento: "em_acabamento",
   conferencia: "em_conferencia",
+  retrabalho: "retrabalho",
   liberado: "liberado",
 };
 
@@ -559,10 +568,19 @@ export default function ProducaoPage() {
         }
       }
     },
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ["producao"] });
+    onSuccess: async (_data, variables) => {
+      await queryClient.invalidateQueries({ queryKey: ["producao"] });
       queryClient.invalidateQueries({ queryKey: ["pedidos"] });
       queryClient.invalidateQueries({ queryKey: ["instalacoes"] });
+      // Refresh selectedOP so the modal shows updated etapa state
+      if (variables.opId && selectedOP?.id === variables.opId) {
+        const { data: freshOP } = await supabase
+          .from("ordens_producao")
+          .select("*, pedido_itens(descricao, especificacao, quantidade, pedidos(numero, clientes(nome_fantasia, razao_social))), producao_etapas(*)")
+          .eq("id", variables.opId)
+          .single();
+        if (freshOP) setSelectedOP(freshOP as unknown as OrdemProducaoRow);
+      }
       showSuccess("Etapa atualizada!");
     },
     onError: (err: Error) => {
@@ -1227,7 +1245,7 @@ export default function ProducaoPage() {
                   <SelectValue placeholder="Selecione um item do pedido" />
                 </SelectTrigger>
                 <SelectContent>
-                  {pedidoItens.map((pi) => {
+                  {pedidoItens.filter((pi) => pi.id).map((pi) => {
                     const pedNum = pi.pedidos?.numero ?? "---";
                     const cliente = pi.pedidos?.clientes?.nome_fantasia ?? pi.pedidos?.clientes?.razao_social ?? "";
                     return (
@@ -1300,7 +1318,7 @@ export default function ProducaoPage() {
                 id="create-obs"
                 value={formObservacoes}
                 onChange={(e) => setFormObservacoes(e.target.value)}
-                placeholder="Informacoes adicionais sobre a OP..."
+                placeholder="Informações adicionais sobre a OP..."
                 className="rounded-xl border-slate-200 min-h-[80px]"
               />
             </div>
@@ -1636,7 +1654,15 @@ export default function ProducaoPage() {
                   </p>
                   <p className="text-sm font-medium text-slate-700 flex items-center gap-1">
                     <Timer size={14} className="text-slate-400" />
-                    {formatMinutes(selectedOP.tempo_real_min)}
+                    {formatMinutes(
+                      selectedOP.tempo_real_min ||
+                      (selectedOP.producao_etapas ?? []).reduce((acc, e) => {
+                        if (e.inicio && e.fim) {
+                          return acc + Math.round((new Date(e.fim).getTime() - new Date(e.inicio).getTime()) / 60000);
+                        }
+                        return acc;
+                      }, 0) || null
+                    )}
                   </p>
                 </div>
               </div>

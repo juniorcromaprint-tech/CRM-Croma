@@ -175,7 +175,7 @@ export default function ServicoSelector({
                     onChange={(e) =>
                       handleUpdate(index, { descricao: e.target.value })
                     }
-                    placeholder="Descricao do servico"
+                    placeholder="Descrição do serviço"
                     className="h-7 rounded-lg text-sm border-slate-200"
                   />
                 ) : (
@@ -266,7 +266,7 @@ export default function ServicoSelector({
                 </div>
               </SelectTrigger>
               <SelectContent>
-                {servicosDb.map((s) => (
+                {servicosDb.filter((s) => s.id).map((s) => (
                   <SelectItem key={s.id} value={s.id}>
                     <div className="flex items-center justify-between w-full gap-4">
                       <span>{s.nome}</span>

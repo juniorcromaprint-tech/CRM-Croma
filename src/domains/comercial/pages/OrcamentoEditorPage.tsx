@@ -600,7 +600,7 @@ export default function OrcamentoEditorPage() {
         </Link>
         <div className="flex-1">
           <h1 className="text-2xl font-bold text-slate-800">
-            {isNew ? "Novo Orcamento" : `Editar ${orcamento?.numero || "Orcamento"}`}
+            {isNew ? "Novo Orçamento" : `Editar ${orcamento?.numero || "Orçamento"}`}
           </h1>
           {!isNew && orcamento && (
             <p className="text-slate-500 text-sm mt-0.5">
@@ -633,7 +633,7 @@ export default function OrcamentoEditorPage() {
       {/* ══════════ DADOS DO ORCAMENTO ══════════ */}
       <Card className="rounded-2xl border-none shadow-sm">
         <CardHeader className="pb-4">
-          <CardTitle className="text-base font-semibold text-slate-800">Dados do Orcamento</CardTitle>
+          <CardTitle className="text-base font-semibold text-slate-800">Dados do Orçamento</CardTitle>
         </CardHeader>
         <CardContent className="space-y-4">
           <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
@@ -698,7 +698,7 @@ export default function OrcamentoEditorPage() {
               )}
             </div>
             <div>
-              <Label htmlFor="condicoes">Condicoes de Pagamento</Label>
+              <Label htmlFor="condicoes">Condições de Pagamento</Label>
               <Input
                 id="condicoes"
                 value={condicoes}
@@ -708,12 +708,12 @@ export default function OrcamentoEditorPage() {
               />
             </div>
             <div className="md:col-span-2">
-              <Label htmlFor="obs">Observacoes</Label>
+              <Label htmlFor="obs">Observações</Label>
               <Textarea
                 id="obs"
                 value={observacoes}
                 onChange={(e) => setObservacoes(e.target.value)}
-                placeholder="Observacoes adicionais para o cliente..."
+                placeholder="Observações adicionais para o cliente..."
                 className="mt-1.5 rounded-xl min-h-[80px]"
               />
             </div>
@@ -753,7 +753,7 @@ export default function OrcamentoEditorPage() {
                 <table className="w-full text-sm">
                   <thead>
                     <tr className="bg-slate-50 border-b border-slate-200">
-                      <th className="text-left py-2.5 px-3 text-xs font-semibold text-slate-400 uppercase tracking-wider">Descricao</th>
+                      <th className="text-left py-2.5 px-3 text-xs font-semibold text-slate-400 uppercase tracking-wider">Descrição</th>
                       <th className="text-right py-2.5 px-3 text-xs font-semibold text-slate-400 uppercase tracking-wider hidden md:table-cell">Qtd</th>
                       <th className="text-right py-2.5 px-3 text-xs font-semibold text-slate-400 uppercase tracking-wider hidden md:table-cell">Unit</th>
                       <th className="text-right py-2.5 px-3 text-xs font-semibold text-slate-400 uppercase tracking-wider">Total</th>
@@ -859,7 +859,7 @@ export default function OrcamentoEditorPage() {
                                 />
                               </div>
                               <div className="md:col-span-2">
-                                <Label className="text-xs">Especificacao</Label>
+                                <Label className="text-xs">Especificação</Label>
                                 <Input
                                   value={newItem.especificacao}
                                   onChange={(e) => setNewItem((s) => ({ ...s, especificacao: e.target.value }))}
@@ -886,7 +886,7 @@ export default function OrcamentoEditorPage() {
                                 onClick={handleNextStep}
                                 className="bg-blue-600 hover:bg-blue-700 text-white rounded-xl px-6"
                               >
-                                Proximo
+                                Próximo
                               </Button>
                             </div>
                           </>
@@ -959,7 +959,7 @@ export default function OrcamentoEditorPage() {
                                 onClick={handleNextStep}
                                 className="bg-blue-600 hover:bg-blue-700 text-white rounded-xl px-6"
                               >
-                                Proximo
+                                Próximo
                               </Button>
                             </div>
                           </>

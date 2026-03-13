@@ -1899,7 +1899,7 @@ export default function EstoquePage() {
               <Textarea
                 value={movMotivo}
                 onChange={(e) => setMovMotivo(e.target.value)}
-                placeholder="Descricao da movimentacao..."
+                placeholder="Descrição da movimentação..."
                 className="rounded-xl"
                 rows={3}
               />

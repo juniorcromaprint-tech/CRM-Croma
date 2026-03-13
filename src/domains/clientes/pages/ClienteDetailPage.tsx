@@ -728,7 +728,7 @@ export default function ClienteDetailPage() {
                 </div>
 
                 <div>
-                  <Label>Observacoes</Label>
+                  <Label>Observações</Label>
                   <Textarea
                     rows={3}
                     value={editForm.observacoes ?? ""}
@@ -836,11 +836,11 @@ export default function ClienteDetailPage() {
                   </div>
                 )}
 
-                {/* Observacoes */}
+                {/* Observações */}
                 {cliente.observacoes && (
                   <div className="border-t border-slate-100 pt-4">
                     <h3 className="text-sm font-semibold text-slate-500 mb-2">
-                      Observacoes
+                      Observações
                     </h3>
                     <p className="text-sm text-slate-600 whitespace-pre-wrap">
                       {cliente.observacoes}

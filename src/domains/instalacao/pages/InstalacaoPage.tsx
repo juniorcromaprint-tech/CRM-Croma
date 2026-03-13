@@ -120,7 +120,9 @@ function formatDateTimeBR(dateStr: string | null | undefined): string {
 }
 
 function formatDuracao(minutos: number | null | undefined): string {
-  if (!minutos) return "-";
+  if (minutos === null || minutos === undefined) return "-";
+  if (minutos < 0) return "Horário inválido";
+  if (minutos === 0) return "0min";
   const h = Math.floor(minutos / 60);
   const m = Math.round(minutos % 60);
   if (h === 0) return `${m}min`;
@@ -157,7 +159,7 @@ function KpiCard({
           <Icon size={22} className={iconColor} />
         </div>
         <div className="min-w-0">
-          <p className="text-xs text-slate-400 font-medium uppercase tracking-wide truncate">
+          <p className="text-xs text-slate-400 font-medium uppercase tracking-wide">
             {label}
           </p>
           <p className="text-2xl font-bold text-slate-800 mt-0.5 leading-tight">
@@ -199,16 +201,21 @@ function JobCard({
   job,
   onVerFotos,
   onChecklist,
+  onDetalhes,
 }: {
   job: CampoInstalacao;
   onVerFotos: (job: CampoInstalacao) => void;
   onChecklist: (job: CampoInstalacao) => void;
+  onDetalhes: (job: CampoInstalacao) => void;
 }) {
   const temFotos = (job.fotos_antes ?? 0) + (job.fotos_depois ?? 0) > 0;
   const temProblema = !!job.issues;
 
   return (
-    <Card className="border border-slate-100 shadow-sm rounded-2xl bg-white hover:shadow-md transition-shadow">
+    <Card
+      className="border border-slate-100 shadow-sm rounded-2xl bg-white hover:shadow-md transition-shadow cursor-pointer"
+      onClick={() => onDetalhes(job)}
+    >
       <CardContent className="p-5">
         {/* Header */}
         <div className="flex items-start justify-between gap-3 mb-3">
@@ -297,7 +304,7 @@ function JobCard({
         {/* Mídia + Checklist */}
         <div className="flex items-center gap-2 mt-3 flex-wrap">
           <button
-            onClick={() => onVerFotos(job)}
+            onClick={(e) => { e.stopPropagation(); onVerFotos(job); }}
             disabled={!temFotos}
             className={`inline-flex items-center gap-1.5 text-xs font-medium px-3 py-1.5 rounded-lg border transition-colors ${
               temFotos
@@ -309,7 +316,7 @@ function JobCard({
             {job.fotos_antes ?? 0} antes / {job.fotos_depois ?? 0} depois
           </button>
           <button
-            onClick={() => onChecklist(job)}
+            onClick={(e) => { e.stopPropagation(); onChecklist(job); }}
             className="inline-flex items-center gap-1.5 text-xs font-medium px-3 py-1.5 rounded-lg border border-violet-200 bg-violet-50 text-violet-700 hover:bg-violet-100 transition-colors"
           >
             <ClipboardList size={12} />
@@ -464,6 +471,183 @@ function FotoCard({ foto }: { foto: CampoFoto }) {
 }
 
 // ============================================================
+// DETALHES SHEET
+// ============================================================
+
+function DetalhesSheet({
+  job,
+  open,
+  onClose,
+}: {
+  job: CampoInstalacao | null;
+  open: boolean;
+  onClose: () => void;
+}) {
+  if (!job) return null;
+
+  const cfg = getStatusConfig(job.status_campo);
+
+  return (
+    <Sheet open={open} onOpenChange={(v) => !v && onClose()}>
+      <SheetContent className="w-full sm:max-w-lg overflow-y-auto">
+        <SheetHeader className="mb-6">
+          <SheetTitle className="flex items-center gap-2">
+            <Wrench size={20} className="text-orange-600" />
+            {job.os_number}
+          </SheetTitle>
+          <div className="flex items-center gap-2 flex-wrap">
+            <StatusBadge status={job.status_campo} />
+            <span className="text-xs text-slate-400 uppercase tracking-wide">
+              {job.tipo_servico}
+            </span>
+          </div>
+        </SheetHeader>
+
+        <div className="space-y-5">
+          {/* Cliente / Loja */}
+          <div className="bg-slate-50 rounded-2xl p-4 space-y-3">
+            <h4 className="text-xs font-bold text-slate-500 uppercase tracking-wide">
+              Cliente / Loja
+            </h4>
+            <div className="space-y-2">
+              <div className="flex items-start gap-2">
+                <Building2 size={14} className="text-slate-400 mt-0.5 flex-shrink-0" />
+                <div>
+                  <p className="text-sm font-semibold text-slate-700">
+                    {job.loja_nome ?? "Sem loja"}
+                  </p>
+                  {job.loja_marca && job.loja_marca !== job.loja_nome && (
+                    <p className="text-xs text-slate-400">{job.loja_marca}</p>
+                  )}
+                </div>
+              </div>
+              {job.loja_endereco && (
+                <div className="flex items-start gap-2">
+                  <MapPin size={14} className="text-slate-400 mt-0.5 flex-shrink-0" />
+                  <p className="text-sm text-slate-600">
+                    {job.loja_endereco}
+                    {job.loja_estado ? ` — ${job.loja_estado}` : ""}
+                  </p>
+                </div>
+              )}
+            </div>
+          </div>
+
+          {/* Técnico */}
+          {job.tecnico_nome && job.tecnico_nome.trim() !== "" && (
+            <div className="bg-slate-50 rounded-2xl p-4 space-y-2">
+              <h4 className="text-xs font-bold text-slate-500 uppercase tracking-wide">
+                Técnico
+              </h4>
+              <div className="flex items-center gap-2">
+                <User size={14} className="text-slate-400" />
+                <p className="text-sm font-medium text-slate-700">{job.tecnico_nome}</p>
+                {job.tecnico_role && (
+                  <span className="text-xs text-slate-400">({job.tecnico_role})</span>
+                )}
+              </div>
+            </div>
+          )}
+
+          {/* Datas e Horários */}
+          <div className="bg-slate-50 rounded-2xl p-4 space-y-3">
+            <h4 className="text-xs font-bold text-slate-500 uppercase tracking-wide">
+              Datas e Horários
+            </h4>
+            <div className="grid grid-cols-2 gap-3 text-sm">
+              <div>
+                <p className="text-xs text-slate-400 mb-0.5">Data Agendada</p>
+                <p className="font-medium text-slate-700">{formatDateBR(job.data_agendada)}</p>
+              </div>
+              <div>
+                <p className="text-xs text-slate-400 mb-0.5">Duração</p>
+                <p className="font-medium text-slate-700">{formatDuracao(job.duracao_minutos)}</p>
+              </div>
+              {job.started_at && (
+                <div>
+                  <p className="text-xs text-slate-400 mb-0.5">Início</p>
+                  <p className="font-medium text-slate-700 flex items-center gap-1">
+                    <Play size={10} className="text-cyan-500" />
+                    {formatDateTimeBR(job.started_at)}
+                  </p>
+                </div>
+              )}
+              {job.finished_at && (
+                <div>
+                  <p className="text-xs text-slate-400 mb-0.5">Fim</p>
+                  <p className="font-medium text-slate-700 flex items-center gap-1">
+                    <CheckCircle2 size={10} className="text-emerald-500" />
+                    {formatDateTimeBR(job.finished_at)}
+                  </p>
+                </div>
+              )}
+            </div>
+          </div>
+
+          {/* Observações */}
+          {job.notes && (
+            <div className="bg-slate-50 rounded-2xl p-4 space-y-2">
+              <h4 className="text-xs font-bold text-slate-500 uppercase tracking-wide">
+                Observações
+              </h4>
+              <p className="text-sm text-slate-600">{job.notes}</p>
+            </div>
+          )}
+
+          {/* Ocorrência */}
+          {job.issues && (
+            <div className="bg-red-50 rounded-2xl p-4 space-y-2 border border-red-100">
+              <h4 className="text-xs font-bold text-red-600 uppercase tracking-wide flex items-center gap-1">
+                <AlertTriangle size={12} />
+                Ocorrência
+              </h4>
+              <p className="text-sm text-red-700">{job.issues}</p>
+            </div>
+          )}
+
+          {/* Assinatura */}
+          {job.signature_url && (
+            <div className="bg-emerald-50 rounded-2xl p-4 space-y-2 border border-emerald-100">
+              <h4 className="text-xs font-bold text-emerald-600 uppercase tracking-wide flex items-center gap-1">
+                <FileText size={12} />
+                Assinatura
+              </h4>
+              <a
+                href={job.signature_url}
+                target="_blank"
+                rel="noopener noreferrer"
+                className="text-sm text-blue-600 hover:underline"
+              >
+                Ver assinatura
+              </a>
+            </div>
+          )}
+
+          {/* Mídia */}
+          <div className="bg-slate-50 rounded-2xl p-4 space-y-2">
+            <h4 className="text-xs font-bold text-slate-500 uppercase tracking-wide">
+              Mídia
+            </h4>
+            <div className="flex items-center gap-3 text-sm text-slate-600">
+              <span className="flex items-center gap-1">
+                <Camera size={12} className="text-blue-500" />
+                {job.fotos_antes ?? 0} antes / {job.fotos_depois ?? 0} depois
+              </span>
+              {(job.total_videos ?? 0) > 0 && (
+                <span className="flex items-center gap-1">
+                  <Video size={12} className="text-slate-500" />
+                  {job.total_videos} vídeos
+                </span>
+              )}
+            </div>
+          </div>
+        </div>
+      </SheetContent>
+    </Sheet>
+  );
+}
+
+// ============================================================
 // MAIN PAGE
 // ============================================================
 
@@ -485,6 +669,8 @@ export default function InstalacaoPage() {
   const [sheetFotosAberta, setSheetFotosAberta] = useState(false);
   const [jobChecklist, setJobChecklist] = useState<CampoInstalacao | null>(null);
   const [sheetChecklistAberta, setSheetChecklistAberta] = useState(false);
+  const [jobDetalhes, setJobDetalhes] = useState<CampoInstalacao | null>(null);
+  const [sheetDetalhesAberta, setSheetDetalhesAberta] = useState(false);
 
   // Realtime global — invalida queries automaticamente
   useCampoRealtimeGlobal();
@@ -613,6 +799,11 @@ export default function InstalacaoPage() {
   function abrirChecklist(job: CampoInstalacao) {
     setJobChecklist(job);
     setSheetChecklistAberta(true);
+  }
+
+  function abrirDetalhes(job: CampoInstalacao) {
+    setJobDetalhes(job);
+    setSheetDetalhesAberta(true);
   }
 
   const isLoading = abaAtiva === "hoje" ? loadingHoje : loadingTodos;
@@ -826,7 +1017,7 @@ export default function InstalacaoPage() {
           ) : (
             <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-4">
               {jobsHojeFiltrados.map((job) => (
-                <JobCard key={job.job_id} job={job} onVerFotos={abrirFotos} onChecklist={abrirChecklist} />
+                <JobCard key={job.job_id} job={job} onVerFotos={abrirFotos} onChecklist={abrirChecklist} onDetalhes={abrirDetalhes} />
               ))}
             </div>
           )}
@@ -847,7 +1038,7 @@ export default function InstalacaoPage() {
           ) : (
             <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-4">
               {jobsTodosFiltrados.map((job) => (
-                <JobCard key={job.job_id} job={job} onVerFotos={abrirFotos} onChecklist={abrirChecklist} />
+                <JobCard key={job.job_id} job={job} onVerFotos={abrirFotos} onChecklist={abrirChecklist} onDetalhes={abrirDetalhes} />
               ))}
             </div>
           )}
@@ -934,6 +1125,13 @@ export default function InstalacaoPage() {
         job={jobChecklist}
         open={sheetChecklistAberta}
         onClose={() => setSheetChecklistAberta(false)}
+      />
+
+      {/* Sheet de Detalhes */}
+      <DetalhesSheet
+        job={jobDetalhes}
+        open={sheetDetalhesAberta}
+        onClose={() => setSheetDetalhesAberta(false)}
       />
     </div>
   );

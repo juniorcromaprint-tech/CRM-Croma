@@ -224,7 +224,7 @@ export default function DiarioBordoPage() {
             </SelectTrigger>
             <SelectContent>
               <SelectItem value="__all__">Todos os equipamentos</SelectItem>
-              {ferramentas.map((f) => (
+              {ferramentas.filter((f) => f.id).map((f) => (
                 <SelectItem key={f.id} value={f.id}>
                   {f.nome}
                 </SelectItem>
@@ -324,7 +324,7 @@ export default function DiarioBordoPage() {
                   <SelectValue placeholder="Selecione o equipamento" />
                 </SelectTrigger>
                 <SelectContent>
-                  {ferramentas.map((f) => (
+                  {ferramentas.filter((f) => f.id).map((f) => (
                     <SelectItem key={f.id} value={f.id}>
                       {f.nome}
                     </SelectItem>

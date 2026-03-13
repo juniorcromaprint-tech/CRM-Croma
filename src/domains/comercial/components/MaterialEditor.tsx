@@ -86,7 +86,7 @@ export default function MaterialEditor({
       {/* Table header */}
       {materiais.length > 0 && (
         <div className="grid grid-cols-[1fr_90px_70px_100px_90px_36px] gap-2 px-4 py-2 border-b border-slate-100 bg-slate-50/50">
-          <span className="text-xs text-slate-500">Descricao</span>
+          <span className="text-xs text-slate-500">Descrição</span>
           <span className="text-xs text-slate-500 text-right">Qtd</span>
           <span className="text-xs text-slate-500">Unid.</span>
           <span className="text-xs text-slate-500 text-right">Custo Un.</span>

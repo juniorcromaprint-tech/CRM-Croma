@@ -55,9 +55,9 @@ export default function TemplatesPage() {
           </Button>
         </Link>
         <div className="flex-1">
-          <h1 className="text-2xl font-bold text-slate-800">Templates de Orcamento</h1>
+          <h1 className="text-2xl font-bold text-slate-800">Templates de Orçamento</h1>
           <p className="text-slate-500 text-sm mt-0.5">
-            Modelos reutilizaveis para criar orcamentos rapidamente
+            Modelos reutilizáveis para criar orçamentos rapidamente
           </p>
         </div>
         <Button
@@ -180,7 +180,7 @@ function TemplateCard({
               <table className="w-full text-sm">
                 <thead>
                   <tr className="bg-slate-50 border-b border-slate-200">
-                    <th className="text-left py-2 px-3 text-xs font-semibold text-slate-400">Descricao</th>
+                    <th className="text-left py-2 px-3 text-xs font-semibold text-slate-400">Descrição</th>
                     <th className="text-right py-2 px-3 text-xs font-semibold text-slate-400">Qtd</th>
                     <th className="text-right py-2 px-3 text-xs font-semibold text-slate-400">Dimensoes</th>
                     <th className="text-right py-2 px-3 text-xs font-semibold text-slate-400">Markup</th>
@@ -274,7 +274,7 @@ function CreateTemplateModal({ open, onClose }: { open: boolean; onClose: () => 
             />
           </div>
           <div>
-            <Label htmlFor="tmpl-desc">Descricao</Label>
+            <Label htmlFor="tmpl-desc">Descrição</Label>
             <Textarea
               id="tmpl-desc"
               value={descricao}
@@ -289,7 +289,7 @@ function CreateTemplateModal({ open, onClose }: { open: boolean; onClose: () => 
               id="tmpl-cat"
               value={categoria}
               onChange={(e) => setCategoria(e.target.value)}
-              placeholder="Ex: Comunicacao Visual, PDV, Fachadas"
+              placeholder="Ex: Comunicação Visual, PDV, Fachadas"
               className="mt-1.5 rounded-xl"
             />
           </div>

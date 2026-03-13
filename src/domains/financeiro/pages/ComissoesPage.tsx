@@ -569,7 +569,7 @@ function TabDetalhamento({
           </SelectTrigger>
           <SelectContent>
             <SelectItem value="all">Todos vendedores</SelectItem>
-            {vendedores.map(([id, nome]) => (
+            {vendedores.filter(([id]) => id).map(([id, nome]) => (
               <SelectItem key={id} value={id}>
                 {nome}
               </SelectItem>

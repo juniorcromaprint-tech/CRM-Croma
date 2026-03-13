@@ -164,7 +164,7 @@ export default function ProdutoSelector({
           </SelectTrigger>
           <SelectContent>
             <SelectItem value="__all__">Todas as categorias</SelectItem>
-            {categorias.map((c) => (
+            {categorias.filter((c) => c.id).map((c) => (
               <SelectItem key={c.id} value={c.id}>
                 <span className="flex items-center gap-2">
                   {c.icone && <span>{c.icone}</span>}

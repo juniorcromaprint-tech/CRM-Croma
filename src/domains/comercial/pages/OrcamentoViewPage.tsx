@@ -282,7 +282,7 @@ export default function OrcamentoViewPage() {
           </div>
           <div className="text-right">
             <p className="font-bold text-slate-800">Croma Print</p>
-            <p className="text-sm text-slate-500">Comunicacao Visual</p>
+            <p className="text-sm text-slate-500">Comunicação Visual</p>
           </div>
         </div>
 
@@ -305,7 +305,7 @@ export default function OrcamentoViewPage() {
             </div>
             {orc.condicoes_pagamento && (
               <div className="col-span-2">
-                <p className="text-xs font-semibold text-slate-400 uppercase tracking-wider mb-1">Condicoes de Pagamento</p>
+                <p className="text-xs font-semibold text-slate-400 uppercase tracking-wider mb-1">Condições de Pagamento</p>
                 <p className="text-sm text-slate-700">{orc.condicoes_pagamento}</p>
               </div>
             )}
@@ -320,7 +320,7 @@ export default function OrcamentoViewPage() {
               <thead>
                 <tr className="bg-slate-50 border-b border-slate-200">
                   <th className="text-left py-2.5 px-4 text-xs font-semibold text-slate-500">#</th>
-                  <th className="text-left py-2.5 px-4 text-xs font-semibold text-slate-500">Descricao</th>
+                  <th className="text-left py-2.5 px-4 text-xs font-semibold text-slate-500">Descrição</th>
                   <th className="text-right py-2.5 px-4 text-xs font-semibold text-slate-500">Qtd</th>
                   <th className="text-right py-2.5 px-4 text-xs font-semibold text-slate-500">Unit</th>
                   <th className="text-right py-2.5 px-4 text-xs font-semibold text-slate-500">Total</th>
@@ -505,14 +505,14 @@ export default function OrcamentoViewPage() {
         {/* ──── Observacoes ──── */}
         {orc.observacoes && (
           <div className="mt-8 pt-6 border-t border-slate-200">
-            <p className="text-xs font-semibold text-slate-400 uppercase tracking-wider mb-2">Observacoes</p>
+            <p className="text-xs font-semibold text-slate-400 uppercase tracking-wider mb-2">Observações</p>
             <p className="text-sm text-slate-600 whitespace-pre-wrap">{orc.observacoes}</p>
           </div>
         )}
 
         {/* ──── Print footer ──── */}
         <div className="hidden print:block mt-12 pt-6 border-t border-slate-300 text-center text-xs text-slate-400">
-          <p>Croma Print Comunicacao Visual</p>
+          <p>Croma Print Comunicação Visual</p>
           <p>Proposta valida por {orc.validade_dias} dias a partir de {new Date(orc.created_at).toLocaleDateString("pt-BR")}</p>
         </div>
       </div>
