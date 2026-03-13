@@ -1,6 +1,6 @@
 # CROMA PRINT — CRM/ERP SISTEMA
 
-> **Versão**: 3.0 | **Atualizado**: 2026-03-10 | **Status**: Operacional em Produção
+> **Versão**: 3.1 | **Atualizado**: 2026-03-13 | **Status**: Operacional em Produção
 
 ---
 
@@ -10,7 +10,7 @@
 |---|---|
 | **Repositório principal** | `C:\Users\Caldera\Claude\CRM-Croma` |
 | **GitHub** | `https://github.com/juniorcromaprint-tech/CRM-Croma.git` |
-| **Vercel ERP** | `tender-archimedes.vercel.app` (deploy automático de `main`) |
+| **Vercel ERP** | `crm-croma.vercel.app` (deploy automático de `main`) |
 | **Vercel Campo** | `campo-croma.vercel.app` (deploy automático de `main`) |
 | **Supabase** | `djwjmfgplnqyffdcgdaw.supabase.co` |
 
@@ -34,7 +34,7 @@
 
 | Produto | Pasta | URL | Público | Foco |
 |---|---|---|---|---|
-| **ERP/CRM** | `src/` | `tender-archimedes.vercel.app` | Equipe interna | Desktop-first |
+| **ERP/CRM** | `src/` | `crm-croma.vercel.app` | Equipe interna | Desktop-first |
 | **App de Campo** | `APP-Campo/` | `campo-croma.vercel.app` | Técnicos/instaladores | Mobile-first PWA |
 
 **Backend compartilhado**: Supabase `djwjmfgplnqyffdcgdaw`
@@ -60,7 +60,7 @@ Lead → Orçamento → Pedido → Produção → Instalação → Faturamento
 
 ---
 
-## ESTADO ATUAL DO BANCO (2026-03-10)
+## ESTADO ATUAL DO BANCO (2026-03-13)
 
 | Migration | Status | Conteúdo |
 |---|---|---|
@@ -73,24 +73,26 @@ Lead → Orçamento → Pedido → Produção → Instalação → Faturamento
 | `006_orcamento_module.sql` | ❌ NÃO executada | acabamentos, servicos, regras_precificacao — **SCHEMA PRECISA SER CORRIGIDO antes de executar** |
 | `008_update_materiais_precos.sql` | ✅ Executada | 464 materiais com preço real Mubisys |
 | `009_update_produtos_markups.sql` | ✅ Executada | 156 modelos com markup real |
+| `020_portal_tracking_pagamento.sql` | ✅ Executada | Portal cliente, tracking, pagamento, notificações |
 
 ### Dados no Banco
 - `clientes`: 307 registros
-- `materiais`: 467 registros (464 com preço_medio, 3 sem)
+- `materiais`: 467 registros (464 com preço_medio, 3 sem) — visíveis em `/admin/materiais`
 - `produtos`: 156 registros
 - `produto_modelos`: 156 registros (markup seedado)
-- `modelo_materiais`: **0 registros** — CRÍTICO, nenhum material vinculado a modelo
+- `modelo_materiais`: centenas de matérias-primas disponíveis em `/admin/materiais` — vinculação aos modelos pendente
 - `modelo_processos`: **0 registros** — CRÍTICO
 
 ---
 
-## PROBLEMAS CRÍTICOS CONHECIDOS (da auditoria 2026-03-10)
+## PROBLEMAS CRÍTICOS CONHECIDOS (atualizado 2026-03-13)
 
-1. **ERP sem auth** — `DemoRoute` é pass-through, não exige login
-2. **Orçamento gera R$ 0,00** — editor envia arrays vazios para o motor Mubisys
-3. **Bug multiplicação dupla** — `precoTotal = precoVenda * quantidade` (precoVenda já inclui qty)
-4. **Migration 006 schema incompatível** — 3 definições diferentes no código
-5. **modelo_materiais com 0 registros** — motor nunca recebe custo de material real
+1. **Orçamento gera R$ 0,00** — editor envia arrays vazios para o motor Mubisys
+2. **Bug multiplicação dupla** — `precoTotal = precoVenda * quantidade` (precoVenda já inclui qty)
+3. **Migration 006 schema incompatível** — 3 definições diferentes no código
+4. **modelo_materiais sem vínculo** — materiais existem mas não estão vinculados aos modelos de produto
+
+> ~~ERP sem auth~~ — **RESOLVIDO**: auth real funcionando em `crm-croma.vercel.app`
 
 Ver auditoria completa: `docs/AUDITORIA_COMPLETA_2026-03-10.md`
 
