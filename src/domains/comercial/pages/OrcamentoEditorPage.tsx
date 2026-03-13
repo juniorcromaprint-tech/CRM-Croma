@@ -51,6 +51,7 @@ import { validarDesconto } from "@/shared/services/orcamento-pricing.service";
 import { brl } from "@/shared/utils/format";
 import { showError, showSuccess } from "@/utils/toast";
 import { orcamentoService } from "../services/orcamento.service";
+import { CondicoesPagamento, type PaymentConditions } from "../components/CondicoesPagamento";
 
 // ─── Item editor state ──────────────────────────────────────────────────────
 
@@ -219,6 +220,14 @@ export default function OrcamentoEditorPage() {
   // ─── Template modal ─────────────────────────────────────────────────────
   const [showTemplateModal, setShowTemplateModal] = useState(false);
 
+  // ─── Payment conditions ──────────────────────────────────────────────────
+  const [paymentConditions, setPaymentConditions] = useState<PaymentConditions>({
+    forma_pagamento: '',
+    parcelas_count: 1,
+    entrada_percentual: 0,
+    prazo_dias: [],
+  });
+
   // ─── Pre-fill form when editing ─────────────────────────────────────────
   useEffect(() => {
     if (orcamento) {
@@ -228,6 +237,12 @@ export default function OrcamentoEditorPage() {
       setCondicoes(orcamento.condicoes_pagamento || "");
       setObservacoes(orcamento.observacoes || "");
       setValidadeDias(orcamento.validade_dias || 10);
+      setPaymentConditions({
+        forma_pagamento: (orcamento as any).forma_pagamento || '',
+        parcelas_count: (orcamento as any).parcelas_count || 1,
+        entrada_percentual: (orcamento as any).entrada_percentual || 0,
+        prazo_dias: (orcamento as any).prazo_dias || [],
+      });
 
       // Load existing servicos
       if (orcamento.servicos && orcamento.servicos.length > 0) {
@@ -392,7 +407,11 @@ export default function OrcamentoEditorPage() {
           condicoes_pagamento: condicoes || null,
           observacoes: observacoes || null,
           validade_dias: validadeDias,
-        },
+          forma_pagamento: paymentConditions.forma_pagamento || null,
+          parcelas_count: paymentConditions.parcelas_count,
+          entrada_percentual: paymentConditions.entrada_percentual,
+          prazo_dias: paymentConditions.prazo_dias,
+        } as any,
       });
 
       // Salvar serviços
@@ -1132,6 +1151,13 @@ export default function OrcamentoEditorPage() {
           Salve o orcamento primeiro para poder adicionar itens com precificacao automatica.
         </div>
       )}
+
+      {/* ══════════ CONDIÇÕES DE PAGAMENTO ══════════ */}
+      <CondicoesPagamento
+        value={paymentConditions}
+        onChange={setPaymentConditions}
+        valorTotal={orcamento?.total ?? 0}
+      />
 
       {/* Template modal */}
       <TemplateSelector

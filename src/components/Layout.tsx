@@ -13,6 +13,7 @@ import {
 } from "@/shared/constants/navigation";
 import CommandPalette from "@/shared/components/CommandPalette";
 import Breadcrumbs from "@/shared/components/Breadcrumbs";
+import { NotificationBadge } from "@/components/NotificationBadge";
 
 // ---------------------------------------------------------------------------
 // Lucide Icons — mapped by string name from navigation.ts
@@ -96,7 +97,10 @@ function SidebarNavLink({ item, isActive }: SidebarNavLinkProps) {
           : "text-slate-600 hover:bg-blue-50 hover:text-blue-600"
       }`}
     >
-      <Icon size={20} className={isActive ? "text-white" : "text-slate-400"} />
+      <span className="relative">
+        <Icon size={20} className={isActive ? "text-white" : "text-slate-400"} />
+        {item.path === '/orcamentos' && <NotificationBadge />}
+      </span>
       <span className="font-medium text-sm">{item.name}</span>
     </Link>
   );
