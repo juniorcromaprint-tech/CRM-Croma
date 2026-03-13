@@ -633,14 +633,20 @@ export const orcamentoService = {
 
   // ─── Converter para pedido ───────────────────────────────────────────────
   async converterParaPedido(orcamentoId: string, userId?: string): Promise<{ pedido_id: string }> {
+    // Busca orçamento e valida antes de converter
+    const orc = await orcamentoService.buscarPorId(orcamentoId);
+    if (!orc.itens || orc.itens.length === 0) {
+      throw new Error("Orçamento precisa de pelo menos 1 item para gerar pedido.");
+    }
+    if ((orc.total ?? 0) <= 0) {
+      throw new Error("Orçamento precisa ter valor maior que R$ 0,00 para gerar pedido.");
+    }
+
     // Atualiza status para aprovada
     await orcamentoService.atualizar(orcamentoId, {
       status: "aprovada",
       aprovado_em: new Date().toISOString(),
     });
-
-    // Cria pedido (simplificado - a lógica completa seria via Edge Function)
-    const orc = await orcamentoService.buscarPorId(orcamentoId);
     const ano = new Date().getFullYear();
     const { count } = await supabase
       .from("pedidos")

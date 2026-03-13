@@ -911,7 +911,7 @@ export default function ComissoesPage() {
               subColor="text-emerald-600"
             />
             <KpiCard
-              label="Pendente Aprovacao"
+              label="Pendente Aprovação"
               value={String(pendentes)}
               icon={Clock}
               iconBg="bg-amber-50"

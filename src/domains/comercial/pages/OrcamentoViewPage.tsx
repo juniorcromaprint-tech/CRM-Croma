@@ -14,12 +14,24 @@ import { Button } from "@/components/ui/button";
 import { Separator } from "@/components/ui/separator";
 import { Badge } from "@/components/ui/badge";
 import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+  AlertDialogTrigger,
+} from "@/components/ui/alert-dialog";
+import {
   useOrcamento,
   useAtualizarOrcamento,
   useConverterParaPedido,
   useDuplicarOrcamento,
 } from "../hooks/useOrcamentos";
 import { brl } from "@/shared/utils/format";
+import { showError } from "@/utils/toast";
 import type { OrcamentoStatus } from "../services/orcamento.service";
 
 const STATUS_CONFIG: Record<OrcamentoStatus, { label: string; cls: string }> = {
@@ -40,6 +52,7 @@ export default function OrcamentoViewPage() {
   const duplicar = useDuplicarOrcamento();
 
   const [expandedItems, setExpandedItems] = useState<Set<string>>(new Set());
+  const [approveOpen, setApproveOpen] = useState(false);
 
   const toggleItem = (itemId: string) => {
     setExpandedItems((prev) => {
@@ -51,12 +64,30 @@ export default function OrcamentoViewPage() {
   };
 
   const handleEnviar = () => {
-    if (!id) return;
+    if (!id || !orc) return;
+    const itens = (orc as any).itens ?? [];
+    if (itens.length === 0) {
+      showError("Orçamento precisa de pelo menos 1 item para ser enviado.");
+      return;
+    }
+    if ((orc.valor_total ?? 0) <= 0) {
+      showError("Orçamento precisa ter valor maior que R$ 0,00.");
+      return;
+    }
     atualizar.mutate({ id, updates: { status: "enviada" } });
   };
 
   const handleAprovar = () => {
-    if (!id) return;
+    if (!id || !orc) return;
+    const itens = (orc as any).itens ?? [];
+    if (itens.length === 0) {
+      showError("Orçamento precisa de pelo menos 1 item para ser aprovado.");
+      return;
+    }
+    if ((orc.valor_total ?? 0) <= 0) {
+      showError("Orçamento precisa ter valor maior que R$ 0,00 para ser aprovado.");
+      return;
+    }
     atualizar.mutate({ id, updates: { status: "aprovada", aprovado_em: new Date().toISOString() } });
   };
 
@@ -66,7 +97,16 @@ export default function OrcamentoViewPage() {
   };
 
   const handleConverterParaPedido = async () => {
-    if (!id) return;
+    if (!id || !orc) return;
+    const itens = (orc as any).itens ?? [];
+    if (itens.length === 0) {
+      showError("Orçamento precisa de itens para gerar pedido.");
+      return;
+    }
+    if ((orc.valor_total ?? 0) <= 0) {
+      showError("Orçamento com valor R$ 0,00 não pode gerar pedido.");
+      return;
+    }
     await converter.mutateAsync(id);
     navigate("/pedidos");
   };
@@ -167,14 +207,35 @@ export default function OrcamentoViewPage() {
           )}
           {(orc.status === "enviada" || orc.status === "em_revisao") && (
             <>
-              <Button
-                size="sm"
-                className="rounded-xl bg-emerald-600 text-white hover:bg-emerald-700 gap-1.5"
-                onClick={handleAprovar}
-                disabled={atualizar.isPending}
-              >
-                <CheckCircle size={14} /> Aprovar
-              </Button>
+              <AlertDialog open={approveOpen} onOpenChange={setApproveOpen}>
+                <AlertDialogTrigger asChild>
+                  <Button
+                    size="sm"
+                    className="rounded-xl bg-emerald-600 text-white hover:bg-emerald-700 gap-1.5"
+                    disabled={atualizar.isPending}
+                  >
+                    <CheckCircle size={14} /> Aprovar
+                  </Button>
+                </AlertDialogTrigger>
+                <AlertDialogContent>
+                  <AlertDialogHeader>
+                    <AlertDialogTitle>Confirmar aprovação</AlertDialogTitle>
+                    <AlertDialogDescription>
+                      Deseja aprovar o orçamento <strong>{orc.numero}</strong> no valor de{" "}
+                      <strong>{brl(orc.valor_total ?? 0)}</strong>? Esta ação não pode ser desfeita.
+                    </AlertDialogDescription>
+                  </AlertDialogHeader>
+                  <AlertDialogFooter>
+                    <AlertDialogCancel>Cancelar</AlertDialogCancel>
+                    <AlertDialogAction
+                      className="bg-emerald-600 hover:bg-emerald-700"
+                      onClick={handleAprovar}
+                    >
+                      Aprovar
+                    </AlertDialogAction>
+                  </AlertDialogFooter>
+                </AlertDialogContent>
+              </AlertDialog>
               <Button
                 size="sm"
                 variant="outline"

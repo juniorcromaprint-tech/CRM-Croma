@@ -2,6 +2,25 @@ import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { supabase } from '@/integrations/supabase/client';
 import { showSuccess, showError } from '@/utils/toast';
 
+// ─── Helpers ─────────────────────────────────────────────────────────────────
+
+/**
+ * Returns a date as "yyyy-MM-dd" anchored to America/Sao_Paulo timezone.
+ * Using Intl.DateTimeFormat ensures correctness regardless of the browser/OS
+ * timezone setting — critical for users in UTC-3 (Brazil Standard Time) or
+ * UTC-2 (Brasília Summer Time).
+ */
+function localDateStr(d: Date = new Date()): string {
+  const parts = new Intl.DateTimeFormat('en-CA', {
+    timeZone: 'America/Sao_Paulo',
+    year: 'numeric',
+    month: '2-digit',
+    day: '2-digit',
+  }).formatToParts(d);
+  const get = (type: string) => parts.find((p) => p.type === type)?.value ?? '00';
+  return `${get('year')}-${get('month')}-${get('day')}`;
+}
+
 // ─── Types ──────────────────────────────────────────────────────────────────
 
 export type ContaReceberStatus =
@@ -99,7 +118,7 @@ export function useContasReceberStats() {
       let totalPago = 0;
       let totalVencido = 0;
       let totalAVencer = 0;
-      const today = new Date().toISOString().split('T')[0];
+      const today = localDateStr();
 
       for (const c of contas) {
         const valor = Number(c.valor_original) || 0;
@@ -153,7 +172,7 @@ export function useBaixaConta() {
           valor_pago: novoValorPago,
           saldo,
           status: novoStatus,
-          data_pagamento: data_pagamento || new Date().toISOString().split('T')[0],
+          data_pagamento: data_pagamento || localDateStr(),
           updated_at: new Date().toISOString(),
         })
         .eq('id', id)

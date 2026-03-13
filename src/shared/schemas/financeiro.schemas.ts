@@ -1,5 +1,11 @@
 import { z } from "zod";
 
+/** Returns today's date as "yyyy-MM-dd" in local timezone (avoids UTC offset bug). */
+function localDateStr(): string {
+  const d = new Date();
+  return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`;
+}
+
 // ─── Contas a Receber ───────────────────────────────────────────────────────
 
 export const contaReceberStatusEnum = z.enum([
@@ -20,7 +26,7 @@ export const contaReceberSchema = z.object({
   valor_original: z.number().positive("Valor deve ser maior que zero"),
   valor_pago: z.number().nonnegative().default(0),
   saldo: z.number().optional().nullable(),
-  data_emissao: z.string().default(() => new Date().toISOString().split("T")[0]),
+  data_emissao: z.string().default(() => localDateStr()),
   data_vencimento: z.string({ required_error: "Data de vencimento é obrigatória" }),
   data_pagamento: z.string().optional().nullable(),
   status: contaReceberStatusEnum.default("previsto"),
@@ -74,7 +80,7 @@ export const contaPagarSchema = z.object({
   valor_original: z.number().positive("Valor deve ser maior que zero"),
   valor_pago: z.number().nonnegative().default(0),
   saldo: z.number().optional().nullable(),
-  data_emissao: z.string().default(() => new Date().toISOString().split("T")[0]),
+  data_emissao: z.string().default(() => localDateStr()),
   data_vencimento: z.string({ required_error: "Data de vencimento é obrigatória" }),
   data_pagamento: z.string().optional().nullable(),
   status: contaPagarStatusEnum.default("a_pagar"),
@@ -149,7 +155,7 @@ export const lancamentoCaixaSchema = z.object({
   categoria: z.string().min(1, "Categoria é obrigatória"),
   descricao: z.string().min(1, "Descrição é obrigatória"),
   valor: z.number().positive("Valor deve ser maior que zero"),
-  data_lancamento: z.string().default(() => new Date().toISOString().split("T")[0]),
+  data_lancamento: z.string().default(() => localDateStr()),
   conta_receber_id: z.string().uuid().optional().nullable(),
   conta_pagar_id: z.string().uuid().optional().nullable(),
   conta_plano_id: z.string().uuid().optional().nullable(),

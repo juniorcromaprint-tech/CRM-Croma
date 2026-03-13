@@ -395,7 +395,21 @@ function DialogModelo({ open, onClose, produtoId, modelo }: DialogModeloProps) {
   const queryClient = useQueryClient();
   const isEdit = !!modelo;
 
+  const { data: produtosList = [] } = useQuery({
+    queryKey: ["produtos-lista-dialog"],
+    queryFn: async () => {
+      const { data } = await (supabase as unknown as any)
+        .from("produtos")
+        .select("id, nome, categoria")
+        .eq("ativo", true)
+        .order("nome");
+      return (data ?? []) as Produto[];
+    },
+    enabled: open && !isEdit,
+  });
+
   const [form, setForm] = useState({
+    produtoId: produtoId,
     nome: "",
     largura_cm: "",
     altura_cm: "",
@@ -410,6 +424,7 @@ function DialogModelo({ open, onClose, produtoId, modelo }: DialogModeloProps) {
     if (open) {
       if (modelo) {
         setForm({
+          produtoId: modelo.produto_id,
           nome: modelo.nome,
           largura_cm: modelo.largura_cm != null ? String(modelo.largura_cm) : "",
           altura_cm: modelo.altura_cm != null ? String(modelo.altura_cm) : "",
@@ -422,6 +437,7 @@ function DialogModelo({ open, onClose, produtoId, modelo }: DialogModeloProps) {
         });
       } else {
         setForm({
+          produtoId: produtoId,
           nome: "",
           largura_cm: "",
           altura_cm: "",
@@ -433,13 +449,14 @@ function DialogModelo({ open, onClose, produtoId, modelo }: DialogModeloProps) {
         });
       }
     }
-  }, [open, modelo]);
+  }, [open, modelo, produtoId]);
 
   const mutation = useMutation({
     mutationFn: async () => {
+      if (!form.produtoId) throw new Error("Selecione o produto");
       if (!form.nome.trim()) throw new Error("Nome é obrigatório");
       const payload: Record<string, unknown> = {
-        produto_id: produtoId,
+        produto_id: form.produtoId,
         nome: form.nome.trim(),
         markup_padrao: parseFloat(form.markup_padrao) || 45,
         margem_minima: parseFloat(form.margem_minima) || 25,
@@ -490,6 +507,26 @@ function DialogModelo({ open, onClose, produtoId, modelo }: DialogModeloProps) {
           <DialogTitle>{isEdit ? "Editar Modelo" : "Novo Modelo"}</DialogTitle>
         </DialogHeader>
         <div className="space-y-4 py-2">
+          {!isEdit && (
+            <div className="space-y-1">
+              <Label>Produto *</Label>
+              <Select
+                value={form.produtoId}
+                onValueChange={(v) => setForm((f) => ({ ...f, produtoId: v }))}
+              >
+                <SelectTrigger className="rounded-xl">
+                  <SelectValue placeholder="Selecione o produto..." />
+                </SelectTrigger>
+                <SelectContent>
+                  {produtosList.map((p) => (
+                    <SelectItem key={p.id} value={p.id}>
+                      {p.nome}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
+          )}
           <div className="space-y-1">
             <Label>Nome *</Label>
             <Input
@@ -824,7 +861,7 @@ function PainelModeloDetalhe({ modeloId }: PainelModeloDetalheProps) {
         <div className="bg-white border border-slate-100 rounded-xl p-3 space-y-2">
           <p className="text-xs font-medium text-slate-500">Adicionar Material</p>
           <div className="flex gap-2 flex-wrap">
-            <div className="flex-1 min-w-40">
+            <div className="flex-1 min-w-40 relative">
               <Input
                 placeholder="Buscar material..."
                 value={materialSearch}

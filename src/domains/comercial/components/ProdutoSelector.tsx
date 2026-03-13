@@ -180,8 +180,8 @@ export default function ProdutoSelector({
       <div>
         <Label className="text-xs text-slate-500">Produto *</Label>
         <Select
-          value={produtoId ?? ""}
-          onValueChange={handleProdutoChange}
+          value={produtoId || "__none__"}
+          onValueChange={(v) => handleProdutoChange(v === "__none__" ? "" : v)}
           onOpenChange={handleProdutoOpenChange}
           disabled={isLoading}
         >
@@ -196,6 +196,10 @@ export default function ProdutoSelector({
             )}
           </SelectTrigger>
           <SelectContent>
+            {/* Sentinel item required so Radix never has value="" in the list */}
+            <SelectItem value="__none__" className="hidden" aria-hidden>
+              &nbsp;
+            </SelectItem>
             <SelectSearchInput
               value={produtoFilter}
               onChange={setProdutoFilter}
@@ -206,7 +210,7 @@ export default function ProdutoSelector({
                 Nenhum produto encontrado
               </div>
             ) : (
-              filteredProdutos.map((p) => (
+              filteredProdutos.filter((p) => p.id).map((p) => (
                 <SelectItem key={p.id} value={p.id}>
                   <span className="flex items-center gap-2">
                     <span>{p.nome}</span>
@@ -225,8 +229,8 @@ export default function ProdutoSelector({
       <div>
         <Label className="text-xs text-slate-500">Modelo *</Label>
         <Select
-          value={modeloId ?? ""}
-          onValueChange={handleModeloChange}
+          value={modeloId || "__none__"}
+          onValueChange={(v) => handleModeloChange(v === "__none__" ? "" : v)}
           onOpenChange={handleModeloOpenChange}
           disabled={!produtoId || modelosLoading}
         >
@@ -247,6 +251,10 @@ export default function ProdutoSelector({
             )}
           </SelectTrigger>
           <SelectContent>
+            {/* Sentinel item required so Radix never has value="" in the list */}
+            <SelectItem value="__none__" className="hidden" aria-hidden>
+              &nbsp;
+            </SelectItem>
             <SelectSearchInput
               value={modeloFilter}
               onChange={setModeloFilter}
@@ -259,7 +267,7 @@ export default function ProdutoSelector({
                   : "Nenhum modelo encontrado"}
               </div>
             ) : (
-              filteredModelos.map((m) => (
+              filteredModelos.filter((m) => m.id).map((m) => (
                 <SelectItem key={m.id} value={m.id}>
                   <span className="flex items-center gap-2">
                     <span>{m.nome}</span>
