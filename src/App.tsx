@@ -58,7 +58,7 @@ const App = () => (
         <BrowserRouter>
           <Routes>
             <Route path="/login" element={<LoginPage />} />
-            <Route path="/tv" element={<TvPage />} />
+            <Route path="/tv" element={<ProtectedRoute><TvPage /></ProtectedRoute>} />
             <Route path="/p/:token" element={
               <Suspense fallback={<div className="min-h-screen flex items-center justify-center"><Loader2 className="h-8 w-8 animate-spin text-blue-600" /></div>}>
                 <PortalOrcamentoPage />
