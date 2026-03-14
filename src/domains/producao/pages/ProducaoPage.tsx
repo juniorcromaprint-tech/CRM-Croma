@@ -1,4 +1,4 @@
-import React, { useState, useMemo, useCallback, useRef, type DragEvent } from "react";
+import React, { useState, useMemo, useCallback, useRef, useEffect, type DragEvent } from "react";
 import { supabase } from "@/integrations/supabase/client";
 import { criarOrdemInstalacao } from "@/domains/instalacao/services/instalacao-criacao.service";
 import { finalizarCustosOP } from "@/domains/producao/services/producao.service";
@@ -362,6 +362,8 @@ export default function ProducaoPage() {
   const [prioridadeFilter, setPrioridadeFilter] = useState<string>("all");
   const [isCreateOpen, setIsCreateOpen] = useState(false);
   const [selectedOP, setSelectedOP] = useState<OrdemProducaoRow | null>(null);
+  const [page, setPage] = useState(0);
+  const PAGE_SIZE = 20;
 
   // --- Create form ---
   const [formPedidoItemId, setFormPedidoItemId] = useState("");
@@ -376,28 +378,38 @@ export default function ProducaoPage() {
   const dragCounterRef = useRef<Record<string, number>>({});
   const isDragDropUpdate = useRef(false);
 
+  useEffect(() => {
+    setPage(0);
+  }, [searchTerm, statusFilter, prioridadeFilter]);
+
   // =========================================================================
   // QUERIES
   // =========================================================================
 
   const {
-    data: ordens = [],
+    data: ordensResult,
     isLoading,
     isError,
   } = useQuery({
-    queryKey: ["producao", "ordens"],
+    queryKey: ["producao", "ordens", page],
     queryFn: async () => {
-      const { data, error } = await supabase
+      const { data, error, count } = await supabase
         .from("ordens_producao")
         .select(
-          "*, pedido_itens(descricao, especificacao, quantidade, modelo_id, pedidos(numero, clientes(nome_fantasia, razao_social))), producao_etapas(*)"
+          "*, pedido_itens(descricao, especificacao, quantidade, modelo_id, pedidos(numero, clientes(nome_fantasia, razao_social))), producao_etapas(*)",
+          { count: "exact" }
         )
-        .order("created_at", { ascending: false });
+        .order("created_at", { ascending: false })
+        .range(page * PAGE_SIZE, (page + 1) * PAGE_SIZE - 1);
 
       if (error) throw error;
-      return (data ?? []) as unknown as OrdemProducaoRow[];
+      return { data: (data ?? []) as unknown as OrdemProducaoRow[], total: count ?? 0 };
     },
   });
+
+  const ordens = ordensResult?.data ?? [];
+  const totalOrdens = ordensResult?.total ?? 0;
+  const totalOrdensPages = Math.ceil(totalOrdens / PAGE_SIZE);
 
   const { data: pedidoItens = [] } = useQuery({
     queryKey: ["producao", "pedido-itens-select"],
@@ -1243,6 +1255,31 @@ export default function ProducaoPage() {
                   </div>
                 )}
               </div>
+
+              {/* Pagination */}
+              {totalOrdensPages > 1 && (
+                <div className="flex items-center justify-between px-4 py-3 bg-white rounded-2xl border border-slate-100 shadow-sm">
+                  <p className="text-sm text-slate-500">
+                    Mostrando {page * PAGE_SIZE + 1}–{Math.min((page + 1) * PAGE_SIZE, totalOrdens)} de {totalOrdens}
+                  </p>
+                  <div className="flex gap-2">
+                    <Button
+                      variant="outline" size="sm" className="rounded-xl"
+                      disabled={page === 0}
+                      onClick={() => setPage((p) => p - 1)}
+                    >
+                      Anterior
+                    </Button>
+                    <Button
+                      variant="outline" size="sm" className="rounded-xl"
+                      disabled={page >= totalOrdensPages - 1}
+                      onClick={() => setPage((p) => p + 1)}
+                    >
+                      Próximo
+                    </Button>
+                  </div>
+                </div>
+              )}
             </div>
           )}
         </>

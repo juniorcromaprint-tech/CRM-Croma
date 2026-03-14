@@ -3,7 +3,7 @@
 // Materiais, Movimentacoes e Inventario
 // ============================================================================
 
-import { useState, useMemo, useCallback } from "react";
+import { useState, useMemo, useCallback, useEffect } from "react";
 import { supabase } from "@/integrations/supabase/client";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { showSuccess, showError } from "@/utils/toast";
@@ -324,25 +324,34 @@ export default function EstoquePage() {
   const [inventarioAtivo, setInventarioAtivo] = useState(false);
   const [inventarioRows, setInventarioRows] = useState<InventarioRow[]>([]);
 
+  // ─── Pagination state ───────────────────────────────────────────────────
+  const MAT_PAGE_SIZE = 20;
+  const [matPage, setMatPage] = useState(0);
+
   // ==========================================================================
   // QUERIES
   // ==========================================================================
 
   const {
-    data: materiais = [],
+    data: materiaisResult,
     isLoading: loadingMateriais,
-  } = useQuery<Material[]>({
-    queryKey: ["estoque-materiais"],
+  } = useQuery<{ data: Material[]; total: number }>({
+    queryKey: ["estoque-materiais", matPage],
     queryFn: async () => {
-      const { data, error } = await supabase
+      const { data, error, count } = await supabase
         .from("materiais")
-        .select("*, estoque_saldos(quantidade_disponivel, quantidade_reservada)")
+        .select("*, estoque_saldos(quantidade_disponivel, quantidade_reservada)", { count: "exact" })
         .eq("ativo", true)
-        .order("nome");
+        .order("nome")
+        .range(matPage * MAT_PAGE_SIZE, (matPage + 1) * MAT_PAGE_SIZE - 1);
       if (error) throw error;
-      return (data ?? []) as unknown as Material[];
+      return { data: (data ?? []) as unknown as Material[], total: count ?? 0 };
     },
   });
+
+  const materiais = materiaisResult?.data ?? [];
+  const totalMateriais = materiaisResult?.total ?? 0;
+  const totalMatPages = Math.ceil(totalMateriais / MAT_PAGE_SIZE);
 
   const {
     data: movimentacoes = [],
@@ -533,6 +542,10 @@ export default function EstoquePage() {
     [sortKey, sortAsc]
   );
 
+  useEffect(() => {
+    setMatPage(0);
+  }, [searchMat, filterCategoria, filterStatus]);
+
   // ==========================================================================
   // COMPUTED DATA
   // ==========================================================================
@@ -589,7 +602,7 @@ export default function EstoquePage() {
   // KPIs
   const kpis = useMemo(() => {
     const ativos = materiais.filter((m) => m.ativo);
-    const totalMat = ativos.length;
+    const totalMat = totalMateriais;
     const valorTotal = ativos.reduce((acc, m) => {
       const saldo = getSaldo(m);
       const preco = Number(m.preco_medio) || 0;
@@ -1050,8 +1063,30 @@ export default function EstoquePage() {
                   </tbody>
                 </table>
               </div>
-              <div className="px-4 py-3 border-t border-slate-100 text-xs text-slate-400">
-                {filteredMateriais.length} material(is) encontrado(s)
+              <div className="flex items-center justify-between px-4 py-3 border-t border-slate-100">
+                <span className="text-xs text-slate-400">
+                  {filteredMateriais.length > 0
+                    ? `Mostrando ${matPage * MAT_PAGE_SIZE + 1}–${Math.min((matPage + 1) * MAT_PAGE_SIZE, totalMateriais)} de ${totalMateriais} material(is)`
+                    : "Nenhum material encontrado"}
+                </span>
+                {totalMatPages > 1 && (
+                  <div className="flex gap-2">
+                    <Button
+                      variant="outline" size="sm" className="rounded-xl"
+                      disabled={matPage === 0}
+                      onClick={() => setMatPage((p) => p - 1)}
+                    >
+                      Anterior
+                    </Button>
+                    <Button
+                      variant="outline" size="sm" className="rounded-xl"
+                      disabled={matPage >= totalMatPages - 1}
+                      onClick={() => setMatPage((p) => p + 1)}
+                    >
+                      Próximo
+                    </Button>
+                  </div>
+                )}
               </div>
             </Card>
           )}
