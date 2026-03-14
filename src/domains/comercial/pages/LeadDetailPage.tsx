@@ -17,6 +17,7 @@ import {
   AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle,
 } from "@/components/ui/alert-dialog";
 import { useLead, useUpdateLead } from "../hooks/useLeads";
+import { useCreateCliente } from "@/domains/clientes/hooks/useClientes";
 import { brl, formatDate } from "@/shared/utils/format";
 import { showError } from "@/utils/toast";
 
@@ -41,6 +42,7 @@ export default function LeadDetailPage() {
   const navigate = useNavigate();
   const { data: lead, isLoading } = useLead(id);
   const updateLead = useUpdateLead();
+  const createCliente = useCreateCliente();
 
   const [editing, setEditing] = useState(false);
   const [convertOpen, setConvertOpen] = useState(false);
@@ -100,17 +102,29 @@ export default function LeadDetailPage() {
     );
   };
 
-  const handleConverter = () => {
-    if (!id) return;
-    updateLead.mutate(
-      { id, status: "convertido" },
-      {
-        onSuccess: () => {
-          setConvertOpen(false);
-          navigate("/clientes");
-        },
-      }
-    );
+  const handleConverter = async () => {
+    if (!id || !lead) return;
+    try {
+      await createCliente.mutateAsync({
+        razao_social: lead.empresa,
+        nome_fantasia: lead.empresa,
+        email: lead.contato_email ?? null,
+        telefone: lead.contato_telefone ?? null,
+        segmento: lead.segmento ?? null,
+        origem: "lead_convertido",
+      });
+      updateLead.mutate(
+        { id, status: "convertido" },
+        {
+          onSuccess: () => {
+            setConvertOpen(false);
+            navigate("/clientes");
+          },
+        }
+      );
+    } catch (err) {
+      showError("Erro ao converter lead em cliente.");
+    }
   };
 
   if (isLoading) {
