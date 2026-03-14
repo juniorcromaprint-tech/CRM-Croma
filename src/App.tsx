@@ -7,12 +7,12 @@ import { lazy } from "react";
 import { Loader2 } from "lucide-react";
 import LazyPage from "./shared/components/LazyPage";
 import { AuthProvider, useAuth } from "./contexts/AuthContext";
-
-const PortalOrcamentoPage = lazy(() => import('./domains/portal/pages/PortalOrcamentoPage'));
 import Layout from "./components/Layout";
 import ErrorBoundary from "./components/ErrorBoundary";
 import LoginPage from "@/shared/pages/LoginPage";
 import TvPage from "@/domains/producao/pages/TvPage";
+
+const PortalOrcamentoPage = lazy(() => import('./domains/portal/pages/PortalOrcamentoPage'));
 
 // Domain route groups
 import { comercialRoutes } from "./routes/comercialRoutes";
