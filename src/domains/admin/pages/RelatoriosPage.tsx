@@ -9,7 +9,17 @@ import { showSuccess, showError } from "@/utils/toast";
 import { exportCsv } from "@/shared/utils/exportCsv";
 import { exportExcel } from "@/shared/utils/exportExcel";
 import { exportPdf } from "@/shared/utils/exportPdf";
-import { formatDate } from "@/shared/utils/format";
+import { formatDate, brl } from "@/shared/utils/format";
+
+import {
+  BarChart,
+  Bar,
+  XAxis,
+  YAxis,
+  CartesianGrid,
+  Tooltip,
+  ResponsiveContainer,
+} from "recharts";
 
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -37,6 +47,8 @@ import {
   Loader2,
   Download,
   ChevronDown,
+  Eye,
+  EyeOff,
   LucideIcon,
 } from "lucide-react";
 
@@ -550,6 +562,56 @@ async function gerarRelatorio(
 }
 
 // ----------------------------------------------------------------------------
+// PREVIEW HELPERS
+// ----------------------------------------------------------------------------
+
+const PREVIEW_SUPPORTED = new Set(["vendas", "dre"]);
+
+interface ChartPoint {
+  label: string;
+  valor: number;
+}
+
+function transformVendasToChart(rows: (string | number | null | undefined)[][]): ChartPoint[] {
+  // rows: [ID, Número, Status, Valor Total, Cliente, Data]
+  // Group by month (Data is index 5, formatted as dd/mm/yyyy)
+  const byMonth: Record<string, number> = {};
+  for (const row of rows) {
+    const dateStr = String(row[5] ?? "");
+    // formatDate returns dd/mm/yyyy — extract mm/yyyy as label
+    const parts = dateStr.split("/");
+    const key = parts.length === 3 ? `${parts[1]}/${parts[2]}` : "?";
+    byMonth[key] = (byMonth[key] ?? 0) + Number(row[3] ?? 0);
+  }
+  return Object.entries(byMonth)
+    .sort(([a], [b]) => {
+      const [am, ay] = a.split("/").map(Number);
+      const [bm, by_] = b.split("/").map(Number);
+      return ay !== by_ ? ay - by_ : am - bm;
+    })
+    .map(([label, valor]) => ({ label, valor }));
+}
+
+function transformDreToChart(rows: (string | number | null | undefined)[][]): ChartPoint[] {
+  // rows: [Tipo, Descrição, Categoria, Valor, Data Pagamento]
+  // Group by Tipo (Receita/Despesa)
+  const byTipo: Record<string, number> = { Receita: 0, Despesa: 0 };
+  for (const row of rows) {
+    const tipo = String(row[0] ?? "");
+    if (tipo === "Receita" || tipo === "Despesa") {
+      byTipo[tipo] = (byTipo[tipo] ?? 0) + Number(row[3] ?? 0);
+    }
+  }
+  return Object.entries(byTipo).map(([label, valor]) => ({ label, valor }));
+}
+
+function buildChartData(id: string, rows: (string | number | null | undefined)[][]): ChartPoint[] {
+  if (id === "vendas") return transformVendasToChart(rows);
+  if (id === "dre") return transformDreToChart(rows);
+  return [];
+}
+
+// ----------------------------------------------------------------------------
 // COMPONENT
 // ----------------------------------------------------------------------------
 
@@ -559,6 +621,31 @@ export default function RelatoriosPage() {
   const [de, setDe] = useState<string>(getFirstDayOfMonth);
   const [ate, setAte] = useState<string>(getToday);
   const [loading, setLoading] = useState<Set<string>>(new Set());
+  const [previewReport, setPreviewReport] = useState<string | null>(null);
+  const [previewData, setPreviewData] = useState<ChartPoint[]>([]);
+  const [previewLoading, setPreviewLoading] = useState(false);
+
+  async function handlePreview(relatorio: RelatorioConfig) {
+    if (previewReport === relatorio.id) {
+      setPreviewReport(null);
+      setPreviewData([]);
+      return;
+    }
+
+    setPreviewLoading(true);
+    setPreviewReport(relatorio.id);
+    setPreviewData([]);
+    try {
+      const { rows } = await gerarRelatorio(relatorio.id, de, ate);
+      setPreviewData(buildChartData(relatorio.id, rows));
+    } catch (err) {
+      console.error(err);
+      showError("Erro ao carregar pré-visualização.");
+      setPreviewReport(null);
+    } finally {
+      setPreviewLoading(false);
+    }
+  }
 
   async function handleExport(relatorio: RelatorioConfig, format: ExportFormat) {
     if (loading.has(relatorio.id)) return;
@@ -668,45 +755,93 @@ export default function RelatoriosPage() {
                 </div>
               </CardHeader>
 
-              <CardContent className="mt-auto pt-2">
-                <DropdownMenu>
-                  <DropdownMenuTrigger asChild>
+              <CardContent className="mt-auto pt-2 space-y-2">
+                <div className="flex gap-2">
+                  <DropdownMenu>
+                    <DropdownMenuTrigger asChild>
+                      <Button
+                        size="sm"
+                        className="flex-1"
+                        disabled={isLoading}
+                      >
+                        {isLoading ? (
+                          <>
+                            <Loader2 className="mr-2 h-3.5 w-3.5 animate-spin" />
+                            Gerando…
+                          </>
+                        ) : (
+                          <>
+                            <Download className="mr-2 h-3.5 w-3.5" />
+                            Exportar
+                            <ChevronDown className="ml-2 h-3.5 w-3.5" />
+                          </>
+                        )}
+                      </Button>
+                    </DropdownMenuTrigger>
+                    <DropdownMenuContent align="end">
+                      <DropdownMenuItem onClick={() => handleExport(rel, "csv")}>
+                        CSV
+                      </DropdownMenuItem>
+                      <DropdownMenuItem onClick={() => handleExport(rel, "excel")}>
+                        Excel (.xlsx)
+                      </DropdownMenuItem>
+                      <DropdownMenuItem onClick={() => handleExport(rel, "pdf")}>
+                        PDF
+                      </DropdownMenuItem>
+                    </DropdownMenuContent>
+                  </DropdownMenu>
+
+                  {PREVIEW_SUPPORTED.has(rel.id) && (
                     <Button
+                      variant="outline"
                       size="sm"
-                      className="w-full"
-                      disabled={isLoading}
+                      onClick={() => handlePreview(rel)}
+                      disabled={previewLoading && previewReport === rel.id}
+                      title={previewReport === rel.id ? "Ocultar gráfico" : "Pré-visualizar"}
                     >
-                      {isLoading ? (
-                        <>
-                          <Loader2 className="mr-2 h-3.5 w-3.5 animate-spin" />
-                          Gerando…
-                        </>
+                      {previewLoading && previewReport === rel.id ? (
+                        <Loader2 className="h-3.5 w-3.5 animate-spin" />
+                      ) : previewReport === rel.id ? (
+                        <EyeOff className="h-3.5 w-3.5" />
                       ) : (
-                        <>
-                          <Download className="mr-2 h-3.5 w-3.5" />
-                          Exportar
-                          <ChevronDown className="ml-2 h-3.5 w-3.5" />
-                        </>
+                        <Eye className="h-3.5 w-3.5" />
                       )}
                     </Button>
-                  </DropdownMenuTrigger>
-                  <DropdownMenuContent align="end">
-                    <DropdownMenuItem onClick={() => handleExport(rel, "csv")}>
-                      CSV
-                    </DropdownMenuItem>
-                    <DropdownMenuItem onClick={() => handleExport(rel, "excel")}>
-                      Excel (.xlsx)
-                    </DropdownMenuItem>
-                    <DropdownMenuItem onClick={() => handleExport(rel, "pdf")}>
-                      PDF
-                    </DropdownMenuItem>
-                  </DropdownMenuContent>
-                </DropdownMenu>
+                  )}
+                </div>
               </CardContent>
             </Card>
           );
         })}
       </div>
+
+      {/* Chart preview panel */}
+      {previewReport && previewData.length > 0 && (
+        <div className="bg-white rounded-2xl border border-slate-200 p-6">
+          <h3 className="font-semibold text-slate-700 mb-4">
+            {previewReport === "vendas" ? "Vendas por Período" : "DRE — Receitas vs Despesas"}
+          </h3>
+          <ResponsiveContainer width="100%" height={280}>
+            <BarChart data={previewData} margin={{ top: 4, right: 16, left: 16, bottom: 4 }}>
+              <CartesianGrid strokeDasharray="3 3" />
+              <XAxis dataKey="label" fontSize={12} />
+              <YAxis fontSize={12} tickFormatter={(v: number) => brl(v)} width={90} />
+              <Tooltip formatter={(value: number) => [brl(value), "Valor"]} />
+              <Bar dataKey="valor" fill="#2563eb" radius={[4, 4, 0, 0]} />
+            </BarChart>
+          </ResponsiveContainer>
+        </div>
+      )}
+
+      {previewReport && !previewLoading && previewData.length === 0 && (
+        <div className="bg-white rounded-2xl border border-slate-200 p-12 text-center">
+          <BarChart3 size={40} className="mx-auto text-slate-300 mb-3" />
+          <h3 className="font-semibold text-slate-600">Sem dados no período</h3>
+          <p className="text-sm text-slate-400 mt-1">
+            Ajuste o período e tente novamente
+          </p>
+        </div>
+      )}
     </div>
   );
 }
