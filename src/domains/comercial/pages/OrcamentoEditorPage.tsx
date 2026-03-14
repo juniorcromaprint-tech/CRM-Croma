@@ -387,6 +387,10 @@ export default function OrcamentoEditorPage() {
       showError(`Desconto de ${descontoPercentual}% excede o máximo permitido (${descontoValidation.desconto_maximo}%). Reduza ou solicite aprovação.`);
       return;
     }
+    if (!isNew && (orcamento?.total ?? 0) <= 0) {
+      showError('Orçamento sem valor. Configure os materiais do modelo antes de salvar.');
+      return;
+    }
 
     if (isNew) {
       const orc = await criar.mutateAsync({
