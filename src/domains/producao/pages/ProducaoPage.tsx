@@ -2,6 +2,8 @@ import React, { useState, useMemo, useCallback, useRef, type DragEvent } from "r
 import { supabase } from "@/integrations/supabase/client";
 import { criarOrdemInstalacao } from "@/domains/instalacao/services/instalacao-criacao.service";
 import { finalizarCustosOP } from "@/domains/producao/services/producao.service";
+import { useProducaoStats } from "@/domains/producao/hooks/useProducao";
+import KpiCard from "@/shared/components/KpiCard";
 import OPMateriais from "@/domains/producao/components/OPMateriais";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { showSuccess, showError } from "@/utils/toast";
@@ -59,6 +61,9 @@ import {
   Printer,
   PenTool,
   Truck,
+  ClipboardList,
+  Cog,
+  CheckCircle,
 } from "lucide-react";
 
 // ===========================================================================
@@ -356,6 +361,7 @@ export default function ProducaoPage() {
   const queryClient = useQueryClient();
 
   // --- State ---
+  const { data: kpiStats, isLoading: kpiLoading } = useProducaoStats();
   const [viewMode, setViewMode] = useState<"kanban" | "lista">("kanban");
   const [searchTerm, setSearchTerm] = useState("");
   const [statusFilter, setStatusFilter] = useState<string>("all");
@@ -824,6 +830,40 @@ export default function ProducaoPage() {
             <Plus size={20} className="mr-2" /> Nova OP
           </Button>
         </div>
+      </div>
+
+      {/* ----------------------------------------------------------------- */}
+      {/* KPI CARDS                                                         */}
+      {/* ----------------------------------------------------------------- */}
+      <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
+        <KpiCard
+          title="Total OPs"
+          value={kpiStats?.total ?? 0}
+          icon={<ClipboardList size={20} />}
+          color="blue"
+          loading={kpiLoading}
+        />
+        <KpiCard
+          title="Em Produção"
+          value={(kpiStats?.byStatus?.em_producao ?? 0) + (kpiStats?.byStatus?.em_acabamento ?? 0)}
+          icon={<Cog size={20} />}
+          color="orange"
+          loading={kpiLoading}
+        />
+        <KpiCard
+          title="Atrasadas (+3 dias)"
+          value={kpiStats?.atrasadas ?? 0}
+          icon={<AlertTriangle size={20} />}
+          color="red"
+          loading={kpiLoading}
+        />
+        <KpiCard
+          title="Concluídas Hoje"
+          value={kpiStats?.concluidas_hoje ?? 0}
+          icon={<CheckCircle size={20} />}
+          color="green"
+          loading={kpiLoading}
+        />
       </div>
 
       {/* ----------------------------------------------------------------- */}
