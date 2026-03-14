@@ -1,18 +1,26 @@
 // ============================================================================
 // RELATORIOS PAGE — Croma Print ERP/CRM
-// 11 tipos de relatório com exportação CSV, filtro por período
+// 11 tipos de relatório com exportação CSV, Excel e PDF, filtro por período
 // ============================================================================
 
 import { useState } from "react";
 import { supabase } from "@/integrations/supabase/client";
 import { showSuccess, showError } from "@/utils/toast";
 import { exportCsv } from "@/shared/utils/exportCsv";
+import { exportExcel } from "@/shared/utils/exportExcel";
+import { exportPdf } from "@/shared/utils/exportPdf";
 import { formatDate } from "@/shared/utils/format";
 
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuTrigger,
+} from "@/components/ui/dropdown-menu";
 
 import {
   BarChart3,
@@ -27,6 +35,8 @@ import {
   Layers,
   Receipt,
   Loader2,
+  Download,
+  ChevronDown,
   LucideIcon,
 } from "lucide-react";
 
@@ -543,20 +553,36 @@ async function gerarRelatorio(
 // COMPONENT
 // ----------------------------------------------------------------------------
 
+type ExportFormat = "csv" | "excel" | "pdf";
+
 export default function RelatoriosPage() {
   const [de, setDe] = useState<string>(getFirstDayOfMonth);
   const [ate, setAte] = useState<string>(getToday);
   const [loading, setLoading] = useState<Set<string>>(new Set());
 
-  async function handleGerar(relatorio: RelatorioConfig) {
+  async function handleExport(relatorio: RelatorioConfig, format: ExportFormat) {
     if (loading.has(relatorio.id)) return;
 
     setLoading((prev) => new Set(prev).add(relatorio.id));
     try {
       const { headers, rows } = await gerarRelatorio(relatorio.id, de, ate);
       const filename = `${relatorio.id}_${de}_${ate}`;
-      exportCsv(filename, headers, rows);
-      showSuccess(`Relatório "${relatorio.label}" gerado!`);
+
+      if (format === "csv") {
+        exportCsv(filename, headers, rows);
+      } else if (format === "excel") {
+        exportExcel({ filename, sheetName: relatorio.label, headers, rows });
+      } else {
+        exportPdf({
+          filename,
+          title: relatorio.label,
+          subtitle: `Período: ${de} a ${ate}`,
+          headers,
+          rows,
+        });
+      }
+
+      showSuccess(`Relatório "${relatorio.label}" exportado!`);
     } catch (err) {
       console.error(err);
       showError("Erro ao gerar relatório. Tente novamente.");
@@ -579,7 +605,7 @@ export default function RelatoriosPage() {
         <div>
           <h1 className="text-2xl font-bold tracking-tight">Relatórios</h1>
           <p className="text-sm text-muted-foreground">
-            Exporte dados do sistema em formato CSV
+            Exporte dados do sistema em CSV, Excel ou PDF
           </p>
         </div>
       </div>
@@ -643,21 +669,39 @@ export default function RelatoriosPage() {
               </CardHeader>
 
               <CardContent className="mt-auto pt-2">
-                <Button
-                  size="sm"
-                  className="w-full"
-                  disabled={isLoading}
-                  onClick={() => handleGerar(rel)}
-                >
-                  {isLoading ? (
-                    <>
-                      <Loader2 className="mr-2 h-3.5 w-3.5 animate-spin" />
-                      Gerando…
-                    </>
-                  ) : (
-                    "Gerar Relatório"
-                  )}
-                </Button>
+                <DropdownMenu>
+                  <DropdownMenuTrigger asChild>
+                    <Button
+                      size="sm"
+                      className="w-full"
+                      disabled={isLoading}
+                    >
+                      {isLoading ? (
+                        <>
+                          <Loader2 className="mr-2 h-3.5 w-3.5 animate-spin" />
+                          Gerando…
+                        </>
+                      ) : (
+                        <>
+                          <Download className="mr-2 h-3.5 w-3.5" />
+                          Exportar
+                          <ChevronDown className="ml-2 h-3.5 w-3.5" />
+                        </>
+                      )}
+                    </Button>
+                  </DropdownMenuTrigger>
+                  <DropdownMenuContent align="end">
+                    <DropdownMenuItem onClick={() => handleExport(rel, "csv")}>
+                      CSV
+                    </DropdownMenuItem>
+                    <DropdownMenuItem onClick={() => handleExport(rel, "excel")}>
+                      Excel (.xlsx)
+                    </DropdownMenuItem>
+                    <DropdownMenuItem onClick={() => handleExport(rel, "pdf")}>
+                      PDF
+                    </DropdownMenuItem>
+                  </DropdownMenuContent>
+                </DropdownMenu>
               </CardContent>
             </Card>
           );
