@@ -25,6 +25,7 @@ import { criarNFeFromPedido } from '@/domains/fiscal/services/nfe-creation.servi
 import { gerarContasReceber } from '@/domains/financeiro/services/financeiro-automation.service'
 import { showError, showSuccess } from '@/utils/toast'
 import { supabase } from '@/integrations/supabase/client'
+import { updateWithLock, OptimisticLockError } from '@/shared/utils/optimistic-lock'
 
 // Mapa de transições válidas — rejeita saltos de status
 const VALID_TRANSITIONS: Record<string, string[]> = {
@@ -91,17 +92,12 @@ export default function PedidoDetailPage() {
         ? `${obsAtual}\n\n[CANCELADO] ${new Date().toLocaleDateString('pt-BR')}: ${motivoCancelamento}`
         : `[CANCELADO] ${new Date().toLocaleDateString('pt-BR')}: ${motivoCancelamento}`
 
-      const { error } = await supabase
-        .from('pedidos')
-        .update({
-          status: 'cancelado',
-          observacoes: novaObs,
-          cancelado_em: new Date().toISOString(),
-          motivo_cancelamento: motivoCancelamento,
-        })
-        .eq('id', id)
-
-      if (error) throw error
+      await updateWithLock('pedidos', id, {
+        status: 'cancelado',
+        observacoes: novaObs,
+        cancelado_em: new Date().toISOString(),
+        motivo_cancelamento: motivoCancelamento,
+      }, pedido.version)
 
       showSuccess('Pedido cancelado com sucesso')
       setShowCancelDialog(false)
@@ -109,8 +105,13 @@ export default function PedidoDetailPage() {
       queryClient.invalidateQueries({ queryKey: ['pedidos'] })
       queryClient.invalidateQueries({ queryKey: ['dashboard'] })
       refetch()
-    } catch {
-      showError('Erro ao cancelar pedido. Tente novamente.')
+    } catch (err) {
+      if (err instanceof OptimisticLockError) {
+        showError(err.message)
+        refetch()
+      } else {
+        showError('Erro ao cancelar pedido. Tente novamente.')
+      }
     } finally {
       setCancelando(false)
     }
@@ -126,36 +127,46 @@ export default function PedidoDetailPage() {
   })
 
   const iniciarProducao = useMutation({
-    mutationFn: async (pedidoId: string) => {
-      await supabase.from('pedidos').update({ status: 'em_producao' }).eq('id', pedidoId)
+    mutationFn: async ({ pedidoId, version }: { pedidoId: string; version: number }) => {
+      await updateWithLock('pedidos', pedidoId, { status: 'em_producao' }, version)
       await criarOrdemProducao(pedidoId)
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['pedidos'] })
       queryClient.invalidateQueries({ queryKey: ['producao'] })
       queryClient.invalidateQueries({ queryKey: ['dashboard'] })
+      refetch()
     },
-    onError: (err: any) => showError(err.message || 'Erro ao iniciar produção'),
+    onError: (err: any) => {
+      if (err instanceof OptimisticLockError) {
+        showError(err.message)
+        refetch()
+      } else {
+        showError(err.message || 'Erro ao iniciar produção')
+      }
+    },
   })
 
   const concluirPedido = async () => {
-    if (!id) return
+    if (!id || !pedido) return
     try {
       // 1. Gerar contas a receber ANTES de marcar como concluído
       await gerarContasReceber(id)
-      // 2. Atualizar status via Supabase direto (não mutate fire-and-forget)
-      const { error } = await supabase
-        .from('pedidos')
-        .update({ status: 'concluido' })
-        .eq('id', id)
-      if (error) throw error
+      // 2. Atualizar status com optimistic lock
+      await updateWithLock('pedidos', id, { status: 'concluido' }, pedido.version)
       // 3. Invalidar cache para refletir no UI
       queryClient.invalidateQueries({ queryKey: ['pedidos'] })
       queryClient.invalidateQueries({ queryKey: ['dashboard'] })
       showSuccess('Pedido concluído com sucesso!')
+      refetch()
     } catch (err: any) {
       console.error('[concluirPedido]', err)
-      showError('Erro ao concluir pedido. Verifique o módulo financeiro.')
+      if (err instanceof OptimisticLockError) {
+        showError(err.message)
+        refetch()
+      } else {
+        showError('Erro ao concluir pedido. Verifique o módulo financeiro.')
+      }
     }
   }
 
@@ -173,7 +184,7 @@ export default function PedidoDetailPage() {
 
     // Guard: "Aprovado → Em Produção" — cria OP automaticamente
     if (pedido.status === 'aprovado') {
-      iniciarProducao.mutate(id)
+      iniciarProducao.mutate({ pedidoId: id, version: pedido.version })
       return
     }
 
@@ -213,7 +224,7 @@ export default function PedidoDetailPage() {
       return
     }
 
-    updatePedido.mutate({ id, status: action.next as any })
+    updatePedido.mutate({ id, status: action.next as any, version: pedido.version })
   }
 
   if (isLoading) {

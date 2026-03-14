@@ -2,6 +2,7 @@ import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { supabase } from '@/integrations/supabase/client';
 import { showSuccess, showError } from '@/utils/toast';
 import { ilikeTerm } from '@/shared/utils/searchUtils';
+import { updateWithLock, OptimisticLockError } from '@/shared/utils/optimistic-lock';
 
 // ─── Types ──────────────────────────────────────────────────────────────────
 
@@ -38,6 +39,7 @@ export interface Pedido {
   excluido_em: string | null;
   created_at: string;
   updated_at: string;
+  version: number;
   // joins
   clientes?: { nome_fantasia: string | null; razao_social: string } | null;
   pedido_itens?: { count: number }[] | null;
@@ -56,6 +58,7 @@ export interface PedidoCreate {
 
 export interface PedidoUpdate extends Partial<PedidoCreate> {
   id: string;
+  version?: number;
 }
 
 export interface PedidoFilters {
@@ -127,7 +130,7 @@ export function usePedido(id: string | undefined) {
       if (!id) return null;
       const { data, error } = await supabase
         .from('pedidos')
-        .select('*, clientes(nome_fantasia, razao_social)')
+        .select('*, version, clientes(nome_fantasia, razao_social)')
         .eq('id', id)
         .single();
       if (error) throw new Error(`Erro ao buscar pedido: ${error.message}`);
@@ -167,7 +170,12 @@ export function useCreatePedido() {
 export function useUpdatePedido() {
   const queryClient = useQueryClient();
   return useMutation({
-    mutationFn: async ({ id, ...payload }: PedidoUpdate): Promise<Pedido> => {
+    mutationFn: async ({ id, version, ...payload }: PedidoUpdate): Promise<Pedido> => {
+      if (version !== undefined) {
+        const data = await updateWithLock<Record<string, unknown>>('pedidos', id, payload, version);
+        return data as unknown as Pedido;
+      }
+      // Fallback sem lock quando version não está disponível
       const { data, error } = await supabase
         .from('pedidos')
         .update(payload)
@@ -183,7 +191,13 @@ export function useUpdatePedido() {
       queryClient.invalidateQueries({ queryKey: ['dashboard'] });
       showSuccess('Pedido atualizado');
     },
-    onError: (error: Error) => showError(error.message),
+    onError: (error: Error) => {
+      if (error instanceof OptimisticLockError) {
+        showError(error.message);
+      } else {
+        showError(error.message);
+      }
+    },
   });
 }
 
