@@ -72,6 +72,8 @@ interface ProdutoModelo {
   preco_fixo: number | null;
   tempo_producao_min: number | null;
   ativo: boolean;
+  ncm: string | null;
+  descricao_fiscal: string | null;
   produto?: { nome: string; categoria: string } | null;
 }
 
@@ -417,6 +419,8 @@ function DialogModelo({ open, onClose, produtoId, modelo }: DialogModeloProps) {
     margem_minima: "25",
     preco_fixo: "",
     tempo_producao_min: "",
+    ncm: "",
+    descricao_fiscal: "",
     ativo: true,
   });
 
@@ -433,6 +437,8 @@ function DialogModelo({ open, onClose, produtoId, modelo }: DialogModeloProps) {
           preco_fixo: modelo.preco_fixo != null ? String(modelo.preco_fixo) : "",
           tempo_producao_min:
             modelo.tempo_producao_min != null ? String(modelo.tempo_producao_min) : "",
+          ncm: modelo.ncm ?? "",
+          descricao_fiscal: modelo.descricao_fiscal ?? "",
           ativo: modelo.ativo,
         });
       } else {
@@ -445,6 +451,8 @@ function DialogModelo({ open, onClose, produtoId, modelo }: DialogModeloProps) {
           margem_minima: "25",
           preco_fixo: "",
           tempo_producao_min: "",
+          ncm: "",
+          descricao_fiscal: "",
           ativo: true,
         });
       }
@@ -460,6 +468,8 @@ function DialogModelo({ open, onClose, produtoId, modelo }: DialogModeloProps) {
         nome: form.nome.trim(),
         markup_padrao: parseFloat(form.markup_padrao) || 45,
         margem_minima: parseFloat(form.margem_minima) || 25,
+        ncm: form.ncm.trim() || null,
+        descricao_fiscal: form.descricao_fiscal.trim() || null,
         ativo: form.ativo,
       };
       if (form.largura_cm) payload.largura_cm = parseFloat(form.largura_cm);
@@ -604,6 +614,29 @@ function DialogModelo({ open, onClose, produtoId, modelo }: DialogModeloProps) {
                   setForm((f) => ({ ...f, tempo_producao_min: e.target.value }))
                 }
                 placeholder="Opcional"
+                className="rounded-xl"
+              />
+            </div>
+          </div>
+
+          <div className="grid grid-cols-2 gap-3">
+            <div className="space-y-1">
+              <Label htmlFor="edit-ncm">NCM</Label>
+              <Input
+                id="edit-ncm"
+                value={form.ncm}
+                onChange={(e) => setForm((f) => ({ ...f, ncm: e.target.value }))}
+                placeholder="Ex: 4911.99.90"
+                className="rounded-xl"
+              />
+            </div>
+            <div className="space-y-1">
+              <Label htmlFor="edit-descricao-fiscal">Descrição Fiscal</Label>
+              <Input
+                id="edit-descricao-fiscal"
+                value={form.descricao_fiscal}
+                onChange={(e) => setForm((f) => ({ ...f, descricao_fiscal: e.target.value }))}
+                placeholder="Descrição para NF-e"
                 className="rounded-xl"
               />
             </div>

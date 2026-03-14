@@ -4,8 +4,8 @@ import { supabase } from '@/integrations/supabase/client';
  * Cria um documento fiscal (NF-e rascunho) a partir de um pedido.
  * Também cria os itens da NF-e e aplica CSOSN 400 (Simples Nacional).
  *
- * Nota: produto_modelos não possui coluna `ncm` no banco — ncm fica null
- * até que seja preenchido manualmente no documento fiscal.
+ * NCM é lido de produto_modelos.ncm (migration 028). Se não preenchido,
+ * fica null e pode ser editado manualmente no documento fiscal.
  */
 export async function criarNFeFromPedido(pedidoId: string): Promise<string> {
   // 1. Buscar pedido
@@ -39,12 +39,12 @@ export async function criarNFeFromPedido(pedidoId: string): Promise<string> {
   if (error) throw new Error(`Erro ao criar NF-e: ${error.message}`);
   const docId = data.id;
 
-  // 3. Buscar itens do pedido com nome do modelo (ncm não existe em produto_modelos)
+  // 3. Buscar itens do pedido com nome e NCM do modelo (migration 028 adicionou ncm)
   const { data: itens } = await supabase
     .from('pedido_itens')
     .select(`
       id, descricao, quantidade, valor_unitario, valor_total, unidade,
-      modelo:produto_modelos(nome)
+      modelo:produto_modelos(ncm, nome)
     `)
     .eq('pedido_id', pedidoId);
 
@@ -54,8 +54,7 @@ export async function criarNFeFromPedido(pedidoId: string): Promise<string> {
       pedido_item_id: item.id,
       item_numero: idx + 1,
       descricao: item.descricao ?? (item.modelo as any)?.nome ?? 'Item',
-      // ncm: null — produto_modelos não possui coluna ncm ainda
-      ncm: null,
+      ncm: (item.modelo as any)?.ncm ?? null,
       cfop: '5102',
       unidade: item.unidade ?? 'UN',
       quantidade: Number(item.quantidade) || 1,

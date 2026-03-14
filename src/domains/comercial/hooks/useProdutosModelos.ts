@@ -41,6 +41,9 @@ export interface ProdutoModelo {
   garantia_meses: number | null;
   garantia_descricao: string | null;
   unidade_venda: string | null;
+  // Campos adicionados em migration 028
+  ncm: string | null;
+  descricao_fiscal: string | null;
   materiais?: ModeloMaterial[];
   processos?: ModeloProcesso[];
 }
