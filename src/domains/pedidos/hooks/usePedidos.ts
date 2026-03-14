@@ -198,7 +198,8 @@ export function usePedidoStats() {
       const { data, error } = await supabase
         .from('pedidos')
         .select('status, prioridade, valor_total, data_prometida')
-        .is('excluido_em', null);
+        .is('excluido_em', null)
+        .neq('status', 'cancelado');
       if (error) throw new Error(`Erro ao buscar stats de pedidos: ${error.message}`);
 
       const pedidos = data ?? [];

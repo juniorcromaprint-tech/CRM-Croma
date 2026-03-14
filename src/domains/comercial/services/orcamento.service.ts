@@ -249,7 +249,7 @@ export const orcamentoService = {
     return (data ?? []) as unknown as Orcamento[];
   },
 
-  // ─── Buscar orçamento por ID (1 query + 2 queries paralelas para sub-tabelas) ──
+  // ─── Buscar orçamento por ID (2 queries paralelas com nested select) ──────
   async buscarPorId(id: string): Promise<Orcamento & {
     itens: (OrcamentoItem & {
       materiais?: OrcamentoItemMaterial[];
@@ -257,77 +257,38 @@ export const orcamentoService = {
     })[];
     servicos: OrcamentoServico[];
   }> {
-    // C-03: Substituído N+1 por 1 query principal + 2 paralelas para sub-tabelas opcionais
-    // (proposta_item_materiais e proposta_item_acabamentos podem não existir — migration 006 pendente)
-    const [orcResult, itensResult, servicosResult] = await Promise.all([
+    const [mainResult, servicosResult] = await Promise.all([
       supabase
         .from("propostas")
         .select(`
           *,
-          cliente:clientes(razao_social, nome_fantasia, cnpj)
+          cliente:clientes(razao_social, nome_fantasia, cnpj),
+          itens:proposta_itens(
+            *,
+            materiais:proposta_item_materiais(*),
+            acabamentos:proposta_item_acabamentos(*)
+          )
         `)
         .eq("id", id)
         .is("excluido_em", null)
+        .order("ordem", { referencedTable: "proposta_itens" })
         .single(),
-      supabase
-        .from("proposta_itens")
-        .select("*")
-        .eq("proposta_id", id)
-        .order("ordem"),
       supabase
         .from("proposta_servicos")
         .select("*")
         .eq("proposta_id", id),
     ]);
 
-    if (orcResult.error) throw orcResult.error;
+    if (mainResult.error) throw mainResult.error;
 
-    const itens = (itensResult.data ?? []) as OrcamentoItem[];
-    const itemIds = itens.map((i) => i.id);
-
-    // Buscar materiais e acabamentos de todos os itens em 2 queries únicas (não N queries)
-    let materiaisMap: Record<string, OrcamentoItemMaterial[]> = {};
-    let acabamentosMap: Record<string, OrcamentoItemAcabamento[]> = {};
-
-    if (itemIds.length > 0) {
-      const [materiaisResult, acabamentosResult] = await Promise.all([
-        supabase
-          .from("proposta_item_materiais")
-          .select("*")
-          .in("proposta_item_id", itemIds)
-          .then((r) => r)
-          .catch(() => ({ data: null, error: null })),
-        supabase
-          .from("proposta_item_acabamentos")
-          .select("*")
-          .in("proposta_item_id", itemIds)
-          .then((r) => r)
-          .catch(() => ({ data: null, error: null })),
-      ]);
-
-      if (materiaisResult.data) {
-        for (const m of materiaisResult.data as OrcamentoItemMaterial[]) {
-          if (!materiaisMap[m.proposta_item_id]) materiaisMap[m.proposta_item_id] = [];
-          materiaisMap[m.proposta_item_id].push(m);
-        }
-      }
-      if (acabamentosResult.data) {
-        for (const a of acabamentosResult.data as OrcamentoItemAcabamento[]) {
-          if (!acabamentosMap[a.proposta_item_id]) acabamentosMap[a.proposta_item_id] = [];
-          acabamentosMap[a.proposta_item_id].push(a);
-        }
-      }
-    }
-
-    const itensComDetalhes = itens.map((item) => ({
-      ...item,
-      materiais: materiaisMap[item.id] ?? [],
-      acabamentos: acabamentosMap[item.id] ?? [],
-    }));
-
+    const data = mainResult.data as any;
     return {
-      ...(orcResult.data as unknown as Orcamento),
-      itens: itensComDetalhes,
+      ...data,
+      itens: (data.itens ?? []).map((item: any) => ({
+        ...item,
+        materiais: item.materiais ?? [],
+        acabamentos: item.acabamentos ?? [],
+      })),
       servicos: (servicosResult.data ?? []) as OrcamentoServico[],
     };
   },

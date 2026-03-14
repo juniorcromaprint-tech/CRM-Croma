@@ -20,6 +20,13 @@ async function generateOpNumero(): Promise<string> {
 }
 
 export async function criarOrdemProducao(pedidoId: string): Promise<void> {
+  // Guard de idempotência: evita criar OPs duplicadas
+  const { count } = await supabase
+    .from('ordens_producao')
+    .select('id', { count: 'exact', head: true })
+    .eq('pedido_id', pedidoId);
+  if (count && count > 0) return;
+
   const { data: itens, error: itensError } = await supabase
     .from('pedido_itens')
     .select('id, custo_mp, custo_mo, valor_total, quantidade, modelo_id')

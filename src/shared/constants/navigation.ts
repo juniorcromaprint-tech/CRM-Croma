@@ -41,6 +41,7 @@ export const NAV_GROUPS: NavGroup[] = [
     items: [
       { name: 'Pedidos', path: '/pedidos', icon: 'ClipboardList', module: 'pedidos' },
       { name: 'Produção', path: '/producao', icon: 'Factory', module: 'producao' },
+      { name: 'Expedição', path: '/expedicao', icon: 'Truck', module: 'producao' },
       { name: 'Instalações', path: '/instalacoes', icon: 'Wrench', module: 'instalacao' },
       { name: 'Almoxarife', path: '/almoxarife', icon: 'Package2', module: 'producao' },
       { name: 'Diário de Bordo', path: '/producao/diario-bordo', icon: 'BookOpen', module: 'producao' },

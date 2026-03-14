@@ -5,6 +5,13 @@ import { supabase } from '@/integrations/supabase/client';
  * Chamado automaticamente quando o pedido avança para status "concluido".
  */
 export async function gerarContasReceber(pedidoId: string): Promise<void> {
+  // Guard de idempotência: evita criar conta a receber duplicada
+  const { count } = await supabase
+    .from('contas_receber')
+    .select('id', { count: 'exact', head: true })
+    .eq('pedido_id', pedidoId);
+  if (count && count > 0) return;
+
   const { data: pedido, error } = await supabase
     .from('pedidos')
     .select('id, cliente_id, valor_total, numero, proposta_id')

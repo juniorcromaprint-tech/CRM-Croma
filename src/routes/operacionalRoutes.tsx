@@ -9,12 +9,14 @@ import EstoquePage from '@/domains/estoque/pages/EstoquePage';
 import ComprasPage from '@/domains/compras/pages/ComprasPage';
 import Produtos from '@/pages/Produtos';
 import OcorrenciasPage from '@/domains/qualidade/pages/OcorrenciasPage';
+import ExpedicaoPage from '@/domains/producao/pages/ExpedicaoPage';
 
 export const operacionalRoutes = (
   <>
     <Route path="pedidos" element={<PedidosPage />} />
     <Route path="pedidos/:id" element={<PedidoDetailPage />} />
     <Route path="producao" element={<ProducaoPage />} />
+    <Route path="expedicao" element={<ExpedicaoPage />} />
     <Route path="instalacoes" element={<InstalacaoPage />} />
     <Route path="almoxarife" element={<AlmoxarifePage />} />
     <Route path="producao/diario-bordo" element={<DiarioBordoPage />} />
