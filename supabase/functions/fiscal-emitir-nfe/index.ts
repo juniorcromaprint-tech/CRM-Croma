@@ -80,6 +80,69 @@ serve(async (req) => {
       );
     }
 
+    // === VALIDAÇÕES DE NEGÓCIO PRÉ-EMISSÃO ===
+    const errosValidacao: string[] = [];
+
+    // 1. Impedir dupla emissão
+    if (doc.status === 'autorizado') {
+      return new Response(
+        JSON.stringify({ sucesso: false, mensagem_erro: 'NF-e já autorizada — não é possível reemitir' }),
+        { status: 422, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+      );
+    }
+
+    // 2. Cliente com CPF/CNPJ
+    const clienteVal = doc.clientes;
+    const cpfCnpjVal = clienteVal?.cpf_cnpj?.replace(/\D/g, '');
+    if (!cpfCnpjVal || (cpfCnpjVal.length !== 11 && cpfCnpjVal.length !== 14)) {
+      errosValidacao.push('Cliente sem CPF/CNPJ válido');
+    }
+
+    // 3. Itens com NCM e CFOP
+    const itensVal = doc.fiscal_documentos_itens ?? [];
+    if (itensVal.length === 0) {
+      errosValidacao.push('Documento sem itens');
+    }
+    itensVal.forEach((item: any, idx: number) => {
+      if (!item.ncm || item.ncm.replace(/\D/g, '').length !== 8) {
+        errosValidacao.push(`Item ${idx + 1}: NCM inválido ou ausente`);
+      }
+      if (!item.cfop || item.cfop.length < 4) {
+        errosValidacao.push(`Item ${idx + 1}: CFOP ausente`);
+      }
+      if (!item.descricao) {
+        errosValidacao.push(`Item ${idx + 1}: Descrição ausente`);
+      }
+    });
+
+    // 4. Série configurada
+    if (!doc.fiscal_series) {
+      errosValidacao.push('Série fiscal não configurada');
+    }
+
+    // 5. Valor total positivo
+    if (!doc.valor_total || doc.valor_total <= 0) {
+      errosValidacao.push('Valor total deve ser maior que zero');
+    }
+
+    if (errosValidacao.length > 0) {
+      await supabaseAdmin
+        .from('fiscal_documentos')
+        .update({ status: 'rascunho', mensagem_erro: errosValidacao.join('; ') })
+        .eq('id', documento_id);
+
+      return new Response(
+        JSON.stringify({
+          sucesso: false,
+          status: 'erro_validacao',
+          mensagem_erro: 'Dados fiscais incompletos',
+          erros: errosValidacao,
+        }),
+        { status: 422, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+      );
+    }
+    // === FIM VALIDAÇÕES ===
+
     // Marca como emitindo
     await supabaseAdmin
       .from('fiscal_documentos')
@@ -101,99 +164,159 @@ serve(async (req) => {
     const ambiente = doc.fiscal_ambientes?.tipo ?? 'homologacao';
     const cnpjEmitente = Deno.env.get('NFE_CNPJ_EMITENTE') ?? doc.fiscal_certificados?.cnpj_titular ?? '';
 
-    // Monta o payload para o provider externo (Focus NFe, etc.)
-    const nfeProvider = Deno.env.get('NFE_PROVIDER') ?? 'focus_nfe';
-    const nfeToken = Deno.env.get('NFE_PROVIDER_TOKEN');
-    const nfeBaseUrl = Deno.env.get('NFE_PROVIDER_URL') ?? 'https://homologacao.focusnfe.com.br';
-
-    // Monta payload NF-e (estrutura Focus NFe)
+    // Monta payload NF-e (estrutura nfewizard-io / SEFAZ)
+    const uf = Deno.env.get('NFE_UF') ?? 'SP';
     const cliente = doc.clientes;
     const itens = doc.fiscal_documentos_itens ?? [];
 
     const nfePayload = {
-      natureza_operacao: doc.natureza_operacao ?? 'Venda de mercadoria',
-      forma_pagamento: 0,
-      tipo_documento: 1, // 1=saída
-      serie: serie,
-      numero: numero,
-      data_emissao: new Date().toISOString().split('T')[0],
-      data_entrada_saida: new Date().toISOString().split('T')[0],
-      tipo_ambiente: ambiente === 'producao' ? 1 : 2,
-      finalidade_emissao: 1,
-      consumidor_final: doc.consumidor_final ?? 1,
-      presenca_comprador: 1,
-      cnpj_emitente: cnpjEmitente,
-      cpf_destinatario: cliente?.cpf_cnpj?.length === 11 ? cliente.cpf_cnpj : undefined,
-      cnpj_destinatario: cliente?.cpf_cnpj?.length === 14 || cliente?.cpf_cnpj?.length === 18
-        ? cliente.cpf_cnpj?.replace(/\D/g, '')
-        : undefined,
-      nome_destinatario: cliente?.razao_social ?? cliente?.nome_fantasia,
-      email_destinatario: cliente?.email_fiscal ?? cliente?.email,
-      logradouro_destinatario: cliente?.endereco,
-      numero_destinatario: cliente?.numero,
-      complemento_destinatario: cliente?.complemento,
-      bairro_destinatario: cliente?.bairro,
-      municipio_destinatario: cliente?.cidade,
-      uf_destinatario: cliente?.estado,
-      cep_destinatario: cliente?.cep?.replace(/\D/g, ''),
-      pais_destinatario: cliente?.pais ?? 'Brasil',
-      indicador_ie_destinatario: parseInt(cliente?.indicador_ie_destinatario ?? '9'),
-      inscricao_estadual_destinatario: cliente?.inscricao_estadual,
-      informacoes_adicionais_contribuinte: doc.informacoes_contribuinte,
-      informacoes_adicionais_fisco: doc.informacoes_fisco,
-      items: itens.map((item: any, idx: number) => ({
-        numero_item: idx + 1,
-        codigo_produto: item.codigo_produto ?? `PROD-${idx + 1}`,
-        codigo_barras: undefined,
-        descricao: item.descricao,
-        codigo_ncm: item.ncm?.replace(/\D/g, ''),
-        cfop: item.cfop,
-        unidade_comercial: item.unidade,
-        quantidade_comercial: item.quantidade,
-        valor_unitario_comercial: item.valor_unitario,
-        valor_bruto: item.valor_bruto,
-        unidade_tributavel: item.unidade,
-        quantidade_tributavel: item.quantidade,
-        valor_unitario_tributavel: item.valor_unitario,
-        valor_frete: 0,
-        valor_seguro: 0,
-        valor_desconto: item.valor_desconto ?? 0,
-        valor_total_tributos: 0,
-        inclui_no_total: 1,
-        origem_mercadoria: parseInt(item.origem_mercadoria ?? '0'),
-        codigo_situacao_operacional: item.cst_ou_csosn,
-        modalidade_base_calculo_icms: 3,
-        percentual_reducao_base_calculo: 0,
-        base_calculo_icms: item.base_calculo_icms ?? 0,
-        aliquota_icms: item.aliquota_icms ?? 0,
-        valor_icms: item.valor_icms ?? 0,
-        cst_pis: '07',
-        base_calculo_pis: item.base_calculo_pis ?? 0,
-        aliquota_pis: item.aliquota_pis ?? 0,
-        valor_pis: item.valor_pis ?? 0,
-        cst_cofins: '07',
-        base_calculo_cofins: item.base_calculo_cofins ?? 0,
-        aliquota_cofins: item.aliquota_cofins ?? 0,
-        valor_cofins: item.valor_cofins ?? 0,
-      })),
-      valor_produtos: doc.valor_produtos,
-      valor_frete: doc.valor_frete ?? 0,
-      valor_seguro: doc.valor_seguro ?? 0,
-      valor_desconto: doc.valor_desconto ?? 0,
-      valor_outras_despesas: doc.valor_outras_despesas ?? 0,
-      valor_total: doc.valor_total,
-      modalidade_frete: 9,
-      valor_icms: doc.valor_icms ?? 0,
-      valor_pis: doc.valor_pis ?? 0,
-      valor_cofins: doc.valor_cofins ?? 0,
+      NFe: {
+        infNFe: {
+          ide: {
+            cUF: '35', // SP — Croma Print fica em São Paulo
+            natOp: doc.natureza_operacao ?? 'Venda de mercadoria',
+            mod: '55',
+            serie: serie.toString(),
+            nNF: numero.toString(),
+            dhEmi: new Date().toISOString(),
+            tpNF: '1',
+            idDest: '1',
+            cMunFG: Deno.env.get('NFE_COD_IBGE') ?? '3550308',
+            tpImp: '1',
+            tpEmis: '1',
+            tpAmb: ambiente === 'producao' ? '1' : '2',
+            finNFe: '1',
+            indFinal: doc.consumidor_final?.toString() ?? '1',
+            indPres: '1',
+          },
+          emit: {
+            CNPJ: cnpjEmitente.replace(/\D/g, ''),
+            xNome: Deno.env.get('NFE_RAZAO_SOCIAL') ?? 'CROMA PRINT COMUNICACAO VISUAL LTDA',
+            enderEmit: {
+              xLgr: Deno.env.get('NFE_ENDERECO') ?? 'RUA PAULO OROZIMBO',
+              nro: Deno.env.get('NFE_NUMERO') ?? '424',
+              xBairro: Deno.env.get('NFE_BAIRRO') ?? 'ACLIMACAO',
+              cMun: Deno.env.get('NFE_COD_IBGE') ?? '3550308',
+              xMun: Deno.env.get('NFE_MUNICIPIO') ?? 'SAO PAULO',
+              UF: uf,
+              CEP: Deno.env.get('NFE_CEP')?.replace(/\D/g, '') ?? '01535000',
+              cPais: '1058',
+              xPais: 'Brasil',
+            },
+            IE: Deno.env.get('NFE_IE') ?? '142826237111',
+            CRT: Deno.env.get('NFE_CRT') ?? '1', // 1 = Simples Nacional
+          },
+          dest: {
+            ...(cliente?.cpf_cnpj?.replace(/\D/g, '').length === 11
+              ? { CPF: cliente.cpf_cnpj.replace(/\D/g, '') }
+              : { CNPJ: cliente?.cpf_cnpj?.replace(/\D/g, '') ?? '' }),
+            xNome: cliente?.razao_social ?? cliente?.nome_fantasia ?? 'Consumidor Final',
+            enderDest: {
+              xLgr: cliente?.endereco ?? '',
+              nro: cliente?.numero ?? 'SN',
+              xBairro: cliente?.bairro ?? '',
+              cMun: '9999999', // TODO: mapear código IBGE do cliente
+              xMun: cliente?.cidade ?? '',
+              UF: cliente?.estado ?? 'SP',
+              CEP: cliente?.cep?.replace(/\D/g, '') ?? '',
+              cPais: '1058',
+              xPais: 'Brasil',
+            },
+            indIEDest: cliente?.indicador_ie_destinatario ?? '9',
+            email: cliente?.email_fiscal ?? cliente?.email,
+          },
+          det: itens.map((item: any, idx: number) => ({
+            '@nItem': (idx + 1).toString(),
+            prod: {
+              cProd: item.codigo_produto ?? `PROD${idx + 1}`,
+              cEAN: 'SEM GTIN',
+              xProd: item.descricao,
+              NCM: item.ncm?.replace(/\D/g, '') ?? '49019900',
+              CFOP: item.cfop ?? '5102',
+              uCom: item.unidade ?? 'UN',
+              qCom: item.quantidade?.toString(),
+              vUnCom: item.valor_unitario?.toFixed(2),
+              vProd: item.valor_bruto?.toFixed(2),
+              cEANTrib: 'SEM GTIN',
+              uTrib: item.unidade ?? 'UN',
+              qTrib: item.quantidade?.toString(),
+              vUnTrib: item.valor_unitario?.toFixed(2),
+              indTot: '1',
+            },
+            imposto: {
+              // SIMPLES NACIONAL (CRT=1) usa CSOSN, não CST
+              ICMS: {
+                ICMSSN102: {
+                  orig: item.origem_mercadoria ?? '0',
+                  CSOSN: item.cst_ou_csosn ?? '102',
+                },
+              },
+              PIS: {
+                PISOutr: {
+                  CST: '99',
+                  vBC: '0.00',
+                  pPIS: '0.00',
+                  vPIS: '0.00',
+                },
+              },
+              COFINS: {
+                COFINSOutr: {
+                  CST: '99',
+                  vBC: '0.00',
+                  pCOFINS: '0.00',
+                  vCOFINS: '0.00',
+                },
+              },
+            },
+          })),
+          total: {
+            ICMSTot: {
+              vBC: '0.00', // SN: base de cálculo ICMS é zero
+              vICMS: '0.00',
+              vICMSDeson: '0.00',
+              vFCPUFDest: '0.00',
+              vICMSUFDest: '0.00',
+              vICMSUFRemet: '0.00',
+              vFCP: '0.00',
+              vBCST: '0.00',
+              vST: '0.00',
+              vFCPST: '0.00',
+              vFCPSTRet: '0.00',
+              vProd: (doc.valor_produtos ?? 0).toFixed(2),
+              vFrete: (doc.valor_frete ?? 0).toFixed(2),
+              vSeg: (doc.valor_seguro ?? 0).toFixed(2),
+              vDesc: (doc.valor_desconto ?? 0).toFixed(2),
+              vII: '0.00',
+              vIPI: '0.00',
+              vIPIDevol: '0.00',
+              vPIS: '0.00',
+              vCOFINS: '0.00',
+              vOutro: (doc.valor_outras_despesas ?? 0).toFixed(2),
+              vNF: (doc.valor_total ?? 0).toFixed(2),
+              vTotTrib: '0.00',
+            },
+          },
+          transp: {
+            modFrete: '9',
+          },
+          infAdic: {
+            infCpl: doc.informacoes_contribuinte,
+            infAdFisco: doc.informacoes_fisco,
+          },
+        },
+      },
     };
 
-    // Se não há token configurado, simula resposta (modo demo)
+    // Chama o microserviço nfe-service
+    const nfeServiceUrl = Deno.env.get('NFE_SERVICE_URL');
+    const nfeInternalSecret = Deno.env.get('NFE_INTERNAL_SECRET');
+    const nfeProvider = 'nfewizard-io';
+
     let resultado: any;
 
-    if (!nfeToken || nfeToken === 'DEMO_MODE') {
-      // MODO DEMO: simula autorização bem-sucedida
-      console.log('[fiscal-emitir-nfe] MODO DEMO — simulando autorização');
+    if (!nfeServiceUrl || !nfeInternalSecret) {
+      // MODO DEMO: simula autorização bem-sucedida quando nfe-service não configurado
+      console.log('[fiscal-emitir-nfe] MODO DEMO — NFE_SERVICE_URL não configurado');
       resultado = {
         sucesso: true,
         status: 'autorizado',
@@ -206,48 +329,52 @@ serve(async (req) => {
         retorno_raw: { status: 'DEMO', numero, ambiente },
       };
     } else {
-      // MODO REAL: envia para o provider externo
+      // MODO REAL: envia para o nfe-service (nfewizard-io)
       try {
-        const providerUrl = `${nfeBaseUrl}/v2/nfe?ref=${documento_id}`;
-        const response = await fetch(providerUrl, {
+        const response = await fetch(`${nfeServiceUrl}/api/emitir`, {
           method: 'POST',
           headers: {
             'Content-Type': 'application/json',
-            'Authorization': `Token token=${nfeToken}`,
+            'x-internal-secret': nfeInternalSecret,
           },
           body: JSON.stringify(nfePayload),
         });
 
         const retorno = await response.json();
 
-        if (response.status === 200 || response.status === 201) {
-          resultado = {
-            sucesso: true,
-            status: 'autorizado',
-            numero: retorno.numero ?? numero,
-            chave_acesso: retorno.chave_nfe ?? retorno.chave,
-            protocolo: retorno.protocolo_autorizacao,
-            data_autorizacao: retorno.data_hora_autorizacao ?? new Date().toISOString(),
-            xml_autorizado: retorno.nfe_proc_url,
-            retorno_raw: retorno,
-          };
-        } else if (response.status === 422) {
+        if (!response.ok || !retorno.sucesso) {
           resultado = {
             sucesso: false,
-            status: 'rejeitado',
-            mensagem_erro: retorno.mensagem ?? retorno.erros?.[0]?.mensagem ?? 'NF-e rejeitada pela SEFAZ',
-            codigo_erro: retorno.codigo ?? String(response.status),
+            status: 'erro_transmissao',
+            mensagem_erro: retorno.mensagem_erro ?? `Serviço NF-e retornou ${response.status}`,
             retorno_raw: retorno,
           };
         } else {
-          throw new Error(`Provider retornou status ${response.status}: ${JSON.stringify(retorno)}`);
+          // Mapear retorno do nfewizard-io para o formato interno
+          const r = retorno.retorno;
+          const cStat = r?.retEnviNFe?.protNFe?.infProt?.cStat;
+          const autorizado = cStat === '100';
+          const emProcessamento = cStat === '103';
+
+          resultado = {
+            sucesso: autorizado,
+            status: autorizado ? 'autorizado' : emProcessamento ? 'processando' : 'rejeitado',
+            numero: numero,
+            chave_acesso: r?.retEnviNFe?.protNFe?.infProt?.chNFe,
+            protocolo: r?.retEnviNFe?.protNFe?.infProt?.nProt,
+            recibo: emProcessamento ? r?.retEnviNFe?.infRec?.nRec : undefined,
+            data_autorizacao: r?.retEnviNFe?.protNFe?.infProt?.dhRecbto,
+            mensagem_erro: autorizado ? undefined : r?.retEnviNFe?.protNFe?.infProt?.xMotivo,
+            codigo_erro: autorizado ? undefined : cStat?.toString(),
+            retorno_raw: retorno.retorno,
+          };
         }
-      } catch (providerErr) {
+      } catch (serviceErr) {
         resultado = {
           sucesso: false,
           status: 'erro_transmissao',
-          mensagem_erro: String(providerErr),
-          retorno_raw: { error: String(providerErr) },
+          mensagem_erro: `Falha ao contactar serviço NF-e: ${String(serviceErr)}`,
+          retorno_raw: { error: String(serviceErr) },
         };
       }
     }

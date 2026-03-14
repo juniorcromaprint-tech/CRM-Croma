@@ -52,14 +52,14 @@ serve(async (req) => {
       );
     }
 
-    const nfeToken = Deno.env.get('NFE_PROVIDER_TOKEN');
-    const nfeBaseUrl = Deno.env.get('NFE_PROVIDER_URL') ?? 'https://homologacao.focusnfe.com.br';
+    const nfeServiceUrl = Deno.env.get('NFE_SERVICE_URL');
+    const nfeInternalSecret = Deno.env.get('NFE_INTERNAL_SECRET');
 
     let resultado: Record<string, unknown>;
 
-    if (!nfeToken || nfeToken === 'DEMO_MODE') {
+    if (!nfeServiceUrl || !nfeInternalSecret) {
       // Modo demo: simula cancelamento autorizado
-      console.log('[fiscal-cancelar-nfe] MODO DEMO — simulando cancelamento');
+      console.log('[fiscal-cancelar-nfe] MODO DEMO — NFE_SERVICE_URL não configurado');
       resultado = {
         sucesso: true,
         protocolo: `CAN${Date.now()}`,
@@ -69,39 +69,40 @@ serve(async (req) => {
       };
     } else {
       try {
-        const response = await fetch(
-          `${nfeBaseUrl}/v2/nfe/${doc.chave_acesso}`,
-          {
-            method: 'DELETE',
-            headers: {
-              'Content-Type': 'application/json',
-              'Authorization': `Token token=${nfeToken}`,
-            },
-            body: JSON.stringify({ justificativa }),
-          }
-        );
+        const response = await fetch(`${nfeServiceUrl}/api/cancelar`, {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+            'x-internal-secret': nfeInternalSecret,
+          },
+          body: JSON.stringify({
+            chave_acesso: doc.chave_acesso,
+            protocolo: doc.protocolo,
+            justificativa,
+          }),
+        });
         const retorno = await response.json();
 
-        if (response.ok) {
+        if (retorno.sucesso) {
+          const r = retorno.retorno;
           resultado = {
             sucesso: true,
-            protocolo: retorno.protocolo_cancelamento,
-            data_cancelamento: retorno.data_hora_cancelamento ?? new Date().toISOString(),
-            mensagem: retorno.mensagem ?? 'Cancelamento autorizado com sucesso',
-            xml_cancelamento: retorno.cancelamento_xml,
-            retorno_raw: retorno,
+            protocolo: r?.retEvento?.infEvento?.nProt ?? `CAN${Date.now()}`,
+            data_cancelamento: r?.retEvento?.infEvento?.dhRegEvento ?? new Date().toISOString(),
+            mensagem: r?.retEvento?.infEvento?.xMotivo ?? 'Cancelamento autorizado',
+            retorno_raw: retorno.retorno,
           };
         } else {
           resultado = {
             sucesso: false,
-            mensagem: retorno.mensagem ?? `Erro no cancelamento: ${response.status}`,
+            mensagem: retorno.mensagem_erro ?? 'Erro no cancelamento',
             retorno_raw: retorno,
           };
         }
       } catch (fetchErr) {
         resultado = {
           sucesso: false,
-          mensagem: `Falha de comunicação com o provider: ${String(fetchErr)}`,
+          mensagem: `Falha ao contactar serviço NF-e: ${String(fetchErr)}`,
           retorno_raw: { error: String(fetchErr) },
         };
       }
