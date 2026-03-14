@@ -58,7 +58,7 @@ export function useBankAccounts() {
     queryFn: async (): Promise<BankAccount[]> => {
       const { data, error } = await supabase
         .from('bank_accounts')
-        .select('*')
+        .select('id, nome, banco_codigo, banco_nome, agencia, agencia_digito, conta, conta_digito, carteira, convenio, cedente_nome, cedente_cnpj, cedente_endereco, cedente_cidade, cedente_estado, cedente_cep, nosso_numero_sequencial, instrucoes_padrao, juros_ao_mes, multa_percentual, dias_protesto, ativo, created_at, updated_at')
         .eq('ativo', true)
         .order('nome');
 
@@ -76,7 +76,7 @@ export function useBankAccount(id: string | undefined) {
     queryFn: async (): Promise<BankAccount> => {
       const { data, error } = await supabase
         .from('bank_accounts')
-        .select('*')
+        .select('id, nome, banco_codigo, banco_nome, agencia, agencia_digito, conta, conta_digito, carteira, convenio, cedente_nome, cedente_cnpj, cedente_endereco, cedente_cidade, cedente_estado, cedente_cep, nosso_numero_sequencial, instrucoes_padrao, juros_ao_mes, multa_percentual, dias_protesto, ativo, created_at, updated_at')
         .eq('id', id!)
         .single();
 

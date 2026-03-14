@@ -104,7 +104,7 @@ export function useLeads(filters?: LeadFilters) {
     queryFn: async (): Promise<Lead[]> => {
       let query = supabase
         .from('leads')
-        .select('*')
+        .select('id, empresa, contato_nome, contato_email, contato_telefone, segmento, origem_id, vendedor_id, status, temperatura, valor_estimado, proximo_contato, observacoes, created_at, updated_at')
         .order('created_at', { ascending: false });
 
       // Filtro por status
@@ -161,7 +161,7 @@ export function useLead(id: string | undefined) {
 
       const { data, error } = await supabase
         .from('leads')
-        .select('*')
+        .select('id, empresa, contato_nome, contato_email, contato_telefone, segmento, origem_id, vendedor_id, status, temperatura, valor_estimado, proximo_contato, observacoes, created_at, updated_at')
         .eq('id', id)
         .single();
 

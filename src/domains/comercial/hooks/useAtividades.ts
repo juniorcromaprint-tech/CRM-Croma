@@ -53,7 +53,7 @@ export function useAtividades(entidadeTipo: string, entidadeId: string | undefin
       if (!entidadeId) return [];
       const { data, error } = await supabase
         .from('atividades_comerciais')
-        .select('*')
+        .select('id, tipo, entidade_tipo, entidade_id, descricao, data_atividade, duracao_minutos, resultado, proximo_passo, autor_id, created_at')
         .eq('entidade_tipo', entidadeTipo)
         .eq('entidade_id', entidadeId)
         .order('data_atividade', { ascending: false });
@@ -74,7 +74,7 @@ export function useAtividadesRecentes(limit = 20) {
     queryFn: async (): Promise<AtividadeComercial[]> => {
       const { data, error } = await supabase
         .from('atividades_comerciais')
-        .select('*')
+        .select('id, tipo, entidade_tipo, entidade_id, descricao, data_atividade, duracao_minutos, resultado, proximo_passo, autor_id, created_at')
         .order('data_atividade', { ascending: false })
         .limit(limit);
       if (error) throw new Error(`Erro ao buscar atividades recentes: ${error.message}`);
