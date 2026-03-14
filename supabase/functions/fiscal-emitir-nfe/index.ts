@@ -6,11 +6,35 @@
  * - Nunca retorna o conteúdo do certificado ao frontend
  * - Usa SUPABASE_SERVICE_ROLE_KEY para acessar o storage privado
  *
+ * CONFIGURAÇÃO DO AMBIENTE NF-e:
+ * Para habilitar emissão real de NF-e, configure as seguintes variáveis de ambiente
+ * no Supabase Dashboard → Project Settings → Edge Functions → Secrets:
+ *
+ *   NFE_SERVICE_URL      — URL do microserviço nfewizard-io (ex: https://nfe-service.exemplo.com)
+ *   NFE_INTERNAL_SECRET  — Secret compartilhado entre esta Edge Function e o nfe-service
+ *   NFE_CNPJ_EMITENTE    — CNPJ da Croma Print (somente dígitos)
+ *   NFE_RAZAO_SOCIAL     — Razão social da empresa emitente
+ *   NFE_UF               — UF do emitente (ex: SP)
+ *   NFE_COD_IBGE         — Código IBGE do município emitente (ex: 3550308 para São Paulo)
+ *   NFE_ENDERECO         — Logradouro do emitente
+ *   NFE_NUMERO           — Número do endereço do emitente
+ *   NFE_BAIRRO           — Bairro do emitente
+ *   NFE_MUNICIPIO        — Município do emitente
+ *   NFE_CEP              — CEP do emitente
+ *   NFE_IE               — Inscrição Estadual do emitente
+ *   NFE_CRT              — Código do Regime Tributário (1=SN, 3=LP/LR)
+ *
+ * Enquanto NFE_SERVICE_URL não estiver configurado, a função opera em MODO DEMO:
+ * simula autorização bem-sucedida sem transmitir para a SEFAZ.
+ *
+ * AMBIENTE PADRÃO: homologação (tpAmb=2).
+ * O ambiente é controlado pela tabela `fiscal_ambientes` no banco de dados.
+ * Somente altere para produção (tpAmb=1) após validação completa em homologação.
+ *
  * NOTA MVP:
  * Esta função implementa o fluxo de emissão usando um provider externo
  * (ex: Focus NFe, Nota Fiscal de Serviço, ou SEFAZ diretamente).
- * Para o MVP, implementamos integração com Focus NFe (API REST).
- * Para produção real, configure NFE_PROVIDER_TOKEN e NFE_PROVIDER_URL.
+ * Para o MVP, implementamos integração com nfewizard-io (API REST).
  */
 
 import { serve } from 'https://deno.land/std@0.168.0/http/server.ts';
@@ -250,7 +274,12 @@ serve(async (req) => {
               xLgr: cliente?.endereco ?? '',
               nro: cliente?.numero ?? 'SN',
               xBairro: cliente?.bairro ?? '',
-              cMun: '9999999', // TODO: mapear código IBGE do cliente
+              // O código IBGE do município do destinatário é mapeado pelo frontend
+              // usando src/shared/data/ibge-municipios.ts (getCodigoIBGE) e persistido
+              // no campo `codigo_ibge_municipio` do documento fiscal antes da emissão.
+              // Enquanto o campo não estiver preenchido, usa '9999999' como fallback
+              // (válido apenas para homologação — em produção o código real é obrigatório).
+              cMun: doc.codigo_ibge_municipio_dest ?? '9999999',
               xMun: cliente?.cidade ?? '',
               UF: cliente?.estado ?? 'SP',
               CEP: cliente?.cep?.replace(/\D/g, '') ?? '',
