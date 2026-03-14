@@ -68,7 +68,7 @@ Lead → Orçamento → Pedido → Produção → Instalação → Faturamento
 | `002_schema_corrections.sql` | ✅ Executada | RLS granular, triggers, índices |
 | `003_campo_migration.sql` | ✅ Executada | Jobs, fotos, assinaturas, checklists |
 | `003_fiscal_module.sql` | ✅ Executada | 11 tabelas fiscal + RPCs NF-e |
-| `004_integracao_bridge.sql` | ❌ NÃO executada | Bridge ERP↔Campo (views + triggers) |
+| `004_integracao_bridge.sql` | ✅ Executada | Bridge ERP↔Campo — views vw_campo_instalacoes, vw_campo_fotos + triggers de sincronização ativos |
 | `005_storage_security.sql` | ✅ Executada | RLS nos buckets |
 | `006_orcamento_module.sql` | ❌ NÃO executada | acabamentos, servicos, regras_precificacao — **SCHEMA PRECISA SER CORRIGIDO antes de executar** |
 | `008_update_materiais_precos.sql` | ✅ Executada | 464 materiais com preço real Mubisys |
