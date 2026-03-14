@@ -1,6 +1,6 @@
-import React, { useState, useMemo } from "react";
+import React, { useState, useEffect } from "react";
 import { Link, useNavigate } from "react-router-dom";
-import { Plus, Search, FileText, Copy, Trash2, ArrowRight, Loader2, Eye, TrendingUp, CheckCircle2, Clock, DollarSign } from "lucide-react";
+import { Plus, Search, FileText, Copy, Trash2, ArrowRight, Loader2, Eye, CheckCircle2, Clock, DollarSign } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
@@ -8,7 +8,7 @@ import {
   AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent,
   AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle,
 } from "@/components/ui/alert-dialog";
-import { useOrcamentos, useExcluirOrcamento, useDuplicarOrcamento } from "../hooks/useOrcamentos";
+import { useOrcamentos, useOrcamentoKpis, useExcluirOrcamento, useDuplicarOrcamento } from "../hooks/useOrcamentos";
 import { brl } from "@/shared/utils/format";
 import { useAuth } from "@/contexts/AuthContext";
 import type { OrcamentoStatus } from "../services/orcamento.service";
@@ -32,26 +32,27 @@ export default function OrcamentosPage() {
   const [statusFilter, setStatusFilter] = useState<OrcamentoStatus | "todos">("todos");
   const [deleteId, setDeleteId] = useState<string | null>(null);
   const [deleteName, setDeleteName] = useState("");
+  const [page, setPage] = useState(0);
 
   const filtros = {
     search: search || undefined,
     status: statusFilter !== "todos" ? statusFilter : undefined,
+    page,
   };
 
-  const { data: orcamentos = [], isLoading } = useOrcamentos(filtros);
-  const { data: todos = [] } = useOrcamentos();
+  const { data: result, isLoading } = useOrcamentos(filtros);
+  const orcamentos = result?.data ?? [];
+  const totalRegistros = result?.total ?? 0;
+  const totalPages = Math.ceil(totalRegistros / 20);
+
+  const { data: kpis = { total: 0, pendentes: 0, aprovados: 0, valorAberto: 0 } } = useOrcamentoKpis();
+
   const excluir = useExcluirOrcamento();
   const duplicar = useDuplicarOrcamento();
 
-  const kpis = useMemo(() => {
-    const total = todos.length;
-    const pendentes = todos.filter((o) => o.status === "enviada" || o.status === "em_revisao").length;
-    const aprovados = todos.filter((o) => o.status === "aprovada").length;
-    const valorAberto = todos
-      .filter((o) => o.status === "enviada" || o.status === "em_revisao")
-      .reduce((acc, o) => acc + (o.total ?? 0), 0);
-    return { total, pendentes, aprovados, valorAberto };
-  }, [todos]);
+  useEffect(() => {
+    setPage(0);
+  }, [search, statusFilter]);
 
   const handleNovo = () => {
     navigate("/orcamentos/novo");
@@ -293,6 +294,31 @@ export default function OrcamentosPage() {
               );
             })}
           </div>
+
+          {/* Pagination */}
+          {totalPages > 1 && (
+            <div className="flex items-center justify-between px-4 py-3 border-t border-slate-100">
+              <p className="text-sm text-slate-500">
+                Mostrando {page * 20 + 1}–{Math.min((page + 1) * 20, totalRegistros)} de {totalRegistros}
+              </p>
+              <div className="flex gap-2">
+                <Button
+                  variant="outline" size="sm" className="rounded-xl"
+                  disabled={page === 0}
+                  onClick={() => setPage((p) => p - 1)}
+                >
+                  Anterior
+                </Button>
+                <Button
+                  variant="outline" size="sm" className="rounded-xl"
+                  disabled={page >= totalPages - 1}
+                  onClick={() => setPage((p) => p + 1)}
+                >
+                  Próximo
+                </Button>
+              </div>
+            </div>
+          )}
         </div>
       )}
 

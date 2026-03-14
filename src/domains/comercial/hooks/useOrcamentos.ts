@@ -7,17 +7,84 @@ import {
   type OrcamentoItemCreateDetalhado,
   type OrcamentoServicoCreateInput,
 } from "../services/orcamento.service";
+import { supabase } from "@/integrations/supabase/client";
+import { ilikeTerm } from "@/shared/utils/searchUtils";
 import { showSuccess, showError } from "@/utils/toast";
 
 export const ORCAMENTOS_QUERY_KEY = "orcamentos";
 
-// ─── Lista de orçamentos ─────────────────────────────────────────────────────
+const PAGE_SIZE = 20;
 
-export function useOrcamentos(filtros?: OrcamentoFiltros) {
+// ─── Lista de orçamentos (paginada) ──────────────────────────────────────────
+
+export function useOrcamentos(filtros?: OrcamentoFiltros & { page?: number }) {
+  const page = filtros?.page ?? 0;
   return useQuery({
     queryKey: [ORCAMENTOS_QUERY_KEY, filtros],
-    queryFn: () => orcamentoService.listar(filtros),
+    queryFn: async () => {
+      let query = supabase
+        .from("propostas")
+        .select(
+          "id, numero, titulo, status, total, created_at, cliente:clientes(nome_fantasia, razao_social)",
+          { count: "exact" }
+        )
+        .is("excluido_em", null)
+        .order("created_at", { ascending: false })
+        .range(page * PAGE_SIZE, (page + 1) * PAGE_SIZE - 1);
+
+      if (filtros?.status) {
+        const statuses = Array.isArray(filtros.status) ? filtros.status : [filtros.status];
+        query = query.in("status", statuses);
+      }
+      if (filtros?.cliente_id) {
+        query = query.eq("cliente_id", filtros.cliente_id);
+      }
+      if (filtros?.vendedor_id) {
+        query = query.eq("vendedor_id", filtros.vendedor_id);
+      }
+      if (filtros?.search) {
+        const term = ilikeTerm(filtros.search);
+        query = query.or(`numero.ilike.${term},titulo.ilike.${term}`);
+      }
+      if (filtros?.data_inicio) {
+        query = query.gte("created_at", filtros.data_inicio);
+      }
+      if (filtros?.data_fim) {
+        query = query.lte("created_at", filtros.data_fim);
+      }
+
+      const { data, error, count } = await query;
+      if (error) throw error;
+      return { data: data ?? [], total: count ?? 0 };
+    },
     staleTime: 1000 * 60 * 2,
+  });
+}
+
+// ─── KPIs de orçamentos (sem paginação) ──────────────────────────────────────
+
+export function useOrcamentoKpis() {
+  return useQuery({
+    queryKey: [ORCAMENTOS_QUERY_KEY, "kpis"],
+    queryFn: async () => {
+      const { data, error } = await supabase
+        .from("propostas")
+        .select("status, total")
+        .is("excluido_em", null);
+
+      if (error) throw error;
+
+      const rows = data ?? [];
+      const total = rows.length;
+      const pendentes = rows.filter((o) => o.status === "enviada" || o.status === "em_revisao").length;
+      const aprovados = rows.filter((o) => o.status === "aprovada").length;
+      const valorAberto = rows
+        .filter((o) => o.status === "enviada" || o.status === "em_revisao")
+        .reduce((acc, o) => acc + ((o.total as number) ?? 0), 0);
+
+      return { total, pendentes, aprovados, valorAberto };
+    },
+    staleTime: 1000 * 60 * 5,
   });
 }
 
