@@ -1,4 +1,5 @@
 import React, { useState, useMemo, useCallback, useRef, useEffect, type DragEvent } from "react";
+import { ilikeTerm } from "@/shared/utils/searchUtils";
 import { supabase } from "@/integrations/supabase/client";
 import { criarOrdemInstalacao } from "@/domains/instalacao/services/instalacao-criacao.service";
 import { finalizarCustosOP } from "@/domains/producao/services/producao.service";
@@ -352,6 +353,8 @@ function SkeletonRow() {
 // MAIN COMPONENT
 // ============================================================================
 
+const PAGE_SIZE = 20;
+
 export default function ProducaoPage() {
   const queryClient = useQueryClient();
 
@@ -363,7 +366,6 @@ export default function ProducaoPage() {
   const [isCreateOpen, setIsCreateOpen] = useState(false);
   const [selectedOP, setSelectedOP] = useState<OrdemProducaoRow | null>(null);
   const [page, setPage] = useState(0);
-  const PAGE_SIZE = 20;
 
   // --- Create form ---
   const [formPedidoItemId, setFormPedidoItemId] = useState("");
@@ -391,9 +393,9 @@ export default function ProducaoPage() {
     isLoading,
     isError,
   } = useQuery({
-    queryKey: ["producao", "ordens", page],
+    queryKey: ["producao", "ordens", page, statusFilter, prioridadeFilter, searchTerm],
     queryFn: async () => {
-      const { data, error, count } = await supabase
+      let q = supabase
         .from("ordens_producao")
         .select(
           "*, pedido_itens(descricao, especificacao, quantidade, modelo_id, pedidos(numero, clientes(nome_fantasia, razao_social))), producao_etapas(*)",
@@ -402,6 +404,21 @@ export default function ProducaoPage() {
         .order("created_at", { ascending: false })
         .range(page * PAGE_SIZE, (page + 1) * PAGE_SIZE - 1);
 
+      if (statusFilter !== "all") {
+        q = q.eq("status", statusFilter);
+      }
+
+      if (prioridadeFilter !== "all") {
+        q = q.eq("prioridade", parseInt(prioridadeFilter, 10));
+      }
+
+      if (searchTerm.trim()) {
+        q = q.or(
+          `numero.ilike.${ilikeTerm(searchTerm)},pedido_itens.descricao.ilike.${ilikeTerm(searchTerm)}`
+        );
+      }
+
+      const { data, error, count } = await q;
       if (error) throw error;
       return { data: (data ?? []) as unknown as OrdemProducaoRow[], total: count ?? 0 };
     },
@@ -612,29 +629,8 @@ export default function ProducaoPage() {
   // COMPUTED
   // =========================================================================
 
-  const filtered = useMemo(() => {
-    let result = ordens;
-
-    if (statusFilter !== "all") {
-      result = result.filter((op) => op.status === statusFilter);
-    }
-
-    if (prioridadeFilter !== "all") {
-      result = result.filter((op) => op.prioridade === parseInt(prioridadeFilter, 10));
-    }
-
-    const term = searchTerm.toLowerCase().trim();
-    if (term) {
-      result = result.filter(
-        (op) =>
-          (op.numero ?? "").toLowerCase().includes(term) ||
-          getClienteName(op).toLowerCase().includes(term) ||
-          getItemDescricao(op).toLowerCase().includes(term)
-      );
-    }
-
-    return result;
-  }, [ordens, statusFilter, prioridadeFilter, searchTerm]);
+  // Filters are applied server-side; use server results directly.
+  const filtered = ordens;
 
   const stats = useMemo(() => {
     const emFila = ordens.filter(

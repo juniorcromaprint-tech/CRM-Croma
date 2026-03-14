@@ -13,7 +13,7 @@ import { showSuccess, showError } from "@/utils/toast";
 
 export const ORCAMENTOS_QUERY_KEY = "orcamentos";
 
-const PAGE_SIZE = 20;
+export const PAGE_SIZE = 20;
 
 // ─── Lista de orçamentos (paginada) ──────────────────────────────────────────
 

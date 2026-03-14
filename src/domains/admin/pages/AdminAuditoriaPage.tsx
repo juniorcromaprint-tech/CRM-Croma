@@ -2,6 +2,7 @@ import { useState, useEffect } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import { formatDate } from "@/shared/utils/format";
+import { ilikeTerm } from "@/shared/utils/searchUtils";
 import { Shield, Loader2, Search } from "lucide-react";
 import { Input } from "@/components/ui/input";
 import {
@@ -40,7 +41,8 @@ export default function AdminAuditoriaPage() {
       }
 
       if (search) {
-        q = q.or(`acao.ilike.%${search}%,tabela.ilike.%${search}%,registro_id.ilike.%${search}%`);
+        const t = ilikeTerm(search);
+        q = q.or(`acao.ilike.${t},tabela.ilike.${t},registro_id.ilike.${t}`);
       }
 
       const { data, error } = await q;

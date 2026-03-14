@@ -5,6 +5,7 @@
 
 import { useState, useMemo, useCallback, useEffect } from "react";
 import { supabase } from "@/integrations/supabase/client";
+import { ilikeTerm } from "@/shared/utils/searchUtils";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { showSuccess, showError } from "@/utils/toast";
 import { brl, formatDateTime, formatNumber } from "@/shared/utils/format";
@@ -283,6 +284,8 @@ function TableSkeleton({ rows = 5 }: { rows?: number }) {
 // MAIN COMPONENT
 // =============================================================================
 
+const MAT_PAGE_SIZE = 20;
+
 export default function EstoquePage() {
   const queryClient = useQueryClient();
   const [activeTab, setActiveTab] = useState("materiais");
@@ -325,7 +328,6 @@ export default function EstoquePage() {
   const [inventarioRows, setInventarioRows] = useState<InventarioRow[]>([]);
 
   // ─── Pagination state ───────────────────────────────────────────────────
-  const MAT_PAGE_SIZE = 20;
   const [matPage, setMatPage] = useState(0);
 
   // ==========================================================================
@@ -336,14 +338,24 @@ export default function EstoquePage() {
     data: materiaisResult,
     isLoading: loadingMateriais,
   } = useQuery<{ data: Material[]; total: number }>({
-    queryKey: ["estoque-materiais", matPage],
+    queryKey: ["estoque-materiais", matPage, searchMat, filterCategoria],
     queryFn: async () => {
-      const { data, error, count } = await supabase
+      let q = supabase
         .from("materiais")
         .select("*, estoque_saldos(quantidade_disponivel, quantidade_reservada)", { count: "exact" })
         .eq("ativo", true)
         .order("nome")
         .range(matPage * MAT_PAGE_SIZE, (matPage + 1) * MAT_PAGE_SIZE - 1);
+
+      if (searchMat.trim()) {
+        q = q.or(`nome.ilike.${ilikeTerm(searchMat)},codigo.ilike.${ilikeTerm(searchMat)}`);
+      }
+
+      if (filterCategoria !== "todas") {
+        q = q.eq("categoria", filterCategoria);
+      }
+
+      const { data, error, count } = await q;
       if (error) throw error;
       return { data: (data ?? []) as unknown as Material[], total: count ?? 0 };
     },
@@ -544,28 +556,17 @@ export default function EstoquePage() {
 
   useEffect(() => {
     setMatPage(0);
-  }, [searchMat, filterCategoria, filterStatus]);
+  }, [searchMat, filterCategoria]);
 
   // ==========================================================================
   // COMPUTED DATA
   // ==========================================================================
 
   const filteredMateriais = useMemo(() => {
+    // searchMat and filterCategoria are applied server-side.
+    // Only filterStatus (computed semáforo) and sort remain client-side.
     let list = [...materiais];
-    // Search
-    if (searchMat) {
-      const s = searchMat.toLowerCase();
-      list = list.filter(
-        (m) =>
-          m.nome.toLowerCase().includes(s) ||
-          (m.codigo && m.codigo.toLowerCase().includes(s))
-      );
-    }
-    // Category filter
-    if (filterCategoria !== "todas") {
-      list = list.filter((m) => m.categoria === filterCategoria);
-    }
-    // Semáforo filter
+    // Semáforo filter (computed value — must stay client-side)
     if (filterStatus !== "todos") {
       list = list.filter((m) => getStatus(m) === filterStatus);
     }
@@ -580,7 +581,7 @@ export default function EstoquePage() {
       return sortAsc ? cmp : -cmp;
     });
     return list;
-  }, [materiais, searchMat, filterCategoria, filterStatus, sortKey, sortAsc]);
+  }, [materiais, filterStatus, sortKey, sortAsc]);
 
   const filteredMovimentacoes = useMemo(() => {
     let list = [...movimentacoes];

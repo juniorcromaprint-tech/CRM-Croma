@@ -8,7 +8,7 @@ import {
   AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent,
   AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle,
 } from "@/components/ui/alert-dialog";
-import { useOrcamentos, useOrcamentoKpis, useExcluirOrcamento, useDuplicarOrcamento } from "../hooks/useOrcamentos";
+import { useOrcamentos, useOrcamentoKpis, useExcluirOrcamento, useDuplicarOrcamento, PAGE_SIZE } from "../hooks/useOrcamentos";
 import { brl } from "@/shared/utils/format";
 import { useAuth } from "@/contexts/AuthContext";
 import type { OrcamentoStatus } from "../services/orcamento.service";
@@ -43,7 +43,7 @@ export default function OrcamentosPage() {
   const { data: result, isLoading } = useOrcamentos(filtros);
   const orcamentos = result?.data ?? [];
   const totalRegistros = result?.total ?? 0;
-  const totalPages = Math.ceil(totalRegistros / 20);
+  const totalPages = Math.ceil(totalRegistros / PAGE_SIZE);
 
   const { data: kpis = { total: 0, pendentes: 0, aprovados: 0, valorAberto: 0 } } = useOrcamentoKpis();
 
@@ -299,7 +299,7 @@ export default function OrcamentosPage() {
           {totalPages > 1 && (
             <div className="flex items-center justify-between px-4 py-3 border-t border-slate-100">
               <p className="text-sm text-slate-500">
-                Mostrando {page * 20 + 1}–{Math.min((page + 1) * 20, totalRegistros)} de {totalRegistros}
+                Mostrando {page * PAGE_SIZE + 1}–{Math.min((page + 1) * PAGE_SIZE, totalRegistros)} de {totalRegistros}
               </p>
               <div className="flex gap-2">
                 <Button
