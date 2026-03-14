@@ -458,10 +458,9 @@ export default function OrcamentoEditorPage() {
       return;
     }
 
-    // C-12: Alertar quando item tem BOM vazia (valor R$ 0,00) — não bloquear, apenas avisar
+    // C-12: Alertar quando item tem BOM vazia (valor R$ 0,00) — apenas avisar, não bloquear
     if (!pricingResult.precoTotal || pricingResult.precoTotal <= 0) {
       toast.warning("Item com valor R$ 0,00 — verifique os materiais e configurações do modelo");
-      return;
     }
 
     await adicionarItem.mutateAsync({
