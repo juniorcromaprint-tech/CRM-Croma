@@ -1,4 +1,5 @@
 import React, { useState, useEffect } from "react";
+import { useSearchParams } from "react-router-dom";
 import { useQuery } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 
@@ -161,7 +162,10 @@ function OsCard({ pedido }: OsCardProps) {
 // MAIN PAGE
 // ===========================================================================
 
-export default function TvPage() {
+const TV_TOKEN = import.meta.env.VITE_TV_TOKEN || 'croma-tv-2026';
+
+// Componente interno com toda a lógica — só renderizado quando token é válido
+function TvDashboard() {
   // ── Clock ──────────────────────────────────────────────────────────────────
   const [time, setTime] = useState(new Date());
   useEffect(() => {
@@ -379,4 +383,23 @@ export default function TvPage() {
       </footer>
     </div>
   );
+}
+
+// ── Token guard — envolve o dashboard ────────────────────────────────────────
+export default function TvPage() {
+  const [searchParams] = useSearchParams();
+  const token = searchParams.get('token');
+
+  if (token !== TV_TOKEN) {
+    return (
+      <div className="flex items-center justify-center h-screen bg-slate-900">
+        <div className="text-center text-white">
+          <p className="text-xl font-semibold">Acesso restrito</p>
+          <p className="text-slate-400 mt-2 text-sm">Use o link correto com o token de acesso.</p>
+        </div>
+      </div>
+    );
+  }
+
+  return <TvDashboard />;
 }

@@ -247,7 +247,7 @@ export const orcamentoService = {
     return (data ?? []) as unknown as Orcamento[];
   },
 
-  // ─── Buscar orçamento por ID (com materiais e acabamentos nested) ────────
+  // ─── Buscar orçamento por ID (1 query + 2 queries paralelas para sub-tabelas) ──
   async buscarPorId(id: string): Promise<Orcamento & {
     itens: (OrcamentoItem & {
       materiais?: OrcamentoItemMaterial[];
@@ -255,10 +255,15 @@ export const orcamentoService = {
     })[];
     servicos: OrcamentoServico[];
   }> {
+    // C-03: Substituído N+1 por 1 query principal + 2 paralelas para sub-tabelas opcionais
+    // (proposta_item_materiais e proposta_item_acabamentos podem não existir — migration 006 pendente)
     const [orcResult, itensResult, servicosResult] = await Promise.all([
       supabase
         .from("propostas")
-        .select(`*, cliente:clientes(razao_social, nome_fantasia, cnpj)`)
+        .select(`
+          *,
+          cliente:clientes(razao_social, nome_fantasia, cnpj)
+        `)
         .eq("id", id)
         .is("excluido_em", null)
         .single(),
@@ -276,36 +281,47 @@ export const orcamentoService = {
     if (orcResult.error) throw orcResult.error;
 
     const itens = (itensResult.data ?? []) as OrcamentoItem[];
+    const itemIds = itens.map((i) => i.id);
 
-    // Buscar materiais e acabamentos por item (se tabelas existirem)
-    const itensComDetalhes = await Promise.all(
-      itens.map(async (item) => {
-        let materiais: OrcamentoItemMaterial[] = [];
-        let acabamentos: OrcamentoItemAcabamento[] = [];
+    // Buscar materiais e acabamentos de todos os itens em 2 queries únicas (não N queries)
+    let materiaisMap: Record<string, OrcamentoItemMaterial[]> = {};
+    let acabamentosMap: Record<string, OrcamentoItemAcabamento[]> = {};
 
-        try {
-          const { data } = await supabase
-            .from("proposta_item_materiais")
-            .select("*")
-            .eq("proposta_item_id", item.id);
-          materiais = (data ?? []) as OrcamentoItemMaterial[];
-        } catch (err) {
-          console.warn("proposta_item_materiais não disponível (migration 006 pendente?):", err);
+    if (itemIds.length > 0) {
+      const [materiaisResult, acabamentosResult] = await Promise.all([
+        supabase
+          .from("proposta_item_materiais")
+          .select("*")
+          .in("proposta_item_id", itemIds)
+          .then((r) => r)
+          .catch(() => ({ data: null, error: null })),
+        supabase
+          .from("proposta_item_acabamentos")
+          .select("*")
+          .in("proposta_item_id", itemIds)
+          .then((r) => r)
+          .catch(() => ({ data: null, error: null })),
+      ]);
+
+      if (materiaisResult.data) {
+        for (const m of materiaisResult.data as OrcamentoItemMaterial[]) {
+          if (!materiaisMap[m.proposta_item_id]) materiaisMap[m.proposta_item_id] = [];
+          materiaisMap[m.proposta_item_id].push(m);
         }
-
-        try {
-          const { data } = await supabase
-            .from("proposta_item_acabamentos")
-            .select("*")
-            .eq("proposta_item_id", item.id);
-          acabamentos = (data ?? []) as OrcamentoItemAcabamento[];
-        } catch (err) {
-          console.warn("proposta_item_acabamentos não disponível (migration 006 pendente?):", err);
+      }
+      if (acabamentosResult.data) {
+        for (const a of acabamentosResult.data as OrcamentoItemAcabamento[]) {
+          if (!acabamentosMap[a.proposta_item_id]) acabamentosMap[a.proposta_item_id] = [];
+          acabamentosMap[a.proposta_item_id].push(a);
         }
+      }
+    }
 
-        return { ...item, materiais, acabamentos };
-      }),
-    );
+    const itensComDetalhes = itens.map((item) => ({
+      ...item,
+      materiais: materiaisMap[item.id] ?? [],
+      acabamentos: acabamentosMap[item.id] ?? [],
+    }));
 
     return {
       ...(orcResult.data as unknown as Orcamento),
@@ -358,6 +374,22 @@ export const orcamentoService = {
     aprovado_por?: string;
     aprovado_em?: string;
   }>): Promise<Orcamento> {
+    // C-08: Impede edição de orçamentos em status bloqueado
+    // Exceção: a própria mudança de status (aprovação, cancelamento) é permitida
+    const estaAlterandoStatus = updates.status !== undefined;
+    if (!estaAlterandoStatus) {
+      const { data: propostaAtual } = await supabase
+        .from("propostas")
+        .select("status")
+        .eq("id", id)
+        .single();
+
+      const statusBloqueados: OrcamentoStatus[] = ["aprovada", "recusada", "expirada"];
+      if (statusBloqueados.includes(propostaAtual?.status as OrcamentoStatus)) {
+        throw new Error(`Orçamento ${propostaAtual?.status} não pode ser editado`);
+      }
+    }
+
     const { data, error } = await supabase
       .from("propostas")
       .update({ ...updates, updated_at: new Date().toISOString() })
@@ -635,6 +667,14 @@ export const orcamentoService = {
   async converterParaPedido(orcamentoId: string, userId?: string): Promise<{ pedido_id: string }> {
     // Busca orçamento e valida antes de converter
     const orc = await orcamentoService.buscarPorId(orcamentoId);
+
+    // A-04: Apenas propostas aprovadas podem ser convertidas em pedido
+    if (!["aprovada"].includes(orc.status)) {
+      throw new Error(
+        `Apenas orçamentos aprovados podem ser convertidos em pedido. Status atual: ${orc.status}`
+      );
+    }
+
     if (!orc.itens || orc.itens.length === 0) {
       throw new Error("Orçamento precisa de pelo menos 1 item para gerar pedido.");
     }
@@ -642,11 +682,16 @@ export const orcamentoService = {
       throw new Error("Orçamento precisa ter valor maior que R$ 0,00 para gerar pedido.");
     }
 
-    // Atualiza status para aprovada
-    await orcamentoService.atualizar(orcamentoId, {
-      status: "aprovada",
-      aprovado_em: new Date().toISOString(),
-    });
+    // Registra aprovado_em/por (status já é "aprovada" — validado acima)
+    await supabase
+      .from("propostas")
+      .update({
+        aprovado_em: new Date().toISOString(),
+        aprovado_por: userId ?? null,
+        updated_at: new Date().toISOString(),
+      })
+      .eq("id", orcamentoId);
+
     const ano = new Date().getFullYear();
     const { count } = await supabase
       .from("pedidos")

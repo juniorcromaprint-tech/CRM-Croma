@@ -13,6 +13,29 @@ serve(async (req) => {
     return new Response(null, { headers: corsHeaders });
   }
 
+  // Validar autenticação do usuário
+  const authHeader = req.headers.get('Authorization');
+  if (!authHeader || !authHeader.startsWith('Bearer ')) {
+    return new Response(JSON.stringify({ error: 'Não autorizado' }), {
+      status: 401,
+      headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+    });
+  }
+
+  // Verificar token JWT via Supabase
+  const supabaseAuth = createClient(
+    Deno.env.get('SUPABASE_URL')!,
+    Deno.env.get('SUPABASE_ANON_KEY')!,
+    { global: { headers: { Authorization: authHeader } } }
+  );
+  const { data: { user }, error: authError } = await supabaseAuth.auth.getUser();
+  if (authError || !user) {
+    return new Response(JSON.stringify({ error: 'Token inválido' }), {
+      status: 401,
+      headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+    });
+  }
+
   try {
     const { proposta_id, destinatario_email, destinatario_nome } = await req.json();
 
@@ -30,7 +53,7 @@ serve(async (req) => {
 
     if (error || !proposta) throw new Error('Proposta não encontrada');
 
-    const portalUrl = `${Deno.env.get('APP_URL') || 'https://tender-archimedes.vercel.app'}/p/${proposta.share_token}`;
+    const portalUrl = `${Deno.env.get('APP_URL') || 'https://crm-croma.vercel.app'}/p/${proposta.share_token}`;
     const clienteName = destinatario_nome || proposta.cliente?.contato_nome || proposta.cliente?.nome_fantasia || 'Cliente';
 
     // Send via Resend

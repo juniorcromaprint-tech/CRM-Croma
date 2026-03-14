@@ -70,18 +70,46 @@ export default function PedidoDetailPage() {
     onError: (err: any) => showError(err.message || 'Erro ao iniciar produção'),
   })
 
-  const handleAdvanceStatus = () => {
+  const handleAdvanceStatus = async () => {
     if (!id || !pedido) return
     const action = FLOW_ACTIONS[pedido.status]
     if (!action) return
+
+    // Guard: verificar pré-condições antes de avançar status
     if (pedido.status === 'aprovado') {
       iniciarProducao.mutate(id)
-    } else if (action.next === 'concluido') {
-      updatePedido.mutate({ id, status: 'concluido' as any })
-      gerarContasReceber(id).catch((err) => showError(err.message || 'Erro ao gerar conta a receber'))
-    } else {
-      updatePedido.mutate({ id, status: action.next as any })
+      return
     }
+
+    if (action.next === 'concluido') {
+      // Verificar se há faturamentos (NF-e) emitidos
+      const { data: nfes } = await supabase
+        .from('nfe_documentos')
+        .select('id')
+        .eq('pedido_id', id)
+        .limit(1)
+
+      if (!nfes || nfes.length === 0) {
+        const confirmar = window.confirm(
+          'Este pedido não possui Nota Fiscal emitida. Deseja concluir mesmo assim?'
+        )
+        if (!confirmar) return
+      }
+
+      // Avançar status primeiro
+      updatePedido.mutate({ id, status: 'concluido' as any })
+
+      // Gerar contas a receber em seguida — erro não reverte o status mas alerta o usuário
+      try {
+        await gerarContasReceber(id)
+      } catch (err: any) {
+        console.error('[gerarContasReceber]', err)
+        showError('Pedido concluído, mas houve erro ao gerar cobranças. Verifique o módulo financeiro.')
+      }
+      return
+    }
+
+    updatePedido.mutate({ id, status: action.next as any })
   }
 
   if (isLoading) {

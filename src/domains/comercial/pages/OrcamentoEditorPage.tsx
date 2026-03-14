@@ -50,6 +50,7 @@ import type {
 import { validarDesconto } from "@/shared/services/orcamento-pricing.service";
 import { brl } from "@/shared/utils/format";
 import { showError, showSuccess } from "@/utils/toast";
+import { toast } from "sonner";
 import { orcamentoService } from "../services/orcamento.service";
 import { CondicoesPagamento, type PaymentConditions } from "../components/CondicoesPagamento";
 
@@ -364,6 +365,11 @@ export default function OrcamentoEditorPage() {
         showError("Informe a descricao do item antes de continuar");
         return;
       }
+      // A-08: Validar quantidade mínima na navegação do wizard
+      if (!newItem.quantidade || newItem.quantidade < 1) {
+        showError("Quantidade mínima é 1");
+        return;
+      }
     }
     if (currentStep === 2) {
       const hasMateriais = newItem.materiais.length > 0;
@@ -438,6 +444,18 @@ export default function OrcamentoEditorPage() {
     if (!newItem.descricao.trim()) { showError("Informe a descricao do item"); return; }
     if (!id || isNew) { showError("Salve o orcamento antes de adicionar itens"); return; }
     if (pricingResult === null) { showError("Preencha os dados do item corretamente"); return; }
+
+    // A-08: Quantidade deve ser >= 1
+    if (!newItem.quantidade || newItem.quantidade < 1) {
+      showError("Quantidade mínima é 1");
+      return;
+    }
+
+    // C-12: Alertar quando item tem BOM vazia (valor R$ 0,00) — não bloquear, apenas avisar
+    if (!pricingResult.precoTotal || pricingResult.precoTotal <= 0) {
+      toast.warning("Item com valor R$ 0,00 — verifique os materiais e configurações do modelo");
+      return;
+    }
 
     await adicionarItem.mutateAsync({
       propostaId: id,
@@ -878,7 +896,11 @@ export default function OrcamentoEditorPage() {
                                   min={1}
                                   step={1}
                                   value={newItem.quantidade}
-                                  onChange={(e) => setNewItem((s) => ({ ...s, quantidade: Number(e.target.value) }))}
+                                  onChange={(e) => {
+                                    // A-08: Garantir quantidade >= 1
+                                    const val = Math.max(1, Number(e.target.value) || 1);
+                                    setNewItem((s) => ({ ...s, quantidade: val }));
+                                  }}
                                   className="mt-1 rounded-xl h-9 text-sm"
                                 />
                               </div>

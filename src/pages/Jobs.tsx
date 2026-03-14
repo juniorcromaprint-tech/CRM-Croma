@@ -6,6 +6,16 @@ import { Search, Plus, MapPin, ClipboardList, Filter, ChevronLeft, ChevronRight,
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from "@/components/ui/alert-dialog";
 import JobFormSheet from "@/components/JobFormSheet";
 import { useInView } from "react-intersection-observer";
 import { useAuth } from "@/contexts/AuthContext";
@@ -27,6 +37,7 @@ export default function Jobs() {
   const [isJobSheetOpen, setIsJobSheetOpen] = useState(false);
   const [isExporting, setIsExporting] = useState(false);
   const [todayFilter, setTodayFilter] = useState(searchParams.get("today") === "true");
+  const [jobToDelete, setJobToDelete] = useState<string | null>(null);
   const { ref, inView } = useInView();
 
   // Sincroniza o filtro com a URL
@@ -178,9 +189,7 @@ export default function Jobs() {
 
   const handleDeleteClick = (e: React.MouseEvent, jobId: string) => {
     e.stopPropagation(); // Evita que o clique abra os detalhes da OS
-    if (window.confirm("Tem certeza que deseja excluir esta OS? Todas as fotos vinculadas também serão apagadas.")) {
-      deleteJobMutation.mutate(jobId);
-    }
+    setJobToDelete(jobId);
   };
 
   const exportToExcel = async () => {
@@ -500,6 +509,29 @@ export default function Jobs() {
         isOpen={isJobSheetOpen}
         onClose={() => setIsJobSheetOpen(false)}
       />
+
+      <AlertDialog open={!!jobToDelete} onOpenChange={(open) => { if (!open) setJobToDelete(null); }}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Excluir Ordem de Serviço?</AlertDialogTitle>
+            <AlertDialogDescription>
+              Esta ação não pode ser desfeita. Todas as fotos vinculadas à OS também serão apagadas permanentemente.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel>Cancelar</AlertDialogCancel>
+            <AlertDialogAction
+              onClick={() => {
+                if (jobToDelete) deleteJobMutation.mutate(jobToDelete);
+                setJobToDelete(null);
+              }}
+              className="bg-red-600 hover:bg-red-700"
+            >
+              Excluir
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </div>
   );
 }

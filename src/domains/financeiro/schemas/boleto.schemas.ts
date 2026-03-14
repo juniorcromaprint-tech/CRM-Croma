@@ -51,7 +51,12 @@ export const bankSlipCreateSchema = z.object({
   pedido_id: z.string().uuid().optional().nullable(),
   cliente_id: z.string().uuid('Selecione um cliente'),
   valor_nominal: z.coerce.number().positive('Valor deve ser maior que zero'),
-  data_vencimento: z.string().min(1, 'Data de vencimento é obrigatória'),
+  data_vencimento: z.string()
+    .min(1, 'Data de vencimento é obrigatória')
+    .refine(
+      (val) => new Date(val) >= new Date(new Date().setHours(0, 0, 0, 0)),
+      { message: 'Data de vencimento não pode ser no passado' }
+    ),
   sacado_nome: z.string().min(1, 'Nome do pagador é obrigatório'),
   sacado_cpf_cnpj: z.string().min(11, 'CPF/CNPJ é obrigatório'),
   sacado_endereco: z.string().optional().nullable(),

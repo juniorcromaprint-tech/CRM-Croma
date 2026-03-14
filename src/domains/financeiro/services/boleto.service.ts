@@ -24,6 +24,21 @@ export async function gerarNossoNumero(bankAccountId: string): Promise<string> {
 // ─── CRUD ────────────────────────────────────────────────────────────────────
 
 export async function createBoleto(payload: BankSlipCreate): Promise<BankSlip> {
+  // Verificar duplicidade: não permitir novo boleto se já existe um ativo para a mesma conta a receber
+  if (payload.conta_receber_id) {
+    const { data: boletosExistentes } = await supabase
+      .from('bank_slips')
+      .select('id, status')
+      .eq('conta_receber_id', payload.conta_receber_id)
+      .in('status', ['rascunho', 'emitido', 'pronto_remessa', 'remetido', 'registrado']);
+
+    if (boletosExistentes && boletosExistentes.length > 0) {
+      throw new Error(
+        'Já existe um boleto ativo para esta cobrança. Cancele o anterior antes de gerar um novo.'
+      );
+    }
+  }
+
   // Gera nosso_numero automaticamente
   const nossoNumero = await gerarNossoNumero(payload.bank_account_id);
 

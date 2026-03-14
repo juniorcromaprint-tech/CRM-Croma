@@ -6,6 +6,16 @@ import { Card, CardContent } from "@/components/ui/card";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Textarea } from "@/components/ui/textarea";
 import { Input } from "@/components/ui/input";
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from "@/components/ui/alert-dialog";
 import { showSuccess, showError } from "@/utils/toast";
 import { CromaLogo, CromaLogoFallback } from "@/components/Layout";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
@@ -41,6 +51,7 @@ export default function JobDetail() {
   const [isSignatureModalOpen, setIsSignatureModalOpen] = useState(false);
   const [canvasSize, setCanvasSize] = useState({ width: 0, height: 0 });
   const [annotatingPhoto, setAnnotatingPhoto] = useState<{ id: string; currentNote: string } | null>(null);
+  const [photoToDelete, setPhotoToDelete] = useState<{ id: string; photo_url: string } | null>(null);
   const [jobFinished, setJobFinished] = useState(false);
   const [isGeneratingPDF, setIsGeneratingPDF] = useState(false);
   const [notesValue, setNotesValue] = useState('');
@@ -748,7 +759,7 @@ export default function JobDetail() {
                     <div key={photo.id} className="flex flex-col gap-1">
                       <div className="relative group aspect-square rounded-xl overflow-hidden border border-slate-100 bg-slate-50">
                         <img src={photo.photo_url} className="w-full h-full object-cover cursor-zoom-in" onClick={() => { setSelectedImageUrl(photo.photo_url); setIsImageModalOpen(true); }} />
-                        <button onClick={() => { if (window.confirm('Remover esta foto?')) deletePhotoMutation.mutate({ id: photo.id, photo_url: photo.photo_url }); }} className="absolute top-1.5 right-1.5 w-7 h-7 bg-red-500 text-white rounded-lg flex items-center justify-center opacity-100 sm:opacity-0 sm:group-hover:opacity-100 transition-opacity shadow-md">
+                        <button onClick={() => setPhotoToDelete({ id: photo.id, photo_url: photo.photo_url })} className="absolute top-1.5 right-1.5 w-7 h-7 bg-red-500 text-white rounded-lg flex items-center justify-center opacity-100 sm:opacity-0 sm:group-hover:opacity-100 transition-opacity shadow-md">
                           <Trash2 size={13} />
                         </button>
                         <button onClick={() => setAnnotatingPhoto({ id: photo.id, currentNote: (photo as any).note || '' })} className="absolute bottom-1.5 right-1.5 w-7 h-7 bg-black/60 text-white rounded-lg flex items-center justify-center opacity-100 sm:opacity-0 sm:group-hover:opacity-100 transition-opacity shadow-md">
@@ -777,7 +788,7 @@ export default function JobDetail() {
                     <div key={photo.id} className="flex flex-col gap-1">
                       <div className="relative group aspect-square rounded-xl overflow-hidden border border-slate-100 bg-slate-50">
                         <img src={photo.photo_url} className="w-full h-full object-cover cursor-zoom-in" onClick={() => { setSelectedImageUrl(photo.photo_url); setIsImageModalOpen(true); }} />
-                        <button onClick={() => { if (window.confirm('Remover esta foto?')) deletePhotoMutation.mutate({ id: photo.id, photo_url: photo.photo_url }); }} className="absolute top-1.5 right-1.5 w-7 h-7 bg-red-500 text-white rounded-lg flex items-center justify-center opacity-100 sm:opacity-0 sm:group-hover:opacity-100 transition-opacity shadow-md">
+                        <button onClick={() => setPhotoToDelete({ id: photo.id, photo_url: photo.photo_url })} className="absolute top-1.5 right-1.5 w-7 h-7 bg-red-500 text-white rounded-lg flex items-center justify-center opacity-100 sm:opacity-0 sm:group-hover:opacity-100 transition-opacity shadow-md">
                           <Trash2 size={13} />
                         </button>
                         <button onClick={() => setAnnotatingPhoto({ id: photo.id, currentNote: (photo as any).note || '' })} className="absolute bottom-1.5 right-1.5 w-7 h-7 bg-black/60 text-white rounded-lg flex items-center justify-center opacity-100 sm:opacity-0 sm:group-hover:opacity-100 transition-opacity shadow-md">
@@ -1099,6 +1110,29 @@ export default function JobDetail() {
       )}
 
       <ImageModal isOpen={isImageModalOpen} onClose={() => setIsImageModalOpen(false)} imageUrl={selectedImageUrl} />
+
+      <AlertDialog open={!!photoToDelete} onOpenChange={(open) => { if (!open) setPhotoToDelete(null); }}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Remover foto?</AlertDialogTitle>
+            <AlertDialogDescription>
+              Esta ação não pode ser desfeita. A foto será removida permanentemente.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel>Cancelar</AlertDialogCancel>
+            <AlertDialogAction
+              onClick={() => {
+                if (photoToDelete) deletePhotoMutation.mutate(photoToDelete);
+                setPhotoToDelete(null);
+              }}
+              className="bg-red-600 hover:bg-red-700"
+            >
+              Remover
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </div>
   );
 }

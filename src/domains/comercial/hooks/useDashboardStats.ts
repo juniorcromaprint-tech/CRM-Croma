@@ -68,7 +68,10 @@ export function useDashPedidos() {
 
       for (const p of all) {
         byStatus[p.status] = (byStatus[p.status] || 0) + 1;
-        valorTotal += Number(p.valor_total) || 0;
+        // A-06: pedidos cancelados não contam no valor total do dashboard
+        if (p.status !== "cancelado") {
+          valorTotal += Number(p.valor_total) || 0;
+        }
         if (p.data_prometida && p.data_prometida < now && !["concluido", "cancelado"].includes(p.status)) {
           atrasados++;
         }
@@ -91,83 +94,58 @@ export function useDashProducao() {
     queryFn: async () => {
       const hoje = new Date().toISOString().split("T")[0];
 
-      const [
-        aguardandoRes,
-        emFilaRes,
-        emProducaoRes,
-        emConferenciaRes,
-        liberadasRes,
-        retrabalhoRes,
-        atrasadasRes,
-        totalRes,
-      ] = await Promise.all([
-        // Aguardando programação
-        supabase
-          .from("ordens_producao")
-          .select("*", { count: "exact", head: true })
-          .eq("status", "aguardando_programacao")
-          .is("excluido_em", null),
+      // 1 única query busca status + prazo_interno — substituindo 8 COUNT separadas
+      const { data, error } = await supabase
+        .from("ordens_producao")
+        .select("status, prazo_interno")
+        .is("excluido_em", null);
 
-        // Em fila
-        supabase
-          .from("ordens_producao")
-          .select("*", { count: "exact", head: true })
-          .eq("status", "em_fila")
-          .is("excluido_em", null),
+      if (error) throw error;
 
-        // Em produção (inclui acabamento)
-        supabase
-          .from("ordens_producao")
-          .select("*", { count: "exact", head: true })
-          .in("status", ["em_producao", "em_acabamento"])
-          .is("excluido_em", null),
+      const all = data ?? [];
 
-        // Em conferência
-        supabase
-          .from("ordens_producao")
-          .select("*", { count: "exact", head: true })
-          .eq("status", "em_conferencia")
-          .is("excluido_em", null),
+      let aguardando = 0;
+      let emFila = 0;
+      let emProducao = 0;
+      let emConferencia = 0;
+      let liberadas = 0;
+      let retrabalho = 0;
+      let atrasadas = 0;
+      let total = 0;
 
-        // Liberadas
-        supabase
-          .from("ordens_producao")
-          .select("*", { count: "exact", head: true })
-          .eq("status", "liberado")
-          .is("excluido_em", null),
+      const encerrados = new Set(["finalizado"]);
+      const naoEncerradosAtrasados = new Set(["liberado", "finalizado"]);
 
-        // Retrabalho
-        supabase
-          .from("ordens_producao")
-          .select("*", { count: "exact", head: true })
-          .eq("status", "retrabalho")
-          .is("excluido_em", null),
+      for (const op of all) {
+        const status = op.status as string;
 
-        // Atrasadas (prazo vencido e não encerradas)
-        supabase
-          .from("ordens_producao")
-          .select("*", { count: "exact", head: true })
-          .lt("prazo_interno", hoje)
-          .not("status", "in", "(liberado,finalizado)")
-          .is("excluido_em", null),
+        if (!encerrados.has(status)) total++;
 
-        // Total ativo (exceto finalizadas e canceladas)
-        supabase
-          .from("ordens_producao")
-          .select("*", { count: "exact", head: true })
-          .not("status", "in", "(finalizado)")
-          .is("excluido_em", null),
-      ]);
+        if (status === "aguardando_programacao") aguardando++;
+        else if (status === "em_fila") emFila++;
+        else if (status === "em_producao" || status === "em_acabamento") emProducao++;
+        else if (status === "em_conferencia") emConferencia++;
+        else if (status === "liberado") liberadas++;
+        else if (status === "retrabalho") retrabalho++;
+
+        if (
+          op.prazo_interno &&
+          op.prazo_interno < hoje &&
+          !naoEncerradosAtrasados.has(status)
+        ) {
+          atrasadas++;
+        }
+      }
 
       return {
-        total: totalRes.count ?? 0,
-        aguardando: aguardandoRes.count ?? 0,
-        emFila: emFilaRes.count ?? 0,
-        emProducao: emProducaoRes.count ?? 0,
-        emConferencia: emConferenciaRes.count ?? 0,
-        liberadas: liberadasRes.count ?? 0,
-        retrabalho: retrabalhoRes.count ?? 0,
-        atrasadas: atrasadasRes.count ?? 0,
+        total,
+        aguardando,
+        emFila,
+        emProducao,
+        emConferencia,
+        liberadas,
+        retrabalho,
+        atrasadas,
       };
     },
     staleTime: STALE,

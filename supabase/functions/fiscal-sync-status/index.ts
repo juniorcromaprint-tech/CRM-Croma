@@ -9,6 +9,36 @@ const corsHeaders = {
 serve(async (req) => {
   if (req.method === 'OPTIONS') return new Response('ok', { headers: corsHeaders });
 
+  // Validar autenticação: aceita JWT de usuário autenticado ou segredo interno de cron
+  const authHeader = req.headers.get('Authorization');
+  const cronSecret = req.headers.get('x-cron-secret');
+  const expectedCronSecret = Deno.env.get('CRON_SECRET');
+
+  const isValidCron = expectedCronSecret && cronSecret === expectedCronSecret;
+  const hasBearerToken = authHeader && authHeader.startsWith('Bearer ');
+
+  if (!isValidCron && !hasBearerToken) {
+    return new Response(JSON.stringify({ ok: false, mensagem: 'Não autorizado' }), {
+      status: 401,
+      headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+    });
+  }
+
+  if (!isValidCron && hasBearerToken) {
+    const supabaseAuthCheck = createClient(
+      Deno.env.get('SUPABASE_URL') ?? '',
+      Deno.env.get('SUPABASE_ANON_KEY') ?? '',
+      { global: { headers: { Authorization: authHeader! } } }
+    );
+    const { data: { user }, error: authError } = await supabaseAuthCheck.auth.getUser();
+    if (authError || !user) {
+      return new Response(JSON.stringify({ ok: false, mensagem: 'Token inválido' }), {
+        status: 401,
+        headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+      });
+    }
+  }
+
   try {
     const supabaseAdmin = createClient(
       Deno.env.get('SUPABASE_URL') ?? '',
