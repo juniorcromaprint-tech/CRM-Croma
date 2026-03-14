@@ -59,7 +59,7 @@ Código frontend + Edge Functions:
 1. **Validar JWT** nas 3 Edge Functions públicas: `enviar-email-proposta`, `onedrive-criar-pasta`, `onedrive-upload-proposta`. Extrair token do header `Authorization`, validar via `supabase.auth.getUser()`.
 2. **PermissionGuard** nas rotas `/admin/*` — verificar `role in ('admin', 'diretor')` antes de renderizar.
 3. **Auth na rota `/tv`** — aceitar token via query string (`/tv?token=xxx`), validar contra tabela `tv_tokens` ou similar.
-4. **Remover URL `tender-archimedes`** do fallback em `enviar-email-proposta`. Substituir por `https://crm-croma.vercel.app`.
+4. **Verificar URL** do fallback em `enviar-email-proposta`. Garantir que aponta para `https://crm-croma.vercel.app`.
 
 Entregável: PR com 6-8 arquivos editados.
 

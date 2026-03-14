@@ -16,7 +16,7 @@ No início de cada nova sessão, diga:
 |---|---|
 | **Pasta do projeto** | `C:\Users\Caldera\Claude\CRM-Croma` |
 | **GitHub** | `https://github.com/juniorcromaprint-tech/CRM-Croma.git` |
-| **ERP online** | `https://tender-archimedes.vercel.app/` |
+| **ERP online** | `https://crm-croma.vercel.app/` |
 | **App Campo** | `https://campo-croma.vercel.app/` |
 | **Supabase** | `djwjmfgplnqyffdcgdaw.supabase.co` |
 | **Branch principal** | `main` |
@@ -80,7 +80,7 @@ Supabase (Postgres + Auth + Storage + Edge Functions)
 | `src/domains/pedidos/pages/PedidosPage.tsx` | Botão delete admin (Trash2) com AlertDialog + soft delete |
 | `src/domains/estoque/pages/EstoquePage.tsx` | Semáforo: filtro por status (🔴Crítico/🟡Baixo/🟢OK), KPI Críticos separado |
 
-### Páginas do ERP (tender-archimedes.vercel.app)
+### Páginas do ERP (crm-croma.vercel.app)
 | Rota | Página | Status |
 |---|---|---|
 | `/` | Dashboard (4 roles) | ✅ Real |

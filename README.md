@@ -40,7 +40,7 @@
 ```
 
 ### Produto A — CRM/ERP
-- **URL produção**: `tender-archimedes.vercel.app`
+- **URL produção**: `crm-croma.vercel.app`
 - **Domínios**: Admin, Comercial, Clientes, Pedidos, Produção, Estoque, Compras, Financeiro, Fiscal, Instalação, Qualidade
 - **Deploy**: Vercel — push para `main` → build automático (~13s)
 
@@ -152,7 +152,7 @@ Ver schema completo em [docs/DATABASE_OVERVIEW.md](docs/DATABASE_OVERVIEW.md).
 |------|---------|
 | **GitHub** | `github.com/juniorcromaprint-tech/CRM-Croma` |
 | **Branch produção** | `main` |
-| **Vercel CRM** | `tender-archimedes.vercel.app` |
+| **Vercel CRM** | `crm-croma.vercel.app` |
 | **Vercel Campo** | `campo-croma.vercel.app` |
 | **Build time** | ~13 segundos (Vite + SWC) |
 | **Bundle** | ~1.6 MB (~430 KB gzip) |

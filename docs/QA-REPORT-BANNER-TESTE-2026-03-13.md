@@ -1,7 +1,7 @@
 # RELATÓRIO DE QA — CENÁRIO BANNER-TESTE
 **Agente**: QA Croma ERP
 **Data**: 2026-03-13
-**Ambiente auditado**: `tender-archimedes.vercel.app` (demo) + `campo-croma.vercel.app` (produção)
+**Ambiente auditado**: `crm-croma.vercel.app` (demo) + `campo-croma.vercel.app` (produção)
 **Cenário**: Fluxo E2E completo — Lead → Orçamento → Pedido → Produção → Financeiro → NF-e → Campo
 
 ---

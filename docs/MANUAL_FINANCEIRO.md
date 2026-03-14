@@ -6,7 +6,7 @@
 
 ## Acesso ao Dashboard Financeiro
 
-1. Faça login no sistema em `tender-archimedes.vercel.app`
+1. Faça login no sistema em `crm-croma.vercel.app`
 2. O sistema detecta automaticamente seu perfil (role: `financeiro`) e exibe o dashboard correspondente
 3. O menu lateral mostra as seções disponíveis para o perfil financeiro
 

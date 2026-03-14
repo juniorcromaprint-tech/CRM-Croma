@@ -8,7 +8,7 @@
 
 | Item | Valor |
 |---|---|
-| URL do sistema | `tender-archimedes.vercel.app` |
+| URL do sistema | `crm-croma.vercel.app` |
 | Login demo (teste) | `admin@cromaprint.com.br` |
 | Senha demo | Solicitar ao administrador |
 | Navegador recomendado | Chrome ou Edge (versão recente) |

@@ -261,7 +261,7 @@ SELECT COUNT(*) FROM modelo_materiais;
 | Vercel Dashboard ERP | `vercel.com/juniorcromaprint-tech/crm-croma` |
 | Vercel Dashboard Campo | `vercel.com/juniorcromaprint-tech/campo-croma` |
 | GitHub Repositório | `github.com/juniorcromaprint-tech/CRM-Croma` |
-| ERP em Produção | `tender-archimedes.vercel.app` |
+| ERP em Produção | `crm-croma.vercel.app` |
 | App de Campo em Produção | `campo-croma.vercel.app` |
 
 ---

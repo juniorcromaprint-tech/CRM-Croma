@@ -464,7 +464,7 @@ export default function ClientesList() {
 ### URLs dos Produtos
 | Produto | URL | Status |
 |---|---|---|
-| CRM/ERP (Produto A) | `https://tender-archimedes.vercel.app/` | ✅ Online |
+| CRM/ERP (Produto A) | `https://crm-croma.vercel.app/` | ✅ Online |
 | App de Campo (Produto B) | `https://campo-croma.vercel.app/` | ✅ Online |
 
 ### Migrations Supabase (`djwjmfgplnqyffdcgdaw.supabase.co`)

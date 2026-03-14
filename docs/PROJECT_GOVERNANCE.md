@@ -279,7 +279,7 @@ Antes de implementar QUALQUER nova funcionalidade, o sistema DEVE verificar:
 - **Componentes shadcn**: `rounded-2xl border-none shadow-sm` como padrão visual
 
 ### Git
-- **Branch ativo**: `claude/tender-archimedes`
+- **Branch ativo**: `main`
 - **Deploy**: Vercel deploya de `main` — fazer fast-forward merge após cada fase completa
 - **Commits**: descritivos em PT-BR, um por feature/fix
 
@@ -305,7 +305,7 @@ Antes de implementar QUALQUER nova funcionalidade, o sistema DEVE verificar:
 
 ### Produto A — ERP/CRM
 - **Status**: Em desenvolvimento ativo
-- **Branch**: `claude/tender-archimedes`
+- **Branch**: `main`
 - **Fase atual**: Fase 0 completa + início Fase 1 (Comercial + Clientes)
 
 ### Produto B — App de Campo

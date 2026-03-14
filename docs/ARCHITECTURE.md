@@ -43,7 +43,7 @@ O sistema da Croma Print é composto por **dois produtos independentes** que com
 - **Público**: Equipe interna (direção, comercial, financeiro, produção, compras)
 - **Interface**: Desktop-first, responsivo para tablet
 - **Rota base**: `/` (raiz)
-- **Deploy**: Vercel (tender-archimedes.vercel.app)
+- **Deploy**: Vercel (crm-croma.vercel.app)
 - **Status**: ✅ 29 páginas implementadas, 12 domínios de negócio
 
 ### Produto B — App de Campo
@@ -380,7 +380,7 @@ export const clienteSchema = z.object({
 
 | Ambiente | Plataforma | URL | Trigger |
 |----------|-----------|-----|---------|
-| CRM/ERP | Vercel (tender-archimedes) | tender-archimedes.vercel.app | Push para `main` |
+| CRM/ERP | Vercel (crm-croma) | crm-croma.vercel.app | Push para `main` |
 | App Campo | Vercel (campo-croma) | campo-croma.vercel.app | Push para `main` (root: `apps/campo/`) |
 
 - **Build automático** via Vercel em cada push para `main`

@@ -77,7 +77,7 @@ Ordenados por prioridade. Os itens com **Sprint 1** são bloqueadores de go-live
 |----|----------|-------|---------|
 | SEC-03 | Rotas `/admin/*` sem `PermissionGuard` — qualquer autenticado acessa | `adminRoutes.tsx` | 30min |
 | SEC-04 | `/tv` pública expõe dados de produção em tempo real | `App.tsx:61` | Auth por token de query string | 1h |
-| SEC-05 | URL antiga `tender-archimedes.lovable.app` hardcoded no fallback de email | `enviar-email-proposta/index.ts:33` | Substituir por `crm-croma.vercel.app` | 5min |
+| SEC-05 | URL desatualizada hardcoded no fallback de email | `enviar-email-proposta/index.ts:33` | Usar `crm-croma.vercel.app` | 5min |
 | PERF-02 | Dashboard produção faz 8 queries `COUNT` separadas — 240 req/h por usuário | `useDashboardStats` | Consolidar em 1 query com `GROUP BY status` | 1h |
 | NEG-05 | Pedidos cancelados somam no total do dashboard | `useDashboardStats` | Adicionar `.neq('status', 'cancelado')` | 15min |
 | NEG-06 | Quantidade 0 ou negativa aceita no orçamento | `OrcamentoEditorPage.tsx` | `if (quantidade <= 0) return showError(...)` | 15min |
@@ -166,7 +166,7 @@ Ordenados por prioridade. Os itens com **Sprint 1** são bloqueadores de go-live
 - [ ] Validação de vencimento futuro no boleto
 - [ ] Check de boleto duplicado antes de inserir
 - [ ] Índices nas FKs de transação (14 prioritárias)
-- [ ] URL correta no fallback de email (remover `tender-archimedes`)
+- [ ] URL correta no fallback de email (usar `crm-croma.vercel.app`)
 
 ### Recomendados (não bloqueiam, mas melhoram muito a experiência)
 

@@ -97,7 +97,7 @@ CRM-Croma/
 ### Deploy Separado
 | Produto | Domínio | Root dir | Vercel |
 |---------|---------|----------|--------|
-| CRM/ERP | tender-archimedes.vercel.app | `./` (raiz) | Auto-deploy |
+| CRM/ERP | crm-croma.vercel.app | `./` (raiz) | Auto-deploy |
 | App Campo | campo-croma.vercel.app | `apps/campo/` | Auto-deploy |
 
 ---
