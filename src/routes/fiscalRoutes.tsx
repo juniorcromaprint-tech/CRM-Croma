@@ -11,7 +11,7 @@ export const fiscalRoutes = (
     <Route path="fiscal" element={<FiscalDashboardPage />} />
     <Route path="fiscal/documentos" element={<FiscalDocumentosPage />} />
     <Route path="fiscal/fila" element={<FiscalFilaPage />} />
-    <Route path="fiscal/emissao" element={<FiscalFilaPage />} />
+    {/* Rota duplicada removida — /fiscal/fila já cobre esta funcionalidade */}
     <Route path="fiscal/configuracao" element={<FiscalConfiguracaoPage />} />
     <Route path="fiscal/certificado" element={<FiscalCertificadoPage />} />
     <Route path="fiscal/auditoria" element={<FiscalAuditoriaPage />} />

@@ -74,7 +74,7 @@ export default function PedidoDetailPage() {
     if (!id) return
     setCancelando(true)
     try {
-      // Registra o motivo em observacoes (colunas cancelado_em/motivo_cancelamento não existem no schema)
+      // M-14: Registra cancelamento com campos dedicados + fallback em observacoes
       const obsAtual = pedido?.observacoes ?? ''
       const novaObs = obsAtual
         ? `${obsAtual}\n\n[CANCELADO] ${new Date().toLocaleDateString('pt-BR')}: ${motivoCancelamento}`
@@ -85,7 +85,9 @@ export default function PedidoDetailPage() {
         .update({
           status: 'cancelado',
           observacoes: novaObs,
-        })
+          cancelado_em: new Date().toISOString(),
+          motivo_cancelamento: motivoCancelamento,
+        } as any)
         .eq('id', id)
 
       if (error) throw error
@@ -150,7 +152,7 @@ export default function PedidoDetailPage() {
     if (action.next === 'concluido') {
       // Verificar se há faturamentos (NF-e) emitidos
       const { data: nfes } = await supabase
-        .from('nfe_documentos')
+        .from('fiscal_documentos')
         .select('id')
         .eq('pedido_id', id)
         .limit(1)

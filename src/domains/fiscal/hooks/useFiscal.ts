@@ -127,9 +127,10 @@ export function useGerarRascunhoFiscal() {
   const qc = useQueryClient();
   return useMutation({
     mutationFn: async (pedidoId: string) => {
+      const { data: { user } } = await supabase.auth.getUser();
       const { data, error } = await supabase.rpc('fiscal_criar_rascunho_nfe', {
         p_pedido_id: pedidoId,
-        p_user_id: '00000000-0000-0000-0000-000000000000',
+        p_user_id: user?.id ?? '00000000-0000-0000-0000-000000000000',
         p_provider: 'nfe_provider',
       });
       if (error) throw error;

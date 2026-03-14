@@ -33,7 +33,7 @@ export const NAV_GROUPS: NavGroup[] = [
       { name: 'Propostas', path: '/propostas', icon: 'FileText', module: 'comercial' },
       { name: 'Calendário', path: '/calendario', icon: 'Calendar', module: 'comercial' },
       { name: 'Campanhas', path: '/campanhas', icon: 'Megaphone', module: 'comercial' },
-      { name: 'Templates', path: '/orcamentos/templates', icon: 'BookOpen', module: 'comercial' },
+      // Templates removido — rota /orcamentos/templates não existe
     ],
   },
   {

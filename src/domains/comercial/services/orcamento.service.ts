@@ -675,6 +675,20 @@ export const orcamentoService = {
       throw new Error("Orçamento precisa ter valor maior que R$ 0,00 para gerar pedido.");
     }
 
+    // A-01: Verificar se já existe pedido para este orçamento (anti-duplicação)
+    const { data: pedidoExistente } = await supabase
+      .from("pedidos")
+      .select("id, numero")
+      .eq("proposta_id", orcamentoId)
+      .neq("status", "cancelado")
+      .limit(1);
+
+    if (pedidoExistente && pedidoExistente.length > 0) {
+      throw new Error(
+        `Já existe o pedido ${pedidoExistente[0].numero} para este orçamento. Cancele-o antes de gerar outro.`
+      );
+    }
+
     // Registra aprovado_em/por (status já é "aprovada" — validado acima)
     await supabase
       .from("propostas")
@@ -684,13 +698,21 @@ export const orcamentoService = {
       })
       .eq("id", orcamentoId);
 
+    // A-01: Numeração atômica via MAX + 1 com lock implícito do INSERT
     const ano = new Date().getFullYear();
-    const { count } = await supabase
+    const { data: ultimoPedido } = await supabase
       .from("pedidos")
-      .select("id", { count: "exact", head: true })
-      .gte("created_at", `${ano}-01-01`);
+      .select("numero")
+      .like("numero", `PED-${ano}-%`)
+      .order("numero", { ascending: false })
+      .limit(1);
 
-    const numeroPedido = `PED-${ano}-${String((count ?? 0) + 1).padStart(4, "0")}`;
+    let seq = 1;
+    if (ultimoPedido && ultimoPedido.length > 0) {
+      const match = ultimoPedido[0].numero.match(/PED-\d{4}-(\d+)/);
+      if (match) seq = parseInt(match[1], 10) + 1;
+    }
+    const numeroPedido = `PED-${ano}-${String(seq).padStart(4, "0")}`;
 
     const { data: pedido, error } = await supabase
       .from("pedidos")

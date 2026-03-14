@@ -7,15 +7,33 @@ import { supabase } from '@/integrations/supabase/client';
 export async function gerarContasReceber(pedidoId: string): Promise<void> {
   const { data: pedido, error } = await supabase
     .from('pedidos')
-    .select('id, cliente_id, valor_total, numero')
+    .select('id, cliente_id, valor_total, numero, proposta_id')
     .eq('id', pedidoId)
     .single();
 
   if (error || !pedido) throw new Error(`Pedido não encontrado: ${error?.message}`);
 
-  // Vencimento padrão: 30 dias a partir de hoje
+  // M-05: Buscar condições de pagamento da proposta (em vez de fixo 30 dias)
+  let formaPagamento = 'a_definir';
+  let diasVencimento = 30;
+  if (pedido.proposta_id) {
+    const { data: proposta } = await supabase
+      .from('propostas')
+      .select('forma_pagamento, prazo_dias')
+      .eq('id', pedido.proposta_id)
+      .single();
+    if (proposta?.forma_pagamento) {
+      formaPagamento = proposta.forma_pagamento;
+      if (proposta.forma_pagamento === 'pix') diasVencimento = 1;
+      else if (proposta.forma_pagamento === 'boleto_vista') diasVencimento = 5;
+      else if (Array.isArray((proposta as any).prazo_dias) && (proposta as any).prazo_dias.length > 0) {
+        diasVencimento = (proposta as any).prazo_dias[0];
+      }
+    }
+  }
+
   const vencimento = new Date();
-  vencimento.setDate(vencimento.getDate() + 30);
+  vencimento.setDate(vencimento.getDate() + diasVencimento);
 
   const { error: crError } = await supabase.from('contas_receber').insert({
     pedido_id: pedido.id,
@@ -25,7 +43,7 @@ export async function gerarContasReceber(pedidoId: string): Promise<void> {
     saldo: pedido.valor_total ?? 0,
     data_vencimento: vencimento.toISOString().split('T')[0],
     status: 'pendente',
-    forma_pagamento: 'a_definir',
+    forma_pagamento: formaPagamento,
     descricao: `Pedido ${pedido.numero}`,
   });
 

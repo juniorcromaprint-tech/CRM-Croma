@@ -458,9 +458,10 @@ export default function OrcamentoEditorPage() {
       return;
     }
 
-    // C-12: Alertar quando item tem BOM vazia (valor R$ 0,00) — apenas avisar, não bloquear
+    // C-01: Bloquear item com valor R$ 0,00 — modelo precisa ter BOM populada
     if (!pricingResult.precoTotal || pricingResult.precoTotal <= 0) {
-      toast.warning("Item com valor R$ 0,00 — verifique os materiais e configurações do modelo");
+      showError("Não é possível adicionar item com valor R$ 0,00. Verifique se o modelo possui materiais e processos cadastrados.");
+      return;
     }
 
     await adicionarItem.mutateAsync({
@@ -477,7 +478,7 @@ export default function OrcamentoEditorPage() {
         area_m2: pricingResult.areaM2,
         custo_mp: pricingResult.custoMP + pricingResult.custosAcabamentos,
         custo_mo: pricingResult.custoMO,
-        custo_fixo: pricingResult.custoTotal - pricingResult.custoMP - pricingResult.custosAcabamentos - pricingResult.custoMO,
+        custo_fixo: Math.max(0, pricingResult.custoTotal - pricingResult.custoMP - pricingResult.custosAcabamentos - pricingResult.custoMO),
         markup_percentual: newItem.markup_percentual,
         valor_unitario: pricingResult.precoUnitario,
         valor_total: pricingResult.precoTotal,

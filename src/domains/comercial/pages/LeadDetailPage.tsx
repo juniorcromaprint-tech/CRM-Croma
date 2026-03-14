@@ -41,6 +41,7 @@ export default function LeadDetailPage() {
 
   const [editing, setEditing] = useState(false);
   const [convertOpen, setConvertOpen] = useState(false);
+  const [convertCnpj, setConvertCnpj] = useState("");
   const [form, setForm] = useState<{
     empresa: string;
     contato_nome: string;
@@ -80,6 +81,16 @@ export default function LeadDetailPage() {
       showError("Nome da empresa é obrigatório.");
       return;
     }
+    // M-01: Validação de email
+    if (form.contato_email && !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(form.contato_email)) {
+      showError("Email inválido. Verifique o formato.");
+      return;
+    }
+    // M-01: Validação de telefone (aceita formatos brasileiros)
+    if (form.contato_telefone && !/^\(?\d{2}\)?\s?\d{4,5}-?\d{4}$/.test(form.contato_telefone.replace(/\s/g, ""))) {
+      showError("Telefone inválido. Use o formato (XX) XXXXX-XXXX.");
+      return;
+    }
     updateLead.mutate(
       {
         id,
@@ -107,6 +118,8 @@ export default function LeadDetailPage() {
         telefone: lead.contato_telefone ?? null,
         segmento: lead.segmento ?? null,
         origem: "lead_convertido",
+        lead_id: id,
+        cnpj: convertCnpj.trim() || null,
       });
       await updateLead.mutateAsync({ id, status: "convertido" });
       setConvertOpen(false);
@@ -381,10 +394,21 @@ export default function LeadDetailPage() {
         <AlertDialogContent>
           <AlertDialogHeader>
             <AlertDialogTitle>Converter em cliente?</AlertDialogTitle>
-            <AlertDialogDescription>
-              <strong>{lead.empresa}</strong> será marcado como convertido e você será redirecionado
-              para o cadastro do cliente para preencher os dados fiscais (CNPJ, endereço) necessários
-              para emissão de NF-e e boletos.
+            <AlertDialogDescription asChild>
+              <div>
+                <p className="mb-3">
+                  <strong>{lead.empresa}</strong> será marcado como convertido e você será redirecionado
+                  para o cadastro do cliente.
+                </p>
+                <label className="block text-sm font-medium text-slate-700 mb-1">CNPJ (opcional)</label>
+                <input
+                  type="text"
+                  className="w-full px-3 py-2 border border-slate-300 rounded-xl text-sm text-slate-900 placeholder:text-slate-400"
+                  placeholder="00.000.000/0000-00"
+                  value={convertCnpj}
+                  onChange={(e) => setConvertCnpj(e.target.value)}
+                />
+              </div>
             </AlertDialogDescription>
           </AlertDialogHeader>
           <AlertDialogFooter>

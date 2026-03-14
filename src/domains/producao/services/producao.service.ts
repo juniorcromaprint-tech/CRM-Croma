@@ -2,10 +2,21 @@ import { supabase } from '@/integrations/supabase/client';
 
 const ETAPA_NOMES = ['criacao', 'impressao', 'acabamento', 'conferencia', 'expedicao'] as const;
 
-function generateOpNumero(): string {
+async function generateOpNumero(): Promise<string> {
   const year = new Date().getFullYear();
-  const seq = String(Math.floor(Math.random() * 9999) + 1).padStart(4, '0');
-  return `OP-${year}-${seq}`;
+  const { data: ultimo } = await supabase
+    .from('ordens_producao')
+    .select('numero')
+    .like('numero', `OP-${year}-%`)
+    .order('numero', { ascending: false })
+    .limit(1);
+
+  let seq = 1;
+  if (ultimo && ultimo.length > 0) {
+    const match = ultimo[0].numero.match(/OP-\d{4}-(\d+)/);
+    if (match) seq = parseInt(match[1], 10) + 1;
+  }
+  return `OP-${year}-${String(seq).padStart(4, '0')}`;
 }
 
 export async function criarOrdemProducao(pedidoId: string): Promise<void> {
@@ -31,7 +42,7 @@ export async function criarOrdemProducao(pedidoId: string): Promise<void> {
     const { data: op, error: opError } = await supabase
       .from('ordens_producao')
       .insert({
-        numero: generateOpNumero(),
+        numero: await generateOpNumero(),
         pedido_id: pedidoId,
         pedido_item_id: pedidoItemId,
         status: 'aguardando_programacao',
@@ -156,5 +167,39 @@ export async function finalizarCustosOP(opId: string): Promise<void> {
         },
         { onConflict: 'material_id' }
       );
+  }
+
+  // A-14: Verificar se todas as OPs do pedido estão concluídas e atualizar status
+  await atualizarStatusPedidoSeTodasOpsConcluidas(opId);
+}
+
+/**
+ * Verifica se todas as OPs de um pedido estão concluídas.
+ * Se sim, atualiza o status do pedido para 'produzido'.
+ */
+async function atualizarStatusPedidoSeTodasOpsConcluidas(opId: string): Promise<void> {
+  // Buscar pedido_id desta OP
+  const { data: op } = await supabase
+    .from('ordens_producao')
+    .select('pedido_id')
+    .eq('id', opId)
+    .single();
+
+  if (!op?.pedido_id) return;
+
+  // Contar OPs não-concluídas deste pedido
+  const { count } = await supabase
+    .from('ordens_producao')
+    .select('id', { count: 'exact', head: true })
+    .eq('pedido_id', op.pedido_id)
+    .not('status', 'in', '("concluida","cancelada")');
+
+  // Se todas concluídas (count === 0), atualizar pedido
+  if (count === 0) {
+    await supabase
+      .from('pedidos')
+      .update({ status: 'produzido' })
+      .eq('id', op.pedido_id)
+      .in('status', ['em_producao', 'aprovado']);
   }
 }

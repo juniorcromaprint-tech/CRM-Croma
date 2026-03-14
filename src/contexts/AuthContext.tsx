@@ -85,8 +85,8 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
     await supabase.auth.signOut();
   };
 
-  /** Role efetiva: sem role atribuída = admin (acesso total) */
-  const effectiveRole = profile?.role ?? 'admin';
+  /** Role efetiva: sem role atribuída = comercial (acesso restrito por segurança) */
+  const effectiveRole = profile?.role ?? 'comercial';
 
   /** Verifica permissão usando role efetiva */
   const can = useMemo(() => {

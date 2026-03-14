@@ -9,6 +9,7 @@ import { AuthProvider, useAuth } from "./contexts/AuthContext";
 
 const PortalOrcamentoPage = lazy(() => import('./domains/portal/pages/PortalOrcamentoPage'));
 import Layout from "./components/Layout";
+import ErrorBoundary from "./components/ErrorBoundary";
 import LoginPage from "@/shared/pages/LoginPage";
 import TvPage from "@/domains/producao/pages/TvPage";
 
@@ -48,6 +49,7 @@ const ProtectedRoute = ({ children }: { children: React.ReactNode }) => {
 };
 
 const App = () => (
+  <ErrorBoundary>
   <QueryClientProvider client={queryClient}>
     <AuthProvider>
       <TooltipProvider>
@@ -85,6 +87,7 @@ const App = () => (
       </TooltipProvider>
     </AuthProvider>
   </QueryClientProvider>
+  </ErrorBoundary>
 );
 
 export default App;
