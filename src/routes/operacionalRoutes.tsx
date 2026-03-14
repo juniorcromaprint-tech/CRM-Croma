@@ -1,26 +1,29 @@
-import { Route } from 'react-router-dom';
-import PedidosPage from '@/domains/pedidos/pages/PedidosPage';
-import PedidoDetailPage from '@/domains/pedidos/pages/PedidoDetailPage';
-import ProducaoPage from '@/domains/producao/pages/ProducaoPage';
-import InstalacaoPage from '@/domains/instalacao/pages/InstalacaoPage';
-import AlmoxarifePage from '@/domains/producao/pages/AlmoxarifePage';
-import DiarioBordoPage from '@/domains/producao/pages/DiarioBordoPage';
-import EstoquePage from '@/domains/estoque/pages/EstoquePage';
-import ComprasPage from '@/domains/compras/pages/ComprasPage';
-import Produtos from '@/pages/Produtos';
-import OcorrenciasPage from '@/domains/qualidade/pages/OcorrenciasPage';
+import { lazy } from "react";
+import { Route } from "react-router-dom";
+import LazyPage from "@/shared/components/LazyPage";
+
+const PedidosPage = lazy(() => import("@/domains/pedidos/pages/PedidosPage"));
+const PedidoDetailPage = lazy(() => import("@/domains/pedidos/pages/PedidoDetailPage"));
+const ProducaoPage = lazy(() => import("@/domains/producao/pages/ProducaoPage"));
+const InstalacaoPage = lazy(() => import("@/domains/instalacao/pages/InstalacaoPage"));
+const AlmoxarifePage = lazy(() => import("@/domains/producao/pages/AlmoxarifePage"));
+const DiarioBordoPage = lazy(() => import("@/domains/producao/pages/DiarioBordoPage"));
+const EstoquePage = lazy(() => import("@/domains/estoque/pages/EstoquePage"));
+const ComprasPage = lazy(() => import("@/domains/compras/pages/ComprasPage"));
+const Produtos = lazy(() => import("@/pages/Produtos"));
+const OcorrenciasPage = lazy(() => import("@/domains/qualidade/pages/OcorrenciasPage"));
 
 export const operacionalRoutes = (
   <>
-    <Route path="pedidos" element={<PedidosPage />} />
-    <Route path="pedidos/:id" element={<PedidoDetailPage />} />
-    <Route path="producao" element={<ProducaoPage />} />
-    <Route path="instalacoes" element={<InstalacaoPage />} />
-    <Route path="almoxarife" element={<AlmoxarifePage />} />
-    <Route path="producao/diario-bordo" element={<DiarioBordoPage />} />
-    <Route path="estoque" element={<EstoquePage />} />
-    <Route path="compras" element={<ComprasPage />} />
-    <Route path="produtos" element={<Produtos />} />
-    <Route path="ocorrencias" element={<OcorrenciasPage />} />
+    <Route path="pedidos" element={<LazyPage><PedidosPage /></LazyPage>} />
+    <Route path="pedidos/:id" element={<LazyPage><PedidoDetailPage /></LazyPage>} />
+    <Route path="producao" element={<LazyPage><ProducaoPage /></LazyPage>} />
+    <Route path="instalacoes" element={<LazyPage><InstalacaoPage /></LazyPage>} />
+    <Route path="almoxarife" element={<LazyPage><AlmoxarifePage /></LazyPage>} />
+    <Route path="producao/diario-bordo" element={<LazyPage><DiarioBordoPage /></LazyPage>} />
+    <Route path="estoque" element={<LazyPage><EstoquePage /></LazyPage>} />
+    <Route path="compras" element={<LazyPage><ComprasPage /></LazyPage>} />
+    <Route path="produtos" element={<LazyPage><Produtos /></LazyPage>} />
+    <Route path="ocorrencias" element={<LazyPage><OcorrenciasPage /></LazyPage>} />
   </>
 );
