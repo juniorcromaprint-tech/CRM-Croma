@@ -474,6 +474,10 @@ function DialogModelo({ open, onClose, produtoId, modelo }: DialogModeloProps) {
       };
       if (form.largura_cm) payload.largura_cm = parseFloat(form.largura_cm);
       if (form.altura_cm) payload.altura_cm = parseFloat(form.altura_cm);
+      // M-02: Calcular area_m2 automaticamente
+      if (form.largura_cm && form.altura_cm) {
+        payload.area_m2 = (parseFloat(form.largura_cm) / 100) * (parseFloat(form.altura_cm) / 100);
+      }
       if (form.preco_fixo) payload.preco_fixo = parseFloat(form.preco_fixo);
       if (form.tempo_producao_min)
         payload.tempo_producao_min = parseInt(form.tempo_producao_min);

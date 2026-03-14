@@ -1,9 +1,20 @@
 import { supabase } from '@/integrations/supabase/client';
 
-function generateOsNumero(): string {
+async function generateOsNumero(): Promise<string> {
   const year = new Date().getFullYear();
-  const seq = String(Math.floor(Math.random() * 9999) + 1).padStart(4, '0');
-  return `OS-${year}-${seq}`;
+  const { data: ultimo } = await supabase
+    .from('ordens_instalacao')
+    .select('numero')
+    .like('numero', `OS-${year}-%`)
+    .order('numero', { ascending: false })
+    .limit(1);
+
+  let seq = 1;
+  if (ultimo && ultimo.length > 0) {
+    const match = ultimo[0].numero.match(/OS-\d{4}-(\d+)/);
+    if (match) seq = parseInt(match[1], 10) + 1;
+  }
+  return `OS-${year}-${String(seq).padStart(4, '0')}`;
 }
 
 /**
@@ -29,7 +40,7 @@ export async function criarOrdemInstalacao(opId: string): Promise<void> {
   if (pedidoError || !pedido) throw new Error(`Pedido não encontrado: ${pedidoError?.message}`);
 
   const { error: osError } = await supabase.from('ordens_instalacao').insert({
-    numero: generateOsNumero(),
+    numero: await generateOsNumero(),
     pedido_id: pedido.id,
     pedido_item_id: op.pedido_item_id ?? null,
     cliente_id: pedido.cliente_id,
