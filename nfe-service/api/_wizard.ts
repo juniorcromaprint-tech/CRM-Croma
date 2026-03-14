@@ -15,24 +15,25 @@ export async function createNFeWizard(): Promise<InstanceType<typeof NFeWizard>>
   const nfe = new NFeWizard();
 
   await nfe.NFE_LoadEnvironment({
-    dfe: {
-      pathCertificado: certPath,
-      senhaCertificado: certPassword,
-      UF: uf,
-      CPFCNPJ: cnpj,
-      xmlFolder: '/tmp/nfewizard/',
-      xmlAutorizados: '/tmp/nfewizard/autorizados/',
-      xmlCancelados: '/tmp/nfewizard/cancelados/',
+    config: {
+      dfe: {
+        pathCertificado: certPath,
+        senhaCertificado: certPassword,
+        UF: uf,
+        CPFCNPJ: cnpj,
+        armazenarXMLAutorizacao: false,
+        armazenarXMLConsulta: false,
+        armazenarXMLRetorno: false,
+      },
+      nfe: {
+        ambiente,
+        versaoDF: '4.00',
+      },
+      lib: {
+        connection: { timeout: 30000 }, // 30s — SEFAZ pode levar 15-45s
+        useForSchemaValidation: 'validateSchemaJsBased', // Vercel nao tem Java
+      },
     },
-    nfe: {
-      ambiente,
-      versaoDF: '4.00',
-      idCSC: '',
-      tokenCSC: '',
-    },
-    // email e completamente opcional — omitido intencionalmente
-    // notificacoes sao feitas pelo ERP via Resend
-    conexao: { timeout: 30000 }, // 30s — SEFAZ pode levar 15-45s
   });
 
   return nfe;

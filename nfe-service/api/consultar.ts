@@ -19,7 +19,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
       return res.status(400).json({ sucesso: false, mensagem_erro: 'chave_acesso e obrigatorio' });
     }
 
-    const resultado = await nfe.NFE_ConsultaProtocolo({ chNFe: chave_acesso });
+    const resultado = await nfe.NFE_ConsultaProtocolo(chave_acesso);
 
     return res.status(200).json({ sucesso: true, retorno: resultado });
   } catch (err) {
