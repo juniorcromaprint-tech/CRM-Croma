@@ -22,11 +22,12 @@ export default function MaterialEditor({
 }: MaterialEditorProps) {
   const newRowRef = useRef<HTMLInputElement>(null);
 
-  // Total geral de materia prima
-  const totalMP = materiais.reduce(
-    (sum, m) => sum + m.quantidade * m.custo_unitario,
-    0,
-  );
+  // Total geral de materia prima (considera aproveitamento)
+  const totalMP = materiais.reduce((sum, m) => {
+    const aprovFactor = (m.aproveitamento ?? 100) / 100;
+    const quantidadeReal = aprovFactor > 0 ? m.quantidade / aprovFactor : m.quantidade;
+    return sum + quantidadeReal * m.custo_unitario;
+  }, 0);
 
   // ── Handlers ────────────────────────────────────────────────────────────
 
@@ -48,6 +49,7 @@ export default function MaterialEditor({
       quantidade: 1,
       unidade: "un",
       custo_unitario: 0,
+      aproveitamento: 100,
     };
     onChange([...materiais, novo]);
     // Focus the descricao input of the new row after React renders it
@@ -85,11 +87,12 @@ export default function MaterialEditor({
 
       {/* Table header */}
       {materiais.length > 0 && (
-        <div className="grid grid-cols-[1fr_90px_70px_100px_90px_36px] gap-2 px-4 py-2 border-b border-slate-100 bg-slate-50/50">
+        <div className="grid grid-cols-[1fr_90px_70px_100px_70px_90px_36px] gap-2 px-4 py-2 border-b border-slate-100 bg-slate-50/50">
           <span className="text-xs text-slate-500">Descrição</span>
           <span className="text-xs text-slate-500 text-right">Qtd</span>
           <span className="text-xs text-slate-500">Unid.</span>
           <span className="text-xs text-slate-500 text-right">Custo Un.</span>
+          <span className="text-xs text-slate-500 text-right">Aprov.%</span>
           <span className="text-xs text-slate-500 text-right">Subtotal</span>
           <span />
         </div>
@@ -104,13 +107,15 @@ export default function MaterialEditor({
         )}
 
         {materiais.map((mat, index) => {
-          const subtotal = mat.quantidade * mat.custo_unitario;
+          const aprovFactor = (mat.aproveitamento ?? 100) / 100;
+          const quantidadeReal = aprovFactor > 0 ? mat.quantidade / aprovFactor : mat.quantidade;
+          const subtotal = quantidadeReal * mat.custo_unitario;
           const isLast = index === materiais.length - 1;
 
           return (
             <div
               key={index}
-              className="grid grid-cols-[1fr_90px_70px_100px_90px_36px] gap-2 items-center px-4 py-2"
+              className="grid grid-cols-[1fr_90px_70px_100px_70px_90px_36px] gap-2 items-center px-4 py-2"
             >
               {/* Descricao */}
               <Input
@@ -170,7 +175,26 @@ export default function MaterialEditor({
                 className="h-8 text-sm rounded-lg text-right tabular-nums"
               />
 
-              {/* Subtotal (read-only) */}
+              {/* Aproveitamento */}
+              <Input
+                type="number"
+                value={mat.aproveitamento ?? 100}
+                min={1}
+                max={100}
+                step={1}
+                disabled={readonly}
+                onChange={(e) =>
+                  handleFieldChange(
+                    index,
+                    "aproveitamento",
+                    parseFloat(e.target.value) || 100,
+                  )
+                }
+                className="h-8 text-sm rounded-lg text-right tabular-nums"
+                title="Percentual de aproveitamento (ex: 85 = 15% de desperdício)"
+              />
+
+              {/* Subtotal (read-only, já com aproveitamento) */}
               <span className="text-sm text-slate-700 text-right tabular-nums pr-1">
                 {brl(subtotal)}
               </span>
