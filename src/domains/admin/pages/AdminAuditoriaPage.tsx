@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import { formatDate } from "@/shared/utils/format";
@@ -27,7 +27,7 @@ export default function AdminAuditoriaPage() {
   const [page, setPage] = useState(0);
 
   const { data: registros, isLoading } = useQuery({
-    queryKey: ["auditoria", tabelaFilter, page],
+    queryKey: ["auditoria", tabelaFilter, search, page],
     queryFn: async () => {
       let q = supabase
         .from("registros_auditoria")
@@ -37,6 +37,10 @@ export default function AdminAuditoriaPage() {
 
       if (tabelaFilter && tabelaFilter !== "todas") {
         q = q.eq("tabela", tabelaFilter);
+      }
+
+      if (search) {
+        q = q.or(`acao.ilike.%${search}%,tabela.ilike.%${search}%,registro_id.ilike.%${search}%`);
       }
 
       const { data, error } = await q;
@@ -59,16 +63,9 @@ export default function AdminAuditoriaPage() {
     staleTime: 60_000,
   });
 
-  const filtered = (registros ?? []).filter((r) => {
-    if (!search) return true;
-    const term = search.toLowerCase();
-    return (
-      r.acao.toLowerCase().includes(term) ||
-      r.tabela.toLowerCase().includes(term) ||
-      (r.registro_id ?? "").toLowerCase().includes(term) ||
-      (r.user_id ?? "").toLowerCase().includes(term)
-    );
-  });
+  useEffect(() => {
+    setPage(0);
+  }, [search]);
 
   if (isLoading) {
     return (
@@ -114,7 +111,7 @@ export default function AdminAuditoriaPage() {
       </div>
 
       {/* Tabela */}
-      {filtered.length === 0 ? (
+      {(registros ?? []).length === 0 ? (
         <div className="bg-white rounded-2xl border border-slate-200 p-12 text-center">
           <Shield size={40} className="mx-auto text-slate-300 mb-3" />
           <h3 className="font-semibold text-slate-600">Nenhum registro encontrado</h3>
@@ -137,7 +134,7 @@ export default function AdminAuditoriaPage() {
                 </tr>
               </thead>
               <tbody>
-                {filtered.map((r) => (
+                {(registros ?? []).map((r) => (
                   <tr key={r.id} className="border-b border-slate-50 hover:bg-slate-50/50">
                     <td className="px-4 py-3 text-slate-600 whitespace-nowrap">
                       {formatDate(r.created_at)}
