@@ -16,6 +16,20 @@
 import { serve } from 'https://deno.land/std@0.168.0/http/server.ts';
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2.38.4';
 
+/**
+ * Calcula dígito verificador da chave NF-e (módulo 11, pesos 2-9)
+ * Conforme Manual de Orientação do Contribuinte NF-e 4.0
+ */
+function calcDVChaveNFe(chave43: string): number {
+  const pesos = [2, 3, 4, 5, 6, 7, 8, 9];
+  let soma = 0;
+  for (let i = chave43.length - 1; i >= 0; i--) {
+    soma += parseInt(chave43[i]) * pesos[(chave43.length - 1 - i) % 8];
+  }
+  const resto = soma % 11;
+  return resto < 2 ? 0 : 11 - resto;
+}
+
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
   'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
@@ -55,7 +69,7 @@ serve(async (req) => {
         fiscal_documentos_itens(*),
         clientes(*),
         pedidos(numero, valor_total),
-        fiscal_ambientes(tipo, endpoint_base),
+        fiscal_ambientes(tipo, endpoint_base, uf, cnpj_emitente),
         fiscal_series(serie),
         fiscal_certificados(id, nome, arquivo_encriptado_url, senha_secret_ref, cnpj_titular)
       `)
@@ -194,11 +208,31 @@ serve(async (req) => {
     if (!nfeToken || nfeToken === 'DEMO_MODE') {
       // MODO DEMO: simula autorização bem-sucedida
       console.log('[fiscal-emitir-nfe] MODO DEMO — simulando autorização');
+      const cUF = doc.fiscal_ambientes?.uf === 'SP' ? '35' :
+                  doc.fiscal_ambientes?.uf === 'RJ' ? '33' :
+                  doc.fiscal_ambientes?.uf === 'MG' ? '31' :
+                  doc.fiscal_ambientes?.uf === 'RS' ? '43' :
+                  doc.fiscal_ambientes?.uf === 'PR' ? '41' :
+                  doc.fiscal_ambientes?.uf === 'SC' ? '42' :
+                  doc.fiscal_ambientes?.uf === 'BA' ? '29' :
+                  doc.fiscal_ambientes?.uf === 'GO' ? '52' :
+                  doc.fiscal_ambientes?.uf === 'PE' ? '26' :
+                  doc.fiscal_ambientes?.uf === 'CE' ? '23' : '35'; // default SP
+      const now = new Date();
+      const aamm = `${now.getFullYear().toString().slice(-2)}${(now.getMonth() + 1).toString().padStart(2, '0')}`;
+      const cnpjAmbiente = (doc.fiscal_ambientes as any)?.cnpj_emitente ?? cnpjEmitente;
+      const cnpjLimpo = cnpjAmbiente.replace(/\D/g, '').padStart(14, '0');
+      const serieStr = doc.fiscal_series?.serie?.toString().padStart(3, '0') ?? '001';
+      const nNF = numero.toString().padStart(9, '0');
+      const cNF = Math.floor(Math.random() * 100000000).toString().padStart(8, '0');
+      const chave43 = `${cUF}${aamm}${cnpjLimpo}55${serieStr}${nNF}1${cNF}`;
+      const dv = calcDVChaveNFe(chave43);
+      const chave_acesso_demo = `${chave43}${dv}`;
       resultado = {
         sucesso: true,
         status: 'autorizado',
         numero: numero,
-        chave_acesso: `35${new Date().getFullYear().toString().slice(-2)}${cnpjEmitente?.replace(/\D/g, '').padStart(14, '0')}55001${numero.toString().padStart(9, '0')}1`,
+        chave_acesso: chave_acesso_demo,
         protocolo: `1${Date.now().toString()}`,
         recibo: `${Date.now()}`,
         data_autorizacao: new Date().toISOString(),
