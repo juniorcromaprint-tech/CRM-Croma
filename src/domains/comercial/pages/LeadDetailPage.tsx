@@ -19,7 +19,7 @@ import {
 import { useLead, useUpdateLead } from "../hooks/useLeads";
 import { useCreateCliente } from "@/domains/clientes/hooks/useClientes";
 import { brl, formatDate } from "@/shared/utils/format";
-import { showError } from "@/utils/toast";
+import { showError, showSuccess } from "@/utils/toast";
 import { TEMPERATURA_CONFIG } from "../constants/temperatura";
 
 const STATUS_CONFIG: Record<string, { label: string; color: string }> = {
@@ -100,7 +100,7 @@ export default function LeadDetailPage() {
   const handleConverter = async () => {
     if (!id || !lead) return;
     try {
-      await createCliente.mutateAsync({
+      const novoCliente = await createCliente.mutateAsync({
         razao_social: lead.empresa,
         nome_fantasia: lead.empresa,
         email: lead.contato_email ?? null,
@@ -108,15 +108,10 @@ export default function LeadDetailPage() {
         segmento: lead.segmento ?? null,
         origem: "lead_convertido",
       });
-      updateLead.mutate(
-        { id, status: "convertido" },
-        {
-          onSuccess: () => {
-            setConvertOpen(false);
-            navigate("/clientes");
-          },
-        }
-      );
+      await updateLead.mutateAsync({ id, status: "convertido" });
+      setConvertOpen(false);
+      showSuccess("Lead convertido! Complete os dados fiscais (CNPJ, endereço) para emitir NF-e.");
+      navigate(`/clientes/${novoCliente.id}`);
     } catch (err) {
       showError("Erro ao converter lead em cliente.");
     }
@@ -387,8 +382,9 @@ export default function LeadDetailPage() {
           <AlertDialogHeader>
             <AlertDialogTitle>Converter em cliente?</AlertDialogTitle>
             <AlertDialogDescription>
-              <strong>{lead.empresa}</strong> será marcado como convertido. Você será redirecionado
-              para a lista de clientes para cadastrar o cliente completo.
+              <strong>{lead.empresa}</strong> será marcado como convertido e você será redirecionado
+              para o cadastro do cliente para preencher os dados fiscais (CNPJ, endereço) necessários
+              para emissão de NF-e e boletos.
             </AlertDialogDescription>
           </AlertDialogHeader>
           <AlertDialogFooter>
