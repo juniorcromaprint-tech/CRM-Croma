@@ -11,7 +11,7 @@ function generateOpNumero(): string {
 export async function criarOrdemProducao(pedidoId: string): Promise<void> {
   const { data: itens, error: itensError } = await supabase
     .from('pedido_itens')
-    .select('id, custo_mp, custo_mo, valor_total, quantidade')
+    .select('id, custo_mp, custo_mo, valor_total, quantidade, modelo_id')
     .eq('pedido_id', pedidoId);
 
   if (itensError) throw new Error(`Erro ao buscar itens: ${itensError.message}`);
@@ -22,10 +22,12 @@ export async function criarOrdemProducao(pedidoId: string): Promise<void> {
           pedidoItemId: i.id as string,
           custo_mp: Number(i.custo_mp) || 0,
           custo_mo: Number(i.custo_mo) || 0,
+          quantidade: Number(i.quantidade) || 1,
+          modelo_id: (i as any).modelo_id as string | null,
         }))
-      : [{ pedidoItemId: null as string | null, custo_mp: 0, custo_mo: 0 }];
+      : [{ pedidoItemId: null as string | null, custo_mp: 0, custo_mo: 0, quantidade: 1, modelo_id: null }];
 
-  for (const { pedidoItemId, custo_mp, custo_mo } of targets) {
+  for (const { pedidoItemId, custo_mp, custo_mo, quantidade, modelo_id } of targets) {
     const { data: op, error: opError } = await supabase
       .from('ordens_producao')
       .insert({
@@ -51,6 +53,27 @@ export async function criarOrdemProducao(pedidoId: string): Promise<void> {
 
     const { error: etapaError } = await supabase.from('producao_etapas').insert(etapas);
     if (etapaError) throw new Error(`Erro ao criar etapas: ${etapaError.message}`);
+
+    // Popular producao_materiais a partir da BOM (modelo_materiais)
+    if (modelo_id) {
+      const { data: bom } = await supabase
+        .from('modelo_materiais')
+        .select('material_id, quantidade_por_unidade, unidade, material:materiais(preco_medio)')
+        .eq('modelo_id', modelo_id);
+
+      if (bom && bom.length > 0) {
+        const materiaisOp = bom.map((b) => ({
+          ordem_producao_id: op.id,
+          material_id: b.material_id,
+          quantidade_prevista: Number(b.quantidade_por_unidade) * quantidade,
+          custo_unitario: Number((b.material as any)?.preco_medio) || 0,
+          custo_total:
+            Number(b.quantidade_por_unidade) * quantidade * (Number((b.material as any)?.preco_medio) || 0),
+        }));
+        // Falha silenciosa — não bloquear criação da OP
+        await supabase.from('producao_materiais').insert(materiaisOp);
+      }
+    }
   }
 }
 
