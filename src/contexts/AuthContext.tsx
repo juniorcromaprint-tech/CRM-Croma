@@ -26,7 +26,7 @@ type AuthContextType = {
   signOut: () => Promise<void>;
   /** Verifica se o usuário tem permissão para uma ação em um módulo */
   can: (module: Module, action: Action) => boolean;
-  /** Módulos acessíveis: null = todos (demo/admin) */
+  /** Módulos acessíveis baseados na role efetiva */
   accessibleModules: string[] | null;
 };
 
@@ -96,13 +96,11 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
     };
   }, [effectiveRole]);
 
-  /** Módulos acessíveis: null = todos (admin sem role), lista filtrada para demais */
+  /** Módulos acessíveis: baseado na role efetiva — sem role = comercial (restrito) */
   const accessibleModules = useMemo<string[] | null>(() => {
-    if (!profile?.role) {
-      return null; // sem role = acesso total (admin)
-    }
-    return getAccessibleModules(profile.role);
-  }, [profile?.role]);
+    // Sem role = acesso restrito (comercial) por segurança
+    return getAccessibleModules(effectiveRole);
+  }, [effectiveRole]);
 
   return (
     <AuthContext.Provider value={{ session, user, profile, isLoading, signOut, can, accessibleModules }}>

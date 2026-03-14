@@ -16,8 +16,8 @@ interface PermissionGuardProps {
  *
  * Uso: <PermissionGuard module="admin" action="ver">...</PermissionGuard>
  *
- * Nota: usuários sem role (profile.role === null) recebem acesso total
- * por design (admin provisório até que roles sejam atribuídos).
+ * Nota: usuários sem role recebem acesso de 'comercial' por segurança.
+ * Para acesso admin, a role deve ser atribuída explicitamente no banco.
  */
 export default function PermissionGuard({
   module,
