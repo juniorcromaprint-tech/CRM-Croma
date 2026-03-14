@@ -1,6 +1,6 @@
 # CROMA PRINT — CRM/ERP SISTEMA
 
-> **Versão**: 3.1 | **Atualizado**: 2026-03-13 | **Status**: Operacional em Produção
+> **Versão**: 3.2 | **Atualizado**: 2026-03-14 | **Status**: Operacional em Produção
 
 ---
 
@@ -60,7 +60,7 @@ Lead → Orçamento → Pedido → Produção → Instalação → Faturamento
 
 ---
 
-## ESTADO ATUAL DO BANCO (2026-03-13)
+## ESTADO ATUAL DO BANCO (2026-03-14)
 
 | Migration | Status | Conteúdo |
 |---|---|---|
@@ -70,27 +70,36 @@ Lead → Orçamento → Pedido → Produção → Instalação → Faturamento
 | `003_fiscal_module.sql` | ✅ Executada | 11 tabelas fiscal + RPCs NF-e |
 | `004_integracao_bridge.sql` | ✅ Executada | Bridge ERP↔Campo — views vw_campo_instalacoes, vw_campo_fotos + triggers de sincronização ativos |
 | `005_storage_security.sql` | ✅ Executada | RLS nos buckets |
-| `006_orcamento_module.sql` | ❌ NÃO executada | acabamentos, servicos, regras_precificacao — **SCHEMA PRECISA SER CORRIGIDO antes de executar** |
+| `006_orcamento_module.sql` | ✅ Executada | acabamentos (17), servicos (16), proposta_item_materiais, proposta_item_acabamentos, proposta_servicos, templates_orcamento |
+| `007_orcamento_campos.sql` | ✅ Executada | regras_precificacao (11 categorias), modelo_id em proposta_itens, campos de custeio em pedido_itens |
 | `008_update_materiais_precos.sql` | ✅ Executada | 464 materiais com preço real Mubisys |
 | `009_update_produtos_markups.sql` | ✅ Executada | 156 modelos com markup real |
 | `020_portal_tracking_pagamento.sql` | ✅ Executada | Portal cliente, tracking, pagamento, notificações |
+| `022_pedidos_cancelamento_fields.sql` | ✅ Executada | `cancelado_em` e `motivo_cancelamento` na tabela pedidos |
 
 ### Dados no Banco
 - `clientes`: 307 registros
 - `materiais`: 467 registros (464 com preço_medio, 3 sem) — visíveis em `/admin/materiais`
 - `produtos`: 156 registros
 - `produto_modelos`: 156 registros (markup seedado)
-- `modelo_materiais`: centenas de matérias-primas disponíveis em `/admin/materiais` — vinculação aos modelos pendente
-- `modelo_processos`: **0 registros** — CRÍTICO
+- `modelo_materiais`: 321 registros vinculados
+- `modelo_processos`: 362 registros
+- `acabamentos`: 17 registros (ilhós, bastão, laminação, etc.)
+- `servicos`: 16 registros (criação de arte, instalação, etc.)
+- `regras_precificacao`: 11 categorias (banner, adesivo, fachada, placa, letreiro, painel, totem, backdrop, geral, pdv, envelopamento)
 
 ---
 
-## PROBLEMAS CRÍTICOS CONHECIDOS (atualizado 2026-03-13)
+## BUGS CORRIGIDOS (2026-03-14) — PR #5 mergeado em main
 
-1. **Orçamento gera R$ 0,00** — editor envia arrays vazios para o motor Mubisys
-2. **Bug multiplicação dupla** — `precoTotal = precoVenda * quantidade` (precoVenda já inclui qty)
-3. **Migration 006 schema incompatível** — 3 definições diferentes no código
-4. **modelo_materiais sem vínculo** — materiais existem mas não estão vinculados aos modelos de produto
+19 bugs corrigidos na auditoria QA. Ver relatório completo em `docs/qa-reports/2026-03-14-CORRECOES-PARA-REVISAO.md`.
+
+Principais:
+- ~~Orçamento gera R$ 0,00~~ — **RESOLVIDO**: item com valor zero é bloqueado
+- ~~Bug multiplicação dupla~~ — **RESOLVIDO**: custo_fixo com Math.max(0, ...)
+- ~~Migration 006 schema incompatível~~ — **RESOLVIDO**: tabelas existem, schema unificado
+- ~~Default role 'admin'~~ — **RESOLVIDO**: padrão agora é 'comercial'
+- ~~Tabela nfe_documentos~~ — **RESOLVIDO**: corrigido para fiscal_documentos
 
 > ~~ERP sem auth~~ — **RESOLVIDO**: auth real funcionando em `crm-croma.vercel.app`
 
