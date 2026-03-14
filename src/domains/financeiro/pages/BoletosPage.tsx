@@ -2,7 +2,7 @@
 // Croma Print ERP — Gestão de boletos, remessas e retornos bancários
 // ─────────────────────────────────────────────────────────────────────────────
 
-import { useState, useMemo } from 'react';
+import { useState, useMemo, useRef } from 'react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
@@ -31,10 +31,12 @@ import {
   Receipt,
   Upload,
   ArrowRightLeft,
+  Loader2,
+  FileText,
 } from 'lucide-react';
 
 import { brl, formatDate, formatDateTime } from '@/shared/utils/format';
-import { showError } from '@/utils/toast';
+import { showError, showSuccess } from '@/utils/toast';
 
 import BoletoStatusBadge from '../components/BoletoStatusBadge';
 import RemessaStatusBadge from '../components/RemessaStatusBadge';
@@ -54,6 +56,8 @@ import {
   useGerarRemessa,
   useDownloadRemessa,
   useMarcarRemessaEnviada,
+  useRetornos,
+  useProcessarRetorno,
 } from '../hooks/useBoletos';
 
 // ─── Boletos Tab ────────────────────────────────────────────────────────────
@@ -377,16 +381,120 @@ function RemessasTab() {
   );
 }
 
-// ─── Retornos Tab (placeholder) ─────────────────────────────────────────────
+// ─── Retornos Tab ────────────────────────────────────────────────────────────
 
 function RetornosTab() {
+  const fileInputRef = useRef<HTMLInputElement>(null);
+  const { data: retornos, isLoading } = useRetornos();
+  const processarRetorno = useProcessarRetorno();
+
+  const handleFileSelect = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+
+    const reader = new FileReader();
+    reader.onload = async (event) => {
+      const content = event.target?.result as string;
+      if (!content) {
+        showError('Não foi possível ler o arquivo');
+        return;
+      }
+      try {
+        const result = await processarRetorno.mutateAsync(content);
+        showSuccess(
+          `Retorno processado: ${result.baixados} liquidação(ões) de ${result.total} registros`,
+        );
+      } catch (err) {
+        showError(err instanceof Error ? err.message : 'Erro ao processar retorno');
+      }
+    };
+    reader.onerror = () => showError('Erro ao ler o arquivo');
+    reader.readAsText(file, 'latin1');
+
+    // Reset input so the same file can be selected again
+    e.target.value = '';
+  };
+
   return (
-    <div className="bg-white rounded-2xl border border-slate-200 p-12 text-center">
-      <Upload size={40} className="mx-auto text-slate-300 mb-3" />
-      <h3 className="font-semibold text-slate-600">Importação de Retorno</h3>
-      <p className="text-sm text-slate-400 mt-1">
-        Em breve: importação de arquivos de retorno bancário (CNAB 400) para baixa automática
-      </p>
+    <div className="space-y-4">
+      {/* Upload card */}
+      <div className="bg-white rounded-2xl border border-slate-200 p-6">
+        <div className="flex items-start gap-4">
+          <div className="flex-shrink-0 bg-blue-50 rounded-xl p-3">
+            <ArrowRightLeft size={24} className="text-blue-600" />
+          </div>
+          <div className="flex-1">
+            <h3 className="font-semibold text-slate-700 mb-1">Importar Arquivo de Retorno</h3>
+            <p className="text-sm text-slate-400 mb-4">
+              Selecione o arquivo de retorno bancário CNAB 400 (.RET) para processar as liquidações automaticamente.
+            </p>
+            <input
+              ref={fileInputRef}
+              type="file"
+              accept=".ret,.RET,.txt"
+              className="hidden"
+              onChange={handleFileSelect}
+            />
+            <Button
+              onClick={() => fileInputRef.current?.click()}
+              disabled={processarRetorno.isPending}
+            >
+              {processarRetorno.isPending ? (
+                <>
+                  <Loader2 size={16} className="mr-2 animate-spin" /> Processando...
+                </>
+              ) : (
+                <>
+                  <Upload size={16} className="mr-2" /> Selecionar Arquivo
+                </>
+              )}
+            </Button>
+          </div>
+        </div>
+      </div>
+
+      {/* History table */}
+      <div className="bg-white rounded-2xl border border-slate-200 overflow-hidden">
+        <div className="px-4 py-3 border-b border-slate-100">
+          <h4 className="font-semibold text-slate-700 text-sm">Histórico de Retornos</h4>
+        </div>
+        {isLoading ? (
+          <div className="p-12 text-center text-slate-400">Carregando histórico...</div>
+        ) : !retornos?.length ? (
+          <div className="p-12 text-center">
+            <FileText size={40} className="mx-auto text-slate-300 mb-3" />
+            <h3 className="font-semibold text-slate-600">Nenhum retorno importado</h3>
+            <p className="text-sm text-slate-400 mt-1">
+              Importe seu primeiro arquivo de retorno bancário acima
+            </p>
+          </div>
+        ) : (
+          <div className="overflow-x-auto">
+            <table className="w-full text-sm">
+              <thead className="bg-slate-50 border-b border-slate-200">
+                <tr>
+                  <th className="p-3 text-left font-medium text-slate-600">Data</th>
+                  <th className="p-3 text-left font-medium text-slate-600">Banco</th>
+                  <th className="p-3 text-left font-medium text-slate-600">Total Registros</th>
+                  <th className="p-3 text-left font-medium text-slate-600">Liquidações</th>
+                  <th className="p-3 text-left font-medium text-slate-600">Valor Total</th>
+                </tr>
+              </thead>
+              <tbody>
+                {retornos.map((ret) => (
+                  <tr key={ret.id} className="border-b border-slate-100 hover:bg-slate-50">
+                    <td className="p-3 text-slate-600">{formatDate(ret.created_at)}</td>
+                    <td className="p-3 text-slate-700 font-medium">{ret.banco}</td>
+                    <td className="p-3 text-slate-600">{ret.total_registros}</td>
+                    <td className="p-3 text-slate-600">{ret.total_liquidacoes}</td>
+                    <td className="p-3 font-semibold">{brl(Number(ret.valor_total))}</td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        )}
+      </div>
     </div>
   );
 }
