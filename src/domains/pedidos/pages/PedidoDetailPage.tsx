@@ -26,6 +26,17 @@ import { gerarContasReceber } from '@/domains/financeiro/services/financeiro-aut
 import { showError, showSuccess } from '@/utils/toast'
 import { supabase } from '@/integrations/supabase/client'
 
+// Mapa de transições válidas — rejeita saltos de status
+const VALID_TRANSITIONS: Record<string, string[]> = {
+  rascunho:              ['aguardando_aprovacao'],
+  aguardando_aprovacao:  ['aprovado', 'cancelado'],
+  aprovado:              ['em_producao', 'cancelado'],
+  em_producao:           ['produzido', 'cancelado'],
+  produzido:             ['aguardando_instalacao', 'cancelado'],
+  aguardando_instalacao: ['em_instalacao', 'cancelado'],
+  em_instalacao:         ['concluido', 'cancelado'],
+}
+
 // Map of current status → next status action
 const FLOW_ACTIONS: Record<string, { label: string; next: string; icon: React.ReactNode; cls: string }> = {
   rascunho:              { label: 'Enviar p/ Aprovação',  next: 'aguardando_aprovacao',   icon: <FileText size={14} />,     cls: 'bg-slate-600 hover:bg-slate-700' },
@@ -129,12 +140,22 @@ export default function PedidoDetailPage() {
 
   const concluirPedido = async () => {
     if (!id) return
-    updatePedido.mutate({ id, status: 'concluido' as any })
     try {
+      // 1. Gerar contas a receber ANTES de marcar como concluído
       await gerarContasReceber(id)
+      // 2. Atualizar status via Supabase direto (não mutate fire-and-forget)
+      const { error } = await supabase
+        .from('pedidos')
+        .update({ status: 'concluido' })
+        .eq('id', id)
+      if (error) throw error
+      // 3. Invalidar cache para refletir no UI
+      queryClient.invalidateQueries({ queryKey: ['pedidos'] })
+      queryClient.invalidateQueries({ queryKey: ['dashboard'] })
+      showSuccess('Pedido concluído com sucesso!')
     } catch (err: any) {
-      console.error('[gerarContasReceber]', err)
-      showError('Pedido concluído, mas houve erro ao gerar cobranças. Verifique o módulo financeiro.')
+      console.error('[concluirPedido]', err)
+      showError('Erro ao concluir pedido. Verifique o módulo financeiro.')
     }
   }
 
@@ -143,14 +164,40 @@ export default function PedidoDetailPage() {
     const action = FLOW_ACTIONS[pedido.status]
     if (!action) return
 
-    // Guard: verificar pré-condições antes de avançar status
+    // Guard geral: validar que a transição é permitida
+    const allowed = VALID_TRANSITIONS[pedido.status] ?? []
+    if (!allowed.includes(action.next)) {
+      showError(`Transição inválida: ${pedido.status} → ${action.next}`)
+      return
+    }
+
+    // Guard: "Aprovado → Em Produção" — cria OP automaticamente
     if (pedido.status === 'aprovado') {
       iniciarProducao.mutate(id)
       return
     }
 
+    // Guard: "Em Produção → Produzido" — verificar se todas as OPs estão concluídas
+    if (pedido.status === 'em_producao') {
+      const { data: ops } = await supabase
+        .from('ordens_producao')
+        .select('id, status')
+        .eq('pedido_id', id)
+
+      if (!ops || ops.length === 0) {
+        showError('Nenhuma Ordem de Produção encontrada. Crie as OPs antes de marcar como produzido.')
+        return
+      }
+
+      const pendentes = ops.filter(op => op.status !== 'concluida')
+      if (pendentes.length > 0) {
+        showError(`${pendentes.length} OP(s) ainda não concluída(s). Finalize todas antes de marcar como produzido.`)
+        return
+      }
+    }
+
+    // Guard: "Em Instalação → Concluído" — verificar NF-e + gerar contas
     if (action.next === 'concluido') {
-      // Verificar se há faturamentos (NF-e) emitidos
       const { data: nfes } = await supabase
         .from('fiscal_documentos')
         .select('id')
