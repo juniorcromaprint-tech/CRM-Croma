@@ -3,6 +3,7 @@ import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import { showSuccess, showError } from "@/utils/toast";
 import { formatCNPJ, formatPhone } from "@/shared/utils/format";
+import { ilikeTerm } from "@/shared/utils/searchUtils";
 import { Link } from "react-router-dom";
 import {
   Building2, Search, Plus, Phone, Mail, MapPin,
@@ -19,6 +20,12 @@ import {
 } from "@/components/ui/dialog";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
+import {
+  Pagination, PaginationContent, PaginationItem,
+  PaginationNext, PaginationPrevious,
+} from "@/components/ui/pagination";
+
+const PAGE_SIZE = 20;
 
 const CLASSIFICACAO_CONFIG: Record<string, { label: string; color: string; icon: string }> = {
   A: { label: "A", color: "bg-blue-100 text-blue-700 border-blue-200", icon: "💎" },
@@ -40,6 +47,7 @@ export default function ClientesPage() {
   const [segFilter, setSegFilter] = useState<string>("all");
   const [classFilter, setClassFilter] = useState<string>("all");
   const [showNew, setShowNew] = useState(false);
+  const [page, setPage] = useState(1);
 
   const [form, setForm] = useState({
     razao_social: "", nome_fantasia: "", cnpj: "", segmento: "",
@@ -47,24 +55,43 @@ export default function ClientesPage() {
     endereco_cidade: "", endereco_estado: "", observacoes: "",
   });
 
-  const { data: clientes, isLoading } = useQuery({
-    queryKey: ["clientes", search, segFilter, classFilter],
+  const { data: clientesResult, isLoading } = useQuery({
+    queryKey: ["clientes", search, segFilter, classFilter, page],
+    staleTime: 2 * 60 * 1000,
     queryFn: async () => {
+      const from = (page - 1) * PAGE_SIZE;
+      const to = from + PAGE_SIZE - 1;
+
       let query = supabase
         .from("clientes")
-        .select("*, cliente_unidades(count)")
+        .select("*, unidades_cliente(count)", { count: "exact" })
         .eq("ativo", true)
-        .order("nome_fantasia", { ascending: true });
+        .order("nome_fantasia", { ascending: true })
+        .range(from, to);
 
       if (segFilter && segFilter !== "all") query = query.eq("segmento", segFilter);
       if (classFilter && classFilter !== "all") query = query.eq("classificacao", classFilter);
-      if (search) query = query.or(`razao_social.ilike.%${search}%,nome_fantasia.ilike.%${search}%,cnpj.ilike.%${search}%`);
+      if (search) { const t = ilikeTerm(search); query = query.or(`razao_social.ilike.${t},nome_fantasia.ilike.${t},cnpj.ilike.${t}`); }
 
-      const { data, error } = await query;
+      const { data, count, error } = await query;
       if (error) throw error;
-      return data;
+      return { data: data ?? [], total: count ?? 0 };
     },
   });
+
+  const clientes = clientesResult?.data ?? [];
+  const totalClientes = clientesResult?.total ?? 0;
+  const totalPages = Math.ceil(totalClientes / PAGE_SIZE);
+
+  const handleFilterChange = (setter: (v: string) => void) => (value: string) => {
+    setter(value);
+    setPage(1);
+  };
+
+  const handleSearchChange = (value: string) => {
+    setSearch(value);
+    setPage(1);
+  };
 
   const createCliente = useMutation({
     mutationFn: async (newCliente: typeof form) => {
@@ -88,6 +115,7 @@ export default function ClientesPage() {
 
   const { data: stats } = useQuery({
     queryKey: ["clientes", "stats"],
+    staleTime: 2 * 60 * 1000,
     queryFn: async () => {
       const { data } = await supabase.from("clientes").select("classificacao, segmento").eq("ativo", true);
       const byClass: Record<string, number> = {};
@@ -124,9 +152,9 @@ export default function ClientesPage() {
       <div className="flex flex-col sm:flex-row gap-3">
         <div className="relative flex-1">
           <Search size={16} className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" />
-          <Input placeholder="Buscar por nome, fantasia ou CNPJ..." value={search} onChange={(e) => setSearch(e.target.value)} className="pl-10" />
+          <Input placeholder="Buscar por nome, fantasia ou CNPJ..." value={search} onChange={(e) => handleSearchChange(e.target.value)} className="pl-10" />
         </div>
-        <Select value={segFilter} onValueChange={setSegFilter}>
+        <Select value={segFilter} onValueChange={handleFilterChange(setSegFilter)}>
           <SelectTrigger className="w-full sm:w-44">
             <SelectValue placeholder="Segmento" />
           </SelectTrigger>
@@ -137,7 +165,7 @@ export default function ClientesPage() {
             ))}
           </SelectContent>
         </Select>
-        <Select value={classFilter} onValueChange={setClassFilter}>
+        <Select value={classFilter} onValueChange={handleFilterChange(setClassFilter)}>
           <SelectTrigger className="w-full sm:w-40">
             <SelectValue placeholder="Classificação" />
           </SelectTrigger>
@@ -204,6 +232,31 @@ export default function ClientesPage() {
           </div>
         )}
       </div>
+
+      {/* Paginação */}
+      {totalPages > 1 && (
+        <Pagination>
+          <PaginationContent>
+            <PaginationItem>
+              <PaginationPrevious
+                onClick={() => setPage(p => Math.max(1, p - 1))}
+                className={page <= 1 ? "pointer-events-none opacity-50" : "cursor-pointer"}
+              />
+            </PaginationItem>
+            <PaginationItem>
+              <span className="px-4 py-2 text-sm text-slate-600">
+                Página {page} de {totalPages}
+              </span>
+            </PaginationItem>
+            <PaginationItem>
+              <PaginationNext
+                onClick={() => setPage(p => Math.min(totalPages, p + 1))}
+                className={page >= totalPages ? "pointer-events-none opacity-50" : "cursor-pointer"}
+              />
+            </PaginationItem>
+          </PaginationContent>
+        </Pagination>
+      )}
 
       {/* New Client Dialog */}
       <Dialog open={showNew} onOpenChange={setShowNew}>

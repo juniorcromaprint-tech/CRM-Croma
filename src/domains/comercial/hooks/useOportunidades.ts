@@ -1,6 +1,7 @@
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { supabase } from '@/integrations/supabase/client';
 import { showSuccess, showError } from '@/utils/toast';
+import { ilikeTerm } from '@/shared/utils/searchUtils';
 
 // ─── Types ──────────────────────────────────────────────────────────────────
 
@@ -78,6 +79,7 @@ const OPORT_STATS_KEY = [...OPORT_KEY, 'stats'] as const;
 export function useOportunidades(filters?: OportunidadeFilters) {
   return useQuery({
     queryKey: oportunidadesQueryKey(filters),
+    staleTime: 2 * 60 * 1000,
     queryFn: async (): Promise<Oportunidade[]> => {
       let query = supabase
         .from('oportunidades')
@@ -101,7 +103,7 @@ export function useOportunidades(filters?: OportunidadeFilters) {
       }
 
       if (filters?.search && filters.search.trim().length > 0) {
-        const term = `%${filters.search.trim()}%`;
+        const term = ilikeTerm(filters.search);
         query = query.or(`titulo.ilike.${term},descricao.ilike.${term}`);
       }
 
@@ -118,6 +120,7 @@ export function useOportunidades(filters?: OportunidadeFilters) {
 export function useOportunidade(id: string | undefined) {
   return useQuery({
     queryKey: oportunidadeQueryKey(id ?? ''),
+    staleTime: 2 * 60 * 1000,
     queryFn: async (): Promise<Oportunidade | null> => {
       if (!id) return null;
       const { data, error } = await supabase
@@ -188,6 +191,7 @@ export function useUpdateOportunidade() {
 export function useOportunidadeStats() {
   return useQuery({
     queryKey: OPORT_STATS_KEY,
+    staleTime: 60 * 1000,
     queryFn: async () => {
       const { data, error } = await supabase
         .from('oportunidades')

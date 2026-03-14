@@ -83,6 +83,7 @@ const CR_KEY = ['financeiro', 'contas_receber'] as const;
 export function useContasReceber(opts?: { status?: ContaReceberStatus; cliente_id?: string }) {
   return useQuery({
     queryKey: [...CR_KEY, opts],
+    staleTime: 2 * 60 * 1000,
     queryFn: async (): Promise<ContaReceber[]> => {
       let query = supabase
         .from('contas_receber')
@@ -106,6 +107,7 @@ export function useContasReceber(opts?: { status?: ContaReceberStatus; cliente_i
 export function useContasReceberStats() {
   return useQuery({
     queryKey: [...CR_KEY, 'stats'],
+    staleTime: 60 * 1000,
     queryFn: async () => {
       const { data, error } = await supabase
         .from('contas_receber')

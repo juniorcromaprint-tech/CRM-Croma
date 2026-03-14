@@ -1,14 +1,16 @@
-import { useState } from "react";
+import { useState, useCallback } from "react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { useNavigate } from "react-router-dom";
 import { supabase } from "@/integrations/supabase/client";
 import { showSuccess, showError } from "@/utils/toast";
 import { brl as formatBRL } from "@/shared/utils/format";
+import { ilikeTerm } from "@/shared/utils/searchUtils";
 import {
   UserPlus, Search, Filter, Plus, Phone, Mail, Building2,
-  Thermometer, ChevronRight, MoreHorizontal
+  Thermometer, ChevronRight, AlertTriangle,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
+import { Badge } from "@/components/ui/badge";
 import { Input } from "@/components/ui/input";
 import {
   Select, SelectContent, SelectItem, SelectTrigger, SelectValue,
@@ -16,8 +18,20 @@ import {
 import {
   Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter,
 } from "@/components/ui/dialog";
+import {
+  AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent,
+  AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle,
+} from "@/components/ui/alert-dialog";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
+import {
+  Pagination, PaginationContent, PaginationItem,
+  PaginationNext, PaginationPrevious,
+} from "@/components/ui/pagination";
+
+const PAGE_SIZE = 20;
+
+// ─── Constants ────────────────────────────────────────────────────────────────
 
 const STATUS_CONFIG: Record<string, { label: string; color: string }> = {
   novo: { label: "Novo", color: "bg-blue-100 text-blue-700" },
@@ -35,12 +49,26 @@ const TEMP_CONFIG: Record<string, { label: string; color: string }> = {
   quente: { label: "Quente", color: "bg-red-100 text-red-700" },
 };
 
+// ─── Types ───────────────────────────────────────────────────────────────────
+
+interface LeadDuplicado {
+  id: string;
+  empresa: string | null;
+  contato_nome: string | null;
+  status: string;
+}
+
+// ─── Component ───────────────────────────────────────────────────────────────
+
 export default function LeadsPage() {
   const navigate = useNavigate();
   const queryClient = useQueryClient();
   const [search, setSearch] = useState("");
   const [statusFilter, setStatusFilter] = useState<string>("all");
   const [showNewLead, setShowNewLead] = useState(false);
+  const [page, setPage] = useState(1);
+  const [showConfirmDup, setShowConfirmDup] = useState(false);
+  const [leadsDuplicados, setLeadsDuplicados] = useState<LeadDuplicado[]>([]);
 
   // Form state
   const [form, setForm] = useState({
@@ -49,47 +77,69 @@ export default function LeadsPage() {
     observacoes: "",
   });
 
-  const { data: leads, isLoading } = useQuery({
-    queryKey: ["leads", search, statusFilter],
+  // ── Duplicate detection ──────────────────────────────────────────────────
+
+  const verificarDuplicata = useCallback(async (termo: string) => {
+    if (!termo || termo.trim().length < 3) return;
+
+    const t = ilikeTerm(termo.trim());
+    const { data } = await supabase
+      .from("leads")
+      .select("id, empresa, contato_nome, status")
+      .or(`empresa.ilike.${t},contato_nome.ilike.${t}`)
+      .limit(3);
+
+    setLeadsDuplicados((data ?? []) as LeadDuplicado[]);
+  }, []);
+
+  const limparDuplicatas = () => setLeadsDuplicados([]);
+
+  // ── Queries ──────────────────────────────────────────────────────────────
+
+  const { data: leadsResult, isLoading } = useQuery({
+    queryKey: ["leads", search, statusFilter, page],
+    staleTime: 2 * 60 * 1000,
     queryFn: async () => {
+      const from = (page - 1) * PAGE_SIZE;
+      const to = from + PAGE_SIZE - 1;
+
       let query = supabase
         .from("leads")
-        .select("*")
-        .order("created_at", { ascending: false });
+        .select("*", { count: "exact" })
+        .order("created_at", { ascending: false })
+        .range(from, to);
 
       if (statusFilter && statusFilter !== "all") {
         query = query.eq("status", statusFilter);
       }
       if (search) {
-        query = query.or(`empresa.ilike.%${search}%,contato_nome.ilike.%${search}%`);
+        const t = ilikeTerm(search);
+        query = query.or(`empresa.ilike.${t},contato_nome.ilike.${t}`);
       }
 
-      const { data, error } = await query;
+      const { data, count, error } = await query;
       if (error) throw error;
-      return data;
+      return { data: data ?? [], total: count ?? 0 };
     },
   });
 
-  const createLead = useMutation({
-    mutationFn: async (newLead: typeof form) => {
-      const { error } = await supabase.from("leads").insert({
-        ...newLead,
-        valor_estimado: newLead.valor_estimado ? Number(newLead.valor_estimado) : null,
-      });
-      if (error) throw error;
-    },
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ["leads"] });
-      queryClient.invalidateQueries({ queryKey: ["dashboard"] });
-      showSuccess("Lead criado com sucesso!");
-      setShowNewLead(false);
-      setForm({ empresa: "", contato_nome: "", contato_email: "", contato_telefone: "", segmento: "", status: "novo", temperatura: "frio", valor_estimado: "", observacoes: "" });
-    },
-    onError: (err: any) => showError(err.message || "Erro ao criar lead"),
-  });
+  const leads = leadsResult?.data ?? [];
+  const totalLeads = leadsResult?.total ?? 0;
+  const totalPages = Math.ceil(totalLeads / PAGE_SIZE);
+
+  const handleStatusFilterChange = (value: string) => {
+    setStatusFilter(value);
+    setPage(1);
+  };
+
+  const handleSearchChange = (value: string) => {
+    setSearch(value);
+    setPage(1);
+  };
 
   const { data: stats } = useQuery({
     queryKey: ["leads", "stats"],
+    staleTime: 60 * 1000,
     queryFn: async () => {
       const { data } = await supabase.from("leads").select("status, temperatura, valor_estimado");
       const byStatus: Record<string, number> = {};
@@ -105,6 +155,56 @@ export default function LeadsPage() {
       return { byStatus, byTemp, total: data?.length || 0, totalValor };
     },
   });
+
+  // ── Mutations ────────────────────────────────────────────────────────────
+
+  const createLead = useMutation({
+    mutationFn: async (newLead: typeof form) => {
+      const { error } = await supabase.from("leads").insert({
+        ...newLead,
+        valor_estimado: newLead.valor_estimado ? Number(newLead.valor_estimado) : null,
+      });
+      if (error) throw error;
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["leads"] });
+      queryClient.invalidateQueries({ queryKey: ["dashboard"] });
+      showSuccess("Lead criado com sucesso!");
+      setShowNewLead(false);
+      setLeadsDuplicados([]);
+      setForm({
+        empresa: "", contato_nome: "", contato_email: "", contato_telefone: "",
+        segmento: "", status: "novo", temperatura: "frio", valor_estimado: "", observacoes: "",
+      });
+    },
+    onError: (err: any) => showError(err.message || "Erro ao criar lead"),
+  });
+
+  // ── Handlers ─────────────────────────────────────────────────────────────
+
+  const handleSalvar = () => {
+    if (leadsDuplicados.length > 0) {
+      setShowConfirmDup(true);
+    } else {
+      createLead.mutate(form);
+    }
+  };
+
+  const handleConfirmarCriacao = () => {
+    setShowConfirmDup(false);
+    createLead.mutate(form);
+  };
+
+  const handleFecharDialog = () => {
+    setShowNewLead(false);
+    setLeadsDuplicados([]);
+    setForm({
+      empresa: "", contato_nome: "", contato_email: "", contato_telefone: "",
+      segmento: "", status: "novo", temperatura: "frio", valor_estimado: "", observacoes: "",
+    });
+  };
+
+  // ── Render ───────────────────────────────────────────────────────────────
 
   return (
     <div className="space-y-6">
@@ -137,11 +237,11 @@ export default function LeadsPage() {
           <Input
             placeholder="Buscar empresa ou contato..."
             value={search}
-            onChange={(e) => setSearch(e.target.value)}
+            onChange={(e) => handleSearchChange(e.target.value)}
             className="pl-10"
           />
         </div>
-        <Select value={statusFilter} onValueChange={setStatusFilter}>
+        <Select value={statusFilter} onValueChange={handleStatusFilterChange}>
           <SelectTrigger className="w-full sm:w-48">
             <Filter size={14} className="mr-2 text-slate-400" />
             <SelectValue placeholder="Status" />
@@ -159,7 +259,7 @@ export default function LeadsPage() {
       <div className="space-y-3">
         {isLoading ? (
           <div className="space-y-3">
-            {[1,2,3].map(i => (
+            {[1, 2, 3].map(i => (
               <div key={i} className="bg-white rounded-2xl border border-slate-200 p-5 animate-pulse">
                 <div className="h-5 bg-slate-100 rounded w-1/3 mb-3" />
                 <div className="h-4 bg-slate-100 rounded w-1/2" />
@@ -168,7 +268,11 @@ export default function LeadsPage() {
           </div>
         ) : leads && leads.length > 0 ? (
           leads.map((lead) => (
-            <div key={lead.id} className="bg-white rounded-2xl border border-slate-200 p-5 hover:shadow-md transition-shadow group cursor-pointer" onClick={() => navigate(`/leads/${lead.id}`)}>
+            <div
+              key={lead.id}
+              className="bg-white rounded-2xl border border-slate-200 p-5 hover:shadow-md transition-shadow group cursor-pointer"
+              onClick={() => navigate(`/leads/${lead.id}`)}
+            >
               <div className="flex items-start justify-between">
                 <div className="flex-1 min-w-0">
                   <div className="flex items-center gap-2 mb-1">
@@ -208,35 +312,128 @@ export default function LeadsPage() {
         )}
       </div>
 
-      {/* New Lead Dialog */}
-      <Dialog open={showNewLead} onOpenChange={setShowNewLead}>
+      {/* Paginação */}
+      {totalPages > 1 && (
+        <Pagination>
+          <PaginationContent>
+            <PaginationItem>
+              <PaginationPrevious
+                onClick={() => setPage(p => Math.max(1, p - 1))}
+                className={page <= 1 ? "pointer-events-none opacity-50" : "cursor-pointer"}
+              />
+            </PaginationItem>
+            <PaginationItem>
+              <span className="px-4 py-2 text-sm text-slate-600">
+                Página {page} de {totalPages}
+              </span>
+            </PaginationItem>
+            <PaginationItem>
+              <PaginationNext
+                onClick={() => setPage(p => Math.min(totalPages, p + 1))}
+                className={page >= totalPages ? "pointer-events-none opacity-50" : "cursor-pointer"}
+              />
+            </PaginationItem>
+          </PaginationContent>
+        </Pagination>
+      )}
+
+      {/* ── New Lead Dialog ──────────────────────────────────────────────── */}
+      <Dialog open={showNewLead} onOpenChange={(open) => { if (!open) handleFecharDialog(); }}>
         <DialogContent className="sm:max-w-lg">
           <DialogHeader>
             <DialogTitle>Novo Lead</DialogTitle>
           </DialogHeader>
+
           <div className="grid gap-4 py-4">
+            {/* Empresa */}
             <div>
               <Label htmlFor="empresa">Empresa *</Label>
-              <Input id="empresa" value={form.empresa} onChange={e => setForm({...form, empresa: e.target.value})} placeholder="Nome da empresa" />
+              <Input
+                id="empresa"
+                value={form.empresa}
+                onChange={e => {
+                  setForm({ ...form, empresa: e.target.value });
+                  limparDuplicatas();
+                }}
+                onBlur={e => verificarDuplicata(e.target.value)}
+                placeholder="Nome da empresa"
+              />
             </div>
+
+            {/* Contato + Telefone */}
             <div className="grid grid-cols-2 gap-3">
               <div>
                 <Label htmlFor="contato_nome">Contato</Label>
-                <Input id="contato_nome" value={form.contato_nome} onChange={e => setForm({...form, contato_nome: e.target.value})} placeholder="Nome do contato" />
+                <Input
+                  id="contato_nome"
+                  value={form.contato_nome}
+                  onChange={e => {
+                    setForm({ ...form, contato_nome: e.target.value });
+                    limparDuplicatas();
+                  }}
+                  onBlur={e => {
+                    if (!form.empresa && e.target.value.trim().length >= 3) {
+                      verificarDuplicata(e.target.value);
+                    }
+                  }}
+                  placeholder="Nome do contato"
+                />
               </div>
               <div>
                 <Label htmlFor="contato_telefone">Telefone</Label>
-                <Input id="contato_telefone" value={form.contato_telefone} onChange={e => setForm({...form, contato_telefone: e.target.value})} placeholder="(51) 99999-9999" />
+                <Input
+                  id="contato_telefone"
+                  value={form.contato_telefone}
+                  onChange={e => setForm({ ...form, contato_telefone: e.target.value })}
+                  placeholder="(51) 99999-9999"
+                />
               </div>
             </div>
+
+            {/* Alerta de duplicatas */}
+            {leadsDuplicados.length > 0 && (
+              <div className="mt-1 p-3 bg-yellow-50 border border-yellow-200 rounded-xl">
+                <div className="flex items-center gap-2 text-yellow-700 text-sm font-medium mb-2">
+                  <AlertTriangle size={14} />
+                  Possíveis duplicatas encontradas
+                </div>
+                {leadsDuplicados.map(lead => (
+                  <div
+                    key={lead.id}
+                    className="flex items-center justify-between text-xs text-yellow-600 py-1 border-b border-yellow-100 last:border-0"
+                  >
+                    <span>
+                      {lead.empresa ?? lead.contato_nome}
+                      {lead.empresa && lead.contato_nome ? ` — ${lead.contato_nome}` : ""}
+                    </span>
+                    <Badge variant="outline" className="text-yellow-600 border-yellow-300 text-[10px]">
+                      {STATUS_CONFIG[lead.status]?.label ?? lead.status}
+                    </Badge>
+                  </div>
+                ))}
+                <p className="text-xs text-yellow-500 mt-2">
+                  Verifique antes de criar um novo lead.
+                </p>
+              </div>
+            )}
+
+            {/* Email */}
             <div>
               <Label htmlFor="contato_email">Email</Label>
-              <Input id="contato_email" type="email" value={form.contato_email} onChange={e => setForm({...form, contato_email: e.target.value})} placeholder="contato@empresa.com" />
+              <Input
+                id="contato_email"
+                type="email"
+                value={form.contato_email}
+                onChange={e => setForm({ ...form, contato_email: e.target.value })}
+                placeholder="contato@empresa.com"
+              />
             </div>
+
+            {/* Temperatura + Valor */}
             <div className="grid grid-cols-2 gap-3">
               <div>
                 <Label>Temperatura</Label>
-                <Select value={form.temperatura} onValueChange={v => setForm({...form, temperatura: v})}>
+                <Select value={form.temperatura} onValueChange={v => setForm({ ...form, temperatura: v })}>
                   <SelectTrigger><SelectValue /></SelectTrigger>
                   <SelectContent>
                     <SelectItem value="frio">Frio</SelectItem>
@@ -247,12 +444,20 @@ export default function LeadsPage() {
               </div>
               <div>
                 <Label htmlFor="valor_estimado">Valor Estimado</Label>
-                <Input id="valor_estimado" type="number" value={form.valor_estimado} onChange={e => setForm({...form, valor_estimado: e.target.value})} placeholder="50000" />
+                <Input
+                  id="valor_estimado"
+                  type="number"
+                  value={form.valor_estimado}
+                  onChange={e => setForm({ ...form, valor_estimado: e.target.value })}
+                  placeholder="50000"
+                />
               </div>
             </div>
+
+            {/* Segmento */}
             <div>
               <Label>Segmento</Label>
-              <Select value={form.segmento} onValueChange={v => setForm({...form, segmento: v})}>
+              <Select value={form.segmento} onValueChange={v => setForm({ ...form, segmento: v })}>
                 <SelectTrigger><SelectValue placeholder="Selecione..." /></SelectTrigger>
                 <SelectContent>
                   <SelectItem value="calcados">Calçados</SelectItem>
@@ -268,15 +473,24 @@ export default function LeadsPage() {
                 </SelectContent>
               </Select>
             </div>
+
+            {/* Observações */}
             <div>
               <Label htmlFor="observacoes">Observações</Label>
-              <Textarea id="observacoes" value={form.observacoes} onChange={e => setForm({...form, observacoes: e.target.value})} placeholder="Notas sobre o lead..." rows={3} />
+              <Textarea
+                id="observacoes"
+                value={form.observacoes}
+                onChange={e => setForm({ ...form, observacoes: e.target.value })}
+                placeholder="Notas sobre o lead..."
+                rows={3}
+              />
             </div>
           </div>
+
           <DialogFooter>
-            <Button variant="outline" onClick={() => setShowNewLead(false)}>Cancelar</Button>
+            <Button variant="outline" onClick={handleFecharDialog}>Cancelar</Button>
             <Button
-              onClick={() => createLead.mutate(form)}
+              onClick={handleSalvar}
               disabled={!form.empresa || createLead.isPending}
               className="bg-blue-600 hover:bg-blue-700"
             >
@@ -285,6 +499,48 @@ export default function LeadsPage() {
           </DialogFooter>
         </DialogContent>
       </Dialog>
+
+      {/* ── Confirmação de duplicata ─────────────────────────────────────── */}
+      <AlertDialog open={showConfirmDup} onOpenChange={setShowConfirmDup}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle className="flex items-center gap-2">
+              <AlertTriangle size={18} className="text-yellow-500" />
+              Possíveis duplicatas encontradas
+            </AlertDialogTitle>
+            <AlertDialogDescription asChild>
+              <div className="space-y-3">
+                <p>Os seguintes leads com nome/empresa similar já existem:</p>
+                <ul className="space-y-1">
+                  {leadsDuplicados.map(lead => (
+                    <li key={lead.id} className="flex items-center justify-between text-sm bg-yellow-50 px-3 py-1.5 rounded-lg">
+                      <span className="font-medium text-slate-700">
+                        {lead.empresa ?? lead.contato_nome}
+                        {lead.empresa && lead.contato_nome ? ` — ${lead.contato_nome}` : ""}
+                      </span>
+                      <span className={`text-xs px-2 py-0.5 rounded-full font-medium ${STATUS_CONFIG[lead.status]?.color ?? "bg-slate-100 text-slate-600"}`}>
+                        {STATUS_CONFIG[lead.status]?.label ?? lead.status}
+                      </span>
+                    </li>
+                  ))}
+                </ul>
+                <p className="text-sm text-slate-500">
+                  Deseja criar um novo lead mesmo assim?
+                </p>
+              </div>
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel>Voltar e revisar</AlertDialogCancel>
+            <AlertDialogAction
+              onClick={handleConfirmarCriacao}
+              className="bg-blue-600 hover:bg-blue-700"
+            >
+              Criar mesmo assim
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </div>
   );
 }

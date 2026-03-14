@@ -8,6 +8,7 @@ import { supabase } from "@/integrations/supabase/client";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { showSuccess, showError } from "@/utils/toast";
 import { formatDateTime, formatDateRelative } from "@/shared/utils/format";
+import { ilikeTerm } from "@/shared/utils/searchUtils";
 import { MODULES, ACTIONS } from "@/shared/constants/permissions";
 import type { Module, Action } from "@/shared/constants/permissions";
 
@@ -264,8 +265,9 @@ function TabUsuarios() {
         query = query.eq("ativo", false);
       }
       if (search) {
+        const t = ilikeTerm(search);
         query = query.or(
-          `full_name.ilike.%${search}%,email.ilike.%${search}%`
+          `full_name.ilike.${t},email.ilike.${t}`
         );
       }
 
@@ -1163,8 +1165,9 @@ function TabAuditoria() {
         query = query.eq("acao", acaoFilter);
       }
       if (search) {
+        const t = ilikeTerm(search);
         query = query.or(
-          `tabela.ilike.%${search}%,acao.ilike.%${search}%`
+          `tabela.ilike.${t},acao.ilike.${t}`
         );
       }
 

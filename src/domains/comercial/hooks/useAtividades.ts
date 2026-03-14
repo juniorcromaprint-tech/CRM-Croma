@@ -48,6 +48,7 @@ function atividadesQueryKey(entidadeTipo: string, entidadeId: string) {
 export function useAtividades(entidadeTipo: string, entidadeId: string | undefined) {
   return useQuery({
     queryKey: atividadesQueryKey(entidadeTipo, entidadeId ?? ''),
+    staleTime: 2 * 60 * 1000,
     queryFn: async (): Promise<AtividadeComercial[]> => {
       if (!entidadeId) return [];
       const { data, error } = await supabase
@@ -69,6 +70,7 @@ export function useAtividades(entidadeTipo: string, entidadeId: string | undefin
 export function useAtividadesRecentes(limit = 20) {
   return useQuery({
     queryKey: [...ATIVIDADES_KEY, 'recentes', limit],
+    staleTime: 60 * 1000,
     queryFn: async (): Promise<AtividadeComercial[]> => {
       const { data, error } = await supabase
         .from('atividades_comerciais')

@@ -41,6 +41,7 @@ const PIPELINE_KEY = ['comercial', 'pipeline'] as const;
 export function usePipelineData() {
   return useQuery({
     queryKey: PIPELINE_KEY,
+    staleTime: 60 * 1000,
     queryFn: async (): Promise<PipelineData> => {
       const { data, error } = await supabase
         .from('leads')

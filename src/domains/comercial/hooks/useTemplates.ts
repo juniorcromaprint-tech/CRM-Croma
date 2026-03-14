@@ -71,6 +71,7 @@ export function useTemplates() {
 export function useTemplate(id: string | undefined) {
   return useQuery({
     queryKey: [TEMPLATES_KEY, id],
+    staleTime: 5 * 60 * 1000,
     queryFn: async () => {
       const { data, error } = await supabase
         .from("templates_orcamento" as any)

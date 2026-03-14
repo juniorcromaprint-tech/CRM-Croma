@@ -44,6 +44,7 @@ const UNIDADES_KEY = 'unidades';
 export function useUnidades(clienteId: string | undefined) {
   return useQuery({
     queryKey: [UNIDADES_KEY, clienteId],
+    staleTime: 2 * 60 * 1000,
     queryFn: async () => {
       if (!clienteId) throw new Error('ID do cliente nao informado');
 

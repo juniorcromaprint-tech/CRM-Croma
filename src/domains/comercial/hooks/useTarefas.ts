@@ -52,6 +52,7 @@ const TAREFAS_KEY = ['comercial', 'tarefas'] as const;
 export function useTarefas(opts?: { entidadeTipo?: string; entidadeId?: string; status?: TarefaStatus }) {
   return useQuery({
     queryKey: [...TAREFAS_KEY, opts],
+    staleTime: 2 * 60 * 1000,
     queryFn: async (): Promise<TarefaComercial[]> => {
       let query = supabase
         .from('tarefas_comerciais')
@@ -75,6 +76,7 @@ export function useTarefas(opts?: { entidadeTipo?: string; entidadeId?: string; 
 export function useTarefasPendentes() {
   return useQuery({
     queryKey: [...TAREFAS_KEY, 'pendentes'],
+    staleTime: 60 * 1000,
     queryFn: async (): Promise<TarefaComercial[]> => {
       const today = new Date().toISOString().split('T')[0];
       const { data, error } = await supabase

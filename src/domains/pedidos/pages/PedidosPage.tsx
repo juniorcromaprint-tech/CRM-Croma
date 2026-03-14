@@ -66,6 +66,12 @@ import {
   AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle,
 } from "@/components/ui/alert-dialog";
 import { useAuth } from "@/contexts/AuthContext";
+import {
+  Pagination, PaginationContent, PaginationItem,
+  PaginationNext, PaginationPrevious,
+} from "@/components/ui/pagination";
+
+const PAGE_SIZE = 20;
 
 // ---------------------------------------------------------------------------
 // TYPES
@@ -212,6 +218,7 @@ export default function PedidosPage() {
   const [statusFilter, setStatusFilter] = useState<string>("all");
   const [prioridadeFilter, setPrioridadeFilter] = useState<string>("all");
   const [isCreateOpen, setIsCreateOpen] = useState(false);
+  const [page, setPage] = useState(1);
   const [selectedPedido, setSelectedPedido] = useState<PedidoRow | null>(null);
   const [deleteId, setDeleteId] = useState<string | null>(null);
   const [deleteName, setDeleteName] = useState("");
@@ -235,6 +242,7 @@ export default function PedidosPage() {
     isError,
   } = useQuery({
     queryKey: ["pedidos"],
+    staleTime: 2 * 60 * 1000,
     queryFn: async () => {
       const { data, error } = await supabase
         .from("pedidos")
@@ -249,6 +257,7 @@ export default function PedidosPage() {
 
   const { data: clientes = [] } = useQuery({
     queryKey: ["clientes-select"],
+    staleTime: 5 * 60 * 1000,
     queryFn: async () => {
       const { data, error } = await supabase
         .from("clientes")
@@ -377,6 +386,12 @@ export default function PedidosPage() {
     return result;
   }, [pedidos, statusFilter, prioridadeFilter, searchTerm]);
 
+  const totalPages = Math.ceil(filtered.length / PAGE_SIZE);
+  const pagedPedidos = useMemo(
+    () => filtered.slice((page - 1) * PAGE_SIZE, page * PAGE_SIZE),
+    [filtered, page]
+  );
+
   const stats = useMemo(() => {
     const total = pedidos.length;
     const valorPipeline = pedidos.reduce(
@@ -400,6 +415,21 @@ export default function PedidosPage() {
     setFormPrioridade("normal");
     setFormDataPrometida("");
     setFormObservacoes("");
+  }
+
+  function handleStatusFilterChange(value: string) {
+    setStatusFilter(value);
+    setPage(1);
+  }
+
+  function handlePrioridadeFilterChange(value: string) {
+    setPrioridadeFilter(value);
+    setPage(1);
+  }
+
+  function handleSearchChange(value: string) {
+    setSearchTerm(value);
+    setPage(1);
   }
 
   function handleCreate() {
@@ -518,12 +548,12 @@ export default function PedidosPage() {
           <Input
             placeholder="Buscar por número ou nome do cliente..."
             value={searchTerm}
-            onChange={(e) => setSearchTerm(e.target.value)}
+            onChange={(e) => handleSearchChange(e.target.value)}
             className="pl-10 rounded-xl border-slate-200 bg-white h-11 shadow-sm"
           />
         </div>
 
-        <Select value={statusFilter} onValueChange={setStatusFilter}>
+        <Select value={statusFilter} onValueChange={handleStatusFilterChange}>
           <SelectTrigger className="w-full md:w-52 rounded-xl border-slate-200 bg-white h-11 shadow-sm">
             <SelectValue placeholder="Status" />
           </SelectTrigger>
@@ -537,7 +567,7 @@ export default function PedidosPage() {
           </SelectContent>
         </Select>
 
-        <Select value={prioridadeFilter} onValueChange={setPrioridadeFilter}>
+        <Select value={prioridadeFilter} onValueChange={handlePrioridadeFilterChange}>
           <SelectTrigger className="w-full md:w-44 rounded-xl border-slate-200 bg-white h-11 shadow-sm">
             <SelectValue placeholder="Prioridade" />
           </SelectTrigger>
@@ -572,7 +602,7 @@ export default function PedidosPage() {
             Verifique a conexão com o banco de dados.
           </p>
         </div>
-      ) : filtered.length === 0 ? (
+      ) : filtered.length === 0 && !isLoading ? (
         <div className="text-center py-16 bg-white rounded-2xl border border-slate-100 shadow-sm">
           <Package className="mx-auto h-12 w-12 text-slate-300 mb-3" />
           <h3 className="text-lg font-semibold text-slate-700">
@@ -598,11 +628,11 @@ export default function PedidosPage() {
       ) : (
         <div className="space-y-3">
           <p className="text-sm text-slate-500 px-1">
-            Mostrando {filtered.length} pedido
+            Mostrando {pagedPedidos.length} de {filtered.length} pedido
             {filtered.length !== 1 ? "s" : ""}
           </p>
           <div className="grid gap-3">
-            {filtered.map((pedido) => {
+            {pagedPedidos.map((pedido) => {
               const statusCfg = PEDIDO_STATUS_CONFIG[pedido.status];
               const prioCfg = PEDIDO_PRIORIDADE_CONFIG[pedido.prioridade];
               const clienteName = getClienteName(pedido);
@@ -700,6 +730,31 @@ export default function PedidosPage() {
               );
             })}
           </div>
+
+          {/* Paginação */}
+          {totalPages > 1 && (
+            <Pagination className="mt-4">
+              <PaginationContent>
+                <PaginationItem>
+                  <PaginationPrevious
+                    onClick={() => setPage(p => Math.max(1, p - 1))}
+                    className={page <= 1 ? "pointer-events-none opacity-50" : "cursor-pointer"}
+                  />
+                </PaginationItem>
+                <PaginationItem>
+                  <span className="px-4 py-2 text-sm text-slate-600">
+                    Página {page} de {totalPages}
+                  </span>
+                </PaginationItem>
+                <PaginationItem>
+                  <PaginationNext
+                    onClick={() => setPage(p => Math.min(totalPages, p + 1))}
+                    className={page >= totalPages ? "pointer-events-none opacity-50" : "cursor-pointer"}
+                  />
+                </PaginationItem>
+              </PaginationContent>
+            </Pagination>
+          )}
         </div>
       )}
 

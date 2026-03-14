@@ -63,6 +63,7 @@ function itensQueryKey(pedidoId: string) {
 export function usePedidoItens(pedidoId: string | undefined) {
   return useQuery({
     queryKey: itensQueryKey(pedidoId ?? ''),
+    staleTime: 2 * 60 * 1000,
     queryFn: async (): Promise<PedidoItem[]> => {
       if (!pedidoId) return [];
       const { data, error } = await supabase

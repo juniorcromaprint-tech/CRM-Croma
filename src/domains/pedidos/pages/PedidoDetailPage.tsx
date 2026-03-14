@@ -1,12 +1,22 @@
-import React from 'react'
+import React, { useState } from 'react'
 import { useParams, useNavigate } from 'react-router-dom'
 import {
   ArrowLeft, FolderOpen, ExternalLink, Loader2,
-  Play, CheckCircle, Truck, Wrench, Award, FileText,
+  Play, CheckCircle, Truck, Wrench, Award, FileText, XCircle,
 } from 'lucide-react'
 import { useMutation, useQueryClient } from '@tanstack/react-query'
 import { Button } from '@/components/ui/button'
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs'
+import {
+  AlertDialog,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from '@/components/ui/alert-dialog'
+import { Textarea } from '@/components/ui/textarea'
 import { usePedido, useUpdatePedido } from '../hooks/usePedidos'
 import { useCriarPastaOneDrive } from '../hooks/useOneDrive'
 import { brl } from '@/shared/utils/format'
@@ -43,10 +53,53 @@ const STATUS_CONFIG: Record<string, { label: string; cls: string }> = {
 export default function PedidoDetailPage() {
   const { id } = useParams<{ id: string }>()
   const navigate = useNavigate()
-  const { data: pedido, isLoading } = usePedido(id)
+  const { data: pedido, isLoading, refetch } = usePedido(id)
   const updatePedido = useUpdatePedido()
   const criarPasta = useCriarPastaOneDrive()
   const queryClient = useQueryClient()
+
+  // ── Estado de cancelamento ─────────────────────────────────────────────────
+  const [showCancelDialog, setShowCancelDialog] = useState(false)
+  const [motivoCancelamento, setMotivoCancelamento] = useState('')
+  const [cancelando, setCancelando] = useState(false)
+
+  const handleCancelar = async () => {
+    if (!motivoCancelamento.trim()) {
+      showError('Informe o motivo do cancelamento')
+      return
+    }
+    if (!id) return
+    setCancelando(true)
+    try {
+      // Registra o motivo em observacoes (colunas cancelado_em/motivo_cancelamento não existem no schema)
+      const obsAtual = pedido?.observacoes ?? ''
+      const novaObs = obsAtual
+        ? `${obsAtual}\n\n[CANCELADO] ${new Date().toLocaleDateString('pt-BR')}: ${motivoCancelamento}`
+        : `[CANCELADO] ${new Date().toLocaleDateString('pt-BR')}: ${motivoCancelamento}`
+
+      const { error } = await supabase
+        .from('pedidos')
+        .update({
+          status: 'cancelado',
+          observacoes: novaObs,
+          updated_at: new Date().toISOString(),
+        })
+        .eq('id', id)
+
+      if (error) throw error
+
+      showSuccess('Pedido cancelado com sucesso')
+      setShowCancelDialog(false)
+      setMotivoCancelamento('')
+      queryClient.invalidateQueries({ queryKey: ['pedidos'] })
+      queryClient.invalidateQueries({ queryKey: ['dashboard'] })
+      refetch()
+    } catch {
+      showError('Erro ao cancelar pedido. Tente novamente.')
+    } finally {
+      setCancelando(false)
+    }
+  }
 
   const gerarNfe = useMutation({
     mutationFn: async (pedidoId: string) => criarNFeFromPedido(pedidoId),
@@ -176,6 +229,18 @@ export default function PedidoDetailPage() {
               {FLOW_ACTIONS[pedido.status].label}
             </Button>
           )}
+          {/* Botão cancelar: visível para qualquer status que não seja concluido/cancelado */}
+          {!['concluido', 'cancelado'].includes(pedido.status) && (
+            <Button
+              size="sm"
+              variant="outline"
+              className="rounded-xl gap-1.5 text-red-600 border-red-200 hover:bg-red-50 hover:border-red-300"
+              onClick={() => setShowCancelDialog(true)}
+            >
+              <XCircle size={14} />
+              Cancelar
+            </Button>
+          )}
         </div>
       </div>
 
@@ -265,6 +330,56 @@ export default function PedidoDetailPage() {
           </div>
         </TabsContent>
       </Tabs>
+
+      {/* ─── AlertDialog de cancelamento ─────────────────────────────────── */}
+      <AlertDialog open={showCancelDialog} onOpenChange={(open) => {
+        if (!cancelando) {
+          setShowCancelDialog(open)
+          if (!open) setMotivoCancelamento('')
+        }
+      }}>
+        <AlertDialogContent className="rounded-2xl border-slate-200">
+          <AlertDialogHeader>
+            <AlertDialogTitle className="text-slate-800">
+              Cancelar pedido #{pedido?.numero}?
+            </AlertDialogTitle>
+            <AlertDialogDescription className="text-slate-500">
+              Esta ação interrompe a produção e notifica a equipe. Não pode ser desfeita.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+
+          <div className="py-2">
+            <label className="text-sm font-medium text-slate-700 mb-1.5 block">
+              Motivo do cancelamento <span className="text-red-500">*</span>
+            </label>
+            <Textarea
+              placeholder="Descreva o motivo do cancelamento..."
+              value={motivoCancelamento}
+              onChange={(e) => setMotivoCancelamento(e.target.value)}
+              className="rounded-xl border-slate-200 resize-none min-h-[100px] text-sm"
+              disabled={cancelando}
+            />
+          </div>
+
+          <AlertDialogFooter>
+            <AlertDialogCancel
+              className="rounded-xl border-slate-200 text-slate-600 hover:bg-slate-50"
+              disabled={cancelando}
+              onClick={() => setMotivoCancelamento('')}
+            >
+              Manter pedido
+            </AlertDialogCancel>
+            <Button
+              onClick={handleCancelar}
+              disabled={cancelando || !motivoCancelamento.trim()}
+              className="rounded-xl bg-red-600 hover:bg-red-700 text-white gap-2"
+            >
+              {cancelando && <Loader2 size={14} className="animate-spin" />}
+              Cancelar pedido
+            </Button>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </div>
   )
 }

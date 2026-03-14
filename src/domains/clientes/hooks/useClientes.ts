@@ -1,6 +1,7 @@
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { supabase } from '@/integrations/supabase/client';
 import { showSuccess, showError } from '@/utils/toast';
+import { ilikeTerm } from '@/shared/utils/searchUtils';
 
 // ---------------------------------------------------------------------------
 // Types
@@ -75,6 +76,7 @@ const CLIENTES_STATS_KEY = 'clientes-stats';
 export function useClientes(filters?: ClienteFilters) {
   return useQuery({
     queryKey: [CLIENTES_KEY, filters],
+    staleTime: 2 * 60 * 1000,
     queryFn: async () => {
       let query = supabase
         .from('clientes')
@@ -91,7 +93,7 @@ export function useClientes(filters?: ClienteFilters) {
         query = query.eq('ativo', filters.ativo);
       }
       if (filters?.search) {
-        const term = `%${filters.search}%`;
+        const term = ilikeTerm(filters.search);
         query = query.or(
           `razao_social.ilike.${term},nome_fantasia.ilike.${term},cnpj.ilike.${term},email.ilike.${term}`,
         );
@@ -110,6 +112,7 @@ export function useClientes(filters?: ClienteFilters) {
 export function useCliente(id: string | undefined) {
   return useQuery({
     queryKey: [CLIENTES_KEY, id],
+    staleTime: 2 * 60 * 1000,
     queryFn: async () => {
       if (!id) throw new Error('ID do cliente nao informado');
 
@@ -219,6 +222,7 @@ export function useDeleteCliente() {
 export function useClienteStats() {
   return useQuery<ClienteStats>({
     queryKey: [CLIENTES_STATS_KEY],
+    staleTime: 2 * 60 * 1000,
     queryFn: async () => {
       // Fetch all clientes (only the columns we need for aggregation)
       const { data, error } = await supabase

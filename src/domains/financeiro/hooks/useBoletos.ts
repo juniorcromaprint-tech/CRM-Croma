@@ -54,6 +54,7 @@ function localDateStr(d: Date = new Date()): string {
 export function useBankAccounts() {
   return useQuery({
     queryKey: [...BANK_ACCOUNT_KEY],
+    staleTime: 5 * 60 * 1000,
     queryFn: async (): Promise<BankAccount[]> => {
       const { data, error } = await supabase
         .from('bank_accounts')
@@ -71,6 +72,7 @@ export function useBankAccount(id: string | undefined) {
   return useQuery({
     queryKey: [...BANK_ACCOUNT_KEY, id],
     enabled: !!id,
+    staleTime: 5 * 60 * 1000,
     queryFn: async (): Promise<BankAccount> => {
       const { data, error } = await supabase
         .from('bank_accounts')
@@ -132,6 +134,7 @@ export function useUpdateBankAccount() {
 export function useBoletos(filters?: BoletoFilters) {
   return useQuery({
     queryKey: [...BOLETO_KEY, filters],
+    staleTime: 2 * 60 * 1000,
     queryFn: async (): Promise<BankSlip[]> => {
       let query = supabase
         .from('bank_slips')
@@ -155,6 +158,7 @@ export function useBoleto(id: string | undefined) {
   return useQuery({
     queryKey: [...BOLETO_KEY, id],
     enabled: !!id,
+    staleTime: 2 * 60 * 1000,
     queryFn: async (): Promise<BankSlip> => {
       const { data, error } = await supabase
         .from('bank_slips')
@@ -170,6 +174,7 @@ export function useBoleto(id: string | undefined) {
 export function useBoletoStats() {
   return useQuery({
     queryKey: [...BOLETO_KEY, 'stats'],
+    staleTime: 60 * 1000,
     queryFn: async () => {
       const { data, error } = await supabase
         .from('bank_slips')
@@ -294,6 +299,7 @@ export function useCancelBoleto() {
 export function useRemessas() {
   return useQuery({
     queryKey: [...REMESSA_KEY],
+    staleTime: 2 * 60 * 1000,
     queryFn: async (): Promise<BankRemittance[]> => {
       const { data, error } = await supabase
         .from('bank_remittances')

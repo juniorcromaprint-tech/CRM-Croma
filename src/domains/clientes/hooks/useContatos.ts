@@ -38,6 +38,7 @@ const CONTATOS_KEY = 'contatos';
 export function useContatos(clienteId: string | undefined) {
   return useQuery({
     queryKey: [CONTATOS_KEY, clienteId],
+    staleTime: 2 * 60 * 1000,
     queryFn: async () => {
       if (!clienteId) throw new Error('ID do cliente nao informado');
 

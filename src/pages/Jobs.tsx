@@ -2,6 +2,7 @@ import React, { useState, useMemo, useEffect } from "react";
 import { useSearchParams, useNavigate } from "react-router-dom";
 import { useInfiniteQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
+import { ilikeTerm } from "@/shared/utils/searchUtils";
 import { Search, Plus, MapPin, ClipboardList, Filter, ChevronLeft, ChevronRight, Calendar, AlertTriangle, User, Loader2, Download, Trash2, CalendarCheck } from "lucide-react";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
@@ -102,7 +103,7 @@ export default function Jobs() {
     }
 
     if (searchTerm) {
-      query = query.or(`os_number.ilike.%${searchTerm}%,type.ilike.%${searchTerm}%`);
+      const searchT = ilikeTerm(searchTerm); query = query.or(`os_number.ilike.${searchT},type.ilike.${searchT}`);
     }
 
     if (todayFilter) {

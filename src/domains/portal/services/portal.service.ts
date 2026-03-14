@@ -34,10 +34,20 @@ export async function fetchPropostaByToken(token: string): Promise<PortalPropost
   return data as PortalProposta;
 }
 
-export async function aprovarProposta(token: string, comentario?: string): Promise<void> {
-  const { error } = await supabase.rpc('portal_aprovar_proposta', {
+export interface AprovarPropostaResult {
+  aprovada: boolean;
+  pedido_id: string | null;
+}
+
+export async function aprovarProposta(
+  token: string,
+  comentario?: string,
+): Promise<AprovarPropostaResult> {
+  const { data, error } = await supabase.rpc('portal_aprovar_proposta', {
     p_token: token,
     p_comentario: comentario || null,
   });
   if (error) throw new Error(error.message);
+  // A RPC retorna JSONB: { aprovada: true, pedido_id: uuid }
+  return (data as AprovarPropostaResult) ?? { aprovada: true, pedido_id: null };
 }

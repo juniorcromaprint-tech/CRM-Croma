@@ -1,6 +1,7 @@
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 import { supabase } from '@/integrations/supabase/client'
 import { showSuccess, showError } from '@/utils/toast'
+import { ilikeTerm } from '@/shared/utils/searchUtils'
 
 // ─── Types ──────────────────────────────────────────────────────────────────
 
@@ -61,7 +62,7 @@ export function usePropostas(filtros?: PropostaFilters) {
         q = q.eq('status', filtros.status)
       }
       if (filtros?.search) {
-        q = q.ilike('titulo', `%${filtros.search}%`)
+        q = q.ilike('titulo', ilikeTerm(filtros.search))
       }
 
       const { data, error } = await q

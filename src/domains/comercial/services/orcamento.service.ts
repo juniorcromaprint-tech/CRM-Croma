@@ -5,6 +5,7 @@
 
 import { supabase } from "@/integrations/supabase/client";
 import { DEFAULT_PRICING_CONFIG, type PricingConfig } from "@/shared/services/pricing-engine";
+import { ilikeTerm } from "@/shared/utils/searchUtils";
 
 // ─── Helper: buscar config de precificação ativa e gerar snapshot ────────────
 
@@ -233,7 +234,8 @@ export const orcamentoService = {
       query = query.eq("vendedor_id", filtros.vendedor_id);
     }
     if (filtros?.search) {
-      query = query.or(`numero.ilike.%${filtros.search}%,titulo.ilike.%${filtros.search}%`);
+      const term = ilikeTerm(filtros.search);
+      query = query.or(`numero.ilike.${term},titulo.ilike.${term}`);
     }
     if (filtros?.data_inicio) {
       query = query.gte("created_at", filtros.data_inicio);
@@ -332,15 +334,7 @@ export const orcamentoService = {
 
   // ─── Criar orçamento ─────────────────────────────────────────────────────
   async criar(input: OrcamentoCreateInput): Promise<Orcamento> {
-    // Gera número sequencial: PROP-YYYY-###
-    const ano = new Date().getFullYear();
-    const { count } = await supabase
-      .from("propostas")
-      .select("id", { count: "exact", head: true })
-      .gte("created_at", `${ano}-01-01`);
-
-    const numero = `PROP-${ano}-${String((count ?? 0) + 1).padStart(3, "0")}`;
-
+    // Número gerado automaticamente pelo trigger `trg_proposta_numero` no banco
     // Snapshot dos custos fixos no momento da criação (imutabilidade)
     const configSnapshot = await buildConfigSnapshot();
 
@@ -348,7 +342,6 @@ export const orcamentoService = {
       .from("propostas")
       .insert({
         ...input,
-        numero,
         status: "rascunho",
         subtotal: 0,
         desconto_percentual: 0,

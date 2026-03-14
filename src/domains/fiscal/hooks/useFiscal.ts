@@ -5,6 +5,7 @@ import { showSuccess, showError } from '@/utils/toast';
 export function useFiscalDocumentos(filters?: { status?: string; pedido_id?: string }) {
   return useQuery({
     queryKey: ['fiscal_documentos', filters],
+    staleTime: 2 * 60 * 1000,
     queryFn: async () => {
       let query = supabase
         .from('fiscal_documentos')
@@ -24,6 +25,7 @@ export function useFiscalDocumento(id: string | null) {
   return useQuery({
     queryKey: ['fiscal_documento', id],
     enabled: !!id,
+    staleTime: 2 * 60 * 1000,
     queryFn: async () => {
       const { data, error } = await supabase
         .from('fiscal_documentos')
@@ -39,6 +41,7 @@ export function useFiscalDocumento(id: string | null) {
 export function useFiscalAmbientes() {
   return useQuery({
     queryKey: ['fiscal_ambientes'],
+    staleTime: 10 * 60 * 1000,
     queryFn: async () => {
       const { data, error } = await supabase.from('fiscal_ambientes').select('*').order('tipo');
       if (error) throw error;
@@ -50,6 +53,7 @@ export function useFiscalAmbientes() {
 export function useFiscalSeries() {
   return useQuery({
     queryKey: ['fiscal_series'],
+    staleTime: 10 * 60 * 1000,
     queryFn: async () => {
       const { data, error } = await supabase.from('fiscal_series').select('*, fiscal_ambientes(nome, tipo)').order('serie');
       if (error) throw error;
@@ -61,6 +65,7 @@ export function useFiscalSeries() {
 export function useFiscalCertificados() {
   return useQuery({
     queryKey: ['fiscal_certificados'],
+    staleTime: 10 * 60 * 1000,
     queryFn: async () => {
       const { data, error } = await supabase
         .from('fiscal_certificados')
@@ -75,6 +80,7 @@ export function useFiscalCertificados() {
 export function useFiscalRegras() {
   return useQuery({
     queryKey: ['fiscal_regras_operacao'],
+    staleTime: 10 * 60 * 1000,
     queryFn: async () => {
       const { data, error } = await supabase
         .from('fiscal_regras_operacao')
@@ -89,6 +95,7 @@ export function useFiscalRegras() {
 export function useFiscalFila() {
   return useQuery({
     queryKey: ['fiscal_filas_emissao'],
+    staleTime: 30 * 1000,
     queryFn: async () => {
       const { data, error } = await supabase
         .from('fiscal_filas_emissao')
@@ -105,6 +112,7 @@ export function useFiscalFila() {
 export function useFiscalAuditLogs(params?: { entidade_id?: string }) {
   return useQuery({
     queryKey: ['fiscal_audit_logs', params],
+    staleTime: 60 * 1000,
     queryFn: async () => {
       let query = supabase.from('fiscal_audit_logs').select('*').order('created_at', { ascending: false }).limit(500);
       if (params?.entidade_id) query = query.eq('entidade_id', params.entidade_id);

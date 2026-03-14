@@ -1,6 +1,7 @@
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { supabase } from '@/integrations/supabase/client';
 import { showSuccess, showError } from '@/utils/toast';
+import { ilikeTerm } from '@/shared/utils/searchUtils';
 
 // ─── Types ──────────────────────────────────────────────────────────────────
 
@@ -99,6 +100,7 @@ const LEADS_STATS_KEY = [...LEADS_KEY, 'stats'] as const;
 export function useLeads(filters?: LeadFilters) {
   return useQuery({
     queryKey: leadsQueryKey(filters),
+    staleTime: 2 * 60 * 1000,
     queryFn: async (): Promise<Lead[]> => {
       let query = supabase
         .from('leads')
@@ -130,7 +132,7 @@ export function useLeads(filters?: LeadFilters) {
 
       // Busca textual (empresa, contato_nome, contato_email)
       if (filters?.search && filters.search.trim().length > 0) {
-        const term = `%${filters.search.trim()}%`;
+        const term = ilikeTerm(filters.search);
         query = query.or(
           `empresa.ilike.${term},contato_nome.ilike.${term},contato_email.ilike.${term}`
         );
@@ -153,6 +155,7 @@ export function useLeads(filters?: LeadFilters) {
 export function useLead(id: string | undefined) {
   return useQuery({
     queryKey: leadQueryKey(id ?? ''),
+    staleTime: 2 * 60 * 1000,
     queryFn: async (): Promise<Lead | null> => {
       if (!id) return null;
 
@@ -240,6 +243,7 @@ export function useUpdateLead() {
 export function useLeadStats() {
   return useQuery({
     queryKey: LEADS_STATS_KEY,
+    staleTime: 60 * 1000,
     queryFn: async (): Promise<LeadStats> => {
       const { data, error } = await supabase
         .from('leads')

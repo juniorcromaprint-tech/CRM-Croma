@@ -1,6 +1,7 @@
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { supabase } from '@/integrations/supabase/client';
 import { showSuccess, showError } from '@/utils/toast';
+import { ilikeTerm } from '@/shared/utils/searchUtils';
 
 // ─── Types ──────────────────────────────────────────────────────────────────
 
@@ -84,6 +85,7 @@ function pedidoQueryKey(id: string) {
 export function usePedidos(filters?: PedidoFilters) {
   return useQuery({
     queryKey: pedidosQueryKey(filters),
+    staleTime: 2 * 60 * 1000,
     queryFn: async (): Promise<Pedido[]> => {
       let query = supabase
         .from('pedidos')
@@ -103,7 +105,7 @@ export function usePedidos(filters?: PedidoFilters) {
       if (filters?.cliente_id) query = query.eq('cliente_id', filters.cliente_id);
 
       if (filters?.search && filters.search.trim().length > 0) {
-        const term = `%${filters.search.trim()}%`;
+        const term = ilikeTerm(filters.search);
         query = query.or(`numero.ilike.${term},observacoes.ilike.${term}`);
       }
 
@@ -120,6 +122,7 @@ export function usePedidos(filters?: PedidoFilters) {
 export function usePedido(id: string | undefined) {
   return useQuery({
     queryKey: pedidoQueryKey(id ?? ''),
+    staleTime: 2 * 60 * 1000,
     queryFn: async (): Promise<Pedido | null> => {
       if (!id) return null;
       const { data, error } = await supabase
@@ -190,6 +193,7 @@ export function useUpdatePedido() {
 export function usePedidoStats() {
   return useQuery({
     queryKey: [...PEDIDOS_KEY, 'stats'],
+    staleTime: 60 * 1000,
     queryFn: async () => {
       const { data, error } = await supabase
         .from('pedidos')

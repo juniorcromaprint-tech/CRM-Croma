@@ -73,6 +73,7 @@ const CP_KEY = ['financeiro', 'contas_pagar'] as const;
 export function useContasPagar(opts?: { status?: ContaPagarStatus; fornecedor_id?: string }) {
   return useQuery({
     queryKey: [...CP_KEY, opts],
+    staleTime: 2 * 60 * 1000,
     queryFn: async (): Promise<ContaPagar[]> => {
       let query = supabase
         .from('contas_pagar')
@@ -96,6 +97,7 @@ export function useContasPagar(opts?: { status?: ContaPagarStatus; fornecedor_id
 export function useContasPagarStats() {
   return useQuery({
     queryKey: [...CP_KEY, 'stats'],
+    staleTime: 60 * 1000,
     queryFn: async () => {
       const { data, error } = await supabase
         .from('contas_pagar')

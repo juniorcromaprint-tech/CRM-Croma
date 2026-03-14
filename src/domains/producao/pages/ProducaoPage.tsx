@@ -2,6 +2,7 @@ import React, { useState, useMemo, useCallback, useRef, type DragEvent } from "r
 import { supabase } from "@/integrations/supabase/client";
 import { criarOrdemInstalacao } from "@/domains/instalacao/services/instalacao-criacao.service";
 import { finalizarCustosOP } from "@/domains/producao/services/producao.service";
+import OPMateriais from "@/domains/producao/components/OPMateriais";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { showSuccess, showError } from "@/utils/toast";
 import { brl, formatDate, formatDateTime } from "@/shared/utils/format";
@@ -82,6 +83,7 @@ interface PedidoItemJoin {
   descricao: string | null;
   especificacao: string | null;
   quantidade: number | null;
+  modelo_id: string | null;
   pedidos: {
     numero: string;
     clientes: {
@@ -386,7 +388,7 @@ export default function ProducaoPage() {
       const { data, error } = await supabase
         .from("ordens_producao")
         .select(
-          "*, pedido_itens(descricao, especificacao, quantidade, pedidos(numero, clientes(nome_fantasia, razao_social))), producao_etapas(*)"
+          "*, pedido_itens(descricao, especificacao, quantidade, modelo_id, pedidos(numero, clientes(nome_fantasia, razao_social))), producao_etapas(*)"
         )
         .order("created_at", { ascending: false });
 
@@ -1563,6 +1565,19 @@ export default function ProducaoPage() {
                   )}
                 </div>
               </div>
+
+              {/* Materiais Necessários */}
+              {selectedOP.pedido_itens?.modelo_id && (
+                <div className="space-y-3">
+                  <p className="text-xs text-slate-400 uppercase tracking-wide font-semibold">
+                    Materiais Necessários
+                  </p>
+                  <OPMateriais
+                    modeloId={selectedOP.pedido_itens.modelo_id}
+                    quantidade={selectedOP.pedido_itens.quantidade ?? 1}
+                  />
+                </div>
+              )}
 
               {/* Custos estimado vs real */}
               <div className="space-y-3">
