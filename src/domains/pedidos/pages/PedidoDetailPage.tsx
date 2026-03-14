@@ -87,7 +87,7 @@ export default function PedidoDetailPage() {
           observacoes: novaObs,
           cancelado_em: new Date().toISOString(),
           motivo_cancelamento: motivoCancelamento,
-        } as any)
+        })
         .eq('id', id)
 
       if (error) throw error
