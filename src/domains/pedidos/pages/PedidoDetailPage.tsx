@@ -63,6 +63,9 @@ export default function PedidoDetailPage() {
   const [motivoCancelamento, setMotivoCancelamento] = useState('')
   const [cancelando, setCancelando] = useState(false)
 
+  // ── Estado de confirmação concluir sem NF-e ──────────────────────────────
+  const [showConcluirSemNfeDialog, setShowConcluirSemNfeDialog] = useState(false)
+
   const handleCancelar = async () => {
     if (!motivoCancelamento.trim()) {
       showError('Informe o motivo do cancelamento')
@@ -82,7 +85,6 @@ export default function PedidoDetailPage() {
         .update({
           status: 'cancelado',
           observacoes: novaObs,
-          updated_at: new Date().toISOString(),
         })
         .eq('id', id)
 
@@ -123,6 +125,17 @@ export default function PedidoDetailPage() {
     onError: (err: any) => showError(err.message || 'Erro ao iniciar produção'),
   })
 
+  const concluirPedido = async () => {
+    if (!id) return
+    updatePedido.mutate({ id, status: 'concluido' as any })
+    try {
+      await gerarContasReceber(id)
+    } catch (err: any) {
+      console.error('[gerarContasReceber]', err)
+      showError('Pedido concluído, mas houve erro ao gerar cobranças. Verifique o módulo financeiro.')
+    }
+  }
+
   const handleAdvanceStatus = async () => {
     if (!id || !pedido) return
     const action = FLOW_ACTIONS[pedido.status]
@@ -143,22 +156,11 @@ export default function PedidoDetailPage() {
         .limit(1)
 
       if (!nfes || nfes.length === 0) {
-        const confirmar = window.confirm(
-          'Este pedido não possui Nota Fiscal emitida. Deseja concluir mesmo assim?'
-        )
-        if (!confirmar) return
+        setShowConcluirSemNfeDialog(true)
+        return
       }
 
-      // Avançar status primeiro
-      updatePedido.mutate({ id, status: 'concluido' as any })
-
-      // Gerar contas a receber em seguida — erro não reverte o status mas alerta o usuário
-      try {
-        await gerarContasReceber(id)
-      } catch (err: any) {
-        console.error('[gerarContasReceber]', err)
-        showError('Pedido concluído, mas houve erro ao gerar cobranças. Verifique o módulo financeiro.')
-      }
+      await concluirPedido()
       return
     }
 
@@ -376,6 +378,34 @@ export default function PedidoDetailPage() {
             >
               {cancelando && <Loader2 size={14} className="animate-spin" />}
               Cancelar pedido
+            </Button>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
+
+      {/* ─── AlertDialog concluir sem NF-e ──────────────────────────────── */}
+      <AlertDialog open={showConcluirSemNfeDialog} onOpenChange={setShowConcluirSemNfeDialog}>
+        <AlertDialogContent className="rounded-2xl border-slate-200">
+          <AlertDialogHeader>
+            <AlertDialogTitle className="text-slate-800">
+              Concluir sem Nota Fiscal?
+            </AlertDialogTitle>
+            <AlertDialogDescription className="text-slate-500">
+              Este pedido não possui Nota Fiscal emitida. Deseja concluir mesmo assim?
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel className="rounded-xl">
+              Cancelar
+            </AlertDialogCancel>
+            <Button
+              onClick={async () => {
+                setShowConcluirSemNfeDialog(false)
+                await concluirPedido()
+              }}
+              className="rounded-xl bg-blue-600 hover:bg-blue-700 text-white"
+            >
+              Concluir mesmo assim
             </Button>
           </AlertDialogFooter>
         </AlertDialogContent>

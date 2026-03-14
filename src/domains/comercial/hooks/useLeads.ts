@@ -215,7 +215,7 @@ export function useUpdateLead() {
     mutationFn: async ({ id, ...payload }: LeadUpdate): Promise<Lead> => {
       const { data, error } = await supabase
         .from('leads')
-        .update({ ...payload, updated_at: new Date().toISOString() })
+        .update(payload)
         .eq('id', id)
         .select()
         .single();

@@ -332,7 +332,6 @@ function TabUsuarios() {
           role: data.role,
           departamento: data.departamento || null,
           ativo: data.ativo,
-          updated_at: new Date().toISOString(),
         })
         .eq("id", id);
       if (error) throw error;

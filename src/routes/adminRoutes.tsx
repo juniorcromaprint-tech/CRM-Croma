@@ -1,5 +1,6 @@
 import { Route } from 'react-router-dom';
 import AdminUsuariosPage from '@/domains/admin/pages/AdminUsuariosPage';
+import AdminAuditoriaPage from '@/domains/admin/pages/AdminAuditoriaPage';
 import AdminPrecificacaoPage from '@/domains/admin/pages/AdminPrecificacaoPage';
 import AdminConfigPage from '@/domains/admin/pages/AdminConfigPage';
 import AdminProdutosPage from '@/domains/admin/pages/AdminProdutosPage';
@@ -36,7 +37,7 @@ export const adminRoutes = (
     } />
     <Route path="admin/auditoria" element={
       <PermissionGuard module="admin" action="ver">
-        <AdminUsuariosPage />
+        <AdminAuditoriaPage />
       </PermissionGuard>
     } />
     <Route path="admin/setup" element={

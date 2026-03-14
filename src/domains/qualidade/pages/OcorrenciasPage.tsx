@@ -370,7 +370,7 @@ export default function OcorrenciasPage() {
   // ── Update status mutation ───────────────────────────────────────────────
   const updateStatusMutation = useMutation({
     mutationFn: async ({ id, status }: { id: string; status: OcorrenciaStatus }) => {
-      const updates: Record<string, unknown> = { status, updated_at: new Date().toISOString() };
+      const updates: Record<string, unknown> = { status };
       if (status === "resolvida") updates.resolvido_em = new Date().toISOString();
       const { error } = await supabase.from("ocorrencias").update(updates).eq("id", id);
       if (error) throw error;
@@ -426,7 +426,7 @@ export default function OcorrenciasPage() {
     mutationFn: async ({ id, updates }: { id: string; updates: Record<string, unknown> }) => {
       const { error } = await supabase
         .from("ocorrencias")
-        .update({ ...updates, updated_at: new Date().toISOString() })
+        .update(updates)
         .eq("id", id);
       if (error) throw error;
     },

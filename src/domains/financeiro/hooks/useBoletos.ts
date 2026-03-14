@@ -112,7 +112,7 @@ export function useUpdateBankAccount() {
     mutationFn: async ({ id, ...rest }: BankAccountCreate & { id: string }) => {
       const { data, error } = await supabase
         .from('bank_accounts')
-        .update({ ...rest, updated_at: new Date().toISOString() })
+        .update(rest)
         .eq('id', id)
         .select('*')
         .single();

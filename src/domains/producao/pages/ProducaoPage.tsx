@@ -5,6 +5,7 @@ import { finalizarCustosOP } from "@/domains/producao/services/producao.service"
 import OPMateriais from "@/domains/producao/components/OPMateriais";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { showSuccess, showError } from "@/utils/toast";
+import { toast } from "sonner";
 import { brl, formatDate, formatDateTime } from "@/shared/utils/format";
 import {
   PRODUCAO_STATUS,
@@ -373,6 +374,7 @@ export default function ProducaoPage() {
   const [draggedOPId, setDraggedOPId] = useState<string | null>(null);
   const [dragOverColumn, setDragOverColumn] = useState<string | null>(null);
   const dragCounterRef = useRef<Record<string, number>>({});
+  const isDragDropUpdate = useRef(false);
 
   // =========================================================================
   // QUERIES
@@ -491,11 +493,15 @@ export default function ProducaoPage() {
     },
     onSuccess: (_data, variables) => {
       queryClient.invalidateQueries({ queryKey: ["producao"] });
-      const label = PRODUCAO_STATUS_CONFIG[variables.newStatus]?.label ?? variables.newStatus;
-      showSuccess(`Status atualizado para "${label}"`);
+      if (!isDragDropUpdate.current) {
+        const label = PRODUCAO_STATUS_CONFIG[variables.newStatus]?.label ?? variables.newStatus;
+        showSuccess(`Status atualizado para "${label}"`);
+      }
+      isDragDropUpdate.current = false;
       setSelectedOP(null);
     },
     onError: (err: Error) => {
+      isDragDropUpdate.current = false;
       showError(`Erro ao atualizar status: ${err.message}`);
     },
   });
@@ -737,7 +743,25 @@ export default function ProducaoPage() {
         return;
       }
 
-      updateStatusMutation.mutate({ id: opId, newStatus: targetStatus });
+      const previousStatus = op.status;
+      const toLabel = PRODUCAO_STATUS_CONFIG[targetStatus]?.label ?? targetStatus;
+      isDragDropUpdate.current = true;
+      updateStatusMutation.mutate(
+        { id: opId, newStatus: targetStatus },
+        {
+          onSuccess: () => {
+            toast.info(`OP ${op.numero} movida para "${toLabel}"`, {
+              action: {
+                label: "Desfazer",
+                onClick: () => {
+                  updateStatusMutation.mutate({ id: opId, newStatus: previousStatus });
+                },
+              },
+              duration: 5000,
+            });
+          },
+        }
+      );
     },
     [ordens, updateStatusMutation]
   );

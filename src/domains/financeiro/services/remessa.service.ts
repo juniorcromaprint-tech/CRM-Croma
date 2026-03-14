@@ -148,7 +148,7 @@ export async function baixarRemessa(remittanceId: string): Promise<void> {
   // Marca como baixado se ainda estiver como "gerado"
   await supabase
     .from('bank_remittances')
-    .update({ status: 'baixado', updated_at: new Date().toISOString() })
+    .update({ status: 'baixado' })
     .eq('id', remittanceId)
     .eq('status', 'gerado');
 }
@@ -161,7 +161,6 @@ export async function marcarRemessaEnviada(remittanceId: string): Promise<void> 
     .update({
       status: 'enviado',
       enviado_em: new Date().toISOString(),
-      updated_at: new Date().toISOString(),
     })
     .eq('id', remittanceId);
 
@@ -174,7 +173,6 @@ export async function marcarRemessaProcessada(remittanceId: string): Promise<voi
     .update({
       status: 'processado',
       processado_em: new Date().toISOString(),
-      updated_at: new Date().toISOString(),
     })
     .eq('id', remittanceId);
 
@@ -190,7 +188,6 @@ export async function marcarRemessaErro(
     .update({
       status: 'erro',
       erro_descricao: descricao,
-      updated_at: new Date().toISOString(),
     })
     .eq('id', remittanceId);
 

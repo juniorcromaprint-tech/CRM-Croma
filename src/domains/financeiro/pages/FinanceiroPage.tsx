@@ -55,6 +55,7 @@ import {
   FileText,
   CircleDollarSign,
   Banknote,
+  Loader2,
 } from "lucide-react";
 
 // ─── Types ──────────────────────────────────────────────────────────────────
@@ -475,7 +476,6 @@ function TabContasReceber() {
           status: novoStatus,
           data_pagamento: data_pagamento || localDateStr(),
           observacoes: comprovante ? `Comprovante: ${comprovante}` : undefined,
-          updated_at: new Date().toISOString(),
         })
         .eq("id", id);
       if (error) throw new Error(error.message);
@@ -929,7 +929,7 @@ function TabContasReceber() {
               disabled={createMutation.isPending}
               className="bg-blue-600 hover:bg-blue-700 rounded-xl"
             >
-              {createMutation.isPending ? "Criando..." : "Criar Conta"}
+              {createMutation.isPending ? <><Loader2 size={16} className="animate-spin mr-2" />Criando...</> : "Criar Conta"}
             </Button>
           </DialogFooter>
         </DialogContent>
@@ -1036,7 +1036,7 @@ function TabContasReceber() {
               className="bg-emerald-600 hover:bg-emerald-700 rounded-xl"
             >
               {baixaMutation.isPending
-                ? "Registrando..."
+                ? <><Loader2 size={16} className="animate-spin mr-2" />Registrando...</>
                 : "Confirmar Pagamento"}
             </Button>
           </DialogFooter>
@@ -1122,7 +1122,6 @@ function TabContasPagar() {
           saldo: 0,
           status: "pago" as ContaPagarStatus,
           data_pagamento: localDateStr(),
-          updated_at: new Date().toISOString(),
         })
         .eq("id", id);
       if (error) throw new Error(error.message);
@@ -1497,7 +1496,7 @@ function TabContasPagar() {
               disabled={createMutation.isPending}
               className="bg-blue-600 hover:bg-blue-700 rounded-xl"
             >
-              {createMutation.isPending ? "Criando..." : "Criar Conta"}
+              {createMutation.isPending ? <><Loader2 size={16} className="animate-spin mr-2" />Criando...</> : "Criar Conta"}
             </Button>
           </DialogFooter>
         </DialogContent>

@@ -12,6 +12,8 @@ export interface PortalProposta {
   prazo_dias: number[];
   entrada_percentual: number;
   validade: number;
+  created_at?: string;
+  data_validade?: string;
   observacoes: string;
   aprovado_pelo_cliente: boolean;
   cliente: {

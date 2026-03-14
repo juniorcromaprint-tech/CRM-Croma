@@ -168,7 +168,7 @@ export function useUpdateOportunidade() {
     mutationFn: async ({ id, ...payload }: OportunidadeUpdate): Promise<Oportunidade> => {
       const { data, error } = await supabase
         .from('oportunidades')
-        .update({ ...payload, updated_at: new Date().toISOString() })
+        .update(payload)
         .eq('id', id)
         .select()
         .single();

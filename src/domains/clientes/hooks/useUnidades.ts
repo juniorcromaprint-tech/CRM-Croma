@@ -98,7 +98,7 @@ export function useUpdateUnidade() {
     mutationFn: async ({ id, ...updates }: UnidadeUpdate) => {
       const { data, error } = await supabase
         .from('unidades_cliente')
-        .update({ ...updates, updated_at: new Date().toISOString() })
+        .update(updates)
         .eq('id', id)
         .select()
         .single();

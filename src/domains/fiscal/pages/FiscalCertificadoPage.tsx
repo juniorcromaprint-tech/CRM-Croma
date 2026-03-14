@@ -392,9 +392,23 @@ export default function FiscalCertificadoPage() {
                   file:mr-4 file:py-2 file:px-4 file:rounded-lg file:border file:border-slate-300
                   file:text-sm file:font-medium file:bg-slate-50 file:text-slate-700
                   hover:file:bg-slate-100 cursor-pointer"
-                onChange={(e) =>
-                  setFormUpload((f) => ({ ...f, arquivo: e.target.files?.[0] ?? null }))
-                }
+                onChange={(e) => {
+                  const file = e.target.files?.[0] ?? null;
+                  if (file) {
+                    const MAX_PFX_SIZE = 10 * 1024; // 10 KB
+                    if (!file.name.endsWith('.pfx') && !file.name.endsWith('.p12')) {
+                      showError('Apenas arquivos .pfx ou .p12 são aceitos');
+                      if (fileRef.current) fileRef.current.value = '';
+                      return;
+                    }
+                    if (file.size > MAX_PFX_SIZE) {
+                      showError(`Arquivo muito grande (${(file.size / 1024).toFixed(1)} KB). Certificados .pfx geralmente têm menos de 10 KB.`);
+                      if (fileRef.current) fileRef.current.value = '';
+                      return;
+                    }
+                  }
+                  setFormUpload((f) => ({ ...f, arquivo: file }));
+                }}
               />
               {formUpload.arquivo && (
                 <p className="text-xs text-green-600 mt-1">

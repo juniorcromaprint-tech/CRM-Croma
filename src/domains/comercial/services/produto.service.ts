@@ -77,7 +77,7 @@ export const produtoService = {
   ) {
     const { data, error } = await (supabase as unknown as any)
       .from("produtos")
-      .update({ ...dados, updated_at: new Date().toISOString() })
+      .update(dados)
       .eq("id", id)
       .select()
       .single();

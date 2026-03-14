@@ -92,7 +92,7 @@ export function useUpdateContato() {
     mutationFn: async ({ id, ...updates }: ContatoUpdate) => {
       const { data, error } = await supabase
         .from('contatos')
-        .update({ ...updates, updated_at: new Date().toISOString() })
+        .update(updates)
         .eq('id', id)
         .select()
         .single();

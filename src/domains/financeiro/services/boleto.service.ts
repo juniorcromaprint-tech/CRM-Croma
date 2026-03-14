@@ -61,7 +61,7 @@ export async function updateBoleto(payload: BankSlipUpdate): Promise<BankSlip> {
   const { id, ...rest } = payload;
   const { data, error } = await supabase
     .from('bank_slips')
-    .update({ ...rest, updated_at: new Date().toISOString() })
+    .update(rest)
     .eq('id', id)
     .select('*')
     .single();
@@ -96,7 +96,7 @@ async function transitionStatus(
 
   const { error } = await supabase
     .from('bank_slips')
-    .update({ status: to, updated_at: new Date().toISOString(), ...extra })
+    .update({ status: to, ...extra })
     .eq('id', id);
 
   if (error) throw new Error(error.message);
@@ -126,7 +126,7 @@ export async function marcarProntoRemessa(ids: string[]): Promise<void> {
 
   const { error: updateError } = await supabase
     .from('bank_slips')
-    .update({ status: 'pronto_remessa', updated_at: new Date().toISOString() })
+    .update({ status: 'pronto_remessa' })
     .in('id', ids);
 
   if (updateError) throw new Error(updateError.message);
@@ -147,7 +147,7 @@ export async function marcarRemetidos(
 ): Promise<void> {
   const { error } = await supabase
     .from('bank_slips')
-    .update({ status: 'remetido', updated_at: new Date().toISOString() })
+    .update({ status: 'remetido' })
     .in('id', ids);
 
   if (error) throw new Error(error.message);

@@ -142,7 +142,6 @@ function TabCustoOperacional() {
         percentual_comissao: parseFloat(percentualComissao) || 0,
         percentual_impostos: parseFloat(percentualImpostos) || 0,
         percentual_juros: parseFloat(percentualJuros) || 0,
-        updated_at: new Date().toISOString(),
       };
       if (config?.id) {
         const { error } = await (supabase as unknown as any)
@@ -521,7 +520,7 @@ function TabMarkupCategoria() {
     mutationFn: async ({ id, data }: { id: string; data: Partial<RegraPrecificacao> }) => {
       const { error } = await (supabase as unknown as any)
         .from("regras_precificacao")
-        .update({ ...data, updated_at: new Date().toISOString() })
+        .update(data)
         .eq("id", id);
       if (error) throw error;
     },

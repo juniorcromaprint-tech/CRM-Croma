@@ -484,7 +484,6 @@ export default function EstoquePage() {
         .update({
           quantidade_disponivel: novoDisponivel,
           quantidade_reservada: novoReservado,
-          updated_at: new Date().toISOString(),
         })
         .eq("material_id", materialId);
       if (saldoUpErr) throw saldoUpErr;

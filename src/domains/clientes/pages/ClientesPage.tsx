@@ -7,7 +7,7 @@ import { ilikeTerm } from "@/shared/utils/searchUtils";
 import { Link } from "react-router-dom";
 import {
   Building2, Search, Plus, Phone, Mail, MapPin,
-  ChevronRight, Star, Filter, Globe
+  ChevronRight, Star, Filter, Globe, Loader2
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -335,7 +335,7 @@ export default function ClientesPage() {
               disabled={!form.razao_social || createCliente.isPending}
               className="bg-blue-600 hover:bg-blue-700"
             >
-              {createCliente.isPending ? "Salvando..." : "Criar Cliente"}
+              {createCliente.isPending ? <><Loader2 size={16} className="animate-spin mr-2" />Salvando...</> : "Criar Cliente"}
             </Button>
           </DialogFooter>
         </DialogContent>

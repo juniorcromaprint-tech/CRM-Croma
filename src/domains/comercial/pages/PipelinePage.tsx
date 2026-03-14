@@ -34,9 +34,6 @@ import {
   Building2,
   CalendarDays,
   GripVertical,
-  Flame,
-  Snowflake,
-  Sun,
   X,
 } from "lucide-react";
 
@@ -125,14 +122,7 @@ const STAGE_INDEX: Record<LeadStatus, number> = {
 
 // ─── Temperature Config ─────────────────────────────────────────────────────
 
-const TEMP_CONFIG: Record<
-  LeadTemperatura,
-  { label: string; icon: typeof Flame; className: string }
-> = {
-  frio: { label: "Frio", icon: Snowflake, className: "text-blue-500" },
-  morno: { label: "Morno", icon: Sun, className: "text-amber-500" },
-  quente: { label: "Quente", icon: Flame, className: "text-red-500" },
-};
+import { TEMPERATURA_CONFIG } from "../constants/temperatura";
 
 // ─── Status Transition Rules ────────────────────────────────────────────────
 
@@ -207,7 +197,7 @@ export default function PipelinePage() {
     }) => {
       const { error } = await supabase
         .from("leads")
-        .update({ status, updated_at: new Date().toISOString() })
+        .update({ status })
         .eq("id", id);
 
       if (error) throw new Error(`Erro ao mover lead: ${error.message}`);
@@ -235,7 +225,7 @@ export default function PipelinePage() {
     }) => {
       const { error } = await supabase
         .from("leads")
-        .update({ observacoes, updated_at: new Date().toISOString() })
+        .update({ observacoes })
         .eq("id", id);
 
       if (error)
@@ -567,7 +557,7 @@ export default function PipelinePage() {
                 ) : (
                   stageLeads.map((lead) => {
                     const days = daysSince(lead.created_at);
-                    const tempCfg = TEMP_CONFIG[lead.temperatura] ?? TEMP_CONFIG.frio;
+                    const tempCfg = TEMPERATURA_CONFIG[lead.temperatura] ?? TEMPERATURA_CONFIG.frio;
                     const TempIcon = tempCfg.icon;
                     const isDragging = draggedLeadId === lead.id;
 
@@ -617,7 +607,7 @@ export default function PipelinePage() {
                           {/* Temperature + Days */}
                           <div className="flex items-center justify-between">
                             <span
-                              className={`inline-flex items-center gap-1 text-[11px] font-medium ${tempCfg.className}`}
+                              className={`inline-flex items-center gap-1 text-[11px] font-medium ${tempCfg.textClass}`}
                             >
                               <TempIcon size={12} />
                               {tempCfg.label}
@@ -692,11 +682,11 @@ export default function PipelinePage() {
                 </Badge>
                 {(() => {
                   const tc =
-                    TEMP_CONFIG[selectedLead.temperatura] ?? TEMP_CONFIG.frio;
+                    TEMPERATURA_CONFIG[selectedLead.temperatura] ?? TEMPERATURA_CONFIG.frio;
                   const TIcon = tc.icon;
                   return (
                     <span
-                      className={`inline-flex items-center gap-1 text-xs font-medium ${tc.className}`}
+                      className={`inline-flex items-center gap-1 text-xs font-medium ${tc.textClass}`}
                     >
                       <TIcon size={14} />
                       {tc.label}

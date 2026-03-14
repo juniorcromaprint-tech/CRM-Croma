@@ -167,7 +167,7 @@ export function useUpdateCliente() {
     mutationFn: async ({ id, ...updates }: ClienteUpdate) => {
       const { data, error } = await supabase
         .from('clientes')
-        .update({ ...updates, updated_at: new Date().toISOString() })
+        .update(updates)
         .eq('id', id)
         .select()
         .single();
@@ -197,7 +197,7 @@ export function useDeleteCliente() {
     mutationFn: async (id: string) => {
       const { data, error } = await supabase
         .from('clientes')
-        .update({ ativo: false, updated_at: new Date().toISOString() })
+        .update({ ativo: false })
         .eq('id', id)
         .select()
         .single();

@@ -124,7 +124,7 @@ export function useAtualizarTemplate() {
     mutationFn: async ({ id, updates }: { id: string; updates: Partial<TemplateCreateInput & { ativo: boolean }> }) => {
       const { data, error } = await supabase
         .from("templates_orcamento" as any)
-        .update({ ...updates, updated_at: new Date().toISOString() })
+        .update(updates)
         .eq("id", id)
         .select()
         .single();
@@ -148,7 +148,7 @@ export function useExcluirTemplate() {
     mutationFn: async (id: string) => {
       const { error } = await supabase
         .from("templates_orcamento" as any)
-        .update({ ativo: false, updated_at: new Date().toISOString() })
+        .update({ ativo: false })
         .eq("id", id);
       if (error) throw error;
     },

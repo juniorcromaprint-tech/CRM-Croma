@@ -175,7 +175,6 @@ export function useBaixaConta() {
           saldo,
           status: novoStatus,
           data_pagamento: data_pagamento || localDateStr(),
-          updated_at: new Date().toISOString(),
         })
         .eq('id', id)
         .select()

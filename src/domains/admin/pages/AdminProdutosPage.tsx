@@ -1560,7 +1560,6 @@ function TabSemPreco({ onCountChange }: TabSemPrecoProps) {
         .from("materiais")
         .update({
           preco_medio: preco,
-          updated_at: new Date().toISOString(),
         })
         .eq("id", id);
       if (error) throw error;

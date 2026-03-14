@@ -20,6 +20,7 @@ import { useLead, useUpdateLead } from "../hooks/useLeads";
 import { useCreateCliente } from "@/domains/clientes/hooks/useClientes";
 import { brl, formatDate } from "@/shared/utils/format";
 import { showError } from "@/utils/toast";
+import { TEMPERATURA_CONFIG } from "../constants/temperatura";
 
 const STATUS_CONFIG: Record<string, { label: string; color: string }> = {
   novo:             { label: "Novo",            color: "bg-blue-100 text-blue-700" },
@@ -29,12 +30,6 @@ const STATUS_CONFIG: Record<string, { label: string; color: string }> = {
   negociando:       { label: "Negociando",      color: "bg-purple-100 text-purple-700" },
   convertido:       { label: "Convertido",      color: "bg-green-100 text-green-700" },
   perdido:          { label: "Perdido",         color: "bg-red-100 text-red-700" },
-};
-
-const TEMP_CONFIG: Record<string, { label: string; color: string }> = {
-  frio:   { label: "Frio",   color: "bg-cyan-100 text-cyan-700" },
-  morno:  { label: "Morno",  color: "bg-amber-100 text-amber-700" },
-  quente: { label: "Quente", color: "bg-red-100 text-red-700" },
 };
 
 export default function LeadDetailPage() {
@@ -147,7 +142,7 @@ export default function LeadDetailPage() {
   }
 
   const sc = STATUS_CONFIG[lead.status] ?? STATUS_CONFIG.novo;
-  const tc = TEMP_CONFIG[lead.temperatura] ?? TEMP_CONFIG.frio;
+  const tc = TEMPERATURA_CONFIG[lead.temperatura as keyof typeof TEMPERATURA_CONFIG] ?? TEMPERATURA_CONFIG.frio;
 
   return (
     <div className="max-w-3xl space-y-6 pb-16">
@@ -164,7 +159,7 @@ export default function LeadDetailPage() {
             <span className={`text-xs font-medium px-2.5 py-1 rounded-full ${sc.color}`}>
               {sc.label}
             </span>
-            <span className={`text-xs font-medium px-2.5 py-1 rounded-full ${tc.color}`}>
+            <span className={`text-xs font-medium px-2.5 py-1 rounded-full ${tc.badgeColor}`}>
               <Thermometer size={11} className="inline mr-1" />{tc.label}
             </span>
           </div>

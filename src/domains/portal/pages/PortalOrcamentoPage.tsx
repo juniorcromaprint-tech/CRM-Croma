@@ -1,6 +1,6 @@
 // src/domains/portal/pages/PortalOrcamentoPage.tsx
 import { useParams } from 'react-router-dom';
-import { Loader2, AlertTriangle } from 'lucide-react';
+import { Loader2, AlertTriangle, CalendarClock } from 'lucide-react';
 import { brl } from '@/shared/utils/format';
 import { usePortalProposta, useAprovarProposta } from '../hooks/usePortalProposta';
 import { usePortalTracking } from '../hooks/usePortalTracking';
@@ -83,6 +83,33 @@ export default function PortalOrcamentoPage() {
             <p className="text-sm opacity-80 mt-1">Desconto de {proposta.desconto_percentual}% aplicado</p>
           )}
         </div>
+
+        {/* Validade */}
+        {(() => {
+          const dataValidade = proposta.data_validade
+            ? new Date(proposta.data_validade)
+            : proposta.validade && proposta.created_at
+              ? new Date(new Date(proposta.created_at).getTime() + proposta.validade * 86400000)
+              : null;
+          if (!dataValidade) return null;
+          const hoje = new Date();
+          const expirada = dataValidade < hoje;
+          const diasRestantes = Math.ceil((dataValidade.getTime() - hoje.getTime()) / 86400000);
+          return (
+            <div className={`flex items-center gap-2 px-4 py-3 rounded-xl border text-sm ${
+              expirada
+                ? 'bg-red-50 border-red-200 text-red-700'
+                : diasRestantes <= 3
+                  ? 'bg-amber-50 border-amber-200 text-amber-700'
+                  : 'bg-slate-50 border-slate-200 text-slate-600'
+            }`}>
+              <CalendarClock size={16} />
+              {expirada
+                ? 'Esta proposta expirou em ' + dataValidade.toLocaleDateString('pt-BR')
+                : `Proposta válida até ${dataValidade.toLocaleDateString('pt-BR')} (${diasRestantes} dia${diasRestantes !== 1 ? 's' : ''} restante${diasRestantes !== 1 ? 's' : ''})`}
+            </div>
+          );
+        })()}
 
         {/* Upload */}
         <PortalFileUpload

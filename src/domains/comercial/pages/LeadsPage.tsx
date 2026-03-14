@@ -7,7 +7,7 @@ import { brl as formatBRL } from "@/shared/utils/format";
 import { ilikeTerm } from "@/shared/utils/searchUtils";
 import {
   UserPlus, Search, Filter, Plus, Phone, Mail, Building2,
-  Thermometer, ChevronRight, AlertTriangle,
+  Thermometer, ChevronRight, AlertTriangle, Loader2,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
@@ -28,6 +28,7 @@ import {
   Pagination, PaginationContent, PaginationItem,
   PaginationNext, PaginationPrevious,
 } from "@/components/ui/pagination";
+import { TEMPERATURA_CONFIG } from "../constants/temperatura";
 
 const PAGE_SIZE = 20;
 
@@ -41,12 +42,6 @@ const STATUS_CONFIG: Record<string, { label: string; color: string }> = {
   negociando: { label: "Negociando", color: "bg-purple-100 text-purple-700" },
   convertido: { label: "Convertido", color: "bg-green-100 text-green-700" },
   perdido: { label: "Perdido", color: "bg-red-100 text-red-700" },
-};
-
-const TEMP_CONFIG: Record<string, { label: string; color: string }> = {
-  frio: { label: "Frio", color: "bg-cyan-100 text-cyan-700" },
-  morno: { label: "Morno", color: "bg-amber-100 text-amber-700" },
-  quente: { label: "Quente", color: "bg-red-100 text-red-700" },
 };
 
 // ─── Types ───────────────────────────────────────────────────────────────────
@@ -74,7 +69,7 @@ export default function LeadsPage() {
   const [form, setForm] = useState({
     empresa: "", contato_nome: "", contato_email: "", contato_telefone: "",
     segmento: "", status: "novo", temperatura: "frio", valor_estimado: "",
-    observacoes: "",
+    proximo_contato: "", observacoes: "",
   });
 
   // ── Duplicate detection ──────────────────────────────────────────────────
@@ -163,6 +158,7 @@ export default function LeadsPage() {
       const { error } = await supabase.from("leads").insert({
         ...newLead,
         valor_estimado: newLead.valor_estimado ? Number(newLead.valor_estimado) : null,
+        proximo_contato: newLead.proximo_contato || null,
       });
       if (error) throw error;
     },
@@ -174,7 +170,8 @@ export default function LeadsPage() {
       setLeadsDuplicados([]);
       setForm({
         empresa: "", contato_nome: "", contato_email: "", contato_telefone: "",
-        segmento: "", status: "novo", temperatura: "frio", valor_estimado: "", observacoes: "",
+        segmento: "", status: "novo", temperatura: "frio", valor_estimado: "",
+        proximo_contato: "", observacoes: "",
       });
     },
     onError: (err: any) => showError(err.message || "Erro ao criar lead"),
@@ -224,8 +221,8 @@ export default function LeadsPage() {
       {/* Stats Pills */}
       <div className="flex flex-wrap gap-2">
         {Object.entries(stats?.byTemp ?? {}).map(([temp, count]) => (
-          <span key={temp} className={`inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-medium ${TEMP_CONFIG[temp]?.color || "bg-slate-100 text-slate-600"}`}>
-            <Thermometer size={12} /> {TEMP_CONFIG[temp]?.label || temp}: {count}
+          <span key={temp} className={`inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-medium ${TEMPERATURA_CONFIG[temp as keyof typeof TEMPERATURA_CONFIG]?.badgeColor || "bg-slate-100 text-slate-600"}`}>
+            <Thermometer size={12} /> {TEMPERATURA_CONFIG[temp as keyof typeof TEMPERATURA_CONFIG]?.label || temp}: {count}
           </span>
         ))}
       </div>
@@ -280,8 +277,8 @@ export default function LeadsPage() {
                     <span className={`px-2 py-0.5 rounded-full text-[10px] font-medium ${STATUS_CONFIG[lead.status]?.color || "bg-slate-100"}`}>
                       {STATUS_CONFIG[lead.status]?.label || lead.status}
                     </span>
-                    <span className={`px-2 py-0.5 rounded-full text-[10px] font-medium ${TEMP_CONFIG[lead.temperatura]?.color || "bg-slate-100"}`}>
-                      {TEMP_CONFIG[lead.temperatura]?.label || lead.temperatura}
+                    <span className={`px-2 py-0.5 rounded-full text-[10px] font-medium ${TEMPERATURA_CONFIG[lead.temperatura as keyof typeof TEMPERATURA_CONFIG]?.badgeColor || "bg-slate-100"}`}>
+                      {TEMPERATURA_CONFIG[lead.temperatura as keyof typeof TEMPERATURA_CONFIG]?.label || lead.temperatura}
                     </span>
                   </div>
                   <div className="flex flex-wrap items-center gap-x-4 gap-y-1 text-sm text-slate-500">
@@ -474,6 +471,17 @@ export default function LeadsPage() {
               </Select>
             </div>
 
+            {/* Próximo contato */}
+            <div>
+              <Label htmlFor="proximo_contato">Próximo contato</Label>
+              <Input
+                id="proximo_contato"
+                type="datetime-local"
+                value={form.proximo_contato}
+                onChange={e => setForm({ ...form, proximo_contato: e.target.value })}
+              />
+            </div>
+
             {/* Observações */}
             <div>
               <Label htmlFor="observacoes">Observações</Label>
@@ -494,7 +502,7 @@ export default function LeadsPage() {
               disabled={!form.empresa || createLead.isPending}
               className="bg-blue-600 hover:bg-blue-700"
             >
-              {createLead.isPending ? "Salvando..." : "Criar Lead"}
+              {createLead.isPending ? <><Loader2 size={16} className="animate-spin mr-2" />Salvando...</> : "Criar Lead"}
             </Button>
           </DialogFooter>
         </DialogContent>

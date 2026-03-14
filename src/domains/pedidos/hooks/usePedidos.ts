@@ -170,7 +170,7 @@ export function useUpdatePedido() {
     mutationFn: async ({ id, ...payload }: PedidoUpdate): Promise<Pedido> => {
       const { data, error } = await supabase
         .from('pedidos')
-        .update({ ...payload, updated_at: new Date().toISOString() })
+        .update(payload)
         .eq('id', id)
         .select()
         .single();

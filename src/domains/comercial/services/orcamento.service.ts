@@ -385,7 +385,7 @@ export const orcamentoService = {
 
     const { data, error } = await supabase
       .from("propostas")
-      .update({ ...updates, updated_at: new Date().toISOString() })
+      .update(updates)
       .eq("id", id)
       .select()
       .single();
@@ -595,7 +595,7 @@ export const orcamentoService = {
 
     await supabase
       .from("propostas")
-      .update({ subtotal, desconto_valor, total, updated_at: new Date().toISOString() })
+      .update({ subtotal, desconto_valor, total })
       .eq("id", propostaId);
   },
 
@@ -681,7 +681,6 @@ export const orcamentoService = {
       .update({
         aprovado_em: new Date().toISOString(),
         aprovado_por: userId ?? null,
-        updated_at: new Date().toISOString(),
       })
       .eq("id", orcamentoId);
 
