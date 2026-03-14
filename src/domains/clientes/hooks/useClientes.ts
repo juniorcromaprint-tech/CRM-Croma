@@ -80,7 +80,7 @@ export function useClientes(filters?: ClienteFilters) {
     queryFn: async () => {
       let query = supabase
         .from('clientes')
-        .select('*')
+        .select('id, razao_social, nome_fantasia, cnpj, email, telefone, cidade, estado, segmento, classificacao, ativo, created_at')
         .order('razao_social', { ascending: true });
 
       if (filters?.segmento) {

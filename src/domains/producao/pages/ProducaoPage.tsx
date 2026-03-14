@@ -1,4 +1,5 @@
-import React, { useState, useMemo, useCallback, useRef, type DragEvent } from "react";
+import React, { useState, useMemo, useCallback, useRef, useEffect, type DragEvent } from "react";
+import { ilikeTerm } from "@/shared/utils/searchUtils";
 import { supabase } from "@/integrations/supabase/client";
 import { criarOrdemInstalacao } from "@/domains/instalacao/services/instalacao-criacao.service";
 import { finalizarCustosOP } from "@/domains/producao/services/producao.service";
@@ -357,6 +358,8 @@ function SkeletonRow() {
 // MAIN COMPONENT
 // ============================================================================
 
+const PAGE_SIZE = 20;
+
 export default function ProducaoPage() {
   const queryClient = useQueryClient();
 
@@ -368,6 +371,7 @@ export default function ProducaoPage() {
   const [prioridadeFilter, setPrioridadeFilter] = useState<string>("all");
   const [isCreateOpen, setIsCreateOpen] = useState(false);
   const [selectedOP, setSelectedOP] = useState<OrdemProducaoRow | null>(null);
+  const [page, setPage] = useState(0);
 
   // --- Create form ---
   const [formPedidoItemId, setFormPedidoItemId] = useState("");
@@ -382,28 +386,53 @@ export default function ProducaoPage() {
   const dragCounterRef = useRef<Record<string, number>>({});
   const isDragDropUpdate = useRef(false);
 
+  useEffect(() => {
+    setPage(0);
+  }, [searchTerm, statusFilter, prioridadeFilter]);
+
   // =========================================================================
   // QUERIES
   // =========================================================================
 
   const {
-    data: ordens = [],
+    data: ordensResult,
     isLoading,
     isError,
   } = useQuery({
-    queryKey: ["producao", "ordens"],
+    queryKey: ["producao", "ordens", page, statusFilter, prioridadeFilter, searchTerm],
     queryFn: async () => {
-      const { data, error } = await supabase
+      let q = supabase
         .from("ordens_producao")
         .select(
-          "*, pedido_itens(descricao, especificacao, quantidade, modelo_id, pedidos(numero, clientes(nome_fantasia, razao_social))), producao_etapas(*)"
+          "*, pedido_itens(descricao, especificacao, quantidade, modelo_id, pedidos(numero, clientes(nome_fantasia, razao_social))), producao_etapas(*)",
+          { count: "exact" }
         )
-        .order("created_at", { ascending: false });
+        .order("created_at", { ascending: false })
+        .range(page * PAGE_SIZE, (page + 1) * PAGE_SIZE - 1);
 
+      if (statusFilter !== "all") {
+        q = q.eq("status", statusFilter);
+      }
+
+      if (prioridadeFilter !== "all") {
+        q = q.eq("prioridade", parseInt(prioridadeFilter, 10));
+      }
+
+      if (searchTerm.trim()) {
+        q = q.or(
+          `numero.ilike.${ilikeTerm(searchTerm)},pedido_itens.descricao.ilike.${ilikeTerm(searchTerm)}`
+        );
+      }
+
+      const { data, error, count } = await q;
       if (error) throw error;
-      return (data ?? []) as unknown as OrdemProducaoRow[];
+      return { data: (data ?? []) as unknown as OrdemProducaoRow[], total: count ?? 0 };
     },
   });
+
+  const ordens = ordensResult?.data ?? [];
+  const totalOrdens = ordensResult?.total ?? 0;
+  const totalOrdensPages = Math.ceil(totalOrdens / PAGE_SIZE);
 
   const { data: pedidoItens = [] } = useQuery({
     queryKey: ["producao", "pedido-itens-select"],
@@ -606,29 +635,8 @@ export default function ProducaoPage() {
   // COMPUTED
   // =========================================================================
 
-  const filtered = useMemo(() => {
-    let result = ordens;
-
-    if (statusFilter !== "all") {
-      result = result.filter((op) => op.status === statusFilter);
-    }
-
-    if (prioridadeFilter !== "all") {
-      result = result.filter((op) => op.prioridade === parseInt(prioridadeFilter, 10));
-    }
-
-    const term = searchTerm.toLowerCase().trim();
-    if (term) {
-      result = result.filter(
-        (op) =>
-          (op.numero ?? "").toLowerCase().includes(term) ||
-          getClienteName(op).toLowerCase().includes(term) ||
-          getItemDescricao(op).toLowerCase().includes(term)
-      );
-    }
-
-    return result;
-  }, [ordens, statusFilter, prioridadeFilter, searchTerm]);
+  // Filters are applied server-side; use server results directly.
+  const filtered = ordens;
 
   const stats = useMemo(() => {
     const emFila = ordens.filter(
@@ -1283,6 +1291,31 @@ export default function ProducaoPage() {
                   </div>
                 )}
               </div>
+
+              {/* Pagination */}
+              {totalOrdensPages > 1 && (
+                <div className="flex items-center justify-between px-4 py-3 bg-white rounded-2xl border border-slate-100 shadow-sm">
+                  <p className="text-sm text-slate-500">
+                    Mostrando {page * PAGE_SIZE + 1}–{Math.min((page + 1) * PAGE_SIZE, totalOrdens)} de {totalOrdens}
+                  </p>
+                  <div className="flex gap-2">
+                    <Button
+                      variant="outline" size="sm" className="rounded-xl"
+                      disabled={page === 0}
+                      onClick={() => setPage((p) => p - 1)}
+                    >
+                      Anterior
+                    </Button>
+                    <Button
+                      variant="outline" size="sm" className="rounded-xl"
+                      disabled={page >= totalOrdensPages - 1}
+                      onClick={() => setPage((p) => p + 1)}
+                    >
+                      Próximo
+                    </Button>
+                  </div>
+                </div>
+              )}
             </div>
           )}
         </>
