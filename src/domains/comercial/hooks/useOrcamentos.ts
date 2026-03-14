@@ -10,6 +10,7 @@ import {
 import { supabase } from "@/integrations/supabase/client";
 import { ilikeTerm } from "@/shared/utils/searchUtils";
 import { showSuccess, showError } from "@/utils/toast";
+import { OptimisticLockError } from "@/shared/utils/optimistic-lock";
 
 export const ORCAMENTOS_QUERY_KEY = "orcamentos";
 
@@ -118,14 +119,20 @@ export function useCriarOrcamento() {
 export function useAtualizarOrcamento() {
   const qc = useQueryClient();
   return useMutation({
-    mutationFn: ({ id, updates }: { id: string; updates: Parameters<typeof orcamentoService.atualizar>[1] }) =>
-      orcamentoService.atualizar(id, updates),
+    mutationFn: ({ id, updates, version }: { id: string; updates: Parameters<typeof orcamentoService.atualizar>[1]; version?: number }) =>
+      orcamentoService.atualizar(id, updates, version),
     onSuccess: (_data, { id }) => {
       qc.invalidateQueries({ queryKey: [ORCAMENTOS_QUERY_KEY] });
       qc.invalidateQueries({ queryKey: [ORCAMENTOS_QUERY_KEY, id] });
       showSuccess("Orçamento atualizado!");
     },
-    onError: (err: Error) => showError(err.message || "Erro ao atualizar orçamento"),
+    onError: (err: Error) => {
+      if (err instanceof OptimisticLockError) {
+        showError(err.message);
+      } else {
+        showError(err.message || "Erro ao atualizar orçamento");
+      }
+    },
   });
 }
 

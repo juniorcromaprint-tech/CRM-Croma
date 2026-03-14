@@ -429,6 +429,7 @@ export default function OrcamentoEditorPage() {
           entrada_percentual: paymentConditions.entrada_percentual,
           prazo_dias: paymentConditions.prazo_dias,
         } as any,
+        version: (orcamento as any)?.version,
       });
 
       // Salvar serviços

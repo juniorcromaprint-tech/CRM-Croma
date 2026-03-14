@@ -6,6 +6,7 @@
 import { supabase } from "@/integrations/supabase/client";
 import { DEFAULT_PRICING_CONFIG, type PricingConfig } from "@/shared/services/pricing-engine";
 import { ilikeTerm } from "@/shared/utils/searchUtils";
+import { updateWithLock, OptimisticLockError } from "@/shared/utils/optimistic-lock";
 
 // ─── Helper: buscar config de precificação ativa e gerar snapshot ────────────
 
@@ -80,6 +81,7 @@ export interface Orcamento {
   cliente_cnpj_snapshot: string | null;
   created_at: string;
   updated_at: string;
+  version: number;
   // Joins
   cliente?: { razao_social: string; nome_fantasia: string | null };
   vendedor?: { first_name: string | null; last_name: string | null };
@@ -327,7 +329,7 @@ export const orcamentoService = {
     total?: number;
     aprovado_por?: string;
     aprovado_em?: string;
-  }>): Promise<Orcamento> {
+  }>, version?: number): Promise<Orcamento> {
     // C-08: Impede edição de orçamentos em status bloqueado
     // Exceção: a própria mudança de status (aprovação, cancelamento) é permitida
     const estaAlterandoStatus = updates.status !== undefined;
@@ -341,6 +343,16 @@ export const orcamentoService = {
       const statusBloqueados: OrcamentoStatus[] = ["aprovada", "recusada", "expirada"];
       if (statusBloqueados.includes(propostaAtual?.status as OrcamentoStatus)) {
         throw new Error(`Orçamento ${propostaAtual?.status} não pode ser editado`);
+      }
+    }
+
+    if (version !== undefined) {
+      try {
+        const data = await updateWithLock<Record<string, unknown>>("propostas", id, updates, version);
+        return data as unknown as Orcamento;
+      } catch (err) {
+        if (err instanceof OptimisticLockError) throw err;
+        throw err;
       }
     }
 
