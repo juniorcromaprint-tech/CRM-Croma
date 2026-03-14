@@ -30,6 +30,11 @@ export interface Lead {
   valor_estimado: number | null;
   proximo_contato: string | null;
   observacoes: string | null;
+  cargo: string | null;
+  score: number | null;
+  motivo_descarte: string | null;
+  telefone: string | null;
+  email: string | null;
   created_at: string;
   updated_at: string;
 }
@@ -104,7 +109,7 @@ export function useLeads(filters?: LeadFilters) {
     queryFn: async (): Promise<Lead[]> => {
       let query = supabase
         .from('leads')
-        .select('id, empresa, contato_nome, contato_email, contato_telefone, segmento, origem_id, vendedor_id, status, temperatura, valor_estimado, proximo_contato, observacoes, created_at, updated_at')
+        .select('id, empresa, contato_nome, contato_email, contato_telefone, segmento, origem_id, vendedor_id, status, temperatura, valor_estimado, proximo_contato, observacoes, cargo, score, motivo_descarte, telefone, email, created_at, updated_at')
         .order('created_at', { ascending: false });
 
       // Filtro por status
@@ -161,7 +166,7 @@ export function useLead(id: string | undefined) {
 
       const { data, error } = await supabase
         .from('leads')
-        .select('id, empresa, contato_nome, contato_email, contato_telefone, segmento, origem_id, vendedor_id, status, temperatura, valor_estimado, proximo_contato, observacoes, created_at, updated_at')
+        .select('id, empresa, contato_nome, contato_email, contato_telefone, segmento, origem_id, vendedor_id, status, temperatura, valor_estimado, proximo_contato, observacoes, cargo, score, motivo_descarte, telefone, email, created_at, updated_at')
         .eq('id', id)
         .single();
 
