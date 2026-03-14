@@ -1,71 +1,74 @@
-import { Route } from 'react-router-dom';
-import AdminUsuariosPage from '@/domains/admin/pages/AdminUsuariosPage';
-import AdminAuditoriaPage from '@/domains/admin/pages/AdminAuditoriaPage';
-import AdminPrecificacaoPage from '@/domains/admin/pages/AdminPrecificacaoPage';
-import AdminConfigPage from '@/domains/admin/pages/AdminConfigPage';
-import AdminProdutosPage from '@/domains/admin/pages/AdminProdutosPage';
-import AdminSetupPage from '@/domains/admin/pages/AdminSetupPage';
-import AdminCentrosCustoPage from '@/domains/admin/pages/AdminCentrosCustoPage';
-import AdminPlanoContasPage from '@/domains/admin/pages/AdminPlanoContasPage';
-import AdminMateriaisPage from '@/domains/admin/pages/AdminMateriaisPage';
-import RelatoriosPage from '@/domains/admin/pages/RelatoriosPage';
-import ProgressoPage from '@/domains/admin/pages/ProgressoPage';
-import Settings from '@/pages/Settings';
-import PermissionGuard from '@/shared/components/PermissionGuard';
+import { lazy } from "react";
+import { Route } from "react-router-dom";
+import LazyPage from "@/shared/components/LazyPage";
+import PermissionGuard from "@/shared/components/PermissionGuard";
+
+const AdminUsuariosPage = lazy(() => import("@/domains/admin/pages/AdminUsuariosPage"));
+const AdminAuditoriaPage = lazy(() => import("@/domains/admin/pages/AdminAuditoriaPage"));
+const AdminPrecificacaoPage = lazy(() => import("@/domains/admin/pages/AdminPrecificacaoPage"));
+const AdminConfigPage = lazy(() => import("@/domains/admin/pages/AdminConfigPage"));
+const AdminProdutosPage = lazy(() => import("@/domains/admin/pages/AdminProdutosPage"));
+const AdminSetupPage = lazy(() => import("@/domains/admin/pages/AdminSetupPage"));
+const AdminCentrosCustoPage = lazy(() => import("@/domains/admin/pages/AdminCentrosCustoPage"));
+const AdminPlanoContasPage = lazy(() => import("@/domains/admin/pages/AdminPlanoContasPage"));
+const AdminMateriaisPage = lazy(() => import("@/domains/admin/pages/AdminMateriaisPage"));
+const RelatoriosPage = lazy(() => import("@/domains/admin/pages/RelatoriosPage"));
+const ProgressoPage = lazy(() => import("@/domains/admin/pages/ProgressoPage"));
+const Settings = lazy(() => import("@/pages/Settings"));
 
 export const adminRoutes = (
   <>
     <Route path="admin/usuarios" element={
       <PermissionGuard module="admin" action="ver">
-        <AdminUsuariosPage />
+        <LazyPage><AdminUsuariosPage /></LazyPage>
       </PermissionGuard>
     } />
     <Route path="admin/precificacao" element={
       <PermissionGuard module="admin" action="ver">
-        <AdminPrecificacaoPage />
+        <LazyPage><AdminPrecificacaoPage /></LazyPage>
       </PermissionGuard>
     } />
     <Route path="admin/config" element={
       <PermissionGuard module="admin" action="ver">
-        <AdminConfigPage />
+        <LazyPage><AdminConfigPage /></LazyPage>
       </PermissionGuard>
     } />
     <Route path="admin/produtos" element={
       <PermissionGuard module="admin" action="ver">
-        <AdminProdutosPage />
+        <LazyPage><AdminProdutosPage /></LazyPage>
       </PermissionGuard>
     } />
     <Route path="admin/auditoria" element={
       <PermissionGuard module="admin" action="ver">
-        <AdminAuditoriaPage />
+        <LazyPage><AdminAuditoriaPage /></LazyPage>
       </PermissionGuard>
     } />
     <Route path="admin/setup" element={
       <PermissionGuard module="admin" action="ver">
-        <AdminSetupPage />
+        <LazyPage><AdminSetupPage /></LazyPage>
       </PermissionGuard>
     } />
     <Route path="admin/centros-custo" element={
       <PermissionGuard module="admin" action="ver">
-        <AdminCentrosCustoPage />
+        <LazyPage><AdminCentrosCustoPage /></LazyPage>
       </PermissionGuard>
     } />
     <Route path="admin/plano-contas" element={
       <PermissionGuard module="admin" action="ver">
-        <AdminPlanoContasPage />
+        <LazyPage><AdminPlanoContasPage /></LazyPage>
       </PermissionGuard>
     } />
     <Route path="admin/materiais" element={
       <PermissionGuard module="admin" action="ver">
-        <AdminMateriaisPage />
+        <LazyPage><AdminMateriaisPage /></LazyPage>
       </PermissionGuard>
     } />
-    <Route path="relatorios" element={<RelatoriosPage />} />
+    <Route path="relatorios" element={<LazyPage><RelatoriosPage /></LazyPage>} />
     <Route path="admin/progresso" element={
       <PermissionGuard module="admin" action="ver">
-        <ProgressoPage />
+        <LazyPage><ProgressoPage /></LazyPage>
       </PermissionGuard>
     } />
-    <Route path="settings" element={<Settings />} />
+    <Route path="settings" element={<LazyPage><Settings /></LazyPage>} />
   </>
 );
