@@ -78,11 +78,13 @@ export async function criarOrdemProducao(pedidoId: string): Promise<void> {
 }
 
 /**
- * Atualiza custos reais da OP ao concluir.
- * Como não temos sistema de apontamento detalhado de custos,
- * o custo real é definido como igual ao estimado quando a OP finaliza.
+ * Atualiza custos reais da OP ao concluir e desconta materiais do estoque.
+ * O custo real é definido como igual ao estimado quando a OP finaliza.
+ * Materiais ainda não baixados (movimentacao_id IS NULL) geram movimentações
+ * de saída em estoque_movimentacoes e decrementam estoque_saldos.
  */
 export async function finalizarCustosOP(opId: string): Promise<void> {
+  // 1. Atualizar custos reais (lógica original)
   const { data: op } = await supabase
     .from('ordens_producao')
     .select('custo_mp_estimado, custo_mo_estimado')
@@ -98,5 +100,61 @@ export async function finalizarCustosOP(opId: string): Promise<void> {
         data_conclusao: new Date().toISOString(),
       })
       .eq('id', opId);
+  }
+
+  // 2. Buscar materiais da OP ainda não baixados
+  const { data: materiais } = await supabase
+    .from('producao_materiais')
+    .select('id, material_id, quantidade_prevista, custo_unitario')
+    .eq('ordem_producao_id', opId)
+    .is('movimentacao_id', null);
+
+  if (!materiais || materiais.length === 0) return;
+
+  // 3. Criar movimentação de saída e atualizar saldo por material
+  for (const mat of materiais) {
+    const qtd = Number(mat.quantidade_prevista) || 0;
+    if (qtd <= 0) continue;
+
+    // Inserir movimentação de saída
+    const { data: mov } = await supabase
+      .from('estoque_movimentacoes')
+      .insert({
+        material_id: mat.material_id,
+        tipo: 'saida',
+        quantidade: qtd,
+        referencia_tipo: 'ordem_producao',
+        referencia_id: opId,
+        motivo: 'Consumo em produção — OP finalizada',
+      })
+      .select('id')
+      .single();
+
+    if (!mov) continue;
+
+    // Vincular movimentação ao producao_materiais
+    await supabase
+      .from('producao_materiais')
+      .update({ movimentacao_id: mov.id, quantidade_consumida: qtd })
+      .eq('id', mat.id);
+
+    // Decrementar saldo — buscar saldo atual e calcular novo valor
+    const { data: saldo } = await supabase
+      .from('estoque_saldos')
+      .select('quantidade_disponivel')
+      .eq('material_id', mat.material_id)
+      .single();
+
+    const novoSaldo = Math.max(0, (Number(saldo?.quantidade_disponivel) || 0) - qtd);
+    await supabase
+      .from('estoque_saldos')
+      .upsert(
+        {
+          material_id: mat.material_id,
+          quantidade_disponivel: novoSaldo,
+          updated_at: new Date().toISOString(),
+        },
+        { onConflict: 'material_id' }
+      );
   }
 }
