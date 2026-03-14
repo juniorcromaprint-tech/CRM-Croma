@@ -4,12 +4,14 @@
 // materiais, acabamentos, serviços e PDF profissional
 // ============================================================================
 
-import React, { useState } from "react";
+import React, { useState, useRef } from "react";
+import { createRoot } from "react-dom/client";
 import { useParams, Link, useNavigate } from "react-router-dom";
 import {
   ArrowLeft, Edit, Loader2, Printer, CheckCircle, XCircle,
-  Send, ChevronDown, ChevronUp, Package, Scissors, Copy,
+  Send, ChevronDown, ChevronUp, Package, Scissors, Copy, FileDown,
 } from "lucide-react";
+import OrcamentoPDF from "../components/OrcamentoPDF";
 import { Button } from "@/components/ui/button";
 import { Separator } from "@/components/ui/separator";
 import { Badge } from "@/components/ui/badge";
@@ -121,6 +123,47 @@ export default function OrcamentoViewPage() {
     navigate(`/orcamentos/${novo.id}/editar`);
   };
 
+  const [pdfLoading, setPdfLoading] = useState(false);
+
+  const handleGerarPDF = async () => {
+    if (!orc) return;
+    setPdfLoading(true);
+    try {
+      // Cria container temporário fora da tela
+      const container = document.createElement("div");
+      container.style.cssText = "position:absolute;left:-9999px;top:0;width:210mm;background:white;";
+      document.body.appendChild(container);
+
+      // Renderiza OrcamentoPDF no container
+      const orcamentoCompleto = orc as Parameters<typeof OrcamentoPDF>[0]["orcamento"];
+      const root = createRoot(container);
+      root.render(<OrcamentoPDF orcamento={orcamentoCompleto} />);
+
+      // Aguarda render completo
+      await new Promise((r) => setTimeout(r, 300));
+
+      // html2pdf.js via import dinâmico (evita SSR issues)
+      const html2pdf = (await import("html2pdf.js")).default;
+      await html2pdf()
+        .set({
+          margin: [15, 12, 15, 12],
+          filename: `Proposta-${orc.numero}.pdf`,
+          html2canvas: { scale: 2, useCORS: true, logging: false },
+          jsPDF: { unit: "mm", format: "a4", orientation: "portrait" },
+        })
+        .from(container.firstElementChild as HTMLElement)
+        .save();
+
+      // Limpa container
+      root.unmount();
+      document.body.removeChild(container);
+    } catch (err) {
+      console.error("[PDF]", err);
+    } finally {
+      setPdfLoading(false);
+    }
+  };
+
   if (isLoading || !orc) {
     return (
       <div className="flex justify-center py-20">
@@ -183,9 +226,13 @@ export default function OrcamentoViewPage() {
         <div className="flex items-center gap-2 flex-wrap justify-end">
           <Button
             variant="outline" size="sm" className="rounded-xl gap-1.5"
-            onClick={() => window.print()}
+            onClick={handleGerarPDF}
+            disabled={pdfLoading}
           >
-            <Printer size={14} /> Imprimir
+            {pdfLoading
+              ? <Loader2 size={14} className="animate-spin" />
+              : <FileDown size={14} />}
+            {pdfLoading ? "Gerando..." : "Baixar PDF"}
           </Button>
           <Button
             variant="outline" size="sm" className="rounded-xl gap-1.5"
