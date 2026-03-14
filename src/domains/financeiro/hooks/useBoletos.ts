@@ -346,3 +346,37 @@ export function useMarcarRemessaEnviada() {
     onError: (e: Error) => showError(e.message),
   });
 }
+
+// ═══════════════════════════════════════
+// RETORNOS
+// ═══════════════════════════════════════
+
+export function useRetornos() {
+  return useQuery({
+    queryKey: ['retornos-bancarios'],
+    queryFn: async () => {
+      const { data, error } = await supabase
+        .from('retornos_bancarios')
+        .select('*')
+        .order('created_at', { ascending: false });
+      if (error) throw error;
+      return data ?? [];
+    },
+  });
+}
+
+export function useProcessarRetorno() {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: async (fileContent: string) => {
+      const { processarRetorno } = await import('../services/retorno-processor.service');
+      return processarRetorno(fileContent);
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['boletos'] });
+      queryClient.invalidateQueries({ queryKey: ['boleto-stats'] });
+      queryClient.invalidateQueries({ queryKey: ['retornos-bancarios'] });
+      queryClient.invalidateQueries({ queryKey: ['contas-receber'] });
+    },
+  });
+}
