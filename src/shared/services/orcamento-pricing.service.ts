@@ -18,6 +18,7 @@ export interface OrcamentoMaterial {
   quantidade: number;
   unidade: string;
   custo_unitario: number;
+  aproveitamento?: number; // 0-100, default 100
 }
 
 export interface OrcamentoAcabamento {
@@ -92,11 +93,15 @@ export function calcOrcamentoItem(
   const areaM2 = calcAreaM2(item.largura_cm, item.altura_cm);
 
   // Apenas materiais entram no motor Mubisys (acabamentos são calculados separado)
-  const materiaisParaMotor = item.materiais.map((m) => ({
-    nome: m.descricao,
-    quantidade: m.quantidade,
-    precoUnitario: m.custo_unitario,
-  }));
+  const materiaisParaMotor = item.materiais.map((m) => {
+    const aproveitamento = (m.aproveitamento ?? 100) / 100;
+    const quantidadeReal = aproveitamento > 0 ? m.quantidade / aproveitamento : m.quantidade;
+    return {
+      nome: m.descricao,
+      quantidade: quantidadeReal,
+      precoUnitario: m.custo_unitario,
+    };
+  });
 
   const processos = item.processos.map((p) => ({
     etapa: p.etapa,

@@ -326,6 +326,7 @@ export default function OrcamentoEditorPage() {
       quantidade: m.quantidade_por_unidade,
       unidade: m.unidade ?? "un",
       custo_unitario: m.material?.preco_medio ?? 0,
+      aproveitamento: m.material?.aproveitamento ?? 100,
     }));
 
     const processosFromModelo: OrcamentoProcesso[] = (modelo.processos ?? []).map((p) => ({

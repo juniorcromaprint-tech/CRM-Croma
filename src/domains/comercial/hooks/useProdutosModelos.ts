@@ -51,7 +51,7 @@ export interface ModeloMaterial {
   material_id: string;
   quantidade_por_unidade: number;
   unidade: string | null;
-  material?: { nome: string; preco_medio: number | null };
+  material?: { nome: string; preco_medio: number | null; aproveitamento: number | null };
 }
 
 export interface ModeloProcesso {
@@ -125,7 +125,7 @@ export function useProdutoModelos(produtoId?: string) {
           *,
           materiais:modelo_materiais(
             *,
-            material:materiais(nome, preco_medio)
+            material:materiais(nome, preco_medio, aproveitamento)
           ),
           processos:modelo_processos(*)
         `)
