@@ -320,18 +320,24 @@ export default function OrcamentoEditorPage() {
     }
 
     // Auto-preenche tudo do modelo selecionado
-    const materiaisFromModelo: OrcamentoMaterial[] = (modelo.materiais ?? []).map((m) => ({
-      material_id: m.material_id,
-      descricao: m.material?.nome ?? `Material ${m.material_id}`,
-      quantidade: m.quantidade_por_unidade,
-      unidade: m.unidade ?? "un",
-      custo_unitario: m.material?.preco_medio ?? 0,
-      aproveitamento: m.material?.aproveitamento ?? 100,
-    }));
+    const materiaisFromModelo: OrcamentoMaterial[] = (modelo.materiais ?? []).map((m) => {
+      const precoMedio = Number(m.material?.preco_medio) || 0;
+      if (!precoMedio) {
+        console.warn(`[PRICING] Material "${m.material?.nome ?? m.material_id}" sem preço cadastrado — custo R$ 0,00`);
+      }
+      return {
+        material_id: m.material_id,
+        descricao: m.material?.nome ?? `Material ${m.material_id}`,
+        quantidade: Number(m.quantidade_por_unidade) || 0,
+        unidade: m.unidade ?? "un",
+        custo_unitario: precoMedio,
+        aproveitamento: Number(m.material?.aproveitamento) || 100,
+      };
+    });
 
     const processosFromModelo: OrcamentoProcesso[] = (modelo.processos ?? []).map((p) => ({
       etapa: p.etapa,
-      tempo_minutos: p.tempo_por_unidade_min,
+      tempo_minutos: Number(p.tempo_por_unidade_min) || 0,
     }));
 
     // Usa descritivo_nf como especificacao para NF (fallback para nome do modelo)

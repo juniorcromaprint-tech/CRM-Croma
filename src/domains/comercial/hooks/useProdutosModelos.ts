@@ -125,7 +125,7 @@ export function useProdutoModelos(produtoId?: string) {
           *,
           materiais:modelo_materiais(
             *,
-            material:materiais(nome, preco_medio, aproveitamento)
+            material:materiais!modelo_materiais_material_id_fkey(nome, preco_medio, aproveitamento)
           ),
           processos:modelo_processos(*)
         `)
