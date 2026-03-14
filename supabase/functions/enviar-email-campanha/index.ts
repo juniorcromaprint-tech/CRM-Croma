@@ -1,0 +1,150 @@
+import { serve } from 'https://deno.land/std@0.168.0/http/server.ts';
+import { createClient } from 'https://esm.sh/@supabase/supabase-js@2';
+
+const corsHeaders = {
+  'Access-Control-Allow-Origin': '*',
+  'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
+};
+
+serve(async (req) => {
+  if (req.method === 'OPTIONS') {
+    return new Response('ok', { headers: corsHeaders });
+  }
+
+  try {
+    // Validate auth
+    const authHeader = req.headers.get('Authorization');
+    if (!authHeader) {
+      return new Response(JSON.stringify({ error: 'Não autorizado' }), {
+        status: 401,
+        headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+      });
+    }
+
+    const supabase = createClient(
+      Deno.env.get('SUPABASE_URL')!,
+      Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!,
+    );
+
+    const { campanha_id } = await req.json();
+    if (!campanha_id) {
+      return new Response(JSON.stringify({ error: 'campanha_id é obrigatório' }), {
+        status: 400,
+        headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+      });
+    }
+
+    // Buscar campanha
+    const { data: campanha, error: cErr } = await supabase
+      .from('campanhas')
+      .select('id, nome, assunto_email, corpo_email')
+      .eq('id', campanha_id)
+      .single();
+
+    if (cErr || !campanha) {
+      return new Response(JSON.stringify({ error: 'Campanha não encontrada' }), {
+        status: 404,
+        headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+      });
+    }
+
+    if (!campanha.assunto_email || !campanha.corpo_email) {
+      return new Response(
+        JSON.stringify({ error: 'Campanha sem assunto ou corpo de email configurado' }),
+        { status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+      );
+    }
+
+    // Buscar destinatários pendentes
+    const { data: destinatarios, error: dErr } = await supabase
+      .from('campanha_destinatarios')
+      .select('id, nome, email')
+      .eq('campanha_id', campanha_id)
+      .eq('status', 'pendente')
+      .limit(100); // processa em lotes de 100
+
+    if (dErr) throw dErr;
+
+    if (!destinatarios || destinatarios.length === 0) {
+      return new Response(
+        JSON.stringify({ enviados: 0, message: 'Nenhum destinatário pendente' }),
+        { headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+      );
+    }
+
+    const RESEND_API_KEY = Deno.env.get('RESEND_API_KEY');
+    if (!RESEND_API_KEY) {
+      // Modo demo: marca como enviado sem chamar Resend
+      await supabase
+        .from('campanha_destinatarios')
+        .update({ status: 'enviado', enviado_em: new Date().toISOString() })
+        .eq('campanha_id', campanha_id)
+        .eq('status', 'pendente');
+
+      return new Response(
+        JSON.stringify({ enviados: destinatarios.length, demo: true }),
+        { headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+      );
+    }
+
+    let enviados = 0;
+    let erros = 0;
+
+    for (const dest of destinatarios) {
+      try {
+        const res = await fetch('https://api.resend.com/emails', {
+          method: 'POST',
+          headers: {
+            'Authorization': `Bearer ${RESEND_API_KEY}`,
+            'Content-Type': 'application/json',
+          },
+          body: JSON.stringify({
+            from: 'Croma Print <noreply@cromaprint.com.br>',
+            to: [dest.email],
+            subject: campanha.assunto_email,
+            html: (campanha.corpo_email as string).replace(/\{\{nome\}\}/g, dest.nome),
+          }),
+        });
+
+        if (res.ok) {
+          await supabase
+            .from('campanha_destinatarios')
+            .update({ status: 'enviado', enviado_em: new Date().toISOString() })
+            .eq('id', dest.id);
+          enviados++;
+        } else {
+          const errText = await res.text();
+          await supabase
+            .from('campanha_destinatarios')
+            .update({ status: 'erro', erro_mensagem: errText.substring(0, 500) })
+            .eq('id', dest.id);
+          erros++;
+        }
+      } catch (err) {
+        await supabase
+          .from('campanha_destinatarios')
+          .update({ status: 'erro', erro_mensagem: (err as Error).message })
+          .eq('id', dest.id);
+        erros++;
+      }
+    }
+
+    // Atualizar contador da campanha
+    if (enviados > 0) {
+      await supabase
+        .from('campanhas')
+        .update({ total_enviados: enviados })
+        .eq('id', campanha_id);
+    }
+
+    return new Response(
+      JSON.stringify({ enviados, erros }),
+      { headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+    );
+  } catch (err) {
+    return new Response(
+      JSON.stringify({ error: (err as Error).message }),
+      { status: 500, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+    );
+  }
+});
