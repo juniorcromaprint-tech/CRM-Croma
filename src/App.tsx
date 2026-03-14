@@ -3,8 +3,9 @@ import { Toaster as Sonner } from "@/components/ui/sonner";
 import { TooltipProvider } from "@/components/ui/tooltip";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { BrowserRouter, Routes, Route, Navigate } from "react-router-dom";
-import { lazy, Suspense } from "react";
+import { lazy } from "react";
 import { Loader2 } from "lucide-react";
+import LazyPage from "./shared/components/LazyPage";
 import { AuthProvider, useAuth } from "./contexts/AuthContext";
 
 const PortalOrcamentoPage = lazy(() => import('./domains/portal/pages/PortalOrcamentoPage'));
@@ -59,11 +60,7 @@ const App = () => (
           <Routes>
             <Route path="/login" element={<LoginPage />} />
             <Route path="/tv" element={<TvPage />} />
-            <Route path="/p/:token" element={
-              <Suspense fallback={<div className="min-h-screen flex items-center justify-center"><Loader2 className="h-8 w-8 animate-spin text-blue-600" /></div>}>
-                <PortalOrcamentoPage />
-              </Suspense>
-            } />
+            <Route path="/p/:token" element={<LazyPage><PortalOrcamentoPage /></LazyPage>} />
 
             <Route
               path="/"
