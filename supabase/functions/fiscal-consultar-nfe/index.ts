@@ -40,14 +40,13 @@ serve(async (req) => {
       );
     }
 
-    const nfeToken = Deno.env.get('NFE_PROVIDER_TOKEN');
-    const nfeBaseUrl = Deno.env.get('NFE_PROVIDER_URL') ?? 'https://homologacao.focusnfe.com.br';
-    const tipoAmbiente = ambiente ?? 'homologacao';
+    const nfeServiceUrl = Deno.env.get('NFE_SERVICE_URL');
+    const nfeInternalSecret = Deno.env.get('NFE_INTERNAL_SECRET');
 
     let resultado: any;
 
-    if (!nfeToken || nfeToken === 'DEMO_MODE') {
-      // Modo demo
+    if (!nfeServiceUrl || !nfeInternalSecret) {
+      // Modo demo — nfe-service não configurado
       resultado = {
         sucesso: true,
         status: 'autorizado',
@@ -58,23 +57,37 @@ serve(async (req) => {
         retorno_raw: { status: 'DEMO', chave },
       };
     } else {
-      const response = await fetch(
-        `${nfeBaseUrl}/v2/nfe/${chave}?completo=1`,
-        {
-          headers: { 'Authorization': `Token token=${nfeToken}` },
-        }
-      );
+      const response = await fetch(`${nfeServiceUrl}/api/consultar`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'x-internal-secret': nfeInternalSecret,
+        },
+        body: JSON.stringify({ chave_acesso: chave }),
+      });
       const retorno = await response.json();
 
-      resultado = {
-        sucesso: response.ok,
-        status: retorno.status ?? 'desconhecido',
-        chave_acesso: retorno.chave_nfe ?? chave,
-        protocolo: retorno.protocolo_autorizacao,
-        data_autorizacao: retorno.data_hora_autorizacao,
-        mensagem: retorno.mensagem ?? retorno.status_sefaz,
-        retorno_raw: retorno,
-      };
+      if (retorno.sucesso) {
+        const r = retorno.retorno;
+        const cStat = r?.protNFe?.infProt?.cStat ?? r?.cStat;
+        resultado = {
+          sucesso: cStat === '100',
+          status: cStat === '100' ? 'autorizado' : cStat === '110' ? 'denegado' : 'desconhecido',
+          chave_acesso: r?.protNFe?.infProt?.chNFe ?? chave,
+          protocolo: r?.protNFe?.infProt?.nProt,
+          data_autorizacao: r?.protNFe?.infProt?.dhRecbto,
+          mensagem: r?.protNFe?.infProt?.xMotivo ?? retorno.mensagem_erro,
+          retorno_raw: retorno.retorno,
+        };
+      } else {
+        resultado = {
+          sucesso: false,
+          status: 'erro',
+          chave_acesso: chave,
+          mensagem: retorno.mensagem_erro,
+          retorno_raw: retorno,
+        };
+      }
     }
 
     // Registra evento de consulta
