@@ -28,16 +28,16 @@ serve(async (req: Request) => {
     const { data: proposta, error: pErr } = await supabase
       .from('propostas')
       .select(`
-        id, numero, titulo, status, total, subtotal, desconto, prazo_entrega,
-        created_at, observacoes,
+        id, numero, titulo, status, total, subtotal, desconto_percentual, desconto_valor,
+        validade_dias, created_at, observacoes,
         cliente:clientes(id, nome_fantasia, razao_social, segmento, classificacao),
         itens:proposta_itens(
-          id, descricao, quantidade, largura, altura, preco_unitario, preco_total,
+          id, descricao, quantidade, largura_cm, altura_cm, area_m2, valor_unitario, valor_total,
           modelo_id, unidade,
-          materiais:proposta_item_materiais(material_id, quantidade, preco_unitario, preco_total, nome_material),
-          acabamentos:proposta_item_acabamentos(acabamento_id, preco, nome_acabamento)
+          materiais:proposta_item_materiais(material_id, quantidade, custo_unitario, custo_total, descricao),
+          acabamentos:proposta_item_acabamentos(acabamento_id, custo_unitario, custo_total, descricao)
         ),
-        servicos:proposta_servicos(servico_id, preco, nome_servico)
+        servicos:proposta_servicos(servico_id, descricao, valor_unitario, valor_total)
       `)
       .eq('id', proposta_id)
       .single();

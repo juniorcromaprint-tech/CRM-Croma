@@ -38,14 +38,14 @@ serve(async (req: Request) => {
 
       // Pedidos sem mudanca de status ha mais de 3 dias
       supabase.from('pedidos')
-        .select('id, numero, status, total, updated_at, cliente:clientes(nome_fantasia)')
+        .select('id, numero, status, valor_total, updated_at, cliente:clientes(nome_fantasia)')
         .not('status', 'in', '("concluido","cancelado","entregue")')
         .lt('updated_at', threeDaysAgo)
         .limit(20),
 
       // Producao concluida sem faturamento
       supabase.from('pedidos')
-        .select('id, numero, total, updated_at, cliente:clientes(nome_fantasia)')
+        .select('id, numero, valor_total, updated_at, cliente:clientes(nome_fantasia)')
         .eq('status', 'concluido')
         .limit(20),
 

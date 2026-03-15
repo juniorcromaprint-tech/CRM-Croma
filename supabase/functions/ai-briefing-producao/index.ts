@@ -27,11 +27,11 @@ serve(async (req: Request) => {
     const { data: pedido, error: pErr } = await supabase
       .from('pedidos')
       .select(`
-        id, numero, status, total, prazo_entrega, observacoes, created_at,
+        id, numero, status, valor_total, data_prometida, observacoes, created_at,
         cliente:clientes(nome_fantasia, cidade, estado, endereco),
         itens:pedido_itens(
-          id, descricao, quantidade, largura, altura, material, acabamento,
-          preco_unitario, preco_total, observacoes
+          id, descricao, quantidade, largura_cm, altura_cm, area_m2,
+          valor_unitario, valor_total, especificacao, instrucoes
         )
       `)
       .eq('id', pedido_id)
@@ -44,8 +44,8 @@ serve(async (req: Request) => {
     // Load stock for materials mentioned
     const { data: estoque } = await supabase
       .from('estoque_saldos')
-      .select('material_id, saldo_atual, materiais(nome)')
-      .gt('saldo_atual', 0);
+      .select('material_id, quantidade_disponivel, materiais(nome)')
+      .gt('quantidade_disponivel', 0);
 
     const context = {
       pedido,
