@@ -6,6 +6,10 @@ import {
 } from 'lucide-react'
 import { useMutation, useQueryClient } from '@tanstack/react-query'
 import { Button } from '@/components/ui/button'
+import AIButton from '@/domains/ai/components/AIButton'
+import AISidebar from '@/domains/ai/components/AISidebar'
+import { useAISidebar } from '@/domains/ai/hooks/useAISidebar'
+import { useBriefingProducao } from '@/domains/ai/hooks/useBriefingProducao'
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs'
 import {
   AlertDialog,
@@ -69,6 +73,16 @@ export default function PedidoDetailPage() {
   const updatePedido = useUpdatePedido()
   const criarPasta = useCriarPastaOneDrive()
   const queryClient = useQueryClient()
+
+  // ── AI ────────────────────────────────────────────────────────────────────
+  const briefingProducao = useBriefingProducao()
+  const aiSidebar = useAISidebar({
+    entityType: 'pedido',
+    entityId: id ?? '',
+    onActionsApplied: () => {
+      queryClient.invalidateQueries({ queryKey: ['pedidos', id] })
+    },
+  })
 
   // ── Estado de cancelamento ─────────────────────────────────────────────────
   const [showCancelDialog, setShowCancelDialog] = useState(false)
@@ -275,6 +289,15 @@ export default function PedidoDetailPage() {
             <FileText size={16} />
             Ordem de Serviço
           </Button>
+          <AIButton
+            label="Briefing de Produção"
+            onClick={() => {
+              briefingProducao.mutate(id!, {
+                onSuccess: (data) => aiSidebar.open(data),
+              })
+            }}
+            isLoading={briefingProducao.isPending}
+          />
           {['produzido', 'aguardando_instalacao', 'em_instalacao', 'concluido'].includes(pedido.status) && (
             <Button
               size="sm"
@@ -479,6 +502,19 @@ export default function PedidoDetailPage() {
           </AlertDialogFooter>
         </AlertDialogContent>
       </AlertDialog>
+
+      <AISidebar
+        isOpen={aiSidebar.isOpen}
+        response={aiSidebar.response}
+        isLoading={briefingProducao.isPending}
+        onClose={aiSidebar.close}
+        onApply={aiSidebar.applyActions}
+        onReanalyze={() => briefingProducao.mutate(id!, {
+          onSuccess: (data) => aiSidebar.setResponse(data),
+        })}
+        isReanalyzing={briefingProducao.isPending}
+        title="Briefing de Produção"
+      />
     </div>
   )
 }
