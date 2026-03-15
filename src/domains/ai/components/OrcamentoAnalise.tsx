@@ -9,6 +9,7 @@ interface OrcamentoAnaliseProps {
   onClose: () => void;
 }
 
+/** @deprecated Use AISidebar instead */
 export default function OrcamentoAnalise({ result, onClose }: OrcamentoAnaliseProps) {
   const data = result.structured_data as unknown as OrcamentoAnaliseData;
 

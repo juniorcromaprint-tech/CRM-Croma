@@ -23,6 +23,7 @@ const SEVERITY_CONFIG = {
   baixa: { bg: 'bg-blue-50', border: 'border-blue-200', text: 'text-blue-800', Icon: Info, iconClass: 'text-blue-500' },
 };
 
+/** @deprecated Use AISidebar instead */
 export default function AIResultPanel({ result, title, onClose, children }: AIResultPanelProps) {
   const [expandedSections, setExpandedSections] = useState<Record<string, boolean>>({
     risks: true,

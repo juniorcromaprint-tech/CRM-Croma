@@ -100,3 +100,74 @@ export interface ComposicaoProdutoData {
   custo_estimado: number;
   observacoes: string[];
 }
+
+// ═══════════════════════════════════════════════════════════
+// AI Actionable System — v2
+// ═══════════════════════════════════════════════════════════
+
+export type AIActionType =
+  // Orçamento
+  | 'preco'
+  | 'adicionar_item'
+  | 'trocar_material'
+  | 'adicionar_acabamento'
+  | 'ajustar_quantidade'
+  | 'corrigir_erro'
+  // Composição
+  | 'definir_modelo'
+  | 'adicionar_material'
+  | 'adicionar_servico'
+  // Cliente
+  | 'criar_tarefa'
+  | 'agendar_contato'
+  | 'aplicar_desconto'
+  // Produção
+  | 'criar_checklist'
+  | 'marcar_pendencia'
+  | 'atribuir_responsavel'
+  // Problemas
+  | 'revalidar_orcamento'
+  | 'mover_pedido'
+  | 'criar_alerta'
+  | 'notificar_responsavel';
+
+export type AIActionSeveridade = 'critica' | 'importante' | 'dica';
+
+export interface AIAction {
+  id: string;
+  tipo: AIActionType;
+  severidade: AIActionSeveridade;
+  titulo: string;
+  descricao: string;
+  campo_alvo: string;
+  valor_atual: unknown;
+  valor_sugerido: unknown;
+  impacto: string;
+  aplicavel: boolean;
+}
+
+export interface AIActionableResponse {
+  summary: string;
+  kpis: Record<string, number | string>;
+  actions: AIAction[];
+  model_used: string;
+  tokens_used: number;
+}
+
+export type AIActionStatus = 'idle' | 'applying' | 'applied' | 'error';
+
+export interface ApplierContext {
+  supabase: import('@supabase/supabase-js').SupabaseClient;
+  userId: string;
+  entityId: string;
+  entityType: string;
+  entityVersion?: number;
+}
+
+export interface ApplierResult {
+  success: boolean;
+  message: string;
+  rollback?: () => Promise<void>;
+}
+
+export type ApplierFn = (action: AIAction, context: ApplierContext) => Promise<ApplierResult>;

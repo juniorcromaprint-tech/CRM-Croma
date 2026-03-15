@@ -55,7 +55,7 @@ serve(async (req: Request) => {
 
     const systemPrompt = buildSystemPrompt(PROMPTS.briefingProducao);
     const userPrompt = buildUserPrompt(context);
-    const result = await callOpenRouter(systemPrompt, userPrompt);
+    const result = await callOpenRouter(systemPrompt, userPrompt, { max_tokens: 3000 });
 
     const aiData = JSON.parse(result.content);
     const response = {

@@ -8,8 +8,12 @@ import { formatDateTime } from "@/shared/utils/format";
 
 import { useCliente, useUpdateCliente } from "@/domains/clientes/hooks/useClientes";
 import AIButton from '@/domains/ai/components/AIButton';
+/** @deprecated Use AISidebar instead */
 import ClienteResumo from '@/domains/ai/components/ClienteResumo';
+import AISidebar from '@/domains/ai/components/AISidebar';
+import { useAISidebar } from '@/domains/ai/hooks/useAISidebar';
 import { useResumoCliente } from '@/domains/ai/hooks/useResumoCliente';
+import { useQueryClient } from '@tanstack/react-query';
 import type { AIResponse } from '@/domains/ai/types/ai.types';
 import { useUnidades, useCreateUnidade } from "@/domains/clientes/hooks/useUnidades";
 import { useContatos, useCreateContato } from "@/domains/clientes/hooks/useContatos";
@@ -221,8 +225,15 @@ export default function ClienteDetailPage() {
   const createContato = useCreateContato();
 
   // ---- AI ----
-  const [resumoResult, setResumoResult] = useState<AIResponse | null>(null);
+  const queryClient = useQueryClient();
   const resumoCliente = useResumoCliente();
+  const aiSidebar = useAISidebar({
+    entityType: 'cliente',
+    entityId: id ?? '',
+    onActionsApplied: () => {
+      queryClient.invalidateQueries({ queryKey: ['cliente', id] });
+    },
+  });
 
   // ---- Inline queries for tabs without dedicated hooks ----
   const { data: propostas, isLoading: loadingPropostas } = useQuery<
@@ -484,7 +495,7 @@ export default function ClienteDetailPage() {
             label="Resumo Inteligente"
             onClick={() => {
               resumoCliente.mutate(id!, {
-                onSuccess: (data) => setResumoResult(data),
+                onSuccess: (data) => aiSidebar.open(data),
               });
             }}
             isLoading={resumoCliente.isPending}
@@ -498,16 +509,6 @@ export default function ClienteDetailPage() {
           </Button>
         </div>
       </div>
-
-      {/* AI Result */}
-      {resumoResult && (
-        <div className="mb-4">
-          <ClienteResumo
-            result={resumoResult}
-            onClose={() => setResumoResult(null)}
-          />
-        </div>
-      )}
 
       {/* ================================================================= */}
       {/* TABS                                                              */}
@@ -1502,6 +1503,19 @@ export default function ClienteDetailPage() {
           )}
         </TabsContent>
       </Tabs>
+
+      <AISidebar
+        isOpen={aiSidebar.isOpen}
+        response={aiSidebar.response}
+        isLoading={resumoCliente.isPending}
+        onClose={aiSidebar.close}
+        onApply={aiSidebar.applyActions}
+        onReanalyze={() => resumoCliente.mutate(id!, {
+          onSuccess: (data) => aiSidebar.setResponse(data),
+        })}
+        isReanalyzing={resumoCliente.isPending}
+        title="Resumo do Cliente"
+      />
     </div>
   );
 }

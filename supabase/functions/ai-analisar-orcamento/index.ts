@@ -65,18 +65,36 @@ serve(async (req: Request) => {
       historico = data;
     }
 
+    // Load available materials and services for suggestions
+    const { data: materiaisDisponiveis } = await supabase
+      .from('materiais')
+      .select('id, nome, preco_medio, categoria')
+      .gt('preco_medio', 0)
+      .limit(50);
+
+    const { data: servicosDisponiveis } = await supabase
+      .from('servicos')
+      .select('id, nome, preco_base');
+
+    const { data: acabamentosDisponiveis } = await supabase
+      .from('acabamentos')
+      .select('id, nome, preco_padrao');
+
     // Build context
     const context = {
       proposta,
       regras_precificacao: regras ?? [],
       historico_cliente: historico ?? [],
+      materiais_disponiveis: materiaisDisponiveis ?? [],
+      servicos_disponiveis: servicosDisponiveis ?? [],
+      acabamentos_disponiveis: acabamentosDisponiveis ?? [],
       data_atual: new Date().toISOString().split('T')[0],
     };
 
     // Call AI
     const systemPrompt = buildSystemPrompt(PROMPTS.analisarOrcamento);
     const userPrompt = buildUserPrompt(context);
-    const result = await callOpenRouter(systemPrompt, userPrompt);
+    const result = await callOpenRouter(systemPrompt, userPrompt, { max_tokens: 3000 });
 
     // Parse AI response
     const aiData = JSON.parse(result.content);

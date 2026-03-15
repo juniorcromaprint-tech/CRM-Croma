@@ -21,51 +21,92 @@ export function buildUserPrompt(context: Record<string, unknown>): string {
   return JSON.stringify(context, null, 2);
 }
 
+const ACTION_INSTRUCTION = `INSTRUCOES PARA ACOES:
+Cada acao deve ter:
+- id: string unico ("act_1", "act_2", ...)
+- tipo: um dos tipos permitidos abaixo
+- severidade: "critica" | "importante" | "dica"
+- titulo: titulo curto (max 50 chars)
+- descricao: explicacao em 1-2 frases
+- campo_alvo: tabela/campo afetado
+- valor_atual: objeto com dados atuais (use IDs reais do contexto)
+- valor_sugerido: objeto com a correcao proposta
+- impacto: efeito estimado (ex: "+R$ 180", "Reduz risco", "+2 dias")
+- aplicavel: true se pode ser aplicado automaticamente, false se so informativo`;
+
 // Task-specific system prompt additions
 
 export const PROMPTS = {
-  analisarOrcamento: `TAREFA: Analisar este orcamento e retornar analise critica.
+  analisarOrcamento: `TAREFA: Analisar este orcamento e retornar sugestoes ACIONAVEIS.
 
-Retorne JSON com esta estrutura EXATA:
+${ACTION_INSTRUCTION}
+
+Tipos permitidos: preco, adicionar_item, trocar_material, adicionar_acabamento, ajustar_quantidade, corrigir_erro
+
+Retorne JSON EXATO:
 {
-  "summary": "resumo em 1-2 frases da analise",
-  "confidence": "alta|media|baixa",
-  "risks": [{"level": "alta|media|baixa", "description": "descricao", "action": "o que fazer"}],
-  "suggestions": [{"priority": "alta|media|baixa", "text": "sugestao", "impact": "impacto esperado"}],
-  "required_actions": ["acao obrigatoria 1", "acao 2"],
-  "structured_data": {
-    "margem_estimada": 0.0,
-    "itens_faltantes": ["instalacao", "frete"],
-    "preco_sugerido": 0.0,
-    "comparativo_historico": "acima|abaixo|dentro da media"
-  }
+  "summary": "resumo em 1-2 frases",
+  "kpis": {
+    "margem_atual": 0.0,
+    "margem_sugerida": 0.0,
+    "total_atual": 0.0,
+    "total_sugerido": 0.0,
+    "economia_possivel": 0.0
+  },
+  "actions": [
+    {
+      "id": "act_1",
+      "tipo": "preco",
+      "severidade": "critica|importante|dica",
+      "titulo": "titulo curto",
+      "descricao": "explicacao em 1-2 frases",
+      "campo_alvo": "proposta_itens",
+      "valor_atual": {"item_id": "uuid-real", "preco": 0.0},
+      "valor_sugerido": {"item_id": "uuid-real", "preco": 0.0},
+      "impacto": "+R$ 0,00",
+      "aplicavel": true
+    }
+  ]
 }
 
-CHECKLIST de analise:
-1. Margem estimada — alerta se < 30%
-2. Itens faltantes — instalacao incluida? frete? acabamento? arte?
-3. Prazo vs volume — prazo realista para a quantidade?
-4. Comparar com ticket medio do cliente
-5. Oportunidade de upsell (acabamento premium, quantidade maior)
-6. Risco operacional (material especial, instalacao complexa)`,
+CHECKLIST:
+1. Margem < 30% → acao tipo "preco"
+2. Falta instalacao/frete/arte → acao tipo "adicionar_item"
+3. Material mais barato disponivel → acao tipo "trocar_material"
+4. Acabamento obrigatorio ausente → acao tipo "adicionar_acabamento"
+5. Quantidade incorreta → acao tipo "ajustar_quantidade"
+6. Erros de medida/dados → acao tipo "corrigir_erro"
 
-  resumoCliente: `TAREFA: Gerar resumo inteligente deste cliente.
+Use IDs REAIS dos itens/materiais fornecidos no contexto.`,
 
-Retorne JSON com esta estrutura EXATA:
+  resumoCliente: `TAREFA: Gerar resumo inteligente deste cliente com acoes ACIONAVEIS.
+
+${ACTION_INSTRUCTION}
+
+Tipos permitidos: criar_tarefa, agendar_contato, aplicar_desconto
+
+Retorne JSON EXATO:
 {
   "summary": "resumo em 1-2 frases do perfil do cliente",
-  "confidence": "alta|media|baixa",
-  "risks": [{"level": "alta|media|baixa", "description": "descricao", "action": "o que fazer"}],
-  "suggestions": [{"priority": "alta|media|baixa", "text": "sugestao", "impact": "impacto esperado"}],
-  "required_actions": [],
-  "structured_data": {
+  "kpis": {
     "ticket_medio": 0.0,
     "total_pedidos": 0,
-    "produtos_frequentes": ["banner", "adesivo"],
-    "risco": "baixo|medio|alto",
-    "padrao_compra": "descricao do padrao",
-    "sugestao_abordagem": "como abordar este cliente"
-  }
+    "economia_possivel": 0.0
+  },
+  "actions": [
+    {
+      "id": "act_1",
+      "tipo": "criar_tarefa|agendar_contato|aplicar_desconto",
+      "severidade": "critica|importante|dica",
+      "titulo": "titulo curto",
+      "descricao": "explicacao em 1-2 frases",
+      "campo_alvo": "clientes|propostas|pedidos",
+      "valor_atual": {},
+      "valor_sugerido": {},
+      "impacto": "descricao do impacto",
+      "aplicavel": true
+    }
+  ]
 }
 
 ANALISE:
@@ -75,22 +116,34 @@ ANALISE:
 4. Padrao de compra (recorrente, esporadico, por campanha)
 5. Sugestao de abordagem personalizada`,
 
-  briefingProducao: `TAREFA: Gerar briefing tecnico de producao a partir do pedido.
+  briefingProducao: `TAREFA: Gerar briefing tecnico de producao com acoes ACIONAVEIS.
 
-Retorne JSON com esta estrutura EXATA:
+${ACTION_INSTRUCTION}
+
+Tipos permitidos: criar_checklist, marcar_pendencia, atribuir_responsavel
+
+Retorne JSON EXATO:
 {
   "summary": "resumo do pedido para producao",
-  "confidence": "alta|media|baixa",
-  "risks": [{"level": "alta|media|baixa", "description": "descricao", "action": "o que fazer"}],
-  "suggestions": [],
-  "required_actions": ["pendencia 1"],
-  "structured_data": {
-    "itens_briefing": [{"produto": "", "medidas": "", "material": "", "acabamento": "", "quantidade": 0, "observacoes": ""}],
-    "materiais_necessarios": [{"nome": "", "quantidade": 0, "unidade": "", "disponivel_estoque": false}],
-    "pendencias": ["arte nao aprovada", "endereco nao confirmado"],
+  "kpis": {
+    "custo_estimado": 0.0,
     "prazo_producao": "X dias uteis",
-    "observacoes_criticas": ["observacao 1"]
-  }
+    "total_pendencias": 0
+  },
+  "actions": [
+    {
+      "id": "act_1",
+      "tipo": "criar_checklist|marcar_pendencia|atribuir_responsavel",
+      "severidade": "critica|importante|dica",
+      "titulo": "titulo curto",
+      "descricao": "explicacao em 1-2 frases",
+      "campo_alvo": "pedidos|pedido_itens",
+      "valor_atual": {},
+      "valor_sugerido": {},
+      "impacto": "descricao do impacto",
+      "aplicavel": true
+    }
+  ]
 }
 
 CHECKLIST:
@@ -100,56 +153,71 @@ CHECKLIST:
 4. Prazo realista de producao
 5. Riscos (material indisponivel, instalacao complexa, prazo apertado)`,
 
-  detectarProblemas: `TAREFA: Analisar dados operacionais e priorizar problemas encontrados.
+  detectarProblemas: `TAREFA: Analisar dados operacionais e retornar problemas como acoes ACIONAVEIS.
 
-Retorne JSON com esta estrutura EXATA:
+${ACTION_INSTRUCTION}
+
+Tipos permitidos: revalidar_orcamento, mover_pedido, criar_alerta, notificar_responsavel
+
+Retorne JSON EXATO:
 {
   "summary": "resumo geral da situacao operacional",
-  "confidence": "alta|media|baixa",
-  "risks": [],
-  "suggestions": [{"priority": "alta|media|baixa", "text": "sugestao", "impact": "impacto esperado"}],
-  "required_actions": ["acao urgente 1"],
-  "structured_data": {
-    "problemas": [
-      {
-        "tipo": "orcamento_vencido|pedido_parado|sem_followup|sem_faturamento|sem_responsavel",
-        "severidade": "alta|media|baixa",
-        "titulo": "titulo curto",
-        "descricao": "descricao detalhada",
-        "entity_type": "proposta|pedido|cliente",
-        "entity_id": "uuid",
-        "acao_sugerida": "o que fazer"
-      }
-    ],
-    "total_por_severidade": {"alta": 0, "media": 0, "baixa": 0}
-  }
+  "kpis": {
+    "total_alertas": 0,
+    "alertas_alta": 0,
+    "risco": "baixo|medio|alto"
+  },
+  "actions": [
+    {
+      "id": "act_1",
+      "tipo": "revalidar_orcamento|mover_pedido|criar_alerta|notificar_responsavel",
+      "severidade": "critica|importante|dica",
+      "titulo": "titulo curto",
+      "descricao": "explicacao em 1-2 frases",
+      "campo_alvo": "propostas|pedidos|clientes",
+      "valor_atual": {"entity_id": "uuid-real", "status": "status-atual"},
+      "valor_sugerido": {"status": "status-sugerido"},
+      "impacto": "descricao do impacto",
+      "aplicavel": true
+    }
+  ]
 }
 
 Priorize por impacto financeiro e urgencia.`,
 
-  composicaoProduto: `TAREFA: Sugerir composicao de produto a partir da descricao.
+  composicaoProduto: `TAREFA: Sugerir composicao de produto com acoes ACIONAVEIS.
 
-Retorne JSON com esta estrutura EXATA:
+${ACTION_INSTRUCTION}
+
+Tipos permitidos: definir_modelo, adicionar_material, adicionar_servico
+
+Retorne JSON EXATO:
 {
   "summary": "resumo da sugestao de composicao",
-  "confidence": "alta|media|baixa",
-  "risks": [{"level": "alta|media|baixa", "description": "descricao", "action": "o que fazer"}],
-  "suggestions": [{"priority": "alta|media|baixa", "text": "sugestao", "impact": "impacto esperado"}],
-  "required_actions": [],
-  "structured_data": {
-    "modelo_sugerido": {"id": "uuid ou null", "nome": "", "categoria": ""},
-    "materiais": [{"material_id": "uuid ou null", "nome": "", "quantidade_estimada": 0, "unidade": "", "preco_unitario": 0}],
-    "acabamentos": [{"acabamento_id": "uuid ou null", "nome": "", "obrigatorio": true}],
-    "processos": [{"processo": "", "ordem": 1, "tempo_estimado_min": 0}],
-    "servicos_sugeridos": [{"servico_id": "uuid ou null", "nome": "", "motivo": ""}],
-    "custo_estimado": 0,
-    "observacoes": ["observacao 1"]
-  }
+  "kpis": {
+    "economia_possivel": 0.0,
+    "total_materiais": 0,
+    "custo_estimado": 0.0
+  },
+  "actions": [
+    {
+      "id": "act_1",
+      "tipo": "definir_modelo|adicionar_material|adicionar_servico",
+      "severidade": "critica|importante|dica",
+      "titulo": "titulo curto",
+      "descricao": "explicacao em 1-2 frases",
+      "campo_alvo": "produto_modelos|materiais|servicos",
+      "valor_atual": {},
+      "valor_sugerido": {"id": "uuid-real-ou-null", "nome": ""},
+      "impacto": "descricao do impacto",
+      "aplicavel": true
+    }
+  ]
 }
 
 REGRAS:
 1. Sempre buscar o modelo mais proximo dos existentes no catalogo
-2. Usar material_id/acabamento_id reais quando encontrar match
+2. Usar IDs reais quando encontrar match no catalogo
 3. Usar null nos IDs quando sugerir algo que nao existe no catalogo
 4. Estimar quantidades baseado nas medidas informadas
 5. Sugerir servicos relevantes (instalacao se > 2m, arte se nao mencionada)

@@ -1,6 +1,11 @@
 import React from "react";
 import { Link } from "react-router-dom";
+/** @deprecated Use AISidebar instead */
 import ProblemasPanel from '@/domains/ai/components/ProblemasPanel';
+import AIButton from '@/domains/ai/components/AIButton';
+import AISidebar from '@/domains/ai/components/AISidebar';
+import { useAISidebar } from '@/domains/ai/hooks/useAISidebar';
+import { useDetectarProblemas } from '@/domains/ai/hooks/useDetectarProblemas';
 import { ProgressTracker } from "@/shared/components/ProgressTracker";
 import {
   Building2, UserPlus, TrendingUp, FileText, Package, Factory,
@@ -205,6 +210,12 @@ function QuickAction({ label, icon, to }: { label: string; icon: React.ReactNode
 /* ──────────────────────────────────────────────────────────────────────── */
 
 export default function DashboardDiretor() {
+  const detectarProblemas = useDetectarProblemas();
+  const aiSidebar = useAISidebar({
+    entityType: 'geral',
+    entityId: 'dashboard',
+  });
+
   const { data: comercial, isLoading: lC } = useDashComercial();
   const { data: pedidos, isLoading: lP } = useDashPedidos();
   const { data: producao, isLoading: lPr } = useDashProducao();
@@ -507,10 +518,31 @@ export default function DashboardDiretor() {
         </div>
 
         {/* AI Alertas Operacionais */}
-        <div className="mt-6">
-          <ProblemasPanel />
+        <div className="mt-6 flex justify-end">
+          <AIButton
+            label="Detectar Problemas"
+            onClick={() => {
+              detectarProblemas.mutate('manual', {
+                onSuccess: (data) => aiSidebar.open(data),
+              });
+            }}
+            isLoading={detectarProblemas.isPending}
+          />
         </div>
       </div>
+
+      <AISidebar
+        isOpen={aiSidebar.isOpen}
+        response={aiSidebar.response}
+        isLoading={detectarProblemas.isPending}
+        onClose={aiSidebar.close}
+        onApply={aiSidebar.applyActions}
+        onReanalyze={() => detectarProblemas.mutate('manual', {
+          onSuccess: (data) => aiSidebar.setResponse(data),
+        })}
+        isReanalyzing={detectarProblemas.isPending}
+        title="Problemas Detectados"
+      />
     </div>
   );
 }
