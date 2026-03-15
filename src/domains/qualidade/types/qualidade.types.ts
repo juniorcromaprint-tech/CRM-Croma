@@ -1,36 +1,63 @@
-// src/domains/qualidade/types/qualidade.types.ts
+export type OcorrenciaStatus = 'aberta' | 'em_analise' | 'em_tratativa' | 'resolvida' | 'encerrada';
+
+export type OcorrenciaTipo =
+  | 'retrabalho'
+  | 'devolucao'
+  | 'erro_producao'
+  | 'erro_instalacao'
+  | 'divergencia_cliente'
+  | 'material_defeituoso'
+  | 'outro';
+
+export type OcorrenciaPrioridade = 'baixa' | 'media' | 'alta' | 'critica';
+
+export type OcorrenciaCausa =
+  | 'material_defeituoso'
+  | 'erro_operacional'
+  | 'erro_projeto'
+  | 'instrucao_incorreta'
+  | 'outro';
 
 export interface Ocorrencia {
   id: string;
-  titulo: string;
-  descricao?: string;
-  tipo: string;
-  prioridade: 'baixa' | 'media' | 'alta' | 'critica';
-  status: 'aberta' | 'em_analise' | 'em_tratamento' | 'resolvida' | 'fechada';
+  numero?: string;
+  descricao: string;
+  tipo: OcorrenciaTipo;
+  status: OcorrenciaStatus;
+  prioridade: OcorrenciaPrioridade;
+  causa?: OcorrenciaCausa;
   pedido_id?: string;
-  ordem_producao_id?: string;
   fornecedor_id?: string;
+  ordem_producao_id?: string;
   responsavel_id?: string;
-  custo_estimado?: number;
+  custo_mp?: number;
+  custo_mo?: number;
+  custo_total?: number;
+  impacto_prazo_dias?: number;
   created_at: string;
-  resolved_at?: string;
+  updated_at?: string;
   tratativas?: Tratativa[];
 }
 
 export interface Tratativa {
   id: string;
   ocorrencia_id: string;
-  descricao: string;
-  tipo: 'analise' | 'acao_corretiva' | 'acao_preventiva' | 'verificacao';
-  responsavel_id?: string;
+  acao_corretiva?: string;
+  prazo?: string;
+  data_conclusao?: string;
+  observacoes?: string;
+  usuario_id?: string;
   created_at: string;
 }
 
 export interface QualidadeKPIs {
-  total_ocorrencias: number;
+  totalOcorrencias: number;
   abertas: number;
-  resolvidas_mes: number;
-  mttr_horas: number;
-  por_tipo: { tipo: string; count: number }[];
-  por_prioridade: { prioridade: string; count: number }[];
+  emTratativa: number;
+  encerradas: number;
+  mttr?: number;
+  taxaResolucao?: number;
 }
+
+export type OcorrenciaCreate = Omit<Ocorrencia, 'id' | 'created_at' | 'updated_at' | 'tratativas'>;
+export type TratativaCreate = Omit<Tratativa, 'id' | 'created_at'>;
