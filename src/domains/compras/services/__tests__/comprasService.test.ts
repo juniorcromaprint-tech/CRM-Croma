@@ -25,9 +25,11 @@ import { comprasService } from "../comprasService";
 function makeFornecedor(overrides: Record<string, any> = {}) {
   return {
     id: "forn-001",
-    nome: "Fornecedor Teste",
+    razao_social: "Fornecedor Teste LTDA",
+    nome_fantasia: "Fornecedor Teste",
     cnpj: "12.345.678/0001-99",
     email: "contato@fornecedor.com",
+    contato_nome: "João Contato",
     ativo: true,
     created_at: "2026-01-01T00:00:00Z",
     ...overrides,

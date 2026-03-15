@@ -1,5 +1,5 @@
 import { lazy } from "react";
-import { Route, Navigate } from "react-router-dom";
+import { Route } from "react-router-dom";
 import LazyPage from "@/shared/components/LazyPage";
 
 const QualidadeDashboardPage = lazy(() => import("@/domains/qualidade/pages/QualidadeDashboardPage"));
@@ -8,7 +8,6 @@ const OcorrenciaDetailPage = lazy(() => import("@/domains/qualidade/pages/Ocorre
 
 export const qualidadeRoutes = (
   <>
-    <Route path="ocorrencias" element={<Navigate to="/qualidade/ocorrencias" replace />} />
     <Route path="qualidade" element={<LazyPage><QualidadeDashboardPage /></LazyPage>} />
     <Route path="qualidade/ocorrencias" element={<LazyPage><OcorrenciasPage /></LazyPage>} />
     <Route path="qualidade/ocorrencias/:id" element={<LazyPage><OcorrenciaDetailPage /></LazyPage>} />
