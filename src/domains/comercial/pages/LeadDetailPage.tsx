@@ -20,6 +20,7 @@ import { useLead, useUpdateLead } from "../hooks/useLeads";
 import { useCreateCliente } from "@/domains/clientes/hooks/useClientes";
 import { brl, formatDate } from "@/shared/utils/format";
 import { showError, showSuccess } from "@/utils/toast";
+import { validarCNPJ } from '@/shared/utils/cnpj';
 import { TEMPERATURA_CONFIG } from "../constants/temperatura";
 
 const STATUS_CONFIG: Record<string, { label: string; color: string }> = {
@@ -110,6 +111,13 @@ export default function LeadDetailPage() {
 
   const handleConverter = async () => {
     if (!id || !lead) return;
+
+    const cnpjLimpo = convertCnpj.trim() || null;
+    if (cnpjLimpo && !validarCNPJ(cnpjLimpo)) {
+      showError("CNPJ inválido. Verifique os dígitos.");
+      return;
+    }
+
     try {
       const novoCliente = await createCliente.mutateAsync({
         razao_social: lead.empresa,
@@ -119,11 +127,11 @@ export default function LeadDetailPage() {
         segmento: lead.segmento ?? null,
         origem: "lead_convertido",
         lead_id: id,
-        cnpj: convertCnpj.trim() || null,
+        cnpj: cnpjLimpo,
       });
       await updateLead.mutateAsync({ id, status: "convertido" });
       setConvertOpen(false);
-      showSuccess("Lead convertido! Complete os dados fiscais (CNPJ, endereço) para emitir NF-e.");
+      showSuccess("Lead convertido! Complete o endereço e IE para emitir NF-e.");
       navigate(`/clientes/${novoCliente.id}`);
     } catch (err) {
       showError("Erro ao converter lead em cliente.");

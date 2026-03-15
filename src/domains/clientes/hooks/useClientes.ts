@@ -35,6 +35,7 @@ export interface ClienteInput {
   cep?: string | null;
   observacoes?: string | null;
   ativo?: boolean;
+  lead_id?: string | null;
 }
 
 export interface ClienteUpdate extends Partial<ClienteInput> {
