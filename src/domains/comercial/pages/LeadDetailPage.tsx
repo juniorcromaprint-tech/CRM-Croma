@@ -22,16 +22,7 @@ import { brl, formatDate } from "@/shared/utils/format";
 import { showError, showSuccess } from "@/utils/toast";
 import { validarCNPJ } from '@/shared/utils/cnpj';
 import { TEMPERATURA_CONFIG } from "../constants/temperatura";
-
-const STATUS_CONFIG: Record<string, { label: string; color: string }> = {
-  novo:             { label: "Novo",            color: "bg-blue-100 text-blue-700" },
-  contatado:        { label: "Contatado",       color: "bg-sky-100 text-sky-700" },
-  qualificado:      { label: "Qualificado",     color: "bg-emerald-100 text-emerald-700" },
-  proposta_enviada: { label: "Proposta Enviada",color: "bg-amber-100 text-amber-700" },
-  negociando:       { label: "Negociando",      color: "bg-purple-100 text-purple-700" },
-  convertido:       { label: "Convertido",      color: "bg-green-100 text-green-700" },
-  perdido:          { label: "Perdido",         color: "bg-red-100 text-red-700" },
-};
+import { LEAD_STATUS_CONFIG, getStatusConfig } from "@/shared/constants/status";
 
 export default function LeadDetailPage() {
   const { id } = useParams<{ id: string }>();
@@ -157,7 +148,7 @@ export default function LeadDetailPage() {
     );
   }
 
-  const sc = STATUS_CONFIG[lead.status] ?? STATUS_CONFIG.novo;
+  const sc = getStatusConfig(LEAD_STATUS_CONFIG, lead.status as any);
   const tc = TEMPERATURA_CONFIG[lead.temperatura as keyof typeof TEMPERATURA_CONFIG] ?? TEMPERATURA_CONFIG.frio;
 
   return (
@@ -334,7 +325,7 @@ export default function LeadDetailPage() {
                 <Select value={form.status} onValueChange={v => setForm({ ...form, status: v })}>
                   <SelectTrigger><SelectValue /></SelectTrigger>
                   <SelectContent>
-                    {Object.entries(STATUS_CONFIG).map(([k, v]) => (
+                    {Object.entries(LEAD_STATUS_CONFIG).map(([k, v]) => (
                       <SelectItem key={k} value={k}>{v.label}</SelectItem>
                     ))}
                   </SelectContent>
