@@ -64,9 +64,9 @@ describe('AI Action types', () => {
       'ajustar_quantidade', 'corrigir_erro', 'definir_modelo', 'adicionar_material',
       'adicionar_servico', 'criar_tarefa', 'agendar_contato', 'aplicar_desconto',
       'criar_checklist', 'marcar_pendencia', 'atribuir_responsavel',
-      'revalidar_orcamento', 'mover_pedido', 'notificar_responsavel',
+      'revalidar_orcamento', 'mover_pedido', 'criar_alerta', 'notificar_responsavel',
     ];
-    expect(allTypes).toHaveLength(18);
+    expect(allTypes).toHaveLength(19);
   });
 });
 ```
@@ -108,6 +108,7 @@ export type AIActionType =
   // Problemas
   | 'revalidar_orcamento'
   | 'mover_pedido'
+  | 'criar_alerta'
   | 'notificar_responsavel';
 
 export type AIActionSeveridade = 'critica' | 'importante' | 'dica';
@@ -140,6 +141,7 @@ export interface ApplierContext {
   userId: string;
   entityId: string;
   entityType: string;
+  entityVersion?: number; // Lock otimista — capturado no momento da análise
 }
 
 export interface ApplierResult {
@@ -769,6 +771,7 @@ git commit -m "feat(ai): add 6 orçamento appliers (preco, item, material, acaba
 - Create: `src/domains/ai/appliers/producao/index.ts`
 - Create: `src/domains/ai/appliers/problemas/revalidarApplier.ts`
 - Create: `src/domains/ai/appliers/problemas/moverPedidoApplier.ts`
+- Create: `src/domains/ai/appliers/problemas/alertaApplier.ts`
 - Create: `src/domains/ai/appliers/problemas/notificarApplier.ts`
 - Create: `src/domains/ai/appliers/problemas/index.ts`
 
@@ -788,20 +791,21 @@ Follow same pattern as Task 3 tests. Each applier:
 
 - [ ] **Step 3: Implement cliente appliers**
 
-`tarefaApplier.ts` — inserts into `leads` or relevant activity table with follow-up data.
-`contatoApplier.ts` — inserts scheduled contact/follow-up.
+`tarefaApplier.ts` — inserts into `tarefas_comerciais` table (existing: titulo, descricao, responsavel_id, data_limite, status).
+`contatoApplier.ts` — inserts into `tarefas_comerciais` with tipo='contato' for scheduled follow-up.
 `descontoApplier.ts` — updates `propostas.desconto` field.
 
 - [ ] **Step 4: Implement produção appliers**
 
 `checklistApplier.ts` — inserts checklist items linked to pedido.
 `pendenciaApplier.ts` — updates status of blocking item.
-`responsavelApplier.ts` — updates `pedido_itens.responsavel_id`.
+`responsavelApplier.ts` — updates `ordens_producao.responsavel_id` (NOT pedido_itens — column doesn't exist there).
 
 - [ ] **Step 5: Implement problemas appliers**
 
 `revalidarApplier.ts` — updates `propostas.validade` and `propostas.status`.
 `moverPedidoApplier.ts` — updates `pedidos.status` (respecting transition map from Sprint 1).
+`alertaApplier.ts` — inserts into `ai_alertas` table (existing).
 `notificarApplier.ts` — calls Supabase edge function or inserts notification record.
 
 - [ ] **Step 6: Create index barrel for each domain**
@@ -835,9 +839,9 @@ import { getRegisteredTypes } from '../registry';
 import '../registerAll'; // side-effect: registers all appliers
 
 describe('registerAll', () => {
-  it('should register all 18 action types', () => {
+  it('should register all 19 action types', () => {
     const types = getRegisteredTypes();
-    expect(types.length).toBeGreaterThanOrEqual(18);
+    expect(types.length).toBeGreaterThanOrEqual(19);
     expect(types).toContain('preco');
     expect(types).toContain('adicionar_item');
     expect(types).toContain('trocar_material');
@@ -856,7 +860,7 @@ import { precoApplier, adicionarItemApplier, materialApplier, acabamentoApplier,
 import { modeloApplier, servicoApplier } from './composicao';
 import { tarefaApplier, contatoApplier, descontoApplier } from './cliente';
 import { checklistApplier, pendenciaApplier, responsavelApplier } from './producao';
-import { revalidarApplier, moverPedidoApplier, notificarApplier } from './problemas';
+import { revalidarApplier, moverPedidoApplier, alertaApplier, notificarApplier } from './problemas';
 
 // Orçamento
 registerApplier('preco', precoApplier);
@@ -884,6 +888,7 @@ registerApplier('atribuir_responsavel', responsavelApplier);
 // Problemas
 registerApplier('revalidar_orcamento', revalidarApplier);
 registerApplier('mover_pedido', moverPedidoApplier);
+registerApplier('criar_alerta', alertaApplier);
 registerApplier('notificar_responsavel', notificarApplier);
 ```
 
@@ -1860,6 +1865,28 @@ Same pattern as Task 14:
 npx tsc --noEmit
 git add src/domains/clientes/pages/ClienteDetailPage.tsx
 git commit -m "feat(ai): integrate AISidebar into ClienteDetailPage"
+```
+
+---
+
+### Task 15b: Integrate AISidebar into PedidoDetailPage
+
+**Files:**
+- Modify: `src/domains/producao/pages/PedidoDetailPage.tsx` (or find the correct pedido detail page)
+
+- [ ] **Step 1: Add useAISidebar + imports, replace ProducaoBriefing with AISidebar**
+
+Same pattern as Task 14:
+- `useAISidebar({ entityType: 'pedido', entityId: id })`
+- AIButton "Briefing Produção" opens sidebar on success
+- AISidebar renders at bottom of JSX
+
+- [ ] **Step 2: Build check and commit**
+
+```bash
+npx tsc --noEmit
+git add src/domains/producao/pages/PedidoDetailPage.tsx
+git commit -m "feat(ai): integrate AISidebar into PedidoDetailPage"
 ```
 
 ---

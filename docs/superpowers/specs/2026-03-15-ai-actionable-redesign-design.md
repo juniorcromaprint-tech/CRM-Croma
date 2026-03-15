@@ -37,9 +37,9 @@ interface AIAction {
   severidade: 'critica' | 'importante' | 'dica';
   titulo: string;
   descricao: string;
-  campo_alvo: string;
-  valor_atual: any;
-  valor_sugerido: any;
+  campo_alvo: AIActionCampoAlvo;
+  valor_atual: unknown;
+  valor_sugerido: unknown;
   impacto: string;
   aplicavel: boolean;
 }
@@ -67,8 +67,40 @@ type AIActionType =
   // Problemas
   | 'revalidar_orcamento'
   | 'mover_pedido'
+  | 'criar_alerta'
   | 'notificar_responsavel';
+
+type AIActionCampoAlvo =
+  | 'itens' | 'servicos' | 'materiais' | 'acabamentos'
+  | 'proposta' | 'pedido' | 'cliente' | 'ordem_producao'
+  | 'proposta_itens.largura' | 'proposta_itens.altura' | string; // extensível
 ```
+
+### Shapes esperados de valor_atual / valor_sugerido por tipo
+
+| AIActionType | valor_atual shape | valor_sugerido shape |
+|---|---|---|
+| `preco` | `{ item_id: string, preco: number }` | `{ item_id: string, preco: number }` |
+| `adicionar_item` | `null` | `{ servico_id?: string, nome: string, valor: number }` ou `{ descricao: string, quantidade: number, preco: number }` |
+| `trocar_material` | `{ material_id: string, item_id: string, nome: string, preco: number }` | `{ material_id: string, nome: string, preco: number }` |
+| `adicionar_acabamento` | `null` | `{ acabamento_id: string, item_id: string, nome: string, preco: number }` |
+| `ajustar_quantidade` | `{ item_id: string, quantidade: number }` | `{ item_id: string, quantidade: number }` |
+| `corrigir_erro` | `{ item_id: string, campo: string, valor: unknown }` | `{ item_id: string, campo: string, valor: unknown }` |
+| `definir_modelo` | `null` | `{ item_id: string, modelo_id: string, nome: string }` |
+| `adicionar_material` | `null` | `{ item_id: string, material_id: string, nome: string, preco: number, quantidade: number }` |
+| `adicionar_servico` | `null` | `{ servico_id: string, nome: string, valor: number }` |
+| `criar_tarefa` | `null` | `{ titulo: string, descricao: string, data_limite?: string, responsavel_id?: string }` |
+| `agendar_contato` | `null` | `{ titulo: string, descricao: string, data_agendamento: string }` |
+| `aplicar_desconto` | `{ desconto: number }` | `{ desconto: number }` |
+| `criar_checklist` | `null` | `{ titulo: string, itens: string[] }` |
+| `marcar_pendencia` | `{ status: string }` | `{ pendencia_id: string, status: string }` |
+| `atribuir_responsavel` | `null` | `{ ordem_producao_id: string, responsavel_id: string }` |
+| `revalidar_orcamento` | `{ proposta_id: string, validade: string }` | `{ proposta_id: string, nova_validade: string }` |
+| `mover_pedido` | `{ pedido_id: string, status_atual: string }` | `{ pedido_id: string, novo_status: string }` |
+| `criar_alerta` | `null` | `{ titulo: string, descricao: string, severidade: string, entity_type: string, entity_id: string }` |
+| `notificar_responsavel` | `null` | `{ responsavel_id: string, mensagem: string, entity_type: string, entity_id: string }` |
+
+> **Nota**: No frontend, usar validação Zod para parsear `AIActionableResponse` recebida da Edge Function antes de renderizar (LLM pode retornar dados malformados).
 
 ### Novo Formato de Resposta das Edge Functions
 
@@ -250,7 +282,7 @@ NÃO retorne sugestões em texto livre. Tudo deve ser uma action estruturada.
 #### ai-detectar-problemas
 - Prompt pede entity_id + ação direta por problema
 - KPIs: total_alertas, alertas_alta, alertas_media, alertas_baixa
-- Tipos permitidos: revalidar_orcamento, mover_pedido, criar_alerta, notificar_responsavel
+- Tipos permitidos: revalidar_orcamento, mover_pedido, criar_alerta, notificar_responsavel (nota: `criar_alerta` agora incluído no `AIActionType`)
 
 ### ai-types.ts (shared)
 
@@ -278,16 +310,17 @@ src/domains/ai/
       modeloApplier.ts       → set modelo_id em proposta_itens
       servicoApplier.ts      → insert proposta_servicos
     cliente/
-      tarefaApplier.ts       → insert tarefas (nova tabela ou existente)
-      contatoApplier.ts      → insert agendamento/follow-up
-      descontoApplier.ts     → update proposta.desconto_percentual
+      tarefaApplier.ts       → insert tarefas_comerciais (tabela existente: titulo, descricao, responsavel_id, data_limite, status)
+      contatoApplier.ts      → insert tarefas_comerciais com tipo='contato' (follow-up agendado)
+      descontoApplier.ts     → update propostas.desconto
     producao/
       checklistApplier.ts    → insert checklist items no pedido
       pendenciaApplier.ts    → update status de pendência
-      responsavelApplier.ts  → update pedido_itens.responsavel
+      responsavelApplier.ts  → update ordens_producao.responsavel_id (NÃO pedido_itens — coluna não existe lá)
     problemas/
       revalidarApplier.ts    → update proposta.validade + status
-      moverPedidoApplier.ts  → update pedidos.status (com mapa de transição)
+      moverPedidoApplier.ts  → update pedidos.status (com mapa de transição do Sprint 1)
+      alertaApplier.ts       → insert ai_alertas (tabela existente)
       notificarApplier.ts    → trigger notificação (Supabase realtime ou edge fn)
 ```
 
@@ -299,6 +332,7 @@ type ApplierContext = {
   userId: string;
   entityId: string;
   entityType: string;
+  entityVersion?: number; // Lock otimista — capturado no momento da análise
 };
 
 type ApplierResult = {
@@ -332,6 +366,7 @@ const applierRegistry: Record<AIActionType, ApplierFn> = {
   atribuir_responsavel:  responsavelApplier,
   revalidar_orcamento:   revalidarApplier,
   mover_pedido:          moverPedidoApplier,
+  criar_alerta:          alertaApplier,
   notificar_responsavel: notificarApplier,
 };
 
@@ -372,10 +407,11 @@ export async function executeAction(
 
 | Mecanismo | Implementação |
 |---|---|
-| **Validação dupla** | Frontend valida tipos + applier revalida antes de persistir |
-| **Lock otimista** | Usa campo `version` existente (migration 030) — rejeita se versão mudou durante análise |
-| **Auditoria** | Cada ação aplicada gera log em `ai_logs` com `action_type`, `entity_id`, `valor_anterior`, `valor_novo` |
-| **Rollback** | Cada applier retorna função de undo — botão "Desfazer" disponível por 30 segundos |
+| **Validação dupla** | Frontend valida via Zod schema + applier revalida antes de persistir |
+| **Lock otimista** | `entityVersion` capturado no momento da análise e passado no `ApplierContext`. Appliers de orçamento fazem `update(...).eq('version', entityVersion)` — se 0 rows affected, retorna erro "Dados alterados por outro usuário, re-analise" |
+| **Auditoria** | Cada ação aplicada gera log via campo JSONB `metadata` na tabela `ai_logs` existente. Formato: `{ action_type, valor_anterior, valor_novo }`. **Não requer migration** — usa a coluna `error_message` (renomear para `metadata` opcionalmente via migration simples) |
+| **Rollback** | Cada applier retorna `rollback?: () => Promise<void>`. Closures armazenadas em `useAISidebar` state enquanto sidebar está aberta. **Batch rollback**: botão "Desfazer" reverte todas as ações aplicadas na última batch (executa rollbacks em ordem reversa). Disponível por 30 segundos ou até re-análise/fechar sidebar. Se sidebar fechar, closures são perdidas (by design — ações confirmadas) |
+| **Batch execution** | Ações executadas **sequencialmente** (não paralelo), **continue-on-error** (não fail-fast). Cada ação tem status individual (applied/error). Ações aplicadas com sucesso NÃO são revertidas se uma subsequente falhar |
 | **Rate limiting** | Mantém rate limit existente nas Edge Functions |
 | **Role-based** | Mantém matriz de acesso existente (comercial, produção, gerente, admin) |
 
@@ -424,6 +460,7 @@ export async function executeAction(
 - `supabase/functions/ai-composicao-produto/index.ts` — novo formato
 - `src/domains/comercial/pages/OrcamentoEditorPage.tsx` — integra AISidebar
 - `src/domains/clientes/pages/ClienteDetailPage.tsx` — integra AISidebar
+- `src/domains/producao/pages/PedidoDetailPage.tsx` (ou equivalente) — integra AISidebar para briefing produção
 - `src/domains/comercial/pages/DashboardDiretor.tsx` — integra AISidebar
 
 ### Deprecados (manter temporariamente)
