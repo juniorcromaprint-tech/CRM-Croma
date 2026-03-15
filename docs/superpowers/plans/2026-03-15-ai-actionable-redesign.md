@@ -1,6 +1,6 @@
 # AI Actionable Redesign — Implementation Plan
 
-> **For agentic workers:** REQUIRED: Use superpowers:subagent-driven-development (if subagents available) or superpowers:executing-plans to implement this plan. Steps use checkbox (`- [ ]`) syntax for tracking.
+> **For agentic workers:** REQUIRED: Use superpowers:subagent-driven-development (if subagents available) or superpowers:executing-plans to implement this plan. Steps use checkbox (`- [x]`) syntax for tracking.
 
 **Goal:** Transform the AI system from read-only analysis into actionable suggestions that users can apply with one click, across all 5 AI functions.
 
@@ -19,7 +19,7 @@
 **Files:**
 - Modify: `src/domains/ai/types/ai.types.ts`
 
-- [ ] **Step 1: Write test for new types**
+- [x] **Step 1: Write test for new types**
 
 Create: `src/domains/ai/types/__tests__/ai.types.test.ts`
 
@@ -71,12 +71,12 @@ describe('AI Action types', () => {
 });
 ```
 
-- [ ] **Step 2: Run test to verify it fails**
+- [x] **Step 2: Run test to verify it fails**
 
 Run: `npx vitest run src/domains/ai/types/__tests__/ai.types.test.ts`
 Expected: FAIL — types not exported yet
 
-- [ ] **Step 3: Add new types to ai.types.ts**
+- [x] **Step 3: Add new types to ai.types.ts**
 
 Append to `src/domains/ai/types/ai.types.ts` (keep all existing types):
 
@@ -153,12 +153,12 @@ export interface ApplierResult {
 export type ApplierFn = (action: AIAction, context: ApplierContext) => Promise<ApplierResult>;
 ```
 
-- [ ] **Step 4: Run test to verify it passes**
+- [x] **Step 4: Run test to verify it passes**
 
 Run: `npx vitest run src/domains/ai/types/__tests__/ai.types.test.ts`
 Expected: PASS
 
-- [ ] **Step 5: Commit**
+- [x] **Step 5: Commit**
 
 ```bash
 git add src/domains/ai/types/ai.types.ts src/domains/ai/types/__tests__/ai.types.test.ts
@@ -172,7 +172,7 @@ git commit -m "feat(ai): add AIAction, AIActionableResponse, and Applier types"
 **Files:**
 - Create: `src/domains/ai/appliers/registry.ts`
 
-- [ ] **Step 1: Write test**
+- [x] **Step 1: Write test**
 
 Create: `src/domains/ai/appliers/__tests__/registry.test.ts`
 
@@ -237,12 +237,12 @@ describe('Applier Registry', () => {
 });
 ```
 
-- [ ] **Step 2: Run test to verify it fails**
+- [x] **Step 2: Run test to verify it fails**
 
 Run: `npx vitest run src/domains/ai/appliers/__tests__/registry.test.ts`
 Expected: FAIL — module not found
 
-- [ ] **Step 3: Implement registry**
+- [x] **Step 3: Implement registry**
 
 Create: `src/domains/ai/appliers/registry.ts`
 
@@ -294,12 +294,12 @@ export function getRegisteredTypes(): AIActionType[] {
 }
 ```
 
-- [ ] **Step 4: Run test to verify it passes**
+- [x] **Step 4: Run test to verify it passes**
 
 Run: `npx vitest run src/domains/ai/appliers/__tests__/registry.test.ts`
 Expected: PASS
 
-- [ ] **Step 5: Commit**
+- [x] **Step 5: Commit**
 
 ```bash
 git add src/domains/ai/appliers/registry.ts src/domains/ai/appliers/__tests__/registry.test.ts
@@ -319,7 +319,7 @@ git commit -m "feat(ai): add applier registry with executeAction and executeActi
 - Create: `src/domains/ai/appliers/orcamento/erroApplier.ts`
 - Create: `src/domains/ai/appliers/orcamento/index.ts`
 
-- [ ] **Step 1: Write tests for all 6 orçamento appliers**
+- [x] **Step 1: Write tests for all 6 orçamento appliers**
 
 Create: `src/domains/ai/appliers/orcamento/__tests__/orcamentoAppliers.test.ts`
 
@@ -454,12 +454,12 @@ describe('erroApplier', () => {
 });
 ```
 
-- [ ] **Step 2: Run tests to verify they fail**
+- [x] **Step 2: Run tests to verify they fail**
 
 Run: `npx vitest run src/domains/ai/appliers/orcamento/__tests__/orcamentoAppliers.test.ts`
 Expected: FAIL
 
-- [ ] **Step 3: Implement precoApplier.ts**
+- [x] **Step 3: Implement precoApplier.ts**
 
 ```typescript
 import type { AIAction, ApplierContext, ApplierResult } from '../../types/ai.types';
@@ -497,7 +497,7 @@ export async function precoApplier(action: AIAction, ctx: ApplierContext): Promi
 }
 ```
 
-- [ ] **Step 4: Implement adicionarItemApplier.ts**
+- [x] **Step 4: Implement adicionarItemApplier.ts**
 
 ```typescript
 import type { AIAction, ApplierContext, ApplierResult } from '../../types/ai.types';
@@ -553,7 +553,7 @@ export async function adicionarItemApplier(action: AIAction, ctx: ApplierContext
 }
 ```
 
-- [ ] **Step 5: Implement materialApplier.ts**
+- [x] **Step 5: Implement materialApplier.ts**
 
 ```typescript
 import type { AIAction, ApplierContext, ApplierResult } from '../../types/ai.types';
@@ -621,7 +621,7 @@ export async function materialApplier(action: AIAction, ctx: ApplierContext): Pr
 }
 ```
 
-- [ ] **Step 6: Implement acabamentoApplier.ts**
+- [x] **Step 6: Implement acabamentoApplier.ts**
 
 ```typescript
 import type { AIAction, ApplierContext, ApplierResult } from '../../types/ai.types';
@@ -654,7 +654,7 @@ export async function acabamentoApplier(action: AIAction, ctx: ApplierContext): 
 }
 ```
 
-- [ ] **Step 7: Implement quantidadeApplier.ts**
+- [x] **Step 7: Implement quantidadeApplier.ts**
 
 ```typescript
 import type { AIAction, ApplierContext, ApplierResult } from '../../types/ai.types';
@@ -688,7 +688,7 @@ export async function quantidadeApplier(action: AIAction, ctx: ApplierContext): 
 }
 ```
 
-- [ ] **Step 8: Implement erroApplier.ts**
+- [x] **Step 8: Implement erroApplier.ts**
 
 ```typescript
 import type { AIAction, ApplierContext, ApplierResult } from '../../types/ai.types';
@@ -728,7 +728,7 @@ export async function erroApplier(action: AIAction, ctx: ApplierContext): Promis
 }
 ```
 
-- [ ] **Step 9: Create index barrel for orcamento appliers**
+- [x] **Step 9: Create index barrel for orcamento appliers**
 
 Create: `src/domains/ai/appliers/orcamento/index.ts`
 
@@ -741,12 +741,12 @@ export { quantidadeApplier } from './quantidadeApplier';
 export { erroApplier } from './erroApplier';
 ```
 
-- [ ] **Step 10: Run tests**
+- [x] **Step 10: Run tests**
 
 Run: `npx vitest run src/domains/ai/appliers/orcamento/__tests__/orcamentoAppliers.test.ts`
 Expected: PASS
 
-- [ ] **Step 11: Commit**
+- [x] **Step 11: Commit**
 
 ```bash
 git add src/domains/ai/appliers/orcamento/
@@ -775,7 +775,7 @@ git commit -m "feat(ai): add 6 orçamento appliers (preco, item, material, acaba
 - Create: `src/domains/ai/appliers/problemas/notificarApplier.ts`
 - Create: `src/domains/ai/appliers/problemas/index.ts`
 
-- [ ] **Step 1: Write tests for all 4 domain appliers**
+- [x] **Step 1: Write tests for all 4 domain appliers**
 
 Create: `src/domains/ai/appliers/__tests__/domainAppliers.test.ts`
 
@@ -784,38 +784,38 @@ Follow same pattern as Task 3 tests. Each applier:
 - Verify correct table is called via `supabase.from()`
 - Verify result has `success: true` and descriptive message
 
-- [ ] **Step 2: Implement composição appliers**
+- [x] **Step 2: Implement composição appliers**
 
 `modeloApplier.ts` — updates `proposta_itens.modelo_id` via `supabase.from('proposta_itens').update({ modelo_id })`.
 `servicoApplier.ts` — reuses same pattern as `adicionarItemApplier` for services.
 
-- [ ] **Step 3: Implement cliente appliers**
+- [x] **Step 3: Implement cliente appliers**
 
 `tarefaApplier.ts` — inserts into `tarefas_comerciais` table (existing: titulo, descricao, responsavel_id, data_limite, status).
 `contatoApplier.ts` — inserts into `tarefas_comerciais` with tipo='contato' for scheduled follow-up.
 `descontoApplier.ts` — updates `propostas.desconto` field.
 
-- [ ] **Step 4: Implement produção appliers**
+- [x] **Step 4: Implement produção appliers**
 
 `checklistApplier.ts` — inserts checklist items linked to pedido.
 `pendenciaApplier.ts` — updates status of blocking item.
 `responsavelApplier.ts` — updates `ordens_producao.responsavel_id` (NOT pedido_itens — column doesn't exist there).
 
-- [ ] **Step 5: Implement problemas appliers**
+- [x] **Step 5: Implement problemas appliers**
 
 `revalidarApplier.ts` — updates `propostas.validade` and `propostas.status`.
 `moverPedidoApplier.ts` — updates `pedidos.status` (respecting transition map from Sprint 1).
 `alertaApplier.ts` — inserts into `ai_alertas` table (existing).
 `notificarApplier.ts` — calls Supabase edge function or inserts notification record.
 
-- [ ] **Step 6: Create index barrel for each domain**
+- [x] **Step 6: Create index barrel for each domain**
 
-- [ ] **Step 7: Run all tests**
+- [x] **Step 7: Run all tests**
 
 Run: `npx vitest run src/domains/ai/appliers/`
 Expected: ALL PASS
 
-- [ ] **Step 8: Commit**
+- [x] **Step 8: Commit**
 
 ```bash
 git add src/domains/ai/appliers/composicao/ src/domains/ai/appliers/cliente/ src/domains/ai/appliers/producao/ src/domains/ai/appliers/problemas/
@@ -829,7 +829,7 @@ git commit -m "feat(ai): add composição, cliente, produção, and problemas ap
 **Files:**
 - Create: `src/domains/ai/appliers/registerAll.ts`
 
-- [ ] **Step 1: Write test**
+- [x] **Step 1: Write test**
 
 Create: `src/domains/ai/appliers/__tests__/registerAll.test.ts`
 
@@ -852,7 +852,7 @@ describe('registerAll', () => {
 });
 ```
 
-- [ ] **Step 2: Implement registerAll.ts**
+- [x] **Step 2: Implement registerAll.ts**
 
 ```typescript
 import { registerApplier } from './registry';
@@ -892,7 +892,7 @@ registerApplier('criar_alerta', alertaApplier);
 registerApplier('notificar_responsavel', notificarApplier);
 ```
 
-- [ ] **Step 3: Run test and commit**
+- [x] **Step 3: Run test and commit**
 
 Run: `npx vitest run src/domains/ai/appliers/__tests__/registerAll.test.ts`
 
@@ -910,7 +910,7 @@ git commit -m "feat(ai): register all 18 appliers in registerAll"
 **Files:**
 - Create: `src/domains/ai/components/AIStatusBadge.tsx`
 
-- [ ] **Step 1: Write test**
+- [x] **Step 1: Write test**
 
 Create: `src/domains/ai/components/__tests__/AIStatusBadge.test.tsx`
 
@@ -942,7 +942,7 @@ describe('AIStatusBadge', () => {
 });
 ```
 
-- [ ] **Step 2: Implement AIStatusBadge**
+- [x] **Step 2: Implement AIStatusBadge**
 
 ```typescript
 import { Loader2, CheckCircle, XCircle } from 'lucide-react';
@@ -971,7 +971,7 @@ export default function AIStatusBadge({ status, message }: AIStatusBadgeProps) {
 }
 ```
 
-- [ ] **Step 3: Run test and commit**
+- [x] **Step 3: Run test and commit**
 
 ```bash
 npx vitest run src/domains/ai/components/__tests__/AIStatusBadge.test.tsx
@@ -986,7 +986,7 @@ git commit -m "feat(ai): add AIStatusBadge component"
 **Files:**
 - Create: `src/domains/ai/components/AIActionPreview.tsx`
 
-- [ ] **Step 1: Implement AIActionPreview**
+- [x] **Step 1: Implement AIActionPreview**
 
 ```typescript
 import { brl } from '@/shared/utils/format';
@@ -1062,7 +1062,7 @@ function buildDiffRows(atual: unknown, sugerido: unknown, tipo: string) {
 }
 ```
 
-- [ ] **Step 2: Commit**
+- [x] **Step 2: Commit**
 
 ```bash
 git add src/domains/ai/components/AIActionPreview.tsx
@@ -1076,7 +1076,7 @@ git commit -m "feat(ai): add AIActionPreview diff component"
 **Files:**
 - Create: `src/domains/ai/components/AIActionCard.tsx`
 
-- [ ] **Step 1: Write test**
+- [x] **Step 1: Write test**
 
 Create: `src/domains/ai/components/__tests__/AIActionCard.test.tsx`
 
@@ -1125,7 +1125,7 @@ describe('AIActionCard', () => {
 });
 ```
 
-- [ ] **Step 2: Implement AIActionCard**
+- [x] **Step 2: Implement AIActionCard**
 
 ```typescript
 import { useState } from 'react';
@@ -1205,7 +1205,7 @@ export default function AIActionCard({ action, selected, status, statusMessage, 
 }
 ```
 
-- [ ] **Step 3: Run test and commit**
+- [x] **Step 3: Run test and commit**
 
 ```bash
 npx vitest run src/domains/ai/components/__tests__/AIActionCard.test.tsx
@@ -1220,7 +1220,7 @@ git commit -m "feat(ai): add AIActionCard with checkbox, preview, and status"
 **Files:**
 - Create: `src/domains/ai/components/AIKPIBar.tsx`
 
-- [ ] **Step 1: Implement AIKPIBar**
+- [x] **Step 1: Implement AIKPIBar**
 
 ```typescript
 import { brl } from '@/shared/utils/format';
@@ -1271,7 +1271,7 @@ export default function AIKPIBar({ kpis }: AIKPIBarProps) {
 }
 ```
 
-- [ ] **Step 2: Commit**
+- [x] **Step 2: Commit**
 
 ```bash
 git add src/domains/ai/components/AIKPIBar.tsx
@@ -1285,7 +1285,7 @@ git commit -m "feat(ai): add AIKPIBar component for sidebar header metrics"
 **Files:**
 - Create: `src/domains/ai/components/AIApplyBar.tsx`
 
-- [ ] **Step 1: Implement AIApplyBar**
+- [x] **Step 1: Implement AIApplyBar**
 
 ```typescript
 import { Loader2, RefreshCw, CheckSquare } from 'lucide-react';
@@ -1352,7 +1352,7 @@ export default function AIApplyBar({
 }
 ```
 
-- [ ] **Step 2: Commit**
+- [x] **Step 2: Commit**
 
 ```bash
 git add src/domains/ai/components/AIApplyBar.tsx
@@ -1366,7 +1366,7 @@ git commit -m "feat(ai): add AIApplyBar footer component"
 **Files:**
 - Create: `src/domains/ai/components/AISidebar.tsx`
 
-- [ ] **Step 1: Write test**
+- [x] **Step 1: Write test**
 
 Create: `src/domains/ai/components/__tests__/AISidebar.test.tsx`
 
@@ -1448,7 +1448,7 @@ describe('AISidebar', () => {
 });
 ```
 
-- [ ] **Step 2: Implement AISidebar**
+- [x] **Step 2: Implement AISidebar**
 
 ```typescript
 import { useState, useCallback } from 'react';
@@ -1620,7 +1620,7 @@ export default function AISidebar({
 }
 ```
 
-- [ ] **Step 3: Run tests and commit**
+- [x] **Step 3: Run tests and commit**
 
 ```bash
 npx vitest run src/domains/ai/components/__tests__/AISidebar.test.tsx
@@ -1637,7 +1637,7 @@ git commit -m "feat(ai): add AISidebar main component with selection, apply, and
 **Files:**
 - Create: `src/domains/ai/hooks/useAISidebar.ts`
 
-- [ ] **Step 1: Implement useAISidebar**
+- [x] **Step 1: Implement useAISidebar**
 
 ```typescript
 import { useState, useCallback } from 'react';
@@ -1709,7 +1709,7 @@ export function useAISidebar({ entityType, entityId, onActionsApplied }: UseAISi
 }
 ```
 
-- [ ] **Step 2: Commit**
+- [x] **Step 2: Commit**
 
 ```bash
 git add src/domains/ai/hooks/useAISidebar.ts
@@ -1727,7 +1727,7 @@ git commit -m "feat(ai): add useAISidebar hook with apply logic"
 - Modify: `src/domains/ai/hooks/useDetectarProblemas.ts`
 - Modify: `src/domains/ai/hooks/useComposicaoProduto.ts`
 
-- [ ] **Step 1: Update useAnalisarOrcamento.ts**
+- [x] **Step 1: Update useAnalisarOrcamento.ts**
 
 Change `AIResponse` import to `AIActionableResponse`. Update return type:
 
@@ -1749,11 +1749,11 @@ export function useAnalisarOrcamento() {
 }
 ```
 
-- [ ] **Step 2: Update remaining 4 hooks with same pattern**
+- [x] **Step 2: Update remaining 4 hooks with same pattern**
 
 Each hook: change `AIResponse` → `AIActionableResponse` in import and return type.
 
-- [ ] **Step 3: Commit**
+- [x] **Step 3: Commit**
 
 ```bash
 git add src/domains/ai/hooks/
@@ -1767,7 +1767,7 @@ git commit -m "refactor(ai): update all 5 hooks to return AIActionableResponse"
 **Files:**
 - Modify: `src/domains/comercial/pages/OrcamentoEditorPage.tsx`
 
-- [ ] **Step 1: Add imports**
+- [x] **Step 1: Add imports**
 
 Add at top of file:
 
@@ -1776,7 +1776,7 @@ import AISidebar from '@/domains/ai/components/AISidebar';
 import { useAISidebar } from '@/domains/ai/hooks/useAISidebar';
 ```
 
-- [ ] **Step 2: Replace analiseResult state with useAISidebar**
+- [x] **Step 2: Replace analiseResult state with useAISidebar**
 
 Remove: `const [analiseResult, setAnaliseResult] = useState<AIResponse | null>(null);`
 
@@ -1793,7 +1793,7 @@ const aiSidebar = useAISidebar({
 });
 ```
 
-- [ ] **Step 3: Update AIButton onClick**
+- [x] **Step 3: Update AIButton onClick**
 
 Replace the `onSuccess` callback to open sidebar:
 
@@ -1809,7 +1809,7 @@ Replace the `onSuccess` callback to open sidebar:
 />
 ```
 
-- [ ] **Step 4: Replace OrcamentoAnalise with AISidebar**
+- [x] **Step 4: Replace OrcamentoAnalise with AISidebar**
 
 Remove the `<OrcamentoAnalise>` render block. Add at the end of the component's return JSX:
 
@@ -1828,16 +1828,16 @@ Remove the `<OrcamentoAnalise>` render block. Add at the end of the component's 
 />
 ```
 
-- [ ] **Step 5: Remove unused imports**
+- [x] **Step 5: Remove unused imports**
 
 Remove imports for `OrcamentoAnalise`, `AIResultPanel`, old `AIResponse` type.
 
-- [ ] **Step 6: Build check**
+- [x] **Step 6: Build check**
 
 Run: `npx tsc --noEmit`
 Expected: No errors
 
-- [ ] **Step 7: Commit**
+- [x] **Step 7: Commit**
 
 ```bash
 git add src/domains/comercial/pages/OrcamentoEditorPage.tsx
@@ -1851,7 +1851,7 @@ git commit -m "feat(ai): integrate AISidebar into OrcamentoEditorPage"
 **Files:**
 - Modify: `src/domains/clientes/pages/ClienteDetailPage.tsx`
 
-- [ ] **Step 1: Add useAISidebar + imports, replace ClienteResumo with AISidebar**
+- [x] **Step 1: Add useAISidebar + imports, replace ClienteResumo with AISidebar**
 
 Same pattern as Task 14:
 - `useAISidebar({ entityType: 'cliente', entityId: id })`
@@ -1859,7 +1859,7 @@ Same pattern as Task 14:
 - AISidebar renders at bottom of JSX
 - Remove `ClienteResumo` usage
 
-- [ ] **Step 2: Build check and commit**
+- [x] **Step 2: Build check and commit**
 
 ```bash
 npx tsc --noEmit
@@ -1874,14 +1874,14 @@ git commit -m "feat(ai): integrate AISidebar into ClienteDetailPage"
 **Files:**
 - Modify: `src/domains/producao/pages/PedidoDetailPage.tsx` (or find the correct pedido detail page)
 
-- [ ] **Step 1: Add useAISidebar + imports, replace ProducaoBriefing with AISidebar**
+- [x] **Step 1: Add useAISidebar + imports, replace ProducaoBriefing with AISidebar**
 
 Same pattern as Task 14:
 - `useAISidebar({ entityType: 'pedido', entityId: id })`
 - AIButton "Briefing Produção" opens sidebar on success
 - AISidebar renders at bottom of JSX
 
-- [ ] **Step 2: Build check and commit**
+- [x] **Step 2: Build check and commit**
 
 ```bash
 npx tsc --noEmit
@@ -1896,13 +1896,13 @@ git commit -m "feat(ai): integrate AISidebar into PedidoDetailPage"
 **Files:**
 - Modify: `src/domains/comercial/pages/DashboardDiretor.tsx`
 
-- [ ] **Step 1: Replace ProblemasPanel with AISidebar integration**
+- [x] **Step 1: Replace ProblemasPanel with AISidebar integration**
 
 - `useAISidebar({ entityType: 'geral', entityId: 'dashboard' })`
 - Detectar problemas button opens sidebar
 - Each problem action card has entity-level actions
 
-- [ ] **Step 2: Build check and commit**
+- [x] **Step 2: Build check and commit**
 
 ```bash
 npx tsc --noEmit
@@ -1919,7 +1919,7 @@ git commit -m "feat(ai): integrate AISidebar into DashboardDiretor"
 **Files:**
 - Modify: `supabase/functions/ai-shared/ai-types.ts`
 
-- [ ] **Step 1: Add AIActionableResponse type**
+- [x] **Step 1: Add AIActionableResponse type**
 
 Append to the existing file (keep all existing types for backward compat):
 
@@ -1948,7 +1948,7 @@ export interface AIActionableResponse {
 }
 ```
 
-- [ ] **Step 2: Commit**
+- [x] **Step 2: Commit**
 
 ```bash
 git add supabase/functions/ai-shared/ai-types.ts
@@ -1962,7 +1962,7 @@ git commit -m "feat(ai): add AIActionableResponse type to Edge Functions"
 **Files:**
 - Modify: `supabase/functions/ai-shared/prompt-builder.ts`
 
-- [ ] **Step 1: Add universal action instruction**
+- [x] **Step 1: Add universal action instruction**
 
 Add a new constant `ACTION_INSTRUCTION` and update all 5 prompts to use the new JSON format with `kpis` and `actions` arrays instead of the old `risks`/`suggestions`/`structured_data` format.
 
@@ -2018,11 +2018,11 @@ IMPORTANTE: Use IDs reais dos itens/materiais/servicos do contexto fornecido.
 Sempre preencha valor_atual com dados reais e valor_sugerido com a correcao.`,
 ```
 
-- [ ] **Step 2: Update remaining 4 prompts**
+- [x] **Step 2: Update remaining 4 prompts**
 
 Apply same pattern to `resumoCliente`, `briefingProducao`, `detectarProblemas`, `composicaoProduto` — each with their allowed types and specific KPIs.
 
-- [ ] **Step 3: Commit**
+- [x] **Step 3: Commit**
 
 ```bash
 git add supabase/functions/ai-shared/prompt-builder.ts
@@ -2040,7 +2040,7 @@ git commit -m "feat(ai): update all 5 prompts for actionable response format"
 - Modify: `supabase/functions/ai-detectar-problemas/index.ts`
 - Modify: `supabase/functions/ai-composicao-produto/index.ts`
 
-- [ ] **Step 1: Update ai-analisar-orcamento**
+- [x] **Step 1: Update ai-analisar-orcamento**
 
 Main changes:
 1. Enrich context with available `materiais` and `servicos` IDs (so AI can suggest real IDs)
@@ -2083,11 +2083,11 @@ Update `callOpenRouter` config:
 const result = await callOpenRouter(systemPrompt, userPrompt, { max_tokens: 3000 });
 ```
 
-- [ ] **Step 2: Update remaining 4 edge functions**
+- [x] **Step 2: Update remaining 4 edge functions**
 
 Same pattern: enrich context with available entities, increase max_tokens to 3000.
 
-- [ ] **Step 3: Commit**
+- [x] **Step 3: Commit**
 
 ```bash
 git add supabase/functions/
@@ -2100,26 +2100,26 @@ git commit -m "feat(ai): update all 5 Edge Functions for actionable response for
 
 ### Task 20: Full Test Suite
 
-- [ ] **Step 1: Run all tests**
+- [x] **Step 1: Run all tests**
 
 Run: `npx vitest run`
 Expected: All existing tests pass + new tests pass
 
-- [ ] **Step 2: Type check**
+- [x] **Step 2: Type check**
 
 Run: `npx tsc --noEmit`
 Expected: No type errors
 
-- [ ] **Step 3: Build check**
+- [x] **Step 3: Build check**
 
 Run: `npx vite build`
 Expected: Build succeeds
 
-- [ ] **Step 4: Commit if any fixes needed**
+- [x] **Step 4: Commit if any fixes needed**
 
 ### Task 21: Cleanup Deprecated Components
 
-- [ ] **Step 1: Add deprecation comments to old components**
+- [x] **Step 1: Add deprecation comments to old components**
 
 Add `/** @deprecated Use AISidebar instead */` to:
 - `src/domains/ai/components/AIResultPanel.tsx`
@@ -2127,7 +2127,7 @@ Add `/** @deprecated Use AISidebar instead */` to:
 
 Do NOT delete them yet — other pages may still reference them.
 
-- [ ] **Step 2: Commit**
+- [x] **Step 2: Commit**
 
 ```bash
 git add src/domains/ai/components/AIResultPanel.tsx src/domains/ai/components/OrcamentoAnalise.tsx
@@ -2136,10 +2136,10 @@ git commit -m "chore(ai): mark AIResultPanel and OrcamentoAnalise as deprecated"
 
 ### Task 22: Final Commit & Summary
 
-- [ ] **Step 1: Verify git status is clean**
+- [x] **Step 1: Verify git status is clean**
 
 Run: `git status`
 
-- [ ] **Step 2: Push branch**
+- [x] **Step 2: Push branch**
 
 Run: `git push -u origin HEAD`
