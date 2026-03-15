@@ -54,10 +54,14 @@ import { toast } from "sonner";
 import { orcamentoService } from "../services/orcamento.service";
 import { CondicoesPagamento, type PaymentConditions } from "../components/CondicoesPagamento";
 import AIButton from '@/domains/ai/components/AIButton';
+/** @deprecated Use AISidebar instead */
 import OrcamentoAnalise from '@/domains/ai/components/OrcamentoAnalise';
 import ComposicaoSugestao from '@/domains/ai/components/ComposicaoSugestao';
+import AISidebar from '@/domains/ai/components/AISidebar';
+import { useAISidebar } from '@/domains/ai/hooks/useAISidebar';
 import { useAnalisarOrcamento } from '@/domains/ai/hooks/useAnalisarOrcamento';
 import { useComposicaoProduto } from '@/domains/ai/hooks/useComposicaoProduto';
+import { useQueryClient } from '@tanstack/react-query';
 import type { AIResponse } from '@/domains/ai/types/ai.types';
 
 // ─── Item editor state ──────────────────────────────────────────────────────
@@ -228,10 +232,17 @@ export default function OrcamentoEditorPage() {
   const [showTemplateModal, setShowTemplateModal] = useState(false);
 
   // ─── AI state ────────────────────────────────────────────────────────────
-  const [analiseResult, setAnaliseResult] = useState<AIResponse | null>(null);
+  const queryClient = useQueryClient();
   const [composicaoResult, setComposicaoResult] = useState<AIResponse | null>(null);
   const analisarOrcamento = useAnalisarOrcamento();
   const composicaoProduto = useComposicaoProduto();
+  const aiSidebar = useAISidebar({
+    entityType: 'proposta',
+    entityId: id ?? '',
+    onActionsApplied: () => {
+      queryClient.invalidateQueries({ queryKey: ['proposta', id] });
+    },
+  });
 
   // ─── Payment conditions ──────────────────────────────────────────────────
   const [paymentConditions, setPaymentConditions] = useState<PaymentConditions>({
@@ -666,7 +677,7 @@ export default function OrcamentoEditorPage() {
               label="Analisar Orcamento"
               onClick={() => {
                 analisarOrcamento.mutate(id!, {
-                  onSuccess: (data) => setAnaliseResult(data),
+                  onSuccess: (data) => aiSidebar.open(data),
                 });
               }}
               isLoading={analisarOrcamento.isPending}
@@ -1217,14 +1228,6 @@ export default function OrcamentoEditorPage() {
       />
 
       {/* ══════════ AI RESULTS ══════════ */}
-      {analiseResult && (
-        <div className="mt-4">
-          <OrcamentoAnalise
-            result={analiseResult}
-            onClose={() => setAnaliseResult(null)}
-          />
-        </div>
-      )}
 
       {composicaoResult && (
         <div className="mt-4">
@@ -1240,6 +1243,19 @@ export default function OrcamentoEditorPage() {
         open={showTemplateModal}
         onClose={() => setShowTemplateModal(false)}
         onSelect={handleTemplateSelect}
+      />
+
+      <AISidebar
+        isOpen={aiSidebar.isOpen}
+        response={aiSidebar.response}
+        isLoading={analisarOrcamento.isPending}
+        onClose={aiSidebar.close}
+        onApply={aiSidebar.applyActions}
+        onReanalyze={() => analisarOrcamento.mutate(id!, {
+          onSuccess: (data) => aiSidebar.setResponse(data),
+        })}
+        isReanalyzing={analisarOrcamento.isPending}
+        title="Análise do Orçamento"
       />
     </div>
   );
