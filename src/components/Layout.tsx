@@ -14,6 +14,7 @@ import {
 import CommandPalette from "@/shared/components/CommandPalette";
 import Breadcrumbs from "@/shared/components/Breadcrumbs";
 import { NotificationBadge } from "@/components/NotificationBadge";
+import AIAlertsBadge from '@/domains/ai/components/AIAlertsBadge';
 
 // ---------------------------------------------------------------------------
 // Lucide Icons — mapped by string name from navigation.ts
@@ -386,6 +387,7 @@ export default function Layout() {
           <CromaLogoFallback />
         </div>
         <div className="flex items-center gap-2">
+          <AIAlertsBadge onClick={() => window.location.href = '/dashboard'} />
           <button
             onClick={() => setCmdOpen(true)}
             className="w-9 h-9 flex items-center justify-center rounded-xl text-slate-500 hover:bg-slate-100 transition-colors"
