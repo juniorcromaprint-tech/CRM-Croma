@@ -25,6 +25,7 @@ export function useCriarOcorrencia() {
     mutationFn: qualidadeService.criarOcorrencia,
     onSuccess: () => {
       qc.invalidateQueries({ queryKey: ["ocorrencias"] });
+      qc.invalidateQueries({ queryKey: ["qualidade-kpis"] });
       showSuccess("Ocorrência registrada");
     },
     onError: () => showError("Erro ao registrar ocorrência"),
@@ -39,6 +40,7 @@ export function useAtualizarOcorrencia() {
     onSuccess: () => {
       qc.invalidateQueries({ queryKey: ["ocorrencias"] });
       qc.invalidateQueries({ queryKey: ["ocorrencia"] });
+      qc.invalidateQueries({ queryKey: ["qualidade-kpis"] });
       showSuccess("Ocorrência atualizada");
     },
     onError: () => showError("Erro ao atualizar ocorrência"),
