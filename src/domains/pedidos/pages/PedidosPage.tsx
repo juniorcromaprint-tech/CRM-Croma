@@ -711,6 +711,13 @@ export default function PedidosPage() {
                           {brl(pedido.valor_total ?? 0)}
                         </p>
                       </div>
+                      <button
+                        onClick={(e) => { e.stopPropagation(); navigate(`/os/${pedido.id}`); }}
+                        title="Ordem de Serviço"
+                        className="p-1.5 rounded-lg text-slate-300 hover:text-blue-600 hover:bg-blue-50 transition-colors opacity-0 group-hover:opacity-100"
+                      >
+                        <FileText size={16} />
+                      </button>
                       {isAdmin && (
                         <button
                           onClick={(e) => { e.stopPropagation(); setDeleteId(pedido.id); setDeleteName(pedido.numero); }}

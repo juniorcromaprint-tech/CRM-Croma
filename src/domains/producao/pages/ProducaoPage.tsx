@@ -1,4 +1,5 @@
 import React, { useState, useMemo, useCallback, useRef, useEffect, type DragEvent } from "react";
+import { useNavigate } from "react-router-dom";
 import { ilikeTerm } from "@/shared/utils/searchUtils";
 import { supabase } from "@/integrations/supabase/client";
 import { criarOrdemInstalacao } from "@/domains/instalacao/services/instalacao-criacao.service";
@@ -65,6 +66,7 @@ import {
   ClipboardList,
   Cog,
   CheckCircle,
+  FileText,
 } from "lucide-react";
 
 // ===========================================================================
@@ -361,6 +363,7 @@ function SkeletonRow() {
 const PAGE_SIZE = 20;
 
 export default function ProducaoPage() {
+  const navigate = useNavigate();
   const queryClient = useQueryClient();
 
   // --- State ---
@@ -1154,10 +1157,19 @@ export default function ProducaoPage() {
                                     {getItemDescricao(op)}
                                   </p>
                                 </div>
-                                <GripVertical
-                                  size={14}
-                                  className="text-slate-300 group-hover:text-slate-400 mt-0.5 flex-shrink-0"
-                                />
+                                <div className="flex items-center gap-0.5 flex-shrink-0">
+                                  <button
+                                    onClick={(e) => { e.stopPropagation(); navigate(`/os/op/${op.id}`); }}
+                                    title="Ordem de Serviço"
+                                    className="p-1 rounded-lg text-slate-300 hover:text-blue-600 hover:bg-blue-50 transition-colors opacity-0 group-hover:opacity-100"
+                                  >
+                                    <FileText size={13} />
+                                  </button>
+                                  <GripVertical
+                                    size={14}
+                                    className="text-slate-300 group-hover:text-slate-400 mt-0.5"
+                                  />
+                                </div>
                               </div>
 
                               {/* Progress */}
@@ -1269,6 +1281,13 @@ export default function ProducaoPage() {
                             </div>
                             <Progress value={progress} className="h-1.5" />
                           </div>
+                          <button
+                            onClick={(e) => { e.stopPropagation(); navigate(`/os/op/${op.id}`); }}
+                            title="Ordem de Serviço"
+                            className="p-1.5 rounded-lg text-slate-300 hover:text-blue-600 hover:bg-blue-50 transition-colors opacity-0 group-hover:opacity-100"
+                          >
+                            <FileText size={16} />
+                          </button>
                           <ChevronRight
                             className="text-slate-300 group-hover:text-blue-600 transition-colors"
                             size={20}

@@ -266,6 +266,15 @@ export default function PedidoDetailPage() {
             <p className="text-2xl font-bold text-slate-800">{brl(pedido.valor_total)}</p>
             <p className="text-xs text-slate-500">Valor total</p>
           </div>
+          <Button
+            size="sm"
+            variant="outline"
+            onClick={() => navigate('/os/' + id)}
+            className="rounded-xl gap-2"
+          >
+            <FileText size={16} />
+            Ordem de Serviço
+          </Button>
           {['produzido', 'aguardando_instalacao', 'em_instalacao', 'concluido'].includes(pedido.status) && (
             <Button
               size="sm"
