@@ -64,7 +64,7 @@ export default function ClientesPage() {
 
       let query = supabase
         .from("clientes")
-        .select("*, cliente_unidades(count)", { count: "exact" })
+        .select("*", { count: "exact" })
         .eq("ativo", true)
         .order("nome_fantasia", { ascending: true })
         .range(from, to);
@@ -214,9 +214,7 @@ export default function ClientesPage() {
                       {c.cidade && (
                         <span className="flex items-center gap-1"><MapPin size={13} /> {c.cidade}/{c.estado}</span>
                       )}
-                      {c.cliente_unidades?.[0]?.count > 0 && (
-                        <span className="text-xs text-blue-500 font-medium">{c.cliente_unidades[0].count} unidade(s)</span>
-                      )}
+                      {/* unidades count removido - tabela vazia */}
                     </div>
                   </div>
                   <ChevronRight size={18} className="text-slate-300 group-hover:text-blue-500 transition-colors mt-1" />
