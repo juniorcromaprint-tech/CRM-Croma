@@ -199,7 +199,7 @@ async function atualizarStatusPedidoSeTodasOpsConcluidas(opId: string): Promise<
     .from('ordens_producao')
     .select('id', { count: 'exact', head: true })
     .eq('pedido_id', op.pedido_id)
-    .not('status', 'in', '("concluida","cancelada")');
+    .not('status', 'in', '("finalizado","cancelada")');
 
   // Se todas concluídas (count === 0), atualizar pedido
   if (count === 0) {
