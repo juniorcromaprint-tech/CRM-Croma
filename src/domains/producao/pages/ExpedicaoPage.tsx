@@ -108,17 +108,17 @@ export default function ExpedicaoPage() {
                         </DropdownMenuTrigger>
                         <DropdownMenuContent align="end">
                           <DropdownMenuItem
-                            onClick={() => liberar.mutate({ pedidoId: p.id, tipo: 'instalacao' })}
+                            onClick={() => liberar.mutate({ pedidoId: p.id, tipo: 'instalacao', version: p.version })}
                           >
                             <MapPin size={14} className="mr-2" /> Enviar p/ Instalação
                           </DropdownMenuItem>
                           <DropdownMenuItem
-                            onClick={() => liberar.mutate({ pedidoId: p.id, tipo: 'retirada' })}
+                            onClick={() => liberar.mutate({ pedidoId: p.id, tipo: 'retirada', version: p.version })}
                           >
                             <Package size={14} className="mr-2" /> Retirada pelo Cliente
                           </DropdownMenuItem>
                           <DropdownMenuItem
-                            onClick={() => liberar.mutate({ pedidoId: p.id, tipo: 'envio' })}
+                            onClick={() => liberar.mutate({ pedidoId: p.id, tipo: 'envio', version: p.version })}
                           >
                             <Truck size={14} className="mr-2" /> Enviar por Transportadora
                           </DropdownMenuItem>
