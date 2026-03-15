@@ -7,6 +7,7 @@ import { QRCodeSVG } from 'qrcode.react';
 import { formatDate } from '@/shared/utils/format';
 import type { OSData, OSOPData, OSItem, OSEtapa } from '../../types/ordem-servico';
 import { ETAPA_STATUS_ICON } from '../../types/ordem-servico';
+import { CROMA_LOGO_BASE64 } from '@/shared/constants/logo';
 
 // ---------------------------------------------------------------------------
 // Props
@@ -125,58 +126,111 @@ const styles = {
 // Etapas Timeline
 // ---------------------------------------------------------------------------
 
+// Production process icons (Mubisys style)
+const PROCESS_ICONS: Record<string, string> = {
+  arquivo: '📁',
+  arquivos: '📁',
+  arte: '🎨',
+  impressao: '🖨️',
+  impressão: '🖨️',
+  corte: '✂️',
+  acabamento: '🔧',
+  acabamentos: '🔧',
+  laminacao: '🔧',
+  laminação: '🔧',
+  montagem: '🔩',
+  conferencia: '✅',
+  conferência: '✅',
+  expedicao: '📦',
+  expedição: '📦',
+  instalacao: '🏗️',
+  instalação: '🏗️',
+  entrega: '🚚',
+};
+
+function getProcessIcon(nome: string): string {
+  const key = nome.toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g, '');
+  return PROCESS_ICONS[key] ?? ETAPA_STATUS_ICON['pendente'] ?? '⏳';
+}
+
 function EtapasTimeline({ etapas }: { etapas: OSEtapa[] }) {
   if (!etapas || etapas.length === 0) return null;
 
   const sorted = [...etapas].sort((a, b) => a.ordem - b.ordem);
+  const totalMinutos = sorted.reduce((s, e) => s + (e.tempo_estimado_min ?? 0), 0);
 
   return (
-    <div style={{ marginBottom: '8px' }}>
-      <div style={styles.sectionTitle}>Etapas de Produção</div>
-      <div style={{ display: 'flex', alignItems: 'center', flexWrap: 'wrap' as const, gap: '0' }}>
+    <div style={{ marginBottom: '10px' }}>
+      <div style={{
+        display: 'flex',
+        justifyContent: 'space-between',
+        alignItems: 'center',
+        marginBottom: '8px',
+      }}>
+        <div style={styles.sectionTitle}>Processo de Produção</div>
+        {totalMinutos > 0 && (
+          <div style={{ fontSize: '9px', color: '#64748b', fontWeight: '600' }}>
+            Tempo total estimado: {totalMinutos >= 60 ? `${Math.floor(totalMinutos / 60)}h${totalMinutos % 60 > 0 ? ` ${totalMinutos % 60}min` : ''}` : `${totalMinutos}min`}
+          </div>
+        )}
+      </div>
+      <div style={{
+        display: 'flex',
+        alignItems: 'stretch',
+        gap: '0',
+        border: '1px solid #e2e8f0',
+        borderRadius: '6px',
+        overflow: 'hidden',
+      }}>
         {sorted.map((etapa, idx) => {
           const isConcluida = etapa.status === 'concluida';
           const isAndamento = etapa.status === 'em_andamento';
-          const icon = ETAPA_STATUS_ICON[etapa.status] ?? '⏳';
-          const circleColor = isConcluida ? '#16a34a' : isAndamento ? '#2563eb' : '#94a3b8';
-          const lineColor = isConcluida ? '#16a34a' : '#e2e8f0';
+          const bgColor = isConcluida ? '#dcfce7' : isAndamento ? '#dbeafe' : '#f8fafc';
+          const borderColor = isConcluida ? '#16a34a' : isAndamento ? '#2563eb' : '#e2e8f0';
+          const icon = getProcessIcon(etapa.nome);
 
           return (
-            <React.Fragment key={etapa.id}>
-              <div style={{ display: 'flex', flexDirection: 'column' as const, alignItems: 'center', minWidth: '60px' }}>
-                <div style={{
-                  width: '28px',
-                  height: '28px',
-                  borderRadius: '50%',
-                  backgroundColor: circleColor,
-                  display: 'flex',
-                  alignItems: 'center',
-                  justifyContent: 'center',
-                  fontSize: '13px',
-                  color: '#ffffff',
-                  border: `2px solid ${circleColor}`,
-                }}>
-                  {icon}
-                </div>
-                <div style={{ fontSize: '9px', color: '#475569', marginTop: '3px', textAlign: 'center' as const, maxWidth: '60px' }}>
-                  {etapa.nome}
-                </div>
-                {etapa.tempo_estimado_min != null && (
-                  <div style={{ fontSize: '8px', color: '#94a3b8' }}>
-                    {etapa.tempo_estimado_min}min
-                  </div>
-                )}
+            <div
+              key={etapa.id}
+              style={{
+                flex: 1,
+                textAlign: 'center',
+                padding: '8px 4px',
+                backgroundColor: bgColor,
+                borderRight: idx < sorted.length - 1 ? `1px solid ${borderColor}` : 'none',
+                borderBottom: isAndamento ? `3px solid #2563eb` : isConcluida ? '3px solid #16a34a' : '3px solid transparent',
+                position: 'relative',
+              }}
+            >
+              <div style={{ fontSize: '18px', marginBottom: '3px' }}>{icon}</div>
+              <div style={{
+                fontSize: '8px',
+                fontWeight: '700',
+                color: isConcluida ? '#166534' : isAndamento ? '#1e40af' : '#475569',
+                textTransform: 'uppercase',
+                letterSpacing: '0.02em',
+                lineHeight: '1.2',
+              }}>
+                {etapa.nome}
               </div>
-              {idx < sorted.length - 1 && (
+              {etapa.tempo_estimado_min != null && etapa.tempo_estimado_min > 0 && (
                 <div style={{
-                  flex: '1',
-                  height: '2px',
-                  backgroundColor: lineColor,
-                  minWidth: '12px',
-                  marginBottom: '20px',
-                }} />
+                  fontSize: '8px',
+                  color: '#94a3b8',
+                  marginTop: '2px',
+                }}>
+                  {etapa.tempo_estimado_min}min
+                </div>
               )}
-            </React.Fragment>
+              {isConcluida && (
+                <div style={{
+                  fontSize: '8px',
+                  color: '#16a34a',
+                  fontWeight: '700',
+                  marginTop: '1px',
+                }}>✓</div>
+              )}
+            </div>
           );
         })}
       </div>
@@ -194,50 +248,105 @@ function ItemBlock({ item, index }: { item: OSItem; index: number }) {
   const areaStr = item.area_m2 != null ? item.area_m2.toFixed(4) : null;
 
   return (
-    <div style={{ pageBreakInside: 'avoid', marginBottom: '10px' }}>
-      {/* Item header */}
+    <div style={{ pageBreakInside: 'avoid', marginBottom: '12px' }}>
+      {/* Item header — blue bar (Mubisys style) */}
       <div style={{
         display: 'flex',
         justifyContent: 'space-between',
         alignItems: 'center',
-        backgroundColor: '#f8fafc',
-        padding: '6px 8px',
-        borderRadius: '4px',
-        borderLeft: '3px solid #2563eb',
-        marginBottom: '6px',
+        backgroundColor: '#1d4ed8',
+        padding: '7px 10px',
+        borderRadius: '4px 4px 0 0',
+        color: '#ffffff',
       }}>
-        <div>
-          <span style={{ fontWeight: '700', fontSize: '12px', color: '#1e293b' }}>
-            Item {index + 1} — {item.descricao}
+        <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+          <span style={{
+            backgroundColor: 'rgba(255,255,255,0.2)',
+            borderRadius: '4px',
+            padding: '1px 7px',
+            fontSize: '11px',
+            fontWeight: '800',
+          }}>
+            {index + 1}
           </span>
-          {item.modelo_nome && (
-            <span style={{ fontSize: '10px', color: '#64748b', marginLeft: '8px' }}>
-              [{item.modelo_nome}]
+          <span style={{ fontWeight: '700', fontSize: '12px' }}>
+            {item.descricao}
+          </span>
+        </div>
+        <div style={{ display: 'flex', alignItems: 'center', gap: '12px', fontSize: '11px' }}>
+          {item.op_numero && (
+            <span style={{
+              backgroundColor: 'rgba(255,255,255,0.2)',
+              borderRadius: '4px',
+              padding: '1px 7px',
+              fontWeight: '600',
+            }}>
+              OP: {item.op_numero}
             </span>
           )}
-        </div>
-        <div style={{ fontSize: '11px', fontWeight: '600', color: '#1e40af' }}>
-          Qtd: {item.quantidade} {item.unidade}
+          <span style={{ fontWeight: '700' }}>
+            Qtd: {item.quantidade} {item.unidade}
+          </span>
         </div>
       </div>
 
-      {/* Dimensions + Acabamentos */}
-      <div style={{ display: 'flex', gap: '16px', marginBottom: '4px', fontSize: '10px', color: '#475569' }}>
-        {larguraM && alturaM && (
-          <span>Dimensões: {larguraM}m × {alturaM}m{areaStr ? ` = ${areaStr} m²` : ''}</span>
-        )}
-        {item.acabamentos && item.acabamentos.length > 0 && (
-          <span>Acabamentos: {item.acabamentos.join(', ')}</span>
-        )}
-        {item.op_numero && (
-          <span style={{ color: '#7c3aed' }}>OP: {item.op_numero}</span>
-        )}
+      {/* Structured info grid (Mubisys style: Produto | Modelo | Acabamentos | Dimensões) */}
+      <div style={{
+        display: 'grid',
+        gridTemplateColumns: '1fr 1fr 1fr 1fr',
+        border: '1px solid #e2e8f0',
+        borderTop: 'none',
+        fontSize: '10px',
+      }}>
+        {/* Produto */}
+        <div style={{ padding: '5px 8px', borderRight: '1px solid #e2e8f0' }}>
+          <div style={{ fontSize: '8px', fontWeight: '700', color: '#94a3b8', textTransform: 'uppercase', letterSpacing: '0.05em', marginBottom: '2px' }}>
+            Produto
+          </div>
+          <div style={{ color: '#1e293b', fontWeight: '500' }}>{item.descricao}</div>
+        </div>
+        {/* Modelo */}
+        <div style={{ padding: '5px 8px', borderRight: '1px solid #e2e8f0' }}>
+          <div style={{ fontSize: '8px', fontWeight: '700', color: '#94a3b8', textTransform: 'uppercase', letterSpacing: '0.05em', marginBottom: '2px' }}>
+            Modelo
+          </div>
+          <div style={{ color: '#1e293b', fontWeight: '500' }}>{item.modelo_nome ?? '—'}</div>
+        </div>
+        {/* Acabamentos */}
+        <div style={{ padding: '5px 8px', borderRight: '1px solid #e2e8f0' }}>
+          <div style={{ fontSize: '8px', fontWeight: '700', color: '#94a3b8', textTransform: 'uppercase', letterSpacing: '0.05em', marginBottom: '2px' }}>
+            Acabamentos
+          </div>
+          <div style={{ color: '#1e293b', fontWeight: '500' }}>
+            {item.acabamentos && item.acabamentos.length > 0
+              ? item.acabamentos.join(', ')
+              : '—'}
+          </div>
+        </div>
+        {/* Dimensões */}
+        <div style={{ padding: '5px 8px' }}>
+          <div style={{ fontSize: '8px', fontWeight: '700', color: '#94a3b8', textTransform: 'uppercase', letterSpacing: '0.05em', marginBottom: '2px' }}>
+            Dimensões
+          </div>
+          <div style={{ color: '#1e293b', fontWeight: '500' }}>
+            {larguraM && alturaM
+              ? `${larguraM}m × ${alturaM}m${areaStr ? ` (${areaStr} m²)` : ''}`
+              : '—'}
+          </div>
+        </div>
       </div>
 
       {/* Especificação */}
       {item.especificacao && (
-        <div style={{ fontSize: '10px', color: '#475569', marginBottom: '4px' }}>
-          {item.especificacao}
+        <div style={{
+          fontSize: '10px',
+          color: '#475569',
+          padding: '5px 8px',
+          backgroundColor: '#f8fafc',
+          border: '1px solid #e2e8f0',
+          borderTop: 'none',
+        }}>
+          <strong style={{ color: '#64748b' }}>Especificação: </strong>{item.especificacao}
         </div>
       )}
 
@@ -246,33 +355,34 @@ function ItemBlock({ item, index }: { item: OSItem; index: number }) {
         <div style={{
           backgroundColor: '#fffbeb',
           border: '1px solid #fcd34d',
-          borderRadius: '4px',
+          borderTop: 'none',
           padding: '5px 8px',
-          marginBottom: '6px',
           fontSize: '10px',
           color: '#92400e',
         }}>
-          <strong>Instruções: </strong>{item.instrucoes}
+          <strong>⚠️ Instruções: </strong>{item.instrucoes}
         </div>
       )}
 
-      {/* Materials table */}
+      {/* Materials table (Matéria-Prima — Mubisys style) */}
       {item.materiais && item.materiais.length > 0 && (
         <table style={{
           width: '100%',
           borderCollapse: 'collapse',
           fontSize: '10px',
-          marginBottom: '4px',
+          marginTop: '0',
+          border: '1px solid #e2e8f0',
+          borderTop: 'none',
         }}>
           <thead>
             <tr style={{ backgroundColor: '#f1f5f9' }}>
-              <th style={{ textAlign: 'left', padding: '3px 6px', fontWeight: '600', color: '#475569', borderBottom: '1px solid #e2e8f0' }}>
-                Material
+              <th style={{ textAlign: 'left', padding: '4px 8px', fontWeight: '700', color: '#475569', borderBottom: '1px solid #e2e8f0', fontSize: '9px', textTransform: 'uppercase', letterSpacing: '0.03em' }}>
+                Matéria-Prima
               </th>
-              <th style={{ textAlign: 'center', padding: '3px 6px', fontWeight: '600', color: '#475569', borderBottom: '1px solid #e2e8f0', width: '50px' }}>
-                Unid
+              <th style={{ textAlign: 'center', padding: '4px 8px', fontWeight: '700', color: '#475569', borderBottom: '1px solid #e2e8f0', width: '60px', fontSize: '9px', textTransform: 'uppercase' }}>
+                Unidade
               </th>
-              <th style={{ textAlign: 'right', padding: '3px 6px', fontWeight: '600', color: '#475569', borderBottom: '1px solid #e2e8f0', width: '80px' }}>
+              <th style={{ textAlign: 'right', padding: '4px 8px', fontWeight: '700', color: '#475569', borderBottom: '1px solid #e2e8f0', width: '90px', fontSize: '9px', textTransform: 'uppercase' }}>
                 Consumo
               </th>
             </tr>
@@ -280,9 +390,9 @@ function ItemBlock({ item, index }: { item: OSItem; index: number }) {
           <tbody>
             {item.materiais.map((mat) => (
               <tr key={mat.id} style={{ borderBottom: '1px solid #f1f5f9' }}>
-                <td style={{ padding: '3px 6px', color: '#1e293b' }}>{mat.nome}</td>
-                <td style={{ padding: '3px 6px', textAlign: 'center', color: '#475569' }}>{mat.unidade}</td>
-                <td style={{ padding: '3px 6px', textAlign: 'right', fontFamily: 'monospace', color: '#1e293b' }}>
+                <td style={{ padding: '4px 8px', color: '#1e293b', fontWeight: '500' }}>{mat.nome}</td>
+                <td style={{ padding: '4px 8px', textAlign: 'center', color: '#64748b' }}>{mat.unidade}</td>
+                <td style={{ padding: '4px 8px', textAlign: 'right', fontFamily: 'monospace', fontWeight: '600', color: '#1e293b' }}>
                   {mat.quantidade_prevista.toFixed(4)}
                 </td>
               </tr>
@@ -332,17 +442,23 @@ export function OSPrintLayout({ data, mode, qrUrl }: OSPrintLayoutProps) {
   return (
     <div style={styles.page}>
       {/* ------------------------------------------------------------------ */}
-      {/* HEADER                                                               */}
+      {/* HEADER — Logo + OS info + QR (estilo Mubisys)                       */}
       {/* ------------------------------------------------------------------ */}
-      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: '8px' }}>
-        {/* Left: Brand */}
-        <div style={{ minWidth: '120px' }}>
-          <div style={{ fontSize: '18px', fontWeight: '800', color: '#1d4ed8', letterSpacing: '-0.02em' }}>
-            CROMA PRINT
-          </div>
-          <div style={{ fontSize: '10px', color: '#64748b', marginTop: '1px' }}>
-            Comunicação Visual
-          </div>
+      <div style={{
+        display: 'flex',
+        justifyContent: 'space-between',
+        alignItems: 'center',
+        marginBottom: '10px',
+        paddingBottom: '10px',
+        borderBottom: '3px solid #1d4ed8',
+      }}>
+        {/* Left: Logo */}
+        <div style={{ minWidth: '140px' }}>
+          <img
+            src={CROMA_LOGO_BASE64}
+            alt="Croma Print"
+            style={{ height: '48px', objectFit: 'contain' }}
+          />
         </div>
 
         {/* Center: OS info */}
@@ -350,7 +466,7 @@ export function OSPrintLayout({ data, mode, qrUrl }: OSPrintLayoutProps) {
           <div style={{ fontSize: '9px', fontWeight: '700', textTransform: 'uppercase', color: '#64748b', letterSpacing: '0.08em', marginBottom: '2px' }}>
             {mode === 'op' ? 'Ordem de Produção' : 'Ordem de Serviço'}
           </div>
-          <div style={{ fontSize: '16px', fontWeight: '800', color: '#0f172a', letterSpacing: '-0.01em' }}>
+          <div style={{ fontSize: '18px', fontWeight: '800', color: '#0f172a', letterSpacing: '-0.01em' }}>
             Nº {numero}
           </div>
           <div style={{ marginTop: '4px' }}>
@@ -358,7 +474,7 @@ export function OSPrintLayout({ data, mode, qrUrl }: OSPrintLayoutProps) {
               ...badgeStyle,
               fontSize: '10px',
               fontWeight: '600',
-              padding: '2px 8px',
+              padding: '2px 10px',
               borderRadius: '9999px',
               display: 'inline-block',
             }}>
@@ -367,7 +483,7 @@ export function OSPrintLayout({ data, mode, qrUrl }: OSPrintLayoutProps) {
           </div>
           {dataEntrega && (
             <div style={{ fontSize: '10px', color: '#dc2626', fontWeight: '600', marginTop: '3px' }}>
-              Entrega: {formatDate(dataEntrega)}
+              📅 Entrega: {formatDate(dataEntrega)}
             </div>
           )}
         </div>
@@ -383,8 +499,6 @@ export function OSPrintLayout({ data, mode, qrUrl }: OSPrintLayoutProps) {
           <QRCodeSVG value={qrUrl} size={56} level="M" />
         </div>
       </div>
-
-      <div style={styles.separator} />
 
       {/* ------------------------------------------------------------------ */}
       {/* CLIENTE                                                             */}
@@ -489,19 +603,36 @@ export function OSPrintLayout({ data, mode, qrUrl }: OSPrintLayoutProps) {
       <div style={styles.separator} />
 
       {/* ------------------------------------------------------------------ */}
-      {/* FOOTER                                                              */}
+      {/* FOOTER — Professional with logo reference                           */}
       {/* ------------------------------------------------------------------ */}
-      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-end', fontSize: '9px', color: '#94a3b8', marginTop: '8px' }}>
+      <div style={{
+        borderTop: '2px solid #1d4ed8',
+        paddingTop: '8px',
+        marginTop: '12px',
+        display: 'flex',
+        justifyContent: 'space-between',
+        alignItems: 'center',
+        fontSize: '9px',
+        color: '#94a3b8',
+      }}>
         <div>
-          {vendedor && aprovadoEm
-            ? `Autorizado por: ${vendedor} em ${formatDate(aprovadoEm)}`
-            : vendedor
-              ? `Responsável: ${vendedor}`
-              : `Emitido em: ${formatDate(new Date())}`
-          }
+          <div style={{ fontWeight: '600', color: '#1d4ed8', fontSize: '10px' }}>
+            Croma Print Comunicação Visual
+          </div>
+          <div style={{ marginTop: '2px' }}>
+            {vendedor && aprovadoEm
+              ? `Autorizado por: ${vendedor} em ${formatDate(aprovadoEm)}`
+              : vendedor
+                ? `Responsável: ${vendedor}`
+                : `Emitido em: ${formatDate(new Date())}`
+            }
+          </div>
         </div>
-        <div style={{ fontWeight: '600', color: '#64748b' }}>
-          Croma Print Comunicação Visual
+        <div style={{ textAlign: 'center', color: '#94a3b8' }}>
+          {mode === 'op' ? 'Ordem de Produção' : 'Ordem de Serviço'} — Nº {numero}
+        </div>
+        <div style={{ textAlign: 'right', color: '#94a3b8' }}>
+          Emitido em {formatDate(new Date())}
         </div>
       </div>
     </div>
