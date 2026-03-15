@@ -36,14 +36,14 @@ serve(async (req: Request) => {
         .order('created_at', { ascending: false })
         .limit(20),
       supabase.from('pedidos')
-        .select('id, numero, status, total, created_at, concluido_em')
+        .select('id, numero, status, valor_total, created_at, data_conclusao')
         .eq('cliente_id', cliente_id)
         .order('created_at', { ascending: false })
         .limit(20),
       supabase.from('contas_receber')
-        .select('id, valor, status, vencimento, pago_em')
+        .select('id, valor_original, status, data_vencimento, data_pagamento')
         .eq('cliente_id', cliente_id)
-        .order('vencimento', { ascending: false })
+        .order('data_vencimento', { ascending: false })
         .limit(20),
       supabase.from('cliente_contatos')
         .select('nome, cargo, email, telefone')

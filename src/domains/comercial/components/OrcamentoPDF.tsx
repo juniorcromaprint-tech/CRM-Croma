@@ -4,6 +4,7 @@
 // ============================================================================
 
 import { brl, formatDate, formatCNPJ } from "@/shared/utils/format";
+import { CROMA_LOGO_BASE64 } from "@/shared/constants/logo";
 import type {
   Orcamento,
   OrcamentoItem,
@@ -102,32 +103,24 @@ export default function OrcamentoPDF({ orcamento }: OrcamentoPDFProps) {
       />
 
       {/* ══════════════════════════════════════════════════════════════════
-          HEADER — Empresa + Título do documento
+          HEADER — Logo + Título do documento
           ══════════════════════════════════════════════════════════════════ */}
       <div
         style={{
           display: "flex",
           justifyContent: "space-between",
-          alignItems: "flex-start",
+          alignItems: "center",
           paddingBottom: "12px",
           borderBottom: "3px solid #1e40af",
           marginBottom: "20px",
         }}
       >
         <div>
-          <div
-            style={{
-              fontSize: "20px",
-              fontWeight: 800,
-              color: "#1e40af",
-              letterSpacing: "-0.02em",
-            }}
-          >
-            CROMA PRINT
-          </div>
-          <div style={{ fontSize: "11px", color: "#64748b", marginTop: "2px" }}>
-            Comunicação Visual
-          </div>
+          <img
+            src={CROMA_LOGO_BASE64}
+            alt="Croma Print"
+            style={{ height: "52px", objectFit: "contain" }}
+          />
         </div>
         <div style={{ textAlign: "right" }}>
           <div
@@ -808,13 +801,72 @@ export default function OrcamentoPDF({ orcamento }: OrcamentoPDFProps) {
       )}
 
       {/* ══════════════════════════════════════════════════════════════════
+          TERMOS E CONDIÇÕES
+          ══════════════════════════════════════════════════════════════════ */}
+      <div style={{ marginBottom: "16px" }}>
+        <div
+          style={{
+            fontSize: "10px",
+            fontWeight: 700,
+            color: "#1e293b",
+            textTransform: "uppercase",
+            letterSpacing: "0.04em",
+            marginBottom: "4px",
+            paddingBottom: "4px",
+            borderBottom: "1px solid #e2e8f0",
+          }}
+        >
+          Termos e Condições
+        </div>
+        <div style={{ fontSize: "9px", color: "#64748b", lineHeight: "1.6" }}>
+          <div>1. Os preços são válidos por {validade_dias} dias a partir da data de emissão.</div>
+          <div>2. Prazo de produção a definir após aprovação.</div>
+          <div>3. Cores podem sofrer variação conforme material e processo de impressão.</div>
+          <div>4. Arte final deve ser aprovada antes do início da produção.</div>
+          <div>5. Frete e instalação conforme especificado na proposta.</div>
+        </div>
+      </div>
+
+      {/* ══════════════════════════════════════════════════════════════════
+          ÁREA DE ASSINATURA
+          ══════════════════════════════════════════════════════════════════ */}
+      <div
+        style={{
+          display: "grid",
+          gridTemplateColumns: "1fr 1fr",
+          gap: "40px",
+          marginBottom: "20px",
+          marginTop: "30px",
+        }}
+      >
+        <div style={{ textAlign: "center" }}>
+          <div style={{ borderBottom: "1px solid #94a3b8", marginBottom: "4px", height: "30px" }} />
+          <div style={{ fontSize: "9px", color: "#64748b", fontWeight: 600 }}>
+            Croma Print Comunicação Visual
+          </div>
+          <div style={{ fontSize: "8px", color: "#94a3b8" }}>
+            Responsável Comercial
+          </div>
+        </div>
+        <div style={{ textAlign: "center" }}>
+          <div style={{ borderBottom: "1px solid #94a3b8", marginBottom: "4px", height: "30px" }} />
+          <div style={{ fontSize: "9px", color: "#64748b", fontWeight: 600 }}>
+            {clienteNome}
+          </div>
+          <div style={{ fontSize: "8px", color: "#94a3b8" }}>
+            Cliente — De acordo
+          </div>
+        </div>
+      </div>
+
+      {/* ══════════════════════════════════════════════════════════════════
           RODAPÉ
           ══════════════════════════════════════════════════════════════════ */}
       <div
         style={{
           borderTop: "2px solid #1e40af",
           paddingTop: "10px",
-          marginTop: "24px",
+          marginTop: "8px",
           display: "flex",
           justifyContent: "space-between",
           alignItems: "flex-end",

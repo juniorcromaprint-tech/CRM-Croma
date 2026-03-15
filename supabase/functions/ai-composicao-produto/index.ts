@@ -25,26 +25,26 @@ serve(async (req: Request) => {
 
     // Load catalog data
     const [modelosRes, materiaisRes, acabamentosRes, servicosRes] = await Promise.all([
-      supabase.from('produto_modelos').select('id, nome, categoria, markup')
+      supabase.from('produto_modelos').select('id, nome, markup_padrao')
         .order('nome'),
       supabase.from('materiais').select('id, nome, unidade, preco_medio, categoria')
         .not('preco_medio', 'is', null)
         .order('nome'),
-      supabase.from('acabamentos').select('id, nome, preco_padrao')
+      supabase.from('acabamentos').select('id, nome, custo_unitario')
         .order('nome'),
-      supabase.from('servicos').select('id, nome, preco_padrao')
+      supabase.from('servicos').select('id, nome, preco_fixo, custo_hora')
         .order('nome'),
     ]);
 
     // Load model compositions (for reference)
     const { data: composicoes } = await supabase
       .from('modelo_materiais')
-      .select('modelo_id, material_id, quantidade, unidade, materiais(nome)')
+      .select('modelo_id, material_id, quantidade_por_unidade, unidade, materiais(nome)')
       .limit(200);
 
     const { data: processos } = await supabase
       .from('modelo_processos')
-      .select('modelo_id, processo, ordem, tempo_estimado')
+      .select('modelo_id, etapa, ordem, tempo_por_unidade_min')
       .limit(200);
 
     const context = {
