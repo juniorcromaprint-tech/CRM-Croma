@@ -69,3 +69,26 @@ export const MODEL_COSTS: Record<string, { input: number; output: number }> = {
   'openai/gpt-4.1-mini': { input: 0.40, output: 1.60 },
   'anthropic/claude-sonnet-4': { input: 3.00, output: 15.00 },
 };
+
+// ═══════ AI Actionable Response v2 ═══════
+
+export interface AIActionV2 {
+  id: string;
+  tipo: string;
+  severidade: 'critica' | 'importante' | 'dica';
+  titulo: string;
+  descricao: string;
+  campo_alvo: string;
+  valor_atual: unknown;
+  valor_sugerido: unknown;
+  impacto: string;
+  aplicavel: boolean;
+}
+
+export interface AIActionableResponse {
+  summary: string;
+  kpis: Record<string, number | string>;
+  actions: AIActionV2[];
+  model_used: string;
+  tokens_used: number;
+}
