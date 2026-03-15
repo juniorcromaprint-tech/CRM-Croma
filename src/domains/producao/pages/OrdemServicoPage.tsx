@@ -17,12 +17,18 @@ import { OSLogistica } from '../components/os/OSLogistica';
 import { OSQRCode } from '../components/os/OSQRCode';
 import { OSActions } from '../components/os/OSActions';
 import { OSPrintLayout } from '../components/os/OSPrintLayout';
+import AIButton from '@/domains/ai/components/AIButton';
+import ProducaoBriefing from '@/domains/ai/components/ProducaoBriefing';
+import { useBriefingProducao } from '@/domains/ai/hooks/useBriefingProducao';
+import type { AIResponse } from '@/domains/ai/types/ai.types';
 
 export default function OrdemServicoPage() {
   const { pedidoId } = useParams<{ pedidoId: string }>();
   const navigate = useNavigate();
   const { data: os, isLoading, isError } = useOrdemServico(pedidoId);
   const [pdfLoading, setPdfLoading] = useState(false);
+  const [briefingResult, setBriefingResult] = useState<AIResponse | null>(null);
+  const briefingProducao = useBriefingProducao();
 
   const handlePrint = () => {
     window.print();
@@ -111,6 +117,15 @@ export default function OrdemServicoPage() {
             <ArrowLeft size={20} />
           </Button>
           <div className="flex-1" />
+          <AIButton
+            label="Gerar Briefing"
+            onClick={() => {
+              briefingProducao.mutate(pedidoId!, {
+                onSuccess: (data) => setBriefingResult(data),
+              });
+            }}
+            isLoading={briefingProducao.isPending}
+          />
           <OSActions
             numero={os.numero}
             onPrint={handlePrint}
@@ -189,6 +204,16 @@ export default function OrdemServicoPage() {
           Croma Print Comunicação Visual
         </div>
       </div>
+
+      {/* ══ AI Briefing Result ══ */}
+      {briefingResult && (
+        <div className="mb-4 print:hidden">
+          <ProducaoBriefing
+            result={briefingResult}
+            onClose={() => setBriefingResult(null)}
+          />
+        </div>
+      )}
 
       {/* ══ Print version ══ */}
       <div className="hidden print:block">
