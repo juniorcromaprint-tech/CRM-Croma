@@ -13,11 +13,15 @@ const ComprasPage = lazy(() => import("@/domains/compras/pages/ComprasPage"));
 const Produtos = lazy(() => import("@/pages/Produtos"));
 const OcorrenciasPage = lazy(() => import("@/domains/qualidade/pages/OcorrenciasPage"));
 const ExpedicaoPage = lazy(() => import("@/domains/producao/pages/ExpedicaoPage"));
+const OrdemServicoPage = lazy(() => import("@/domains/producao/pages/OrdemServicoPage"));
+const OrdemServicoOPPage = lazy(() => import("@/domains/producao/pages/OrdemServicoOPPage"));
 
 export const operacionalRoutes = (
   <>
     <Route path="pedidos" element={<LazyPage><PedidosPage /></LazyPage>} />
     <Route path="pedidos/:id" element={<LazyPage><PedidoDetailPage /></LazyPage>} />
+    <Route path="os/:pedidoId" element={<LazyPage><OrdemServicoPage /></LazyPage>} />
+    <Route path="os/op/:opId" element={<LazyPage><OrdemServicoOPPage /></LazyPage>} />
     <Route path="producao" element={<LazyPage><ProducaoPage /></LazyPage>} />
     <Route path="expedicao" element={<LazyPage><ExpedicaoPage /></LazyPage>} />
     <Route path="instalacoes" element={<LazyPage><InstalacaoPage /></LazyPage>} />
