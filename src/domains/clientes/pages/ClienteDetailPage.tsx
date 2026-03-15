@@ -7,6 +7,10 @@ import { brl, formatCNPJ, formatPhone, formatDate } from "@/shared/utils/format"
 import { formatDateTime } from "@/shared/utils/format";
 
 import { useCliente, useUpdateCliente } from "@/domains/clientes/hooks/useClientes";
+import AIButton from '@/domains/ai/components/AIButton';
+import ClienteResumo from '@/domains/ai/components/ClienteResumo';
+import { useResumoCliente } from '@/domains/ai/hooks/useResumoCliente';
+import type { AIResponse } from '@/domains/ai/types/ai.types';
 import { useUnidades, useCreateUnidade } from "@/domains/clientes/hooks/useUnidades";
 import { useContatos, useCreateContato } from "@/domains/clientes/hooks/useContatos";
 
@@ -215,6 +219,10 @@ export default function ClienteDetailPage() {
   const updateCliente = useUpdateCliente();
   const createUnidade = useCreateUnidade();
   const createContato = useCreateContato();
+
+  // ---- AI ----
+  const [resumoResult, setResumoResult] = useState<AIResponse | null>(null);
+  const resumoCliente = useResumoCliente();
 
   // ---- Inline queries for tabs without dedicated hooks ----
   const { data: propostas, isLoading: loadingPropostas } = useQuery<
@@ -471,15 +479,35 @@ export default function ClienteDetailPage() {
           )}
         </div>
 
-        <Button
-          onClick={startEditing}
-          variant="outline"
-          size="sm"
-          className="shrink-0"
-        >
-          <Edit size={14} className="mr-1.5" /> Editar
-        </Button>
+        <div className="flex items-center gap-2 shrink-0">
+          <AIButton
+            label="Resumo Inteligente"
+            onClick={() => {
+              resumoCliente.mutate(id!, {
+                onSuccess: (data) => setResumoResult(data),
+              });
+            }}
+            isLoading={resumoCliente.isPending}
+          />
+          <Button
+            onClick={startEditing}
+            variant="outline"
+            size="sm"
+          >
+            <Edit size={14} className="mr-1.5" /> Editar
+          </Button>
+        </div>
       </div>
+
+      {/* AI Result */}
+      {resumoResult && (
+        <div className="mb-4">
+          <ClienteResumo
+            result={resumoResult}
+            onClose={() => setResumoResult(null)}
+          />
+        </div>
+      )}
 
       {/* ================================================================= */}
       {/* TABS                                                              */}
