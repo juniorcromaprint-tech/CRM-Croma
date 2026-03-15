@@ -49,7 +49,7 @@ export function useUnidades(clienteId: string | undefined) {
       if (!clienteId) throw new Error('ID do cliente nao informado');
 
       const { data, error } = await supabase
-        .from('unidades_cliente')
+        .from('cliente_unidades')
         .select('*')
         .eq('cliente_id', clienteId)
         .order('nome', { ascending: true });
@@ -70,7 +70,7 @@ export function useCreateUnidade() {
   return useMutation({
     mutationFn: async (input: UnidadeInput) => {
       const { data, error } = await supabase
-        .from('unidades_cliente')
+        .from('cliente_unidades')
         .insert(input)
         .select()
         .single();
@@ -97,7 +97,7 @@ export function useUpdateUnidade() {
   return useMutation({
     mutationFn: async ({ id, ...updates }: UnidadeUpdate) => {
       const { data, error } = await supabase
-        .from('unidades_cliente')
+        .from('cliente_unidades')
         .update(updates)
         .eq('id', id)
         .select()
