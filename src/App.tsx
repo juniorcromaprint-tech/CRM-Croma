@@ -18,6 +18,8 @@ const PortalOrcamentoPage = lazy(() => import('./domains/portal/pages/PortalOrca
 import { comercialRoutes } from "./routes/comercialRoutes";
 import { clientesRoutes } from "./routes/clientesRoutes";
 import { operacionalRoutes } from "./routes/operacionalRoutes";
+import { suprimentosRoutes } from "./routes/suprimentosRoutes";
+import { qualidadeRoutes } from "./routes/qualidadeRoutes";
 import { financeiroRoutes } from "./routes/financeiroRoutes";
 import { fiscalRoutes } from "./routes/fiscalRoutes";
 import { adminRoutes } from "./routes/adminRoutes";
@@ -73,6 +75,8 @@ const App = () => (
               {comercialRoutes}
               {clientesRoutes}
               {operacionalRoutes}
+              {suprimentosRoutes}
+              {qualidadeRoutes}
               {financeiroRoutes}
               {fiscalRoutes}
               {adminRoutes}

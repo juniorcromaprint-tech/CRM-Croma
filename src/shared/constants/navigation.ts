@@ -50,8 +50,11 @@ export const NAV_GROUPS: NavGroup[] = [
   {
     label: 'SUPRIMENTOS',
     items: [
+      { name: 'Fornecedores', path: '/compras/fornecedores', icon: 'Users', module: 'compras' },
+      { name: 'Pedidos de Compra', path: '/compras/pedidos', icon: 'ShoppingCart', module: 'compras' },
       { name: 'Estoque', path: '/estoque', icon: 'Warehouse', module: 'estoque' },
-      { name: 'Compras', path: '/compras', icon: 'ShoppingCart', module: 'compras' },
+      { name: 'Movimentações', path: '/estoque/movimentacoes', icon: 'ArrowLeftRight', module: 'estoque' },
+      { name: 'Inventário', path: '/estoque/inventario', icon: 'ClipboardList', module: 'estoque' },
       { name: 'Produtos', path: '/produtos', icon: 'Package', module: 'producao' },
       { name: 'Matéria Prima', path: '/admin/materiais', icon: 'Package', module: 'admin' },
     ],
@@ -74,7 +77,8 @@ export const NAV_GROUPS: NavGroup[] = [
   {
     label: 'QUALIDADE',
     items: [
-      { name: 'Ocorrências', path: '/ocorrencias', icon: 'AlertTriangle', module: 'qualidade' },
+      { name: 'Dashboard', path: '/qualidade', icon: 'BarChart3', module: 'qualidade' },
+      { name: 'Ocorrências', path: '/qualidade/ocorrencias', icon: 'AlertTriangle', module: 'qualidade' },
     ],
   },
   {

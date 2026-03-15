@@ -8,10 +8,7 @@ const ProducaoPage = lazy(() => import("@/domains/producao/pages/ProducaoPage"))
 const InstalacaoPage = lazy(() => import("@/domains/instalacao/pages/InstalacaoPage"));
 const AlmoxarifePage = lazy(() => import("@/domains/producao/pages/AlmoxarifePage"));
 const DiarioBordoPage = lazy(() => import("@/domains/producao/pages/DiarioBordoPage"));
-const EstoquePage = lazy(() => import("@/domains/estoque/pages/EstoquePage"));
-const ComprasPage = lazy(() => import("@/domains/compras/pages/ComprasPage"));
 const Produtos = lazy(() => import("@/pages/Produtos"));
-const OcorrenciasPage = lazy(() => import("@/domains/qualidade/pages/OcorrenciasPage"));
 const ExpedicaoPage = lazy(() => import("@/domains/producao/pages/ExpedicaoPage"));
 const OrdemServicoPage = lazy(() => import("@/domains/producao/pages/OrdemServicoPage"));
 const OrdemServicoOPPage = lazy(() => import("@/domains/producao/pages/OrdemServicoOPPage"));
@@ -27,9 +24,6 @@ export const operacionalRoutes = (
     <Route path="instalacoes" element={<LazyPage><InstalacaoPage /></LazyPage>} />
     <Route path="almoxarife" element={<LazyPage><AlmoxarifePage /></LazyPage>} />
     <Route path="producao/diario-bordo" element={<LazyPage><DiarioBordoPage /></LazyPage>} />
-    <Route path="estoque" element={<LazyPage><EstoquePage /></LazyPage>} />
-    <Route path="compras" element={<LazyPage><ComprasPage /></LazyPage>} />
     <Route path="produtos" element={<LazyPage><Produtos /></LazyPage>} />
-    <Route path="ocorrencias" element={<LazyPage><OcorrenciasPage /></LazyPage>} />
   </>
 );
