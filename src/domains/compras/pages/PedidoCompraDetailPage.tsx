@@ -19,15 +19,15 @@ import RecebimentoChecklist from "../components/RecebimentoChecklist";
 
 // ─── Tipos ───────────────────────────────────────────────────────────────────
 
-type PCStatus = "rascunho" | "pendente" | "aprovado" | "enviado" | "recebido" | "cancelado";
+type PCStatus = "rascunho" | "aprovado" | "enviado" | "parcial" | "recebido" | "cancelado";
 
 // ─── Constantes ──────────────────────────────────────────────────────────────
 
 const STATUS_CONFIG: Record<PCStatus, { label: string; className: string }> = {
   rascunho: { label: "Rascunho", className: "bg-slate-50 text-slate-700 border-slate-200" },
-  pendente: { label: "Pendente", className: "bg-orange-50 text-orange-700 border-orange-200" },
   aprovado: { label: "Aprovado", className: "bg-blue-50 text-blue-700 border-blue-200" },
   enviado: { label: "Enviado", className: "bg-amber-50 text-amber-700 border-amber-200" },
+  parcial: { label: "Parcialmente Recebido", className: "bg-orange-50 text-orange-700 border-orange-200" },
   recebido: { label: "Recebido", className: "bg-green-50 text-green-700 border-green-200" },
   cancelado: { label: "Cancelado", className: "bg-red-50 text-red-600 border-red-200" },
 };
@@ -40,16 +40,20 @@ interface ActionButton {
 
 const STATUS_ACTIONS: Partial<Record<PCStatus, ActionButton[]>> = {
   rascunho: [
-    { label: "Enviar para Aprovação", nextStatus: "pendente", variant: "primary" },
-    { label: "Cancelar Pedido", nextStatus: "cancelado", variant: "danger" },
-  ],
-  pendente: [
-    { label: "Aprovar", nextStatus: "aprovado", variant: "primary" },
+    { label: "Aprovar Pedido", nextStatus: "aprovado", variant: "primary" },
     { label: "Cancelar Pedido", nextStatus: "cancelado", variant: "danger" },
   ],
   aprovado: [
     { label: "Marcar como Enviado", nextStatus: "enviado", variant: "primary" },
     { label: "Cancelar Pedido", nextStatus: "cancelado", variant: "danger" },
+  ],
+  enviado: [
+    { label: "Marcar Recebido", nextStatus: "recebido", variant: "primary" },
+    { label: "Recebimento Parcial", nextStatus: "parcial", variant: "primary" },
+    { label: "Cancelar Pedido", nextStatus: "cancelado", variant: "danger" },
+  ],
+  parcial: [
+    { label: "Marcar Recebido", nextStatus: "recebido", variant: "primary" },
   ],
 };
 
@@ -91,7 +95,7 @@ export default function PedidoCompraDetailPage() {
 
   const status: PCStatus = pedido.status ?? "rascunho";
   const statusCfg = STATUS_CONFIG[status] ?? STATUS_CONFIG.rascunho;
-  const fornecedorNome = pedido.fornecedor?.nome_fantasia || pedido.fornecedor?.razao_social || pedido.fornecedor?.nome || "—";
+  const fornecedorNome = pedido.fornecedor?.nome_fantasia || pedido.fornecedor?.razao_social || "—";
   const itens = pedido.itens ?? [];
   const actions = STATUS_ACTIONS[status] ?? [];
 
@@ -128,10 +132,10 @@ export default function PedidoCompraDetailPage() {
                 <Building2 size={15} className="text-slate-400" />
                 <span className="font-semibold">{fornecedorNome}</span>
               </div>
-              {pedido.data_entrega && (
+              {pedido.previsao_entrega && (
                 <div className="flex items-center gap-2 mt-1 text-sm text-slate-500">
                   <Calendar size={14} className="text-slate-400" />
-                  Entrega prevista: {formatDate(pedido.data_entrega)}
+                  Entrega prevista: {formatDate(pedido.previsao_entrega)}
                 </div>
               )}
             </div>
@@ -225,8 +229,8 @@ export default function PedidoCompraDetailPage() {
         </div>
       )}
 
-      {/* Recebimento (quando enviado) */}
-      {status === "enviado" && (
+      {/* Recebimento (quando enviado ou parcial) */}
+      {(status === "enviado" || status === "parcial") && (
         <div className="bg-white rounded-2xl p-6 shadow-sm border border-slate-100">
           <h2 className="font-bold text-slate-800 mb-4">Conferência de Recebimento</h2>
           <RecebimentoChecklist pedido={{ id: pedido.id, itens }} />

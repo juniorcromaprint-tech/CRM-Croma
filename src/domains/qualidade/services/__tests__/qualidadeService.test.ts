@@ -25,9 +25,9 @@ import { qualidadeService } from "../qualidadeService";
 function makeOcorrencia(overrides: Record<string, any> = {}) {
   return {
     id: "ocr-001",
-    titulo: "Impressão com defeito",
+    descricao: "Impressão com defeito",
     tipo: "producao",
-    prioridade: "alta",
+    prioridade: "media",
     status: "aberta",
     responsavel_id: "user-001",
     created_at: "2026-01-15T10:00:00Z",
@@ -42,8 +42,10 @@ function makeTratativa(overrides: Record<string, any> = {}) {
   return {
     id: "trat-001",
     ocorrencia_id: "ocr-001",
-    descricao: "Verificação realizada",
-    tipo: "acao",
+    acao_corretiva: "Verificação realizada",
+    prazo: null,
+    data_conclusao: null,
+    observacoes: null,
     responsavel_id: "user-001",
     created_at: "2026-01-15T11:00:00Z",
     ...overrides,
@@ -58,7 +60,7 @@ describe("qualidadeService.listarOcorrencias", () => {
   });
 
   it("retorna array de ocorrências sem filtros", async () => {
-    const ocorrencias = [makeOcorrencia(), makeOcorrencia({ id: "ocr-002", titulo: "Atraso na entrega" })];
+    const ocorrencias = [makeOcorrencia(), makeOcorrencia({ id: "ocr-002", descricao: "Atraso na entrega" })];
 
     mockFrom.mockImplementation(() => ({
       select: vi.fn().mockReturnThis(),
@@ -142,7 +144,7 @@ describe("qualidadeService.buscarOcorrencia", () => {
     const ocorrencia = makeOcorrencia({
       tratativas: [
         makeTratativa(),
-        makeTratativa({ id: "trat-002", descricao: "Correção aplicada" }),
+        makeTratativa({ id: "trat-002", acao_corretiva: "Correção aplicada" }),
       ],
     });
 
@@ -202,9 +204,9 @@ describe("qualidadeService.criarOcorrencia", () => {
     }));
 
     const dados = {
-      titulo: "Impressão com defeito",
+      descricao: "Impressão com defeito",
       tipo: "producao",
-      prioridade: "alta",
+      prioridade: "media",
       status: "aberta",
     };
     const result = await qualidadeService.criarOcorrencia(dados);
@@ -221,7 +223,7 @@ describe("qualidadeService.criarOcorrencia", () => {
     }));
 
     await expect(
-      qualidadeService.criarOcorrencia({ titulo: "Teste", tipo: "qualidade" })
+      qualidadeService.criarOcorrencia({ descricao: "Teste", tipo: "qualidade" })
     ).rejects.toMatchObject({ message: "insert error" });
   });
 });
@@ -245,8 +247,9 @@ describe("qualidadeService.adicionarTratativa", () => {
 
     const dados = {
       ocorrencia_id: "ocr-001",
-      descricao: "Verificação realizada",
-      tipo: "acao",
+      acao_corretiva: "Verificação realizada",
+      prazo: null,
+      data_conclusao: null,
       responsavel_id: "user-001",
     };
     const result = await qualidadeService.adicionarTratativa(dados);
@@ -266,8 +269,7 @@ describe("qualidadeService.adicionarTratativa", () => {
     await expect(
       qualidadeService.adicionarTratativa({
         ocorrencia_id: "ocr-001",
-        descricao: "Ação corretiva",
-        tipo: "corretiva",
+        acao_corretiva: "Ação corretiva",
       })
     ).rejects.toMatchObject({ message: "tratativa error" });
   });
@@ -284,7 +286,7 @@ describe("qualidadeService.buscarKPIs", () => {
     const ocorrencias = [
       makeOcorrencia({ status: "aberta" }),
       makeOcorrencia({ id: "ocr-002", status: "resolvida", resolved_at: new Date().toISOString() }),
-      makeOcorrencia({ id: "ocr-003", status: "fechada", resolved_at: new Date().toISOString() }),
+      makeOcorrencia({ id: "ocr-003", status: "encerrada", resolved_at: new Date().toISOString() }),
     ];
 
     mockFrom.mockImplementation(() => ({
@@ -295,12 +297,12 @@ describe("qualidadeService.buscarKPIs", () => {
     expect(kpis.total_ocorrencias).toBe(3);
   });
 
-  it("conta ocorrências abertas (excluindo resolvida e fechada)", async () => {
+  it("conta ocorrências abertas (excluindo resolvida e encerrada)", async () => {
     const ocorrencias = [
       makeOcorrencia({ status: "aberta" }),
-      makeOcorrencia({ id: "ocr-002", status: "em_andamento" }),
+      makeOcorrencia({ id: "ocr-002", status: "em_tratativa" }),
       makeOcorrencia({ id: "ocr-003", status: "resolvida", resolved_at: new Date().toISOString() }),
-      makeOcorrencia({ id: "ocr-004", status: "fechada", resolved_at: new Date().toISOString() }),
+      makeOcorrencia({ id: "ocr-004", status: "encerrada", resolved_at: new Date().toISOString() }),
     ];
 
     mockFrom.mockImplementation(() => ({

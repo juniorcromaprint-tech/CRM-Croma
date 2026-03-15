@@ -1,30 +1,32 @@
-// src/domains/compras/types/compras.types.ts
-
 export interface Fornecedor {
   id: string;
-  nome: string;
+  razao_social: string;
+  nome_fantasia?: string;
   cnpj?: string;
   email?: string;
   telefone?: string;
-  contato?: string;
-  endereco?: string;
-  cidade?: string;
-  estado?: string;
-  cep?: string;
+  contato_nome?: string;
+  categorias?: string[];
+  lead_time_dias?: number;
+  condicao_pagamento?: string;
   observacoes?: string;
   ativo: boolean;
   created_at: string;
 }
+
+export type PedidoCompraStatus = 'rascunho' | 'aprovado' | 'enviado' | 'parcial' | 'recebido' | 'cancelado';
 
 export interface PedidoCompra {
   id: string;
   numero?: string;
   fornecedor_id: string;
   fornecedor?: Fornecedor;
-  status: 'rascunho' | 'pendente' | 'aprovado' | 'enviado' | 'recebido' | 'cancelado';
+  status: PedidoCompraStatus;
   valor_total: number;
-  data_entrega?: string;
+  previsao_entrega?: string;
   observacoes?: string;
+  criado_por?: string;
+  aprovado_por?: string;
   created_at: string;
   itens?: PedidoCompraItem[];
 }

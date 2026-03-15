@@ -25,9 +25,11 @@ import { comprasService } from "../comprasService";
 function makeFornecedor(overrides: Record<string, any> = {}) {
   return {
     id: "forn-001",
-    nome: "Fornecedor Teste",
+    razao_social: "Fornecedor Teste LTDA",
+    nome_fantasia: "Fornecedor Teste",
     cnpj: "12.345.678/0001-99",
     email: "contato@fornecedor.com",
+    contato_nome: "João Contato",
     ativo: true,
     created_at: "2026-01-01T00:00:00Z",
     ...overrides,
@@ -40,8 +42,9 @@ function makePedidoCompra(overrides: Record<string, any> = {}) {
     fornecedor_id: "forn-001",
     status: "rascunho",
     total: 1500,
+    previsao_entrega: null,
     created_at: "2026-01-01T00:00:00Z",
-    fornecedor: { nome: "Fornecedor Teste" },
+    fornecedor: { nome_fantasia: "Fornecedor Teste" },
     itens: [],
     ...overrides,
   };
@@ -55,7 +58,7 @@ describe("comprasService.listarFornecedores", () => {
   });
 
   it("retorna array de fornecedores sem filtros", async () => {
-    const fornecedores = [makeFornecedor(), makeFornecedor({ id: "forn-002", nome: "Outro Fornecedor" })];
+    const fornecedores = [makeFornecedor(), makeFornecedor({ id: "forn-002", nome_fantasia: "Outro Fornecedor" })];
 
     mockFrom.mockImplementation(() => ({
       select: vi.fn().mockReturnThis(),
@@ -93,7 +96,7 @@ describe("comprasService.listarFornecedores", () => {
     }));
 
     const result = await comprasService.listarFornecedores({ busca: "Teste" });
-    expect(ilikeMock).toHaveBeenCalledWith("nome", "%Teste%");
+    expect(ilikeMock).toHaveBeenCalledWith("nome_fantasia", "%Teste%");
     expect(result).toHaveLength(1);
   });
 
@@ -141,7 +144,7 @@ describe("comprasService.criarFornecedor", () => {
       single: singleMock,
     }));
 
-    const dados = { nome: "Fornecedor Teste", cnpj: "12.345.678/0001-99" };
+    const dados = { razao_social: "Fornecedor Teste LTDA", nome_fantasia: "Fornecedor Teste", cnpj: "12.345.678/0001-99" };
     const result = await comprasService.criarFornecedor(dados);
 
     expect(insertMock).toHaveBeenCalledWith(dados);
@@ -155,7 +158,7 @@ describe("comprasService.criarFornecedor", () => {
       single: vi.fn().mockResolvedValue({ data: null, error: { message: "insert error" } }),
     }));
 
-    await expect(comprasService.criarFornecedor({ nome: "X" })).rejects.toMatchObject({ message: "insert error" });
+    await expect(comprasService.criarFornecedor({ razao_social: "X" })).rejects.toMatchObject({ message: "insert error" });
   });
 });
 
@@ -203,6 +206,19 @@ describe("comprasService.listarPedidosCompra", () => {
     expect(eqMock).toHaveBeenCalledWith("status", "aprovado");
   });
 
+  it("aplica filtro de status parcial", async () => {
+    const eqMock = vi.fn().mockResolvedValue({ data: [makePedidoCompra({ status: "parcial" })], error: null });
+
+    mockFrom.mockImplementation(() => ({
+      select: vi.fn().mockReturnThis(),
+      order: vi.fn().mockReturnThis(),
+      eq: eqMock,
+    }));
+
+    await comprasService.listarPedidosCompra({ status: "parcial" });
+    expect(eqMock).toHaveBeenCalledWith("status", "parcial");
+  });
+
   it("aplica filtro de fornecedor_id", async () => {
     const eqMock = vi.fn().mockResolvedValue({ data: [makePedidoCompra()], error: null });
 
@@ -227,7 +243,7 @@ describe("comprasService.buscarPedidoCompra", () => {
   it("retorna objeto com itens e fornecedor", async () => {
     const pedido = makePedidoCompra({
       itens: [{ id: "item-001", material_id: "mat-001", quantidade: 10 }],
-      fornecedor: { id: "forn-001", nome: "Fornecedor Teste", cnpj: "12.345.678/0001-99" },
+      fornecedor: { id: "forn-001", razao_social: "Fornecedor Teste LTDA", nome_fantasia: "Fornecedor Teste", cnpj: "12.345.678/0001-99" },
     });
 
     mockFrom.mockImplementation(() => ({

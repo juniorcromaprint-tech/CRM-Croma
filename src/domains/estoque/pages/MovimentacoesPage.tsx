@@ -220,7 +220,7 @@ export default function MovimentacoesPage() {
                         )}
                       </td>
                       <td className="px-4 py-3 text-slate-500 text-xs hidden lg:table-cell max-w-xs truncate">
-                        {mov.observacao ?? (
+                        {mov.motivo ?? (
                           <span className="text-slate-300">—</span>
                         )}
                       </td>

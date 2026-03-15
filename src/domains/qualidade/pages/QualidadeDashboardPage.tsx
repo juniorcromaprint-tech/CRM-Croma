@@ -24,11 +24,8 @@ import {
 const STATUS_CONFIG: Record<string, { label: string; color: string }> = {
   aberta: { label: "Aberta", color: "bg-blue-100 text-blue-700 border-blue-200" },
   em_analise: { label: "Em Análise", color: "bg-yellow-100 text-yellow-700 border-yellow-200" },
-  em_tratamento: { label: "Em Tratamento", color: "bg-orange-100 text-orange-700 border-orange-200" },
-  resolvida: { label: "Resolvida", color: "bg-green-100 text-green-700 border-green-200" },
-  fechada: { label: "Fechada", color: "bg-slate-100 text-slate-600 border-slate-200" },
-  // legacy compat
   em_tratativa: { label: "Em Tratativa", color: "bg-orange-100 text-orange-700 border-orange-200" },
+  resolvida: { label: "Resolvida", color: "bg-green-100 text-green-700 border-green-200" },
   encerrada: { label: "Encerrada", color: "bg-slate-100 text-slate-600 border-slate-200" },
 };
 
@@ -199,7 +196,7 @@ export default function QualidadeDashboardPage() {
                 >
                   <div className="flex-1 min-w-0">
                     <p className="text-sm font-medium text-slate-800 truncate">
-                      {oc.titulo}
+                      {oc.descricao}
                     </p>
                     <p className="text-xs text-slate-400 mt-0.5">
                       {formatDate(oc.created_at)}

@@ -24,11 +24,8 @@ import {
 const STATUS_CONFIG: Record<string, { label: string; color: string }> = {
   aberta: { label: "Aberta", color: "bg-blue-100 text-blue-700 border-blue-200" },
   em_analise: { label: "Em Análise", color: "bg-yellow-100 text-yellow-700 border-yellow-200" },
-  em_tratamento: { label: "Em Tratamento", color: "bg-orange-100 text-orange-700 border-orange-200" },
-  resolvida: { label: "Resolvida", color: "bg-green-100 text-green-700 border-green-200" },
-  fechada: { label: "Fechada", color: "bg-slate-100 text-slate-600 border-slate-200" },
-  // legacy compat
   em_tratativa: { label: "Em Tratativa", color: "bg-orange-100 text-orange-700 border-orange-200" },
+  resolvida: { label: "Resolvida", color: "bg-green-100 text-green-700 border-green-200" },
   encerrada: { label: "Encerrada", color: "bg-slate-100 text-slate-600 border-slate-200" },
 };
 
@@ -42,12 +39,9 @@ const PRIORIDADE_CONFIG: Record<string, { label: string; color: string }> = {
 // Linear workflow transitions
 const STATUS_NEXT: Record<string, { value: string; label: string } | null> = {
   aberta: { value: "em_analise", label: "Iniciar Análise" },
-  em_analise: { value: "em_tratamento", label: "Iniciar Tratamento" },
-  em_tratamento: { value: "resolvida", label: "Marcar Resolvida" },
-  resolvida: { value: "fechada", label: "Fechar Ocorrência" },
-  fechada: null,
-  // legacy
+  em_analise: { value: "em_tratativa", label: "Iniciar Tratativa" },
   em_tratativa: { value: "resolvida", label: "Marcar Resolvida" },
+  resolvida: { value: "encerrada", label: "Encerrar Ocorrência" },
   encerrada: null,
 };
 
@@ -144,7 +138,7 @@ export default function OcorrenciaDetailPage() {
       id: ocorrencia.id,
       dados: {
         status: nextStatus.value,
-        ...(nextStatus.value === "resolvida"
+        ...(nextStatus.value === "resolvida" || nextStatus.value === "encerrada"
           ? { resolved_at: new Date().toISOString() }
           : {}),
       },
@@ -182,13 +176,8 @@ export default function OcorrenciaDetailPage() {
               </span>
             </div>
             <h1 className="text-xl font-bold text-slate-800 leading-tight">
-              {ocorrencia.titulo}
+              {ocorrencia.descricao}
             </h1>
-            {ocorrencia.descricao && (
-              <p className="text-sm text-slate-500 mt-2 leading-relaxed">
-                {ocorrencia.descricao}
-              </p>
-            )}
             <p className="text-xs text-slate-400 mt-3">
               Registrada em {formatDate(ocorrencia.created_at)}
               {ocorrencia.resolved_at && (

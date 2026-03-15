@@ -2,12 +2,14 @@
 
 import { supabase } from "@/integrations/supabase/client";
 
+const db = supabase as any;
+
 export const qualidadeService = {
   // === OCORRÊNCIAS ===
   async listarOcorrencias(filtros?: { status?: string; prioridade?: string; tipo?: string }) {
-    let q = (supabase as any)
+    let q = db
       .from("ocorrencias")
-      .select("*, responsavel:profiles(first_name, last_name)")
+      .select("id, descricao, tipo, prioridade, status, created_at, resolved_at, responsavel:profiles(first_name, last_name)")
       .order("created_at", { ascending: false });
     if (filtros?.status) q = q.eq("status", filtros.status);
     if (filtros?.prioridade) q = q.eq("prioridade", filtros.prioridade);
@@ -18,7 +20,7 @@ export const qualidadeService = {
   },
 
   async buscarOcorrencia(id: string) {
-    const { data, error } = await (supabase as any)
+    const { data, error } = await db
       .from("ocorrencias")
       .select("*, tratativas:ocorrencia_tratativas(*), responsavel:profiles(first_name, last_name)")
       .eq("id", id)
@@ -28,7 +30,7 @@ export const qualidadeService = {
   },
 
   async criarOcorrencia(dados: Record<string, any>) {
-    const { data, error } = await (supabase as any)
+    const { data, error } = await db
       .from("ocorrencias")
       .insert(dados)
       .select()
@@ -38,7 +40,7 @@ export const qualidadeService = {
   },
 
   async atualizarOcorrencia(id: string, dados: Record<string, any>) {
-    const { data, error } = await (supabase as any)
+    const { data, error } = await db
       .from("ocorrencias")
       .update(dados)
       .eq("id", id)
@@ -49,8 +51,8 @@ export const qualidadeService = {
   },
 
   // === TRATATIVAS ===
-  async adicionarTratativa(dados: { ocorrencia_id: string; descricao: string; tipo: string; responsavel_id?: string }) {
-    const { data, error } = await (supabase as any)
+  async adicionarTratativa(dados: { ocorrencia_id: string; acao_corretiva: string; prazo?: string; data_conclusao?: string; observacoes?: string; responsavel_id?: string }) {
+    const { data, error } = await db
       .from("ocorrencia_tratativas")
       .insert(dados)
       .select()
@@ -61,13 +63,13 @@ export const qualidadeService = {
 
   // === KPIs ===
   async buscarKPIs(): Promise<any> {
-    const { data: todas, error } = await (supabase as any)
+    const { data: todas, error } = await db
       .from("ocorrencias")
       .select("id, tipo, prioridade, status, created_at, resolved_at");
     if (error) throw error;
 
     const items = todas ?? [];
-    const abertas = items.filter((o: any) => !['resolvida', 'fechada'].includes(o.status));
+    const abertas = items.filter((o: any) => !['resolvida', 'encerrada'].includes(o.status));
     const agora = new Date();
     const mesAtual = agora.getMonth();
     const anoAtual = agora.getFullYear();

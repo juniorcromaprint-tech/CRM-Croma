@@ -10,6 +10,7 @@ export function useAdicionarTratativa() {
     mutationFn: qualidadeService.adicionarTratativa,
     onSuccess: () => {
       qc.invalidateQueries({ queryKey: ["ocorrencia"] });
+      qc.invalidateQueries({ queryKey: ["qualidade-kpis"] });
       showSuccess("Tratativa adicionada");
     },
     onError: () => showError("Erro ao adicionar tratativa"),

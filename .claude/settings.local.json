@@ -31,7 +31,13 @@
       "Bash(wc:*)",
       "Bash(head:*)",
       "Bash(tail:*)",
-      "Bash(cat:*)"
+      "Bash(cat:*)",
+      "Bash(done)",
+      "Read(//c/Users/Caldera/Claude/CRM-Croma/**)",
+      "mcp__claude_ai_Supabase__list_tables",
+      "mcp__claude_ai_Supabase__execute_sql",
+      "Read(//c/Users/Caldera/.claude/projects/c--Users-Caldera-Claude-CRM-Croma/54985425-7cf9-436c-9c3d-76c8fa42b8bc/tool-results/**)",
+      "Bash(pnpm add:*)"
     ]
   }
 }

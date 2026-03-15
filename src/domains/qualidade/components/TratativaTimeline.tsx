@@ -8,58 +8,13 @@ import { formatDate } from "@/shared/utils/format";
 import { Button } from "@/components/ui/button";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
-import { Badge } from "@/components/ui/badge";
+import { Input } from "@/components/ui/input";
 import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from "@/components/ui/select";
-import {
-  Search,
-  Wrench,
-  ShieldCheck,
   CheckCircle2,
   MessageSquarePlus,
   Loader2,
   ClipboardList,
 } from "lucide-react";
-
-// ─── Constants ───────────────────────────────────────────────────────────────
-
-const TIPO_OPTIONS = [
-  { value: "analise", label: "Análise" },
-  { value: "acao_corretiva", label: "Ação Corretiva" },
-  { value: "acao_preventiva", label: "Ação Preventiva" },
-  { value: "verificacao", label: "Verificação" },
-];
-
-const TIPO_CONFIG: Record<
-  string,
-  { label: string; color: string; icon: React.ElementType }
-> = {
-  analise: {
-    label: "Análise",
-    color: "bg-blue-100 text-blue-700 border-blue-200",
-    icon: Search,
-  },
-  acao_corretiva: {
-    label: "Ação Corretiva",
-    color: "bg-orange-100 text-orange-700 border-orange-200",
-    icon: Wrench,
-  },
-  acao_preventiva: {
-    label: "Ação Preventiva",
-    color: "bg-green-100 text-green-700 border-green-200",
-    icon: ShieldCheck,
-  },
-  verificacao: {
-    label: "Verificação",
-    color: "bg-purple-100 text-purple-700 border-purple-200",
-    icon: CheckCircle2,
-  },
-};
 
 // ─── Props ───────────────────────────────────────────────────────────────────
 
@@ -76,21 +31,24 @@ export function TratativaTimeline({
 }: TratativaTimelineProps) {
   const adicionarTratativa = useAdicionarTratativa();
 
-  const [tipo, setTipo] = useState("");
-  const [descricao, setDescricao] = useState("");
+  const [acaoCorretiva, setAcaoCorretiva] = useState("");
+  const [prazo, setPrazo] = useState("");
+  const [observacoes, setObservacoes] = useState("");
 
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
-    if (!tipo || !descricao.trim()) return;
+    if (!acaoCorretiva.trim()) return;
 
     await adicionarTratativa.mutateAsync({
       ocorrencia_id,
-      tipo: tipo as Tratativa["tipo"],
-      descricao: descricao.trim(),
+      acao_corretiva: acaoCorretiva.trim(),
+      prazo: prazo || undefined,
+      observacoes: observacoes.trim() || undefined,
     });
 
-    setTipo("");
-    setDescricao("");
+    setAcaoCorretiva("");
+    setPrazo("");
+    setObservacoes("");
   }
 
   return (
@@ -110,37 +68,51 @@ export function TratativaTimeline({
           <div className="absolute left-2 top-0 bottom-0 w-0.5 bg-slate-200" />
 
           <div className="space-y-5">
-            {tratativas.map((t, idx) => {
-              const cfg = TIPO_CONFIG[t.tipo] ?? TIPO_CONFIG.analise;
-              const Icon = cfg.icon;
-
-              return (
-                <div key={t.id} className="relative">
-                  {/* Dot */}
-                  <div className="absolute -left-4 top-1.5 w-4 h-4 rounded-full bg-white border-2 border-slate-300 flex items-center justify-center">
-                    <div className="w-1.5 h-1.5 rounded-full bg-slate-400" />
-                  </div>
-
-                  <div className="bg-white rounded-2xl border border-slate-200 p-4 ml-2">
-                    <div className="flex items-center justify-between gap-2 mb-2">
-                      <Badge
-                        variant="outline"
-                        className={`text-xs ${cfg.color} flex items-center gap-1`}
-                      >
-                        <Icon size={10} />
-                        {cfg.label}
-                      </Badge>
-                      <span className="text-xs text-slate-400">
-                        {formatDate(t.created_at)}
-                      </span>
-                    </div>
-                    <p className="text-sm text-slate-700 leading-relaxed">
-                      {t.descricao}
-                    </p>
-                  </div>
+            {tratativas.map((t) => (
+              <div key={t.id} className="relative">
+                {/* Dot */}
+                <div className="absolute -left-4 top-1.5 w-4 h-4 rounded-full bg-white border-2 border-slate-300 flex items-center justify-center">
+                  <div className="w-1.5 h-1.5 rounded-full bg-slate-400" />
                 </div>
-              );
-            })}
+
+                <div className="bg-white rounded-2xl border border-slate-200 p-4 ml-2">
+                  <div className="flex items-center justify-between gap-2 mb-2">
+                    <span className="text-xs font-medium text-slate-500">
+                      Ação Corretiva
+                    </span>
+                    <span className="text-xs text-slate-400">
+                      {formatDate(t.created_at)}
+                    </span>
+                  </div>
+                  <p className="text-sm text-slate-700 leading-relaxed">
+                    {t.acao_corretiva ?? "—"}
+                  </p>
+                  {(t.prazo || t.data_conclusao || t.observacoes) && (
+                    <div className="mt-3 pt-3 border-t border-slate-100 space-y-1 text-xs text-slate-500">
+                      {t.prazo && (
+                        <p>
+                          <span className="font-medium">Prazo:</span>{" "}
+                          {formatDate(t.prazo)}
+                        </p>
+                      )}
+                      {t.data_conclusao && (
+                        <p className="flex items-center gap-1">
+                          <CheckCircle2 size={10} className="text-green-500" />
+                          <span className="font-medium">Concluída em:</span>{" "}
+                          {formatDate(t.data_conclusao)}
+                        </p>
+                      )}
+                      {t.observacoes && (
+                        <p>
+                          <span className="font-medium">Obs:</span>{" "}
+                          {t.observacoes}
+                        </p>
+                      )}
+                    </div>
+                  )}
+                </div>
+              </div>
+            ))}
           </div>
         </div>
       )}
@@ -154,36 +126,43 @@ export function TratativaTimeline({
 
         <form onSubmit={handleSubmit} className="space-y-3">
           <div className="space-y-1.5">
-            <Label>Tipo</Label>
-            <Select value={tipo} onValueChange={setTipo}>
-              <SelectTrigger className="rounded-xl bg-white">
-                <SelectValue placeholder="Selecione o tipo" />
-              </SelectTrigger>
-              <SelectContent>
-                {TIPO_OPTIONS.map((o) => (
-                  <SelectItem key={o.value} value={o.value}>
-                    {o.label}
-                  </SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
-          </div>
-
-          <div className="space-y-1.5">
-            <Label>Descrição</Label>
+            <Label>
+              Ação Corretiva <span className="text-red-500">*</span>
+            </Label>
             <Textarea
               className="rounded-xl bg-white resize-none"
               rows={3}
-              placeholder="Descreva a ação realizada ou a análise feita..."
-              value={descricao}
-              onChange={(e) => setDescricao(e.target.value)}
+              placeholder="Descreva a ação corretiva realizada ou planejada..."
+              value={acaoCorretiva}
+              onChange={(e) => setAcaoCorretiva(e.target.value)}
+            />
+          </div>
+
+          <div className="space-y-1.5">
+            <Label>Prazo (opcional)</Label>
+            <Input
+              type="date"
+              className="rounded-xl bg-white"
+              value={prazo}
+              onChange={(e) => setPrazo(e.target.value)}
+            />
+          </div>
+
+          <div className="space-y-1.5">
+            <Label>Observações (opcional)</Label>
+            <Textarea
+              className="rounded-xl bg-white resize-none"
+              rows={2}
+              placeholder="Observações adicionais..."
+              value={observacoes}
+              onChange={(e) => setObservacoes(e.target.value)}
             />
           </div>
 
           <Button
             type="submit"
             className="w-full rounded-xl bg-blue-600 hover:bg-blue-700"
-            disabled={adicionarTratativa.isPending || !tipo || !descricao.trim()}
+            disabled={adicionarTratativa.isPending || !acaoCorretiva.trim()}
           >
             {adicionarTratativa.isPending ? (
               <Loader2 className="w-4 h-4 animate-spin mr-2" />
