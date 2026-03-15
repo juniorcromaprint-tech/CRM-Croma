@@ -20,15 +20,15 @@ import PedidoCompraForm from "../components/PedidoCompraForm";
 
 // ─── Tipos ───────────────────────────────────────────────────────────────────
 
-type PCStatus = "rascunho" | "pendente" | "aprovado" | "enviado" | "recebido" | "cancelado";
+type PCStatus = "rascunho" | "aprovado" | "enviado" | "parcial" | "recebido" | "cancelado";
 
 interface PedidoCompra {
   id: string;
   numero?: string;
-  fornecedor?: { nome: string } | null;
+  fornecedor?: { nome_fantasia?: string | null; razao_social?: string } | null;
   status: PCStatus;
   valor_total: number;
-  data_entrega?: string | null;
+  previsao_entrega?: string | null;
   created_at: string;
   itens?: any[];
 }
@@ -37,9 +37,9 @@ interface PedidoCompra {
 
 const STATUS_CONFIG: Record<PCStatus, { label: string; className: string }> = {
   rascunho: { label: "Rascunho", className: "bg-slate-50 text-slate-700 border-slate-200" },
-  pendente: { label: "Pendente", className: "bg-orange-50 text-orange-700 border-orange-200" },
   aprovado: { label: "Aprovado", className: "bg-blue-50 text-blue-700 border-blue-200" },
   enviado: { label: "Enviado", className: "bg-amber-50 text-amber-700 border-amber-200" },
+  parcial: { label: "Parcialmente Recebido", className: "bg-orange-50 text-orange-700 border-orange-200" },
   recebido: { label: "Recebido", className: "bg-green-50 text-green-700 border-green-200" },
   cancelado: { label: "Cancelado", className: "bg-red-50 text-red-600 border-red-200" },
 };
@@ -47,9 +47,9 @@ const STATUS_CONFIG: Record<PCStatus, { label: string; className: string }> = {
 const TABS: { value: string; label: string }[] = [
   { value: "todos", label: "Todos" },
   { value: "rascunho", label: "Rascunho" },
-  { value: "pendente", label: "Pendente" },
   { value: "aprovado", label: "Aprovado" },
   { value: "enviado", label: "Enviado" },
+  { value: "parcial", label: "Parcial" },
   { value: "recebido", label: "Recebido" },
 ];
 
@@ -164,7 +164,7 @@ export default function PedidosCompraPage() {
                 <div className="grid gap-3">
                   {filtered.map((pc) => {
                     const statusCfg = STATUS_CONFIG[pc.status] ?? STATUS_CONFIG.rascunho;
-                    const fornecedorNome = pc.fornecedor?.nome ?? "Fornecedor não informado";
+                    const fornecedorNome = pc.fornecedor?.nome_fantasia ?? pc.fornecedor?.razao_social ?? "Fornecedor não informado";
 
                     return (
                       <div
@@ -195,10 +195,10 @@ export default function PedidosCompraPage() {
                                 {fornecedorNome}
                               </h3>
                               <div className="flex flex-wrap items-center gap-3 mt-1">
-                                {pc.data_entrega && (
+                                {pc.previsao_entrega && (
                                   <span className="text-xs text-slate-500 flex items-center gap-1">
                                     <Calendar size={12} />
-                                    Entrega: {formatDate(pc.data_entrega)}
+                                    Entrega: {formatDate(pc.previsao_entrega)}
                                   </span>
                                 )}
                                 {pc.itens && (

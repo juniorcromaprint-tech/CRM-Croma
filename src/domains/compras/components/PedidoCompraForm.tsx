@@ -2,7 +2,7 @@
 
 import { useState } from "react";
 import { useQuery } from "@tanstack/react-query";
-import { supabase } from "@/integrations/supabase/client";
+import { comprasService } from "../services/comprasService";
 import {
   Dialog,
   DialogContent,
@@ -54,7 +54,7 @@ export default function PedidoCompraForm({ open, onClose }: PedidoCompraFormProp
 
   // Form state
   const [fornecedorId, setFornecedorId] = useState("");
-  const [dataEntrega, setDataEntrega] = useState("");
+  const [previsaoEntrega, setPrevisaoEntrega] = useState("");
   const [observacoes, setObservacoes] = useState("");
   const [itens, setItens] = useState<NewPCItem[]>([]);
 
@@ -66,32 +66,17 @@ export default function PedidoCompraForm({ open, onClose }: PedidoCompraFormProp
   // Queries
   const { data: fornecedores = [] } = useQuery({
     queryKey: ["fornecedores-select"],
-    queryFn: async () => {
-      const { data, error } = await (supabase as any)
-        .from("fornecedores")
-        .select("id, nome_fantasia, razao_social")
-        .eq("ativo", true)
-        .order("nome_fantasia", { ascending: true });
-      if (error) throw error;
-      return (data ?? []) as { id: string; nome_fantasia: string | null; razao_social: string }[];
-    },
+    queryFn: () => comprasService.listarFornecedoresAtivos(),
   });
 
   const { data: materiais = [] } = useQuery({
     queryKey: ["materiais-select"],
-    queryFn: async () => {
-      const { data, error } = await (supabase as any)
-        .from("materiais")
-        .select("id, codigo, nome, unidade, preco_medio")
-        .order("nome", { ascending: true });
-      if (error) throw error;
-      return (data ?? []) as { id: string; codigo: string | null; nome: string; unidade: string | null; preco_medio: number | null }[];
-    },
+    queryFn: () => comprasService.listarMateriaisSelect(),
   });
 
   function resetForm() {
     setFornecedorId("");
-    setDataEntrega("");
+    setPrevisaoEntrega("");
     setObservacoes("");
     setItens([]);
     resetTempItem();
@@ -150,7 +135,7 @@ export default function PedidoCompraForm({ open, onClose }: PedidoCompraFormProp
         fornecedor_id: fornecedorId,
         status: "rascunho" as const,
         valor_total: valorTotal,
-        data_entrega: dataEntrega || undefined,
+        previsao_entrega: previsaoEntrega || undefined,
         observacoes: observacoes || undefined,
       },
       itens: itens.map((item) => ({
@@ -206,8 +191,8 @@ export default function PedidoCompraForm({ open, onClose }: PedidoCompraFormProp
             <Label className="text-slate-700 font-medium">Previsão de Entrega</Label>
             <Input
               type="date"
-              value={dataEntrega}
-              onChange={(e) => setDataEntrega(e.target.value)}
+              value={previsaoEntrega}
+              onChange={(e) => setPrevisaoEntrega(e.target.value)}
               className="rounded-xl border-slate-200"
             />
           </div>
