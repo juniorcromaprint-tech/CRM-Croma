@@ -1,6 +1,6 @@
 # CROMA PRINT — CRM/ERP SISTEMA
 
-> **Versão**: 3.2 | **Atualizado**: 2026-03-14 | **Status**: Operacional em Produção
+> **Versão**: 4.0 | **Atualizado**: 2026-03-14 | **Status**: Operacional em Produção — 4 Sprints concluídos
 
 ---
 
@@ -48,6 +48,8 @@ React 19 + TypeScript + Vite + Tailwind CSS + shadcn/ui
 TanStack Query v5 + Zod + React Hook Form
 Recharts (gráficos) + Sonner (toasts)
 Supabase (Postgres + Auth + Storage + Edge Functions)
+Vitest (102 testes) + html2pdf + xlsx (relatórios)
+NFeWizard-io (NF-e SEFAZ) + Resend (email campanhas)
 ```
 
 ---
@@ -76,6 +78,10 @@ Lead → Orçamento → Pedido → Produção → Instalação → Faturamento
 | `009_update_produtos_markups.sql` | ✅ Executada | 156 modelos com markup real |
 | `020_portal_tracking_pagamento.sql` | ✅ Executada | Portal cliente, tracking, pagamento, notificações |
 | `022_pedidos_cancelamento_fields.sql` | ✅ Executada | `cancelado_em` e `motivo_cancelamento` na tabela pedidos |
+| `027_rls_blindagem.sql` | ✅ Executada | RLS em 8 tabelas críticas + 14 FK indexes + NOT NULL constraints |
+| `028_retornos_bancarios.sql` | ✅ Executada | Tabelas para retorno CNAB 400 (baixa automática boletos) |
+| `029_campanha_destinatarios.sql` | ✅ Executada | Destinatários de campanhas comerciais |
+| `030_optimistic_lock.sql` | ✅ Executada | Campo `version` para lock otimista em pedidos e propostas |
 
 ### Dados no Banco
 - `clientes`: 307 registros
@@ -90,20 +96,46 @@ Lead → Orçamento → Pedido → Produção → Instalação → Faturamento
 
 ---
 
-## BUGS CORRIGIDOS (2026-03-14) — PR #5 mergeado em main
+## SPRINTS CONCLUÍDOS (2026-03-14)
 
-19 bugs corrigidos na auditoria QA. Ver relatório completo em `docs/qa-reports/2026-03-14-CORRECOES-PARA-REVISAO.md`.
+Auditoria identificou 66 problemas. 4 sprints executados para resolver todos:
 
-Principais:
-- ~~Orçamento gera R$ 0,00~~ — **RESOLVIDO**: item com valor zero é bloqueado
-- ~~Bug multiplicação dupla~~ — **RESOLVIDO**: custo_fixo com Math.max(0, ...)
-- ~~Migration 006 schema incompatível~~ — **RESOLVIDO**: tabelas existem, schema unificado
-- ~~Default role 'admin'~~ — **RESOLVIDO**: padrão agora é 'comercial'
-- ~~Tabela nfe_documentos~~ — **RESOLVIDO**: corrigido para fiscal_documentos
+### Sprint 1 — Blindagem (Segurança)
+- RLS em 8 tabelas críticas (clientes, propostas, pedidos, leads, contas_*)
+- 14 FK indexes para performance
+- NOT NULL constraints em campos críticos
+- AuthContext null-role bypass corrigido (default = comercial)
+- Rota /tv protegida com autenticação
+- Mapa de transições de status nos pedidos (impede pular etapas)
+- gerarContasReceber transacional (CR antes de marcar concluído)
 
-> ~~ERP sem auth~~ — **RESOLVIDO**: auth real funcionando em `crm-croma.vercel.app`
+### Sprint 2 — Fluxo Completo (Lead→Faturamento)
+- N+1 do orçamento corrigido (23→2 queries)
+- Guards de idempotência (OP e contas_receber)
+- KPIs de produção (4 cards)
+- Página de Expedição (`/expedicao`)
+- Calendário com 3 fontes (pedidos, leads, orçamentos)
 
-Ver auditoria completa: `docs/AUDITORIA_COMPLETA_2026-03-10.md`
+### Sprint 3 — Experiência (Performance + UX)
+- Lazy loading em todas as rotas (100+ chunks)
+- Paginação server-side em listagens
+- Select de colunas específicas nas top queries
+- Loading states nos botões
+- Dead code e console.log removidos
+
+### Sprint 4 — Crescimento (Features avançadas)
+- 102 testes automatizados (Vitest)
+- Parser CNAB 400 retorno (baixa automática de boletos)
+- Relatórios exportáveis (Excel + PDF)
+- NF-e em homologação SEFAZ (IBGE mapping, banner amarelo)
+- Campanhas comerciais (Edge Function Resend)
+- Lock otimista (campo version em pedidos/propostas)
+
+### Bugs da auditoria original (PR #5)
+19 bugs corrigidos. Ver `docs/qa-reports/2026-03-14-RELATORIO-DEV.md`.
+
+Ver spec completa: `docs/superpowers/specs/2026-03-14-plano-acao-erp-design.md`
+Ver planos: `docs/superpowers/plans/`
 
 ---
 
