@@ -26,7 +26,7 @@ function makeSaldo(overrides: Record<string, any> = {}) {
   return {
     id: "saldo-001",
     material_id: "mat-001",
-    quantidade: 50,
+    quantidade_disponivel: 50,
     material: {
       nome: "Lona 440g",
       unidade: "m²",
@@ -42,7 +42,7 @@ function makeMovimentacao(overrides: Record<string, any> = {}) {
     material_id: "mat-001",
     tipo: "entrada",
     quantidade: 20,
-    observacao: "Recebimento NF 1234",
+    motivo: "Recebimento NF 1234",
     created_at: "2026-01-01T00:00:00Z",
     material: { nome: "Lona 440g", unidade: "m²" },
     ...overrides,
@@ -93,8 +93,8 @@ describe("estoqueService.listarSaldos", () => {
 
   it("aplica filtro abaixoMinimo corretamente em memória", async () => {
     const saldos = [
-      makeSaldo({ quantidade: 5, material: { nome: "Lona 440g", unidade: "m²", estoque_minimo: 10 } }),  // abaixo
-      makeSaldo({ id: "saldo-002", quantidade: 50, material: { nome: "Vinil", unidade: "m²", estoque_minimo: 10 } }), // ok
+      makeSaldo({ quantidade_disponivel: 5, material: { nome: "Lona 440g", unidade: "m²", estoque_minimo: 10 } }),  // abaixo
+      makeSaldo({ id: "saldo-002", quantidade_disponivel: 50, material: { nome: "Vinil", unidade: "m²", estoque_minimo: 10 } }), // ok
     ];
 
     mockFrom.mockImplementation(() => ({
@@ -110,8 +110,8 @@ describe("estoqueService.listarSaldos", () => {
 
   it("não filtra abaixoMinimo quando flag não é passada", async () => {
     const saldos = [
-      makeSaldo({ quantidade: 5, material: { nome: "Lona 440g", unidade: "m²", estoque_minimo: 10 } }),
-      makeSaldo({ id: "saldo-002", quantidade: 50, material: { nome: "Vinil", unidade: "m²", estoque_minimo: 10 } }),
+      makeSaldo({ quantidade_disponivel: 5, material: { nome: "Lona 440g", unidade: "m²", estoque_minimo: 10 } }),
+      makeSaldo({ id: "saldo-002", quantidade_disponivel: 50, material: { nome: "Vinil", unidade: "m²", estoque_minimo: 10 } }),
     ];
 
     mockFrom.mockImplementation(() => ({
@@ -144,9 +144,9 @@ describe("estoqueService.alertasEstoqueMinimo", () => {
 
   it("filtra materiais com quantidade abaixo do mínimo", async () => {
     const saldos = [
-      makeSaldo({ quantidade: 3, material: { nome: "Lona 440g", unidade: "m²", estoque_minimo: 10 } }),
-      makeSaldo({ id: "saldo-002", quantidade: 50, material: { nome: "Vinil", unidade: "m²", estoque_minimo: 10 } }),
-      makeSaldo({ id: "saldo-003", quantidade: 0, material: { nome: "Bastão", unidade: "un", estoque_minimo: 5 } }),
+      makeSaldo({ quantidade_disponivel: 3, material: { nome: "Lona 440g", unidade: "m²", estoque_minimo: 10 } }),
+      makeSaldo({ id: "saldo-002", quantidade_disponivel: 50, material: { nome: "Vinil", unidade: "m²", estoque_minimo: 10 } }),
+      makeSaldo({ id: "saldo-003", quantidade_disponivel: 0, material: { nome: "Bastão", unidade: "un", estoque_minimo: 5 } }),
     ];
 
     mockFrom.mockImplementation(() => ({
@@ -163,7 +163,7 @@ describe("estoqueService.alertasEstoqueMinimo", () => {
 
   it("exclui materiais com estoque_minimo = 0", async () => {
     const saldos = [
-      makeSaldo({ quantidade: 0, material: { nome: "Material X", unidade: "un", estoque_minimo: 0 } }),
+      makeSaldo({ quantidade_disponivel: 0, material: { nome: "Material X", unidade: "un", estoque_minimo: 0 } }),
     ];
 
     mockFrom.mockImplementation(() => ({
@@ -176,7 +176,7 @@ describe("estoqueService.alertasEstoqueMinimo", () => {
 
   it("retorna array vazio quando não há alertas", async () => {
     const saldos = [
-      makeSaldo({ quantidade: 100, material: { nome: "Lona 440g", unidade: "m²", estoque_minimo: 10 } }),
+      makeSaldo({ quantidade_disponivel: 100, material: { nome: "Lona 440g", unidade: "m²", estoque_minimo: 10 } }),
     ];
 
     mockFrom.mockImplementation(() => ({
@@ -289,7 +289,7 @@ describe("estoqueService.criarMovimentacao", () => {
       single: vi.fn().mockResolvedValue({ data: novaMovimentacao, error: null }),
     }));
 
-    const dados = { material_id: "mat-001", tipo: "entrada", quantidade: 20 };
+    const dados = { material_id: "mat-001", tipo: "entrada", quantidade: 20, motivo: "Recebimento NF 1234" };
     const result = await estoqueService.criarMovimentacao(dados);
 
     expect(insertMock).toHaveBeenCalledWith(dados);
@@ -319,8 +319,8 @@ describe("estoqueService.criarInventario", () => {
   it("cria inventário e preenche itens com saldos atuais", async () => {
     const inventarioCriado = makeInventario();
     const saldos = [
-      { material_id: "mat-001", quantidade: 50 },
-      { material_id: "mat-002", quantidade: 100 },
+      { material_id: "mat-001", quantidade_disponivel: 50 },
+      { material_id: "mat-002", quantidade_disponivel: 100 },
     ];
     let inventarioItemsInsertCalled = false;
 
