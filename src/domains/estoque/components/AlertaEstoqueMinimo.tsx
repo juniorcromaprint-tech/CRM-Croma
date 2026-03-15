@@ -32,7 +32,7 @@ export function AlertaEstoqueMinimo() {
       <div className="flex items-center gap-2 px-4 py-3 bg-red-50 border-b border-red-200">
         <AlertTriangle size={16} className="text-red-600 flex-shrink-0" />
         <p className="text-sm font-semibold text-red-700">
-          {alertas.length} material{alertas.length > 1 ? "is" : ""} abaixo do mínimo
+          {alertas.length} materia{alertas.length > 1 ? "is" : "l"} abaixo do mínimo
         </p>
       </div>
 
@@ -41,7 +41,7 @@ export function AlertaEstoqueMinimo() {
           const nome = alerta.material?.nome ?? "Material";
           const unidade = alerta.material?.unidade ?? "";
           const minimo = alerta.material?.estoque_minimo ?? 0;
-          const atual = alerta.quantidade ?? 0;
+          const atual = alerta.quantidade_disponivel ?? 0;
           const diferenca = atual - minimo;
 
           return (

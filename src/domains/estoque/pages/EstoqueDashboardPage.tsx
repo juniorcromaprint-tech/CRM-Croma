@@ -108,7 +108,7 @@ export default function EstoqueDashboardPage() {
     material_id: "",
     tipo: "ajuste",
     quantidade: "",
-    observacao: "",
+    motivo: "",
   });
 
   const { data: saldos = [], isLoading: loadingSaldos } = useEstoqueSaldos({
@@ -152,7 +152,7 @@ export default function EstoqueDashboardPage() {
         material_id: ajusteForm.material_id,
         tipo: ajusteForm.tipo,
         quantidade: parseFloat(ajusteForm.quantidade),
-        observacao: ajusteForm.observacao || undefined,
+        motivo: ajusteForm.motivo || undefined,
       },
       {
         onSuccess: () => {
@@ -161,7 +161,7 @@ export default function EstoqueDashboardPage() {
             material_id: "",
             tipo: "ajuste",
             quantidade: "",
-            observacao: "",
+            motivo: "",
           });
         },
       }
@@ -368,9 +368,9 @@ export default function EstoqueDashboardPage() {
               <Label className="text-sm font-medium">Observação</Label>
               <Textarea
                 placeholder="Motivo do ajuste..."
-                value={ajusteForm.observacao}
+                value={ajusteForm.motivo}
                 onChange={(e) =>
-                  setAjusteForm((p) => ({ ...p, observacao: e.target.value }))
+                  setAjusteForm((p) => ({ ...p, motivo: e.target.value }))
                 }
                 className="rounded-xl resize-none"
                 rows={3}

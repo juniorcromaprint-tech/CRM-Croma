@@ -35,7 +35,7 @@ export function SaldoCard({ saldo }: SaldoCardProps) {
   const nome = saldo.material?.nome ?? "Material";
   const unidade = saldo.material?.unidade ?? "";
   const estoqueMinimo = saldo.material?.estoque_minimo ?? 0;
-  const quantidade = saldo.quantidade ?? 0;
+  const quantidade = saldo.quantidade_disponivel ?? 0;
   const reservado = saldo.quantidade_reservada ?? 0;
 
   const badge = getBadgeStatus(quantidade, estoqueMinimo);
