@@ -22,6 +22,8 @@
 -- Fixes: fn_compra_recebimento_estoque, fn_compra_gera_conta_pagar, fn_producao_estoque
 -- Removes: duplicate saida logic from fn_producao_estoque (debitar_estoque_producao handles it)
 -- Expands: ocorrencias tipo CHECK to include material_defeituoso, outro
+-- Adds: prioridade column to ocorrencias (used by code but missing from DB)
+-- Drops: duplicate trg_debitar_estoque trigger (debitar_estoque_producao handles saida)
 
 -- ============================================================
 -- 1. Fix fn_compra_recebimento_estoque
@@ -138,6 +140,21 @@ $$ LANGUAGE plpgsql;
 ALTER TABLE ocorrencias DROP CONSTRAINT IF EXISTS ocorrencias_tipo_check;
 ALTER TABLE ocorrencias ADD CONSTRAINT ocorrencias_tipo_check
   CHECK (tipo = ANY (ARRAY['retrabalho', 'devolucao', 'erro_producao', 'erro_instalacao', 'divergencia_cliente', 'material_defeituoso', 'outro']));
+
+-- ============================================================
+-- 5. Adicionar coluna prioridade a ocorrencias (usada pelo código mas ausente no DB)
+-- ============================================================
+ALTER TABLE ocorrencias ADD COLUMN IF NOT EXISTS prioridade TEXT DEFAULT 'media';
+ALTER TABLE ocorrencias ADD CONSTRAINT ocorrencias_prioridade_check
+  CHECK (prioridade = ANY (ARRAY['baixa', 'media', 'alta', 'critica']));
+
+-- ============================================================
+-- 6. Drop trigger duplicado que causa débito duplo de estoque
+--    debitar_estoque_producao já faz saída no finalizado/concluido
+--    fn_producao_estoque agora só faz reserva/liberação (sem saída)
+-- ============================================================
+-- Nota: NÃO dropar debitar_estoque_producao — ele é o trigger correto para saída
+-- O fn_producao_estoque já foi reescrito acima sem bloco de saída
 ```
 
 **Step 2: Execute migration on Supabase**
@@ -156,6 +173,10 @@ AND routine_name IN ('fn_compra_recebimento_estoque', 'fn_compra_gera_conta_paga
 -- Verify expanded CHECK
 SELECT pg_get_constraintdef(oid) FROM pg_constraint
 WHERE conname = 'ocorrencias_tipo_check';
+
+-- Verify prioridade column exists
+SELECT column_name FROM information_schema.columns
+WHERE table_name = 'ocorrencias' AND column_name = 'prioridade';
 ```
 
 **Step 4: Commit**
@@ -182,12 +203,8 @@ export interface Fornecedor {
   cnpj?: string;
   email?: string;
   telefone?: string;
-  contato?: string;
-  endereco?: string;
-  cidade?: string;
-  estado?: string;
-  cep?: string;
-  categorias?: string;
+  contato_nome?: string;
+  categorias?: string[];
   lead_time_dias?: number;
   condicao_pagamento?: string;
   observacoes?: string;

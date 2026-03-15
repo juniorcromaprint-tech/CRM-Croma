@@ -40,6 +40,32 @@ Além disso, 4 trigger functions no banco estão com colunas erradas e vão **fa
 
 ---
 
+## Problema 1.5: Coluna `prioridade` faltando na tabela `ocorrencias`
+
+O código usa `prioridade` (baixa, media, alta, critica) extensivamente em forms, filtros, KPIs e gráficos. Mas a coluna **não existe** no banco.
+
+**Ação**: Adicionar via migration 032:
+```sql
+ALTER TABLE ocorrencias ADD COLUMN IF NOT EXISTS prioridade TEXT DEFAULT 'media';
+ALTER TABLE ocorrencias ADD CONSTRAINT ocorrencias_prioridade_check
+  CHECK (prioridade = ANY (ARRAY['baixa', 'media', 'alta', 'critica']));
+```
+
+---
+
+## Problema 1.6: Fornecedores — Colunas erradas no type
+
+| Código atual | DB real |
+|---|---|
+| `nome` | NÃO EXISTE (usar `razao_social` + `nome_fantasia`) |
+| `contato` | `contato_nome` |
+| `endereco, cidade, estado, cep` | NÃO EXISTEM |
+| — | `categorias` (ARRAY), `lead_time_dias`, `condicao_pagamento` |
+
+**Ação**: Corrigir interface Fornecedor no type e service (`order("nome")` → `order("nome_fantasia")`)
+
+---
+
 ## Problema 2: Frontend ↔ DB Enum Mismatches
 
 ### 2.1 Compras — Status
