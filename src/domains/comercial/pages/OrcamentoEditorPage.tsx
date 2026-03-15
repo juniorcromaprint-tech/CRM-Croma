@@ -53,6 +53,12 @@ import { showError, showSuccess } from "@/utils/toast";
 import { toast } from "sonner";
 import { orcamentoService } from "../services/orcamento.service";
 import { CondicoesPagamento, type PaymentConditions } from "../components/CondicoesPagamento";
+import AIButton from '@/domains/ai/components/AIButton';
+import OrcamentoAnalise from '@/domains/ai/components/OrcamentoAnalise';
+import ComposicaoSugestao from '@/domains/ai/components/ComposicaoSugestao';
+import { useAnalisarOrcamento } from '@/domains/ai/hooks/useAnalisarOrcamento';
+import { useComposicaoProduto } from '@/domains/ai/hooks/useComposicaoProduto';
+import type { AIResponse } from '@/domains/ai/types/ai.types';
 
 // ─── Item editor state ──────────────────────────────────────────────────────
 
@@ -220,6 +226,12 @@ export default function OrcamentoEditorPage() {
 
   // ─── Template modal ─────────────────────────────────────────────────────
   const [showTemplateModal, setShowTemplateModal] = useState(false);
+
+  // ─── AI state ────────────────────────────────────────────────────────────
+  const [analiseResult, setAnaliseResult] = useState<AIResponse | null>(null);
+  const [composicaoResult, setComposicaoResult] = useState<AIResponse | null>(null);
+  const analisarOrcamento = useAnalisarOrcamento();
+  const composicaoProduto = useComposicaoProduto();
 
   // ─── Payment conditions ──────────────────────────────────────────────────
   const [paymentConditions, setPaymentConditions] = useState<PaymentConditions>({
@@ -648,6 +660,17 @@ export default function OrcamentoEditorPage() {
             >
               <FileText size={14} /> Template
             </Button>
+          )}
+          {!isNew && (
+            <AIButton
+              label="Analisar Orcamento"
+              onClick={() => {
+                analisarOrcamento.mutate(id!, {
+                  onSuccess: (data) => setAnaliseResult(data),
+                });
+              }}
+              isLoading={analisarOrcamento.isPending}
+            />
           )}
           <Button
             onClick={handleSave}
@@ -1192,6 +1215,25 @@ export default function OrcamentoEditorPage() {
         onChange={setPaymentConditions}
         valorTotal={orcamento?.total ?? 0}
       />
+
+      {/* ══════════ AI RESULTS ══════════ */}
+      {analiseResult && (
+        <div className="mt-4">
+          <OrcamentoAnalise
+            result={analiseResult}
+            onClose={() => setAnaliseResult(null)}
+          />
+        </div>
+      )}
+
+      {composicaoResult && (
+        <div className="mt-4">
+          <ComposicaoSugestao
+            result={composicaoResult}
+            onClose={() => setComposicaoResult(null)}
+          />
+        </div>
+      )}
 
       {/* Template modal */}
       <TemplateSelector
