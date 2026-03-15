@@ -1,5 +1,6 @@
 import React from "react";
 import { Link } from "react-router-dom";
+import ProblemasPanel from '@/domains/ai/components/ProblemasPanel';
 import { ProgressTracker } from "@/shared/components/ProgressTracker";
 import {
   Building2, UserPlus, TrendingUp, FileText, Package, Factory,
@@ -503,6 +504,11 @@ export default function DashboardDiretor() {
             </div>
           </div>
 
+        </div>
+
+        {/* AI Alertas Operacionais */}
+        <div className="mt-6">
+          <ProblemasPanel />
         </div>
       </div>
     </div>
