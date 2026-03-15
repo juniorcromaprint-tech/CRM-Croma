@@ -49,9 +49,9 @@ export async function gerarContasReceber(pedidoId: string): Promise<void> {
     valor_pago: 0,
     saldo: pedido.valor_total ?? 0,
     data_vencimento: vencimento.toISOString().split('T')[0],
-    status: 'pendente',
+    status: 'a_vencer',
     forma_pagamento: formaPagamento,
-    descricao: `Pedido ${pedido.numero}`,
+    observacoes: `Pedido ${pedido.numero}`,
   });
 
   if (crError) throw new Error(`Erro ao gerar conta a receber: ${crError.message}`);
