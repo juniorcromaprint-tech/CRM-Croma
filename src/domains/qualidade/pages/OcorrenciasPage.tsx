@@ -37,19 +37,16 @@ const STATUS_TABS = [
   { value: "todas", label: "Todas" },
   { value: "aberta", label: "Abertas" },
   { value: "em_analise", label: "Em Análise" },
-  { value: "em_tratamento", label: "Em Tratamento" },
+  { value: "em_tratativa", label: "Em Tratativa" },
   { value: "resolvida", label: "Resolvidas" },
-  { value: "fechada", label: "Fechadas" },
+  { value: "encerrada", label: "Encerradas" },
 ];
 
 const STATUS_CONFIG: Record<string, { label: string; color: string }> = {
   aberta: { label: "Aberta", color: "bg-blue-100 text-blue-700 border-blue-200" },
   em_analise: { label: "Em Análise", color: "bg-yellow-100 text-yellow-700 border-yellow-200" },
-  em_tratamento: { label: "Em Tratamento", color: "bg-orange-100 text-orange-700 border-orange-200" },
-  resolvida: { label: "Resolvida", color: "bg-green-100 text-green-700 border-green-200" },
-  fechada: { label: "Fechada", color: "bg-slate-100 text-slate-600 border-slate-200" },
-  // legacy compat
   em_tratativa: { label: "Em Tratativa", color: "bg-orange-100 text-orange-700 border-orange-200" },
+  resolvida: { label: "Resolvida", color: "bg-green-100 text-green-700 border-green-200" },
   encerrada: { label: "Encerrada", color: "bg-slate-100 text-slate-600 border-slate-200" },
 };
 
@@ -184,7 +181,7 @@ export default function OcorrenciasPage() {
             <TableHeader>
               <TableRow className="bg-slate-50">
                 <TableHead className="text-xs font-semibold text-slate-500 uppercase tracking-wide">
-                  Título
+                  Descrição
                 </TableHead>
                 <TableHead className="text-xs font-semibold text-slate-500 uppercase tracking-wide">
                   Tipo
@@ -225,7 +222,7 @@ export default function OcorrenciasPage() {
                     onClick={() => navigate(`/qualidade/ocorrencias/${oc.id}`)}
                   >
                     <TableCell className="font-medium text-slate-800">
-                      {oc.titulo}
+                      {oc.descricao}
                     </TableCell>
                     <TableCell className="text-sm text-slate-600">
                       {formatTipoLabel(oc.tipo)}

@@ -13,7 +13,6 @@ import {
   DialogFooter,
 } from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
-import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import {
@@ -56,6 +55,14 @@ const PRIORIDADE_OPTIONS = [
   { value: "media", label: "Média" },
   { value: "alta", label: "Alta" },
   { value: "critica", label: "Crítica" },
+];
+
+const CAUSA_OPTIONS = [
+  { value: "material_defeituoso", label: "Material Defeituoso" },
+  { value: "erro_operacional", label: "Erro Operacional" },
+  { value: "erro_projeto", label: "Erro de Projeto" },
+  { value: "instrucao_incorreta", label: "Instrução Incorreta" },
+  { value: "outro", label: "Outro" },
 ];
 
 // ─── Data hooks ──────────────────────────────────────────────────────────────
@@ -116,18 +123,18 @@ export function OcorrenciaForm({ open, onClose, defaults }: OcorrenciaFormProps)
   const { data: ordensProducao = [] } = useOrdensProducaoSelect();
   const { data: fornecedores = [] } = useFornecedoresSelect();
 
-  const [titulo, setTitulo] = useState("");
   const [tipo, setTipo] = useState("");
-  const [prioridade, setPrioridade] = useState("");
+  const [prioridade, setPrioridade] = useState("media");
+  const [causa, setCausa] = useState("");
   const [descricao, setDescricao] = useState("");
   const [pedidoId, setPedidoId] = useState(defaults?.pedido_id ?? "");
   const [ordemProducaoId, setOrdemProducaoId] = useState(defaults?.ordem_producao_id ?? "");
   const [fornecedorId, setFornecedorId] = useState(defaults?.fornecedor_id ?? "");
 
   function handleClose() {
-    setTitulo("");
     setTipo("");
-    setPrioridade("");
+    setPrioridade("media");
+    setCausa("");
     setDescricao("");
     setPedidoId(defaults?.pedido_id ?? "");
     setOrdemProducaoId(defaults?.ordem_producao_id ?? "");
@@ -137,13 +144,13 @@ export function OcorrenciaForm({ open, onClose, defaults }: OcorrenciaFormProps)
 
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
-    if (!titulo.trim() || !tipo || !prioridade) return;
+    if (!descricao.trim() || !tipo || !prioridade) return;
 
     await criarOcorrencia.mutateAsync({
-      titulo: titulo.trim(),
       tipo,
       prioridade,
-      descricao: descricao.trim() || null,
+      causa: causa || null,
+      descricao: descricao.trim(),
       pedido_id: pedidoId || null,
       ordem_producao_id: ordemProducaoId || null,
       fornecedor_id: fornecedorId || null,
@@ -161,17 +168,18 @@ export function OcorrenciaForm({ open, onClose, defaults }: OcorrenciaFormProps)
         </DialogHeader>
 
         <form onSubmit={handleSubmit} className="space-y-4">
-          {/* Título */}
+          {/* Descrição */}
           <div className="space-y-1.5">
-            <Label htmlFor="oc-titulo">
-              Título <span className="text-red-500">*</span>
+            <Label htmlFor="oc-descricao">
+              Descrição <span className="text-red-500">*</span>
             </Label>
-            <Input
-              id="oc-titulo"
-              className="rounded-xl"
-              placeholder="Descreva brevemente a ocorrência"
-              value={titulo}
-              onChange={(e) => setTitulo(e.target.value)}
+            <Textarea
+              id="oc-descricao"
+              className="rounded-xl resize-none"
+              rows={3}
+              placeholder="Descreva a ocorrência"
+              value={descricao}
+              onChange={(e) => setDescricao(e.target.value)}
               required
             />
           </div>
@@ -216,17 +224,22 @@ export function OcorrenciaForm({ open, onClose, defaults }: OcorrenciaFormProps)
             </div>
           </div>
 
-          {/* Descrição */}
+          {/* Causa */}
           <div className="space-y-1.5">
-            <Label htmlFor="oc-descricao">Descrição</Label>
-            <Textarea
-              id="oc-descricao"
-              className="rounded-xl resize-none"
-              rows={3}
-              placeholder="Detalhe a ocorrência (opcional)"
-              value={descricao}
-              onChange={(e) => setDescricao(e.target.value)}
-            />
+            <Label>Causa (opcional)</Label>
+            <Select value={causa} onValueChange={setCausa}>
+              <SelectTrigger className="rounded-xl">
+                <SelectValue placeholder="Selecione a causa" />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="">Não identificada</SelectItem>
+                {CAUSA_OPTIONS.map((o) => (
+                  <SelectItem key={o.value} value={o.value}>
+                    {o.label}
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
           </div>
 
           {/* Vinculações opcionais */}
@@ -303,7 +316,7 @@ export function OcorrenciaForm({ open, onClose, defaults }: OcorrenciaFormProps)
             <Button
               type="submit"
               className="rounded-xl bg-blue-600 hover:bg-blue-700"
-              disabled={criarOcorrencia.isPending || !titulo.trim() || !tipo || !prioridade}
+              disabled={criarOcorrencia.isPending || !descricao.trim() || !tipo || !prioridade}
             >
               {criarOcorrencia.isPending ? (
                 <Loader2 className="w-4 h-4 animate-spin mr-2" />
