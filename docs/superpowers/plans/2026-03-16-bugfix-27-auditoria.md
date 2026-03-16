@@ -58,7 +58,15 @@ useEffect(() => {
 }, [lancamentosRaw]);
 ```
 
-Ensure `useEffect` is imported at line 7 (it already is: `import React, { useState, useEffect, useMemo } from "react";` — verify this exists in ConciliacaoPage; if not, add `useEffect` to the import).
+**IMPORTANT:** `useEffect` is NOT in the current import. The file imports `{ useState, useMemo, useRef, useCallback }` at line 6. You MUST add `useEffect` to this import:
+
+```ts
+// BEFORE (line 6):
+import { useState, useMemo, useRef, useCallback } from "react";
+
+// AFTER:
+import { useState, useEffect, useMemo, useRef, useCallback } from "react";
+```
 
 - [ ] **Step 4: Run test to verify it passes**
 
@@ -318,9 +326,22 @@ Create `src/domains/comercial/pages/__tests__/OrcamentoEditorPage.test.ts`:
 ```ts
 import { describe, it, expect } from 'vitest';
 
-describe('OrcamentoEditorPage — handleAddItem logic', () => {
-  it('should have try/catch and cache invalidation after mutateAsync', async () => {
-    // This is a static analysis test: verify the file contains the fix patterns
+describe('OrcamentoEditorPage — handleAddItem contract', () => {
+  it('hook useAdicionarItemDetalhado already invalidates orcamentos cache', async () => {
+    // Verify the hook has onSuccess with invalidation
+    const fs = await import('fs');
+    const path = await import('path');
+    const hookContent = fs.readFileSync(
+      path.resolve(__dirname, '../../hooks/useOrcamentos.ts'),
+      'utf-8'
+    );
+
+    // The hook must invalidate ['orcamentos', propostaId] on success
+    expect(hookContent).toContain('useAdicionarItemDetalhado');
+    expect(hookContent).toContain('ORCAMENTOS_QUERY_KEY, propostaId');
+  });
+
+  it('handleAddItem should have error handling (showError in catch)', async () => {
     const fs = await import('fs');
     const path = await import('path');
     const content = fs.readFileSync(
@@ -328,18 +349,18 @@ describe('OrcamentoEditorPage — handleAddItem logic', () => {
       'utf-8'
     );
 
-    // handleAddItem should have try/catch
-    expect(content).toContain('try {');
-    expect(content).toContain('await adicionarItem.mutateAsync');
+    // After fix: handleAddItem should catch errors and show them
+    // Extract handleAddItem function body
+    const match = content.match(/const handleAddItem = async[\s\S]*?^\s{2}\};/m);
+    expect(match).toBeTruthy();
+    const fnBody = match![0];
 
-    // Should NOT have duplicate recalcularTotais after mutateAsync in handleAddItem
-    // (the hook already does it)
-    const handleAddItemMatch = content.match(/handleAddItem[\s\S]*?^  \};/m);
-    if (handleAddItemMatch) {
-      const fnBody = handleAddItemMatch[0];
-      const recalcCount = (fnBody.match(/recalcularTotais/g) || []).length;
-      expect(recalcCount).toBeLessThanOrEqual(0);
-    }
+    // Must have catch with showError
+    expect(fnBody).toContain('catch');
+    expect(fnBody).toContain('showError');
+    // Must NOT have duplicate recalcularTotais (hook already does it)
+    const recalcCount = (fnBody.match(/recalcularTotais/g) || []).length;
+    expect(recalcCount).toBe(0);
   });
 });
 ```
@@ -374,10 +395,12 @@ Wrap the mutation call in try/catch and remove the duplicate `recalcularTotais`:
 ```
 
 Key changes:
-1. Added `try/catch` around `mutateAsync`
-2. Removed duplicate `await orcamentoService.recalcularTotais(id)` (hook already does this)
+1. Added `try/catch` around `mutateAsync` — errors were propagating unhandled
+2. Removed duplicate `await orcamentoService.recalcularTotais(id)` — the hook's `mutationFn` already does this AND invalidates `['orcamentos', propostaId]` via `onSuccess`
 3. Added `showSuccess` on success for user feedback
 4. Added `showError` in catch with real error message
+
+**Cache invalidation note:** The hook `useAdicionarItemDetalhado` already invalidates `['orcamentos', propostaId]` in its `onSuccess`. The `useOrcamento(id)` query uses key `['orcamentos', id]`, so the cache IS properly invalidated. The stale `['proposta', id]` at line 202 is legacy from the AI sidebar and does NOT affect item list refresh. No additional `invalidateQueries` needed in `handleAddItem`.
 
 - [ ] **Step 4: Run test**
 
@@ -635,22 +658,23 @@ ordens.filter(op => col.statuses.includes(op.status))
 
 - [ ] **Step 2: Add progress guard to the filter**
 
-Where the OPs are filtered into Kanban columns, add a guard for the "fila" column:
+Where the OPs are filtered into Kanban columns, add a guard for the "fila" column.
+
+**First check if `progresso` exists on the OP type.** Search for `progresso` in the file. If the OP row has `progresso` as a field, use it directly:
 
 ```ts
-// BEFORE:
-ordens.filter(op => col.statuses.includes(op.status))
-
 // AFTER:
 ordens.filter(op => {
   if (!col.statuses.includes(op.status)) return false;
   // A3: Don't show 100% completed OPs in Fila column
-  if (col.key === 'fila' && op.progresso >= 100) return false;
+  if (col.key === 'fila' && (op as any).progresso >= 100) return false;
   return true;
 })
 ```
 
-If the OP has a `progresso` field, use it. If not, look for how progress is calculated (may be derived from etapas).
+If `progresso` is NOT on the type, look for how progress is calculated in the component (search for `etapas`, `allDone`, `calcProgress`). The progress may be derived from `op.etapas_concluidas / op.total_etapas` or similar. Use that calculation instead of `op.progresso`.
+
+If neither approach works, use a simpler heuristic: check the `updateEtapaStatus` function (~L594) which has an `allDone` check — add a similar condition to the column filter.
 
 - [ ] **Step 3: Commit**
 
@@ -666,32 +690,12 @@ Co-Authored-By: Claude <noreply@anthropic.com>"
 
 ---
 
-### Task 9: A4 + B4 — Dashboard KPIs inconsistent + "Todos no prazo"
+### Task 9: A4 — Dashboard KPIs inconsistent with Produção
 
 **Files:**
-- Modify: `src/domains/comercial/pages/DashboardDiretor.tsx:317`
+- Modify: `src/domains/comercial/pages/DashboardDiretor.tsx`
 
-- [ ] **Step 1: Fix "Todos no prazo" conditional (B4)**
-
-In `src/domains/comercial/pages/DashboardDiretor.tsx`, line 317:
-
-```tsx
-// BEFORE:
-subtitle={pedidos?.atrasados ? `${pedidos.atrasados} em atraso` : pedidos?.ativos ? "Todos no prazo" : "Nenhum pedido em andamento"}
-
-// AFTER:
-subtitle={
-  (pedidos?.atrasados ?? 0) > 0
-    ? `${pedidos.atrasados} em atraso`
-    : pedidos?.ativos
-      ? "Todos no prazo"
-      : "Nenhum pedido em andamento"
-}
-```
-
-The current logic uses `pedidos?.atrasados` which is falsy when `0`. Change to explicit `> 0` check to be safe.
-
-- [ ] **Step 2: Investigate KPI data source mismatch (A4)**
+- [ ] **Step 1: Investigate KPI data source mismatch**
 
 Check the hook that feeds `pedidos` data to DashboardDiretor. Compare with the query used in ProducaoPage. If they use different Supabase queries, align them.
 
@@ -699,14 +703,13 @@ Look at the `useDashboard` or similar hook. The production count ("em produção
 
 This may require reading the dashboard hooks to find the exact discrepancy. If both queries are correct but the dashboard just needs to use the production hook directly, add that dependency.
 
-- [ ] **Step 3: Commit**
+- [ ] **Step 2: Commit**
 
 ```bash
 git add src/domains/comercial/pages/DashboardDiretor.tsx
-git commit -m "fix(dashboard): fix 'Todos no prazo' conditional + align KPIs (A4, B4)
+git commit -m "fix(dashboard): align production KPIs with ProducaoPage data source (A4)
 
-A4: Ensure production KPIs match ProducaoPage data source.
-B4: Fix falsy check on pedidos.atrasados (0 is falsy in JS).
+Ensure dashboard KPI counts match the actual data from ProducaoPage.
 
 Co-Authored-By: Claude <noreply@anthropic.com>"
 ```
@@ -793,9 +796,11 @@ For each file, use exact string replacements. Here is the complete list of repla
 
 **`ProducaoPage.tsx`:** (M1)
 Search for `"ordemns"` or `"ordem"` with wrong plural. If found, replace with `"ordens"`.
+**NOTE:** String `"ordemns"` may NOT exist in source code — it may have been fixed or may come from a dynamic template. If grep returns nothing, mark M1 as N/A.
 
 **Expedição breadcrumb:** (M2)
-Search for `"Expedicao"` in breadcrumb/page title. Replace with `"Expedição"`.
+Search for `"Expedicao"` without accent in breadcrumb/page title. Replace with `"Expedição"`.
+**NOTE:** `ExpedicaoPage.tsx` already uses `"Expedição"` (accented) at line 31. If grep returns no unaccented matches, mark M2 as N/A — it may have been fixed.
 
 **M11 — "Package Banners è Lonas":**
 Search for `"Package"` near `"Banners"` in source. If not found in source code, it comes from the database. Check the `produtos.categoria` or `regras_precificacao.categoria` column. If it's in the DB, note it for a SQL fix (out of scope for this code commit).
@@ -892,11 +897,12 @@ Expected: Build succeeds, all tests pass
 
 ## Chunk 4: Wave 4 — Low Bugs (B1–B4)
 
-### Task 14: B1 + B3 — Router flags + client form defaults
+### Task 14: B1 + B3 + B4 — Router flags + client form defaults + dashboard message
 
 **Files:**
 - Modify: `src/App.tsx:61`
 - Modify: `src/domains/clientes/pages/ClientesPage.tsx:317` (if needed)
+- Modify: `src/domains/comercial/pages/DashboardDiretor.tsx:317`
 
 - [ ] **Step 1: Add React Router v7 future flags (B1)**
 
@@ -922,14 +928,35 @@ If it IS a `defaultValue` or a `value` with initial state "Porto Alegre", change
 // Keep placeholder="Porto Alegre"
 ```
 
-- [ ] **Step 3: Commit**
+- [ ] **Step 3: Fix "Todos no prazo" conditional (B4)**
+
+In `src/domains/comercial/pages/DashboardDiretor.tsx`, line 317:
+
+```tsx
+// BEFORE:
+subtitle={pedidos?.atrasados ? `${pedidos.atrasados} em atraso` : pedidos?.ativos ? "Todos no prazo" : "Nenhum pedido em andamento"}
+
+// AFTER:
+subtitle={
+  (pedidos?.atrasados ?? 0) > 0
+    ? `${pedidos.atrasados} em atraso`
+    : pedidos?.ativos
+      ? "Todos no prazo"
+      : "Nenhum pedido em andamento"
+}
+```
+
+The current logic uses `pedidos?.atrasados` which is falsy when `0`. Change to explicit `> 0` check.
+
+- [ ] **Step 4: Commit**
 
 ```bash
-git add src/App.tsx
-git commit -m "chore: add React Router v7 future flags + verify client form defaults (B1, B3)
+git add src/App.tsx src/domains/comercial/pages/DashboardDiretor.tsx
+git commit -m "chore: add React Router v7 future flags + fix dashboard message (B1, B3, B4)
 
 B1: Add v7_startTransition and v7_relativeSplatPath to suppress warnings.
 B3: Verified placeholder is already used (no defaultValue).
+B4: Fix falsy check on pedidos.atrasados (0 is falsy in JS).
 
 Co-Authored-By: Claude <noreply@anthropic.com>"
 ```
