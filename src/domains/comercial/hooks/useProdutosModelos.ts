@@ -31,7 +31,6 @@ export interface ProdutoModelo {
   area_m2: number | null;
   markup_padrao: number;
   margem_minima: number;
-  preco_fixo: number | null;
   tempo_producao_min: number | null;
   ativo: boolean;
   // Campos adicionados em migration 011
@@ -229,7 +228,6 @@ export function useCriarModelo() {
       altura_cm?: number;
       markup_padrao?: number;
       margem_minima?: number;
-      preco_fixo?: number;
       tempo_producao_min?: number;
     }) => {
       const { data, error } = await supabase.from("produto_modelos").insert(dados).select().single();

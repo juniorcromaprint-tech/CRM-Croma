@@ -21,7 +21,6 @@ export interface ModeloCreate {
   area_m2?: number;
   markup_padrao?: number;
   margem_minima?: number;
-  preco_fixo?: number;
   tempo_producao_min?: number;
 }
 
