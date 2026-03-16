@@ -18,7 +18,7 @@ interface ItemStep3RevisaoProps {
   markup: number;
   markupSugerido: number;
   markupMinimo: number;
-  validacaoMarkup: { valido: boolean; aviso: string | null; markup_minimo: number };
+  validacaoMarkup: { valido: boolean; aviso: string | null };
   pricingResult: OrcamentoItemPricingResult | null;
   quantidade: number;
   alerts: OrcamentoAlert[];
