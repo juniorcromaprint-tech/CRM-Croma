@@ -119,8 +119,8 @@ export default function OrdemServicoPage() {
           <div className="flex-1" />
           <AIButton
             label="Gerar Briefing"
-            onClick={() => {
-              briefingProducao.mutate(pedidoId!, {
+            onClick={(model) => {
+              briefingProducao.mutate({ pedidoId: pedidoId!, model }, {
                 onSuccess: (data) => setBriefingResult(data),
               });
             }}

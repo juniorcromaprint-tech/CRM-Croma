@@ -16,7 +16,7 @@ serve(async (req: Request) => {
     const { auth, error: authError } = await authenticateAndAuthorize(req, 'composicao-produto');
     if (authError) return authError;
 
-    const { descricao } = await req.json();
+    const { descricao, model } = await req.json();
     if (!descricao || typeof descricao !== 'string' || descricao.trim().length < 3) {
       return jsonResponse({ error: 'descricao obrigatoria (min 3 caracteres)' }, 400, corsHeaders);
     }
@@ -61,7 +61,7 @@ serve(async (req: Request) => {
 
     const systemPrompt = buildSystemPrompt(PROMPTS.composicaoProduto);
     const userPrompt = buildUserPrompt(context);
-    const result = await callOpenRouter(systemPrompt, userPrompt, { max_tokens: 3000 });
+    const result = await callOpenRouter(systemPrompt, userPrompt, { max_tokens: 3000, model: model || undefined });
 
     const aiData = JSON.parse(result.content);
     const response = {

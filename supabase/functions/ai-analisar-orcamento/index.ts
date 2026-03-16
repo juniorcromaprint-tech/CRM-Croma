@@ -17,7 +17,7 @@ serve(async (req: Request) => {
     const { auth, error: authError } = await authenticateAndAuthorize(req, 'analisar-orcamento');
     if (authError) return authError;
 
-    const { proposta_id } = await req.json();
+    const { proposta_id, model } = await req.json();
     if (!proposta_id) {
       return jsonResponse({ error: 'proposta_id obrigatorio' }, 400, corsHeaders);
     }
@@ -94,7 +94,7 @@ serve(async (req: Request) => {
     // Call AI
     const systemPrompt = buildSystemPrompt(PROMPTS.analisarOrcamento);
     const userPrompt = buildUserPrompt(context);
-    const result = await callOpenRouter(systemPrompt, userPrompt, { max_tokens: 3000 });
+    const result = await callOpenRouter(systemPrompt, userPrompt, { max_tokens: 3000, model: model || undefined });
 
     // Parse AI response
     const aiData = JSON.parse(result.content);

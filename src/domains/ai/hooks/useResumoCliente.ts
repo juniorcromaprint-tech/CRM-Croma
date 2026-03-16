@@ -7,9 +7,9 @@ import type { AIActionableResponse } from '../types/ai.types';
 
 export function useResumoCliente() {
   return useMutation({
-    mutationFn: async (clienteId: string): Promise<AIActionableResponse> => {
+    mutationFn: async ({ clienteId, model }: { clienteId: string; model?: string }): Promise<AIActionableResponse> => {
       const { data, error } = await supabase.functions.invoke('ai-resumo-cliente', {
-        body: { cliente_id: clienteId },
+        body: { cliente_id: clienteId, model },
       });
 
       if (error) throw new Error(error.message);

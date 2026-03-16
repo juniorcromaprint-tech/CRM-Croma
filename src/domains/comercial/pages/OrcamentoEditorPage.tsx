@@ -675,8 +675,8 @@ export default function OrcamentoEditorPage() {
           {!isNew && (
             <AIButton
               label="Analisar Orcamento"
-              onClick={() => {
-                analisarOrcamento.mutate(id!, {
+              onClick={(model) => {
+                analisarOrcamento.mutate({ propostaId: id!, model }, {
                   onSuccess: (data) => aiSidebar.open(data),
                 });
               }}
@@ -1251,7 +1251,7 @@ export default function OrcamentoEditorPage() {
         isLoading={analisarOrcamento.isPending}
         onClose={aiSidebar.close}
         onApply={aiSidebar.applyActions}
-        onReanalyze={() => analisarOrcamento.mutate(id!, {
+        onReanalyze={() => analisarOrcamento.mutate({ propostaId: id!, model: undefined }, {
           onSuccess: (data) => aiSidebar.setResponse(data),
         })}
         isReanalyzing={analisarOrcamento.isPending}

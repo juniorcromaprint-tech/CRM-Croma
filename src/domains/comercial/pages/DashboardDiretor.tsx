@@ -521,8 +521,8 @@ export default function DashboardDiretor() {
         <div className="mt-6 flex justify-end">
           <AIButton
             label="Detectar Problemas"
-            onClick={() => {
-              detectarProblemas.mutate('manual', {
+            onClick={(model) => {
+              detectarProblemas.mutate({ mode: 'manual', model }, {
                 onSuccess: (data) => aiSidebar.open(data),
               });
             }}
@@ -537,7 +537,7 @@ export default function DashboardDiretor() {
         isLoading={detectarProblemas.isPending}
         onClose={aiSidebar.close}
         onApply={aiSidebar.applyActions}
-        onReanalyze={() => detectarProblemas.mutate('manual', {
+        onReanalyze={() => detectarProblemas.mutate({ mode: 'manual', model: undefined }, {
           onSuccess: (data) => aiSidebar.setResponse(data),
         })}
         isReanalyzing={detectarProblemas.isPending}

@@ -291,8 +291,8 @@ export default function PedidoDetailPage() {
           </Button>
           <AIButton
             label="Briefing de Produção"
-            onClick={() => {
-              briefingProducao.mutate(id!, {
+            onClick={(model) => {
+              briefingProducao.mutate({ pedidoId: id!, model }, {
                 onSuccess: (data) => aiSidebar.open(data),
               })
             }}
@@ -509,7 +509,7 @@ export default function PedidoDetailPage() {
         isLoading={briefingProducao.isPending}
         onClose={aiSidebar.close}
         onApply={aiSidebar.applyActions}
-        onReanalyze={() => briefingProducao.mutate(id!, {
+        onReanalyze={() => briefingProducao.mutate({ pedidoId: id!, model: undefined }, {
           onSuccess: (data) => aiSidebar.setResponse(data),
         })}
         isReanalyzing={briefingProducao.isPending}

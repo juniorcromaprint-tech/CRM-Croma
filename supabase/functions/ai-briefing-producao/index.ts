@@ -16,7 +16,7 @@ serve(async (req: Request) => {
     const { auth, error: authError } = await authenticateAndAuthorize(req, 'briefing-producao');
     if (authError) return authError;
 
-    const { pedido_id } = await req.json();
+    const { pedido_id, model } = await req.json();
     if (!pedido_id) {
       return jsonResponse({ error: 'pedido_id obrigatorio' }, 400, corsHeaders);
     }
@@ -55,7 +55,7 @@ serve(async (req: Request) => {
 
     const systemPrompt = buildSystemPrompt(PROMPTS.briefingProducao);
     const userPrompt = buildUserPrompt(context);
-    const result = await callOpenRouter(systemPrompt, userPrompt, { max_tokens: 3000 });
+    const result = await callOpenRouter(systemPrompt, userPrompt, { max_tokens: 3000, model: model || undefined });
 
     const aiData = JSON.parse(result.content);
     const response = {

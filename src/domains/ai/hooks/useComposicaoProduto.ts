@@ -7,9 +7,9 @@ import type { AIActionableResponse } from '../types/ai.types';
 
 export function useComposicaoProduto() {
   return useMutation({
-    mutationFn: async (descricao: string): Promise<AIActionableResponse> => {
+    mutationFn: async ({ descricao, model }: { descricao: string; model?: string }): Promise<AIActionableResponse> => {
       const { data, error } = await supabase.functions.invoke('ai-composicao-produto', {
-        body: { descricao },
+        body: { descricao, model },
       });
 
       if (error) throw new Error(error.message);

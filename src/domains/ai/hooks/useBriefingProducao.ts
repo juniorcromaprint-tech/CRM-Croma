@@ -7,9 +7,9 @@ import type { AIActionableResponse } from '../types/ai.types';
 
 export function useBriefingProducao() {
   return useMutation({
-    mutationFn: async (pedidoId: string): Promise<AIActionableResponse> => {
+    mutationFn: async ({ pedidoId, model }: { pedidoId: string; model?: string }): Promise<AIActionableResponse> => {
       const { data, error } = await supabase.functions.invoke('ai-briefing-producao', {
-        body: { pedido_id: pedidoId },
+        body: { pedido_id: pedidoId, model },
       });
 
       if (error) throw new Error(error.message);

@@ -98,10 +98,8 @@ export const NAV_GROUPS: NavGroup[] = [
       { name: 'Usuários', path: '/admin/usuarios', icon: 'Users', module: 'admin' },
       { name: 'Configurações', path: '/admin/config', icon: 'Settings', module: 'admin' },
       { name: 'Auditoria', path: '/admin/auditoria', icon: 'Shield', module: 'admin' },
-      { name: 'Precificação', path: '/admin/precificacao', icon: 'SlidersHorizontal', module: 'admin' },
       { name: 'Gestão de Dados', path: '/admin/dados', icon: 'Database', module: 'admin' },
       { name: 'Relatórios', path: '/relatorios', icon: 'BarChart3', module: 'admin' },
-      { name: 'Progresso ERP', path: '/admin/progresso', icon: 'BarChart2', module: 'admin' },
     ],
   },
 ];

@@ -493,8 +493,8 @@ export default function ClienteDetailPage() {
         <div className="flex items-center gap-2 shrink-0">
           <AIButton
             label="Resumo Inteligente"
-            onClick={() => {
-              resumoCliente.mutate(id!, {
+            onClick={(model) => {
+              resumoCliente.mutate({ clienteId: id!, model }, {
                 onSuccess: (data) => aiSidebar.open(data),
               });
             }}
@@ -1510,7 +1510,7 @@ export default function ClienteDetailPage() {
         isLoading={resumoCliente.isPending}
         onClose={aiSidebar.close}
         onApply={aiSidebar.applyActions}
-        onReanalyze={() => resumoCliente.mutate(id!, {
+        onReanalyze={() => resumoCliente.mutate({ clienteId: id!, model: undefined }, {
           onSuccess: (data) => aiSidebar.setResponse(data),
         })}
         isReanalyzing={resumoCliente.isPending}
