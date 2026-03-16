@@ -298,7 +298,7 @@ export default function OrcamentoEditorPage() {
     };
   }, [newItem]);
 
-  const { resultado: pricingResult, markupSugerido, validacaoMarkup, config: pricingConfig } =
+  const { resultado: pricingResult, markupSugerido, validacaoMarkup, config: pricingConfig, isDefaultConfig } =
     useOrcamentoPricing(pricingInput, newItem.categoria);
 
   // ─── Alerts ─────────────────────────────────────────────────────────────
