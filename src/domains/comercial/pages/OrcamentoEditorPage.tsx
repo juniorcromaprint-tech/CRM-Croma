@@ -371,53 +371,60 @@ export default function OrcamentoEditorPage() {
       return;
     }
 
-    await adicionarItem.mutateAsync({
-      propostaId: id,
-      item: {
-        produto_id: newItem.produto_id,
-        modelo_id: newItem.modelo_id ?? undefined,
-        descricao: newItem.descricao,
-        especificacao: newItem.especificacao || null,
-        quantidade: newItem.quantidade,
-        unidade: "un",
-        largura_cm: newItem.largura_cm,
-        altura_cm: newItem.altura_cm,
-        area_m2: pricingResult.areaM2,
-        custo_mp: pricingResult.custoMP,
-        custo_mo: pricingResult.custoMO,
-        custo_fixo: Math.max(0, pricingResult.custoTotal - pricingResult.custoMP - pricingResult.custoMO),
-        markup_percentual: newItem.markup_percentual,
-        preco_override: editor.isPrecoOverride,
-        valor_unitario: pricingResult.precoUnitario,
-        valor_total: pricingResult.precoTotal,
-        ordem: (orcamentoItens.length ?? 0) + 1,
-        // Detalhes do item
-        materiais: newItem.materiais.map((m) => ({
-          material_id: m.material_id ?? null,
-          descricao: m.descricao,
-          quantidade: m.quantidade,
-          unidade: m.unidade,
-          custo_unitario: m.custo_unitario,
-          custo_total: m.quantidade * m.custo_unitario,
-        })),
-        acabamentos: newItem.acabamentos.map((a) => ({
-          acabamento_id: a.acabamento_id ?? null,
-          descricao: a.descricao,
-          quantidade: a.quantidade,
-          custo_unitario: a.custo_unitario,
-          custo_total: a.quantidade * a.custo_unitario,
-        })),
-        processos: newItem.processos.map((p, idx) => ({
-          etapa: p.etapa,
-          tempo_minutos: p.tempo_minutos,
-          ordem: idx,
-        })),
-      },
-    });
+    try {
+      await adicionarItem.mutateAsync({
+        propostaId: id,
+        item: {
+          produto_id: newItem.produto_id,
+          modelo_id: newItem.modelo_id ?? undefined,
+          descricao: newItem.descricao,
+          especificacao: newItem.especificacao || null,
+          quantidade: newItem.quantidade,
+          unidade: "un",
+          largura_cm: newItem.largura_cm,
+          altura_cm: newItem.altura_cm,
+          area_m2: pricingResult.areaM2,
+          custo_mp: pricingResult.custoMP,
+          custo_mo: pricingResult.custoMO,
+          custo_fixo: Math.max(0, pricingResult.custoTotal - pricingResult.custoMP - pricingResult.custoMO),
+          markup_percentual: newItem.markup_percentual,
+          preco_override: editor.isPrecoOverride,
+          valor_unitario: pricingResult.precoUnitario,
+          valor_total: pricingResult.precoTotal,
+          ordem: (orcamentoItens.length ?? 0) + 1,
+          // Detalhes do item
+          materiais: newItem.materiais.map((m) => ({
+            material_id: m.material_id ?? null,
+            descricao: m.descricao,
+            quantidade: m.quantidade,
+            unidade: m.unidade,
+            custo_unitario: m.custo_unitario,
+            custo_total: m.quantidade * m.custo_unitario,
+          })),
+          acabamentos: newItem.acabamentos.map((a) => ({
+            acabamento_id: a.acabamento_id ?? null,
+            descricao: a.descricao,
+            quantidade: a.quantidade,
+            custo_unitario: a.custo_unitario,
+            custo_total: a.quantidade * a.custo_unitario,
+          })),
+          processos: newItem.processos.map((p, idx) => ({
+            etapa: p.etapa,
+            tempo_minutos: p.tempo_minutos,
+            ordem: idx,
+          })),
+        },
+      });
 
-    await orcamentoService.recalcularTotais(id);
-    editor.reset();
-    setShowItemForm(false);
+      // NOTE: recalcularTotais + cache invalidation already handled by
+      // useAdicionarItemDetalhado hook's mutationFn and onSuccess
+      editor.reset();
+      setShowItemForm(false);
+      showSuccess("Item adicionado com sucesso!");
+    } catch (err: any) {
+      console.error("[handleAddItem] Falha ao adicionar item:", err);
+      showError(err?.message || "Erro ao adicionar item ao orçamento");
+    }
   };
 
   const handleRemoveItem = async (itemId: string) => {
