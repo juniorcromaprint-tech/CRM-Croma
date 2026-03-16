@@ -588,7 +588,6 @@ export default function OrcamentoViewPage() {
         shareToken={(orc as any).share_token ?? ''}
         clienteTelefone={(orc.cliente as any)?.telefone}
         clienteEmail={(orc.cliente as any)?.email}
-        onDownloadPDF={handleGerarPDF}
       />
     </div>
   );
