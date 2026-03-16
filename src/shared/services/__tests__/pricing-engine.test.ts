@@ -8,7 +8,7 @@ import {
   calcCustoPorMinuto,
   calcPercentualVendas,
   calcPricing,
-  calcPrecoRapido,
+  calcMarkupReverso,
   calcMargemReal,
   calcBreakEven,
   simularDesconto,
@@ -195,6 +195,63 @@ describe("invariantes de negócio", () => {
     const r80 = calcPricing(makeInput({ markupPercentual: 80 }), CROMA_CONFIG);
     expect(r30.precoVenda).toBeLessThan(r50.precoVenda);
     expect(r50.precoVenda).toBeLessThan(r80.precoVenda);
+  });
+});
+
+// ─── calcMarkupReverso ───────────────────────────────────────────────────
+
+describe("calcMarkupReverso", () => {
+  it("retorna markup correto para preco-alvo conhecido", () => {
+    // Primeiro, calcula preco com markup 40%
+    const input = makeInput({ markupPercentual: 40 });
+    const forward = calcPricing(input, CROMA_CONFIG);
+
+    // Agora faz o reverso: dado precoVenda, deve retornar ~40%
+    const reverso = calcMarkupReverso(
+      forward.precoVenda,
+      { materiais: input.materiais, processos: input.processos },
+      CROMA_CONFIG,
+    );
+    expect(reverso.markupPercentual).toBeCloseTo(40, 1);
+    expect(reverso.valido).toBe(true);
+  });
+
+  it("retorna valido=false para preco-alvo <= 0", () => {
+    const input = makeInput();
+    const r = calcMarkupReverso(0, { materiais: input.materiais, processos: input.processos }, CROMA_CONFIG);
+    expect(r.valido).toBe(false);
+    expect(r.markupPercentual).toBe(0);
+  });
+
+  it("retorna valido=false para preco-alvo negativo", () => {
+    const input = makeInput();
+    const r = calcMarkupReverso(-100, { materiais: input.materiais, processos: input.processos }, CROMA_CONFIG);
+    expect(r.valido).toBe(false);
+  });
+
+  it("retorna markup negativo quando preco abaixo do custo", () => {
+    const input = makeInput();
+    // Preco muito baixo (abaixo do Vam)
+    const r = calcMarkupReverso(1, { materiais: input.materiais, processos: input.processos }, CROMA_CONFIG);
+    expect(r.markupPercentual).toBeLessThan(0);
+    expect(r.valido).toBe(false);
+  });
+
+  it("retorna margemBruta coerente com o motor forward", () => {
+    const input = makeInput({ markupPercentual: 50 });
+    const forward = calcPricing(input, CROMA_CONFIG);
+    const reverso = calcMarkupReverso(
+      forward.precoVenda,
+      { materiais: input.materiais, processos: input.processos },
+      CROMA_CONFIG,
+    );
+    expect(reverso.margemBruta).toBeCloseTo(forward.margemBruta, 0);
+  });
+
+  it("funciona com materiais vazios", () => {
+    const r = calcMarkupReverso(100, { materiais: [], processos: [] }, CROMA_CONFIG);
+    // With no costs, base is 0, so any price gives huge markup
+    expect(r.valido).toBe(false); // valorAntesMarkup = 0
   });
 });
 
