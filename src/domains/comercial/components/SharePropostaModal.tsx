@@ -3,7 +3,7 @@ import { useState } from 'react';
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
-import { Link2, MessageCircle, Mail, FileText, Check, Loader2 } from 'lucide-react';
+import { Link2, MessageCircle, Mail, Check, Loader2 } from 'lucide-react';
 import { supabase } from '@/integrations/supabase/client';
 import { showSuccess, showError } from '@/utils/toast';
 
@@ -15,10 +15,9 @@ interface Props {
   shareToken: string;
   clienteTelefone?: string;
   clienteEmail?: string;
-  onDownloadPDF?: () => void;
 }
 
-export function SharePropostaModal({ open, onClose, propostaId, propostaNumero, shareToken, clienteTelefone, clienteEmail, onDownloadPDF }: Props) {
+export function SharePropostaModal({ open, onClose, propostaId, propostaNumero, shareToken, clienteTelefone, clienteEmail }: Props) {
   const [copied, setCopied] = useState(false);
   const [emailTo, setEmailTo] = useState(clienteEmail || '');
   const [sendingEmail, setSendingEmail] = useState(false);
@@ -107,15 +106,6 @@ export function SharePropostaModal({ open, onClose, propostaId, propostaNumero, 
               </Button>
             </div>
           )}
-          <Button variant="outline" className="w-full justify-start gap-3 h-12" onClick={() => {
-            if (onDownloadPDF) {
-              onDownloadPDF();
-              onClose();
-            }
-          }}>
-            <FileText size={18} className="text-red-600" />
-            Baixar PDF
-          </Button>
         </div>
       </DialogContent>
     </Dialog>
