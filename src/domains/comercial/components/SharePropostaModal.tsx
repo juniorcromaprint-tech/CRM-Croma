@@ -15,9 +15,10 @@ interface Props {
   shareToken: string;
   clienteTelefone?: string;
   clienteEmail?: string;
+  onDownloadPDF?: () => void;
 }
 
-export function SharePropostaModal({ open, onClose, propostaId, propostaNumero, shareToken, clienteTelefone, clienteEmail }: Props) {
+export function SharePropostaModal({ open, onClose, propostaId, propostaNumero, shareToken, clienteTelefone, clienteEmail, onDownloadPDF }: Props) {
   const [copied, setCopied] = useState(false);
   const [emailTo, setEmailTo] = useState(clienteEmail || '');
   const [sendingEmail, setSendingEmail] = useState(false);
@@ -107,8 +108,10 @@ export function SharePropostaModal({ open, onClose, propostaId, propostaNumero, 
             </div>
           )}
           <Button variant="outline" className="w-full justify-start gap-3 h-12" onClick={() => {
-            showSuccess('Gerando PDF...');
-            window.print();
+            if (onDownloadPDF) {
+              onDownloadPDF();
+              onClose();
+            }
           }}>
             <FileText size={18} className="text-red-600" />
             Baixar PDF
