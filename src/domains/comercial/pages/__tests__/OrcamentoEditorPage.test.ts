@@ -8,7 +8,7 @@ describe('OrcamentoEditorPage — handleAddItem contract', () => {
     'utf-8'
   );
 
-  it('hook useAdicionarItemDetalhado already invalidates orcamentos cache', async () => {
+  it('hook useAdicionarItemDetalhado already invalidates orcamentos cache', () => {
     const hookContent = fs.readFileSync(
       path.resolve(__dirname, '../../hooks/useOrcamentos.ts'),
       'utf-8'
@@ -27,11 +27,13 @@ describe('OrcamentoEditorPage — handleAddItem contract', () => {
     expect(fnBody).toContain('showError');
   });
 
-  it('handleAddItem should NOT have duplicate recalcularTotais call', () => {
+  it('handleAddItem should NOT have duplicate recalcularTotais call (only in comments)', () => {
     const match = content.match(/const handleAddItem = async[\s\S]*?^\s{2}\};/m);
     expect(match).toBeTruthy();
     const fnBody = match![0];
-    const recalcCount = (fnBody.match(/recalcularTotais/g) || []).length;
+    // Strip line comments before counting — comment mentions recalcularTotais as explanation
+    const codeOnly = fnBody.replace(/\/\/.*$/gm, '');
+    const recalcCount = (codeOnly.match(/recalcularTotais/g) || []).length;
     expect(recalcCount).toBe(0);
   });
 });
