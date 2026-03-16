@@ -10,13 +10,28 @@ export default function AIStatusBadge({ status, message }: AIStatusBadgeProps) {
   if (status === 'idle') return null;
 
   const config = {
-    applying: { icon: <Loader2 size={12} className="animate-spin" />, text: 'Aplicando...', className: 'text-blue-600 bg-blue-50' },
-    applied: { icon: <CheckCircle size={12} />, text: 'Aplicado', className: 'text-green-600 bg-green-50' },
-    error: { icon: <XCircle size={12} />, text: message ?? 'Erro', className: 'text-red-600 bg-red-50' },
+    applying: {
+      icon: <Loader2 size={10} className="animate-spin" />,
+      text: 'Aplicando...',
+      className: 'text-blue-700 bg-blue-50 border-blue-200',
+    },
+    applied: {
+      icon: <CheckCircle size={10} />,
+      text: 'Aplicado',
+      className: 'text-emerald-700 bg-emerald-50 border-emerald-200',
+    },
+    error: {
+      icon: <XCircle size={10} />,
+      text: message ? (message.length > 40 ? message.slice(0, 40) + '...' : message) : 'Erro',
+      className: 'text-red-700 bg-red-50 border-red-200',
+    },
   }[status];
 
   return (
-    <span className={`inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-medium ${config.className}`}>
+    <span
+      className={`inline-flex items-center gap-1 px-2 py-0.5 rounded-md text-[10px] font-medium border shrink-0 ${config.className}`}
+      title={message}
+    >
       {config.icon}
       {config.text}
     </span>

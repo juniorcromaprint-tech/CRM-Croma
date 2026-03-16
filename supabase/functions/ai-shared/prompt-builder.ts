@@ -70,7 +70,7 @@ Retorne JSON EXATO:
 }
 
 CHECKLIST:
-1. Margem < 30% → acao tipo "preco"
+1. Margem < 30% → acao tipo "preco" — MAS SE o item tem "preco_override": true, NAO sugira ajuste de preco pois o usuario ja definiu o preco manualmente. Ignore margem para itens com preco_override.
 2. Falta instalacao/frete/arte → acao tipo "adicionar_item"
 3. Material mais barato disponivel → acao tipo "trocar_material"
 4. Acabamento obrigatorio ausente → acao tipo "adicionar_acabamento"

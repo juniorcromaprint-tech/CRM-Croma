@@ -1,5 +1,5 @@
 import { useState, useCallback } from 'react';
-import { X, Sparkles } from 'lucide-react';
+import { X, Sparkles, Bot } from 'lucide-react';
 import AIActionCard from './AIActionCard';
 import AIKPIBar from './AIKPIBar';
 import AIApplyBar from './AIApplyBar';
@@ -24,7 +24,7 @@ export default function AISidebar({
   onApply,
   onReanalyze,
   isReanalyzing,
-  title = 'Análise',
+  title = 'Análise do Orçamento',
 }: AISidebarProps) {
   const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
   const [actionStatuses, setActionStatuses] = useState<Map<string, AIActionStatus>>(new Map());
@@ -89,71 +89,123 @@ export default function AISidebar({
 
   if (!isOpen) return null;
 
-  return (
-    <div
-      data-testid="ai-sidebar"
-      className="fixed right-0 top-0 h-full w-[380px] bg-slate-900 text-white shadow-2xl z-50 flex flex-col"
-    >
-      {/* Header */}
-      <div className="px-4 py-3 border-b border-slate-700 flex items-center justify-between shrink-0">
-        <div className="flex items-center gap-2">
-          <Sparkles size={16} className="text-amber-500" />
-          <span className="font-bold text-sm">Croma AI</span>
-          <span className="text-slate-500">|</span>
-          <span className="text-sm text-slate-300">{title}</span>
-        </div>
-        <button onClick={onClose} className="text-slate-400 hover:text-white">
-          <X size={16} />
-        </button>
-      </div>
+  const appliedCount = [...actionStatuses.values()].filter((s) => s === 'applied').length;
+  const errorCount = [...actionStatuses.values()].filter((s) => s === 'error').length;
 
-      {/* Content */}
-      <div className="flex-1 overflow-y-auto">
-        {isLoading ? (
-          <div className="p-4 space-y-3">
-            {[1, 2, 3].map((i) => (
-              <div key={i} className="animate-pulse bg-slate-800 rounded-xl h-20" />
-            ))}
+  return (
+    <>
+      {/* Backdrop */}
+      <div
+        className="fixed inset-0 bg-black/20 z-40 transition-opacity"
+        onClick={onClose}
+      />
+
+      {/* Sidebar */}
+      <div
+        data-testid="ai-sidebar"
+        className="fixed right-0 top-0 h-full w-[440px] bg-white shadow-2xl z-50 flex flex-col border-l border-slate-200"
+      >
+        {/* Header */}
+        <div className="px-5 py-4 border-b border-slate-200 shrink-0 bg-gradient-to-r from-blue-600 to-blue-700">
+          <div className="flex items-center justify-between">
+            <div className="flex items-center gap-3">
+              <div className="w-8 h-8 rounded-lg bg-white/20 flex items-center justify-center">
+                <Sparkles size={16} className="text-white" />
+              </div>
+              <div>
+                <h2 className="font-bold text-sm text-white">Croma AI</h2>
+                <p className="text-[11px] text-blue-100">{title}</p>
+              </div>
+            </div>
+            <button
+              onClick={onClose}
+              className="w-8 h-8 rounded-lg bg-white/10 hover:bg-white/20 flex items-center justify-center transition-colors cursor-pointer"
+            >
+              <X size={14} className="text-white" />
+            </button>
           </div>
-        ) : response ? (
-          <div className="p-4 space-y-4">
-            <p className="text-xs text-slate-400">{response.summary}</p>
-            <AIKPIBar kpis={response.kpis} />
-            <div className="space-y-2">
-              {response.actions.map((action) => (
-                <AIActionCard
-                  key={action.id}
-                  action={action}
-                  selected={selectedIds.has(action.id)}
-                  status={actionStatuses.get(action.id) ?? 'idle'}
-                  statusMessage={statusMessages.get(action.id)}
-                  onToggle={handleToggle}
-                />
+        </div>
+
+        {/* Content */}
+        <div className="flex-1 overflow-y-auto bg-slate-50">
+          {isLoading ? (
+            <div className="p-5 space-y-4">
+              <div className="flex items-center gap-3 text-sm text-slate-500">
+                <Bot size={16} className="animate-pulse text-blue-600" />
+                <span>Analisando orçamento...</span>
+              </div>
+              {[1, 2, 3, 4].map((i) => (
+                <div key={i} className="animate-pulse">
+                  <div className="bg-white rounded-xl h-24 border border-slate-200" />
+                </div>
               ))}
             </div>
-          </div>
-        ) : null}
-      </div>
+          ) : response ? (
+            <div className="p-5 space-y-4">
+              {/* Summary */}
+              <div className="bg-white rounded-xl p-4 border border-slate-200 shadow-sm">
+                <p className="text-sm text-slate-700 leading-relaxed">{response.summary}</p>
+              </div>
 
-      {/* Footer */}
-      {response && totalApplicable > 0 && (
-        <AIApplyBar
-          selectedCount={selectedIds.size}
-          totalCount={totalApplicable}
-          isApplying={isApplying}
-          onApply={handleApply}
-          onSelectAll={handleSelectAll}
-          onReanalyze={handleReanalyze}
-          isReanalyzing={isReanalyzing}
-        />
-      )}
+              {/* KPIs */}
+              <AIKPIBar kpis={response.kpis} />
 
-      {response && (
-        <div className="px-4 py-1.5 border-t border-slate-800 flex justify-between text-[9px] text-slate-500">
-          <span>{response.model_used}</span>
-          <span>{response.tokens_used} tokens</span>
+              {/* Results summary if actions were applied */}
+              {(appliedCount > 0 || errorCount > 0) && (
+                <div className="flex gap-2 text-xs">
+                  {appliedCount > 0 && (
+                    <span className="bg-emerald-50 text-emerald-700 border border-emerald-200 px-2.5 py-1 rounded-lg font-medium">
+                      {appliedCount} aplicada{appliedCount !== 1 ? 's' : ''}
+                    </span>
+                  )}
+                  {errorCount > 0 && (
+                    <span className="bg-red-50 text-red-700 border border-red-200 px-2.5 py-1 rounded-lg font-medium">
+                      {errorCount} erro{errorCount !== 1 ? 's' : ''}
+                    </span>
+                  )}
+                </div>
+              )}
+
+              {/* Actions */}
+              <div className="space-y-2.5">
+                <h3 className="text-[11px] font-semibold text-slate-400 uppercase tracking-wider">
+                  Sugestões ({response.actions.length})
+                </h3>
+                {response.actions.map((action) => (
+                  <AIActionCard
+                    key={action.id}
+                    action={action}
+                    selected={selectedIds.has(action.id)}
+                    status={actionStatuses.get(action.id) ?? 'idle'}
+                    statusMessage={statusMessages.get(action.id)}
+                    onToggle={handleToggle}
+                  />
+                ))}
+              </div>
+            </div>
+          ) : null}
         </div>
-      )}
-    </div>
+
+        {/* Footer */}
+        {response && totalApplicable > 0 && (
+          <AIApplyBar
+            selectedCount={selectedIds.size}
+            totalCount={totalApplicable}
+            isApplying={isApplying}
+            onApply={handleApply}
+            onSelectAll={handleSelectAll}
+            onReanalyze={handleReanalyze}
+            isReanalyzing={isReanalyzing}
+          />
+        )}
+
+        {response && (
+          <div className="px-5 py-2 border-t border-slate-100 flex justify-between text-[10px] text-slate-400">
+            <span>{response.model_used}</span>
+            <span>{response.tokens_used.toLocaleString()} tokens</span>
+          </div>
+        )}
+      </div>
+    </>
   );
 }

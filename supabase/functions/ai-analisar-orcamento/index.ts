@@ -33,7 +33,7 @@ serve(async (req: Request) => {
         cliente:clientes(id, nome_fantasia, razao_social, segmento, classificacao),
         itens:proposta_itens(
           id, descricao, quantidade, largura_cm, altura_cm, area_m2, valor_unitario, valor_total,
-          modelo_id, unidade,
+          modelo_id, unidade, preco_override,
           materiais:proposta_item_materiais(material_id, quantidade, custo_unitario, custo_total, descricao),
           acabamentos:proposta_item_acabamentos(acabamento_id, custo_unitario, custo_total, descricao)
         ),
