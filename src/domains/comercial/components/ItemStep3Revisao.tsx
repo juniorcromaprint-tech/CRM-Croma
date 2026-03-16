@@ -55,7 +55,8 @@ export default function ItemStep3Revisao({
   onPrecoM2Override,
   onMarkupSugeridoClick,
 }: ItemStep3RevisaoProps) {
-  const debounceRef = useRef<ReturnType<typeof setTimeout>>();
+  const debouncePrecoRef = useRef<ReturnType<typeof setTimeout>>();
+  const debounceM2Ref = useRef<ReturnType<typeof setTimeout>>();
 
   // Controlled input state — synced from parent when pricingResult or overrideSource changes
   const [precoInputValue, setPrecoInputValue] = React.useState<string>('');
@@ -146,9 +147,9 @@ export default function ItemStep3Revisao({
               onBlur={(e) => handlePrecoBlur(e.target.value)}
               onChange={(e) => {
                 setPrecoInputValue(e.target.value);
-                clearTimeout(debounceRef.current);
+                clearTimeout(debouncePrecoRef.current);
                 const val = e.target.value;
-                debounceRef.current = setTimeout(() => {
+                debouncePrecoRef.current = setTimeout(() => {
                   const num = parseFloat(val);
                   if (!isNaN(num) && num > 0) onPrecoOverride(num);
                 }, 300);
@@ -167,9 +168,9 @@ export default function ItemStep3Revisao({
                 onBlur={(e) => handlePrecoM2Blur(e.target.value)}
                 onChange={(e) => {
                   setPrecoM2InputValue(e.target.value);
-                  clearTimeout(debounceRef.current);
+                  clearTimeout(debounceM2Ref.current);
                   const val = e.target.value;
-                  debounceRef.current = setTimeout(() => {
+                  debounceM2Ref.current = setTimeout(() => {
                     const num = parseFloat(val);
                     if (!isNaN(num) && num > 0) onPrecoM2Override(num);
                   }, 300);

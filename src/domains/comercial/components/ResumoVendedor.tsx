@@ -60,9 +60,9 @@ export default function ResumoVendedor({
           <div className="flex-1 min-w-0">
             <div className="flex items-center justify-between">
               <span className="text-xs text-slate-500">Custo de Material</span>
-              <span className="text-xs font-semibold text-slate-700 tabular-nums">{brl(resultado.custoMP + resultado.custosAcabamentos)}</span>
+              <span className="text-xs font-semibold text-slate-700 tabular-nums">{brl(resultado.custoMP)}</span>
             </div>
-            {resultado.custoMP + resultado.custosAcabamentos === 0 && (
+            {resultado.custoMP === 0 && (
               <p className="text-[10px] text-amber-600 mt-0.5">⚠️ Sem materiais cadastrados</p>
             )}
           </div>

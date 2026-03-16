@@ -19,9 +19,14 @@ export default function PricingCalculator({ resultado, quantidade = 1 }: Pricing
     );
   }
 
+  // custoMP already includes acabamentos (both go through the motor together)
+  const custoMateriaisPuros = resultado.custoMP - resultado.custosAcabamentos;
+
   const rows = [
-    { label: "Custo de Material", value: resultado.custoMP, color: "text-slate-600" },
-    { label: "Acabamentos", value: resultado.custosAcabamentos, color: "text-slate-600" },
+    { label: "Materiais", value: custoMateriaisPuros, color: "text-slate-600" },
+    ...(resultado.custosAcabamentos > 0
+      ? [{ label: "Acabamentos", value: resultado.custosAcabamentos, color: "text-slate-600" }]
+      : []),
     { label: "Custo de Produção", value: resultado.custoMO, color: "text-slate-600" },
     { label: "Custo de Produção Total", value: resultado.custoTotal, color: "text-slate-800 font-semibold" },
     { label: "Preço Unitário", value: resultado.precoUnitario, color: "text-blue-700 font-bold" },

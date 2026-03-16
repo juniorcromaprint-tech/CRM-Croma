@@ -93,11 +93,11 @@ export function useItemEditor() {
       return;
     }
     // Apply discount to the modelo's markupSugerido, not the already-discounted value
-    const modeloMarkup = markupSugerido || newItem.markup_percentual;
+    const modeloMarkup = markupSugerido ?? newItem.markup_percentual;
     const adjustedMarkup = Math.max(0, modeloMarkup - volumeDiscount.desconto);
     setNewItem((s) => ({ ...s, markup_percentual: Math.round(adjustedMarkup * 100) / 100 }));
     setVolumeApplied(true);
-  }, [volumeDiscount.desconto, overrideSource]);
+  }, [volumeDiscount.desconto, overrideSource, markupSugerido]);
 
   // Alerts
   const alerts = useOrcamentoAlerts({
