@@ -7,7 +7,7 @@ import {
   Select, SelectContent, SelectItem, SelectTrigger, SelectValue,
 } from '@/components/ui/select';
 import { useImportHistory } from '../hooks/useImportHistory';
-import { getAllEntities } from '../configs/entity-registry';
+import { getAllEntities } from '../configs/index';
 import { formatDate } from '@/shared/utils/format';
 
 const operationLabel: Record<string, string> = {

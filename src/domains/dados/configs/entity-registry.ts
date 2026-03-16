@@ -46,15 +46,3 @@ export function getAllEntities(): EntityConfig[] {
   return Array.from(registry.values()).sort((a, b) => a.importOrder - b.importOrder);
 }
 
-// Auto-register all entities (side-effect imports)
-import './materiais.config';
-import './produtos.config';
-import './clientes.config';
-import './fornecedores.config';
-import './modelo-materiais.config';
-import './modelo-processos.config';
-import './contas-receber.config';
-import './contas-pagar.config';
-import './leads.config';
-import './acabamentos.config';
-import './servicos.config';
