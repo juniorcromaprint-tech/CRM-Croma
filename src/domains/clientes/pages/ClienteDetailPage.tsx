@@ -493,8 +493,8 @@ export default function ClienteDetailPage() {
         <div className="flex items-center gap-2 shrink-0">
           <AIButton
             label="Resumo Inteligente"
-            onClick={() => {
-              resumoCliente.mutate({ clienteId: id!, model: undefined }, {
+            onClick={(model) => {
+              resumoCliente.mutate({ clienteId: id!, model }, {
                 onSuccess: (data) => aiSidebar.open(data),
               });
             }}

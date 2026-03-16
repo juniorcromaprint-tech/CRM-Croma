@@ -675,8 +675,8 @@ export default function OrcamentoEditorPage() {
           {!isNew && (
             <AIButton
               label="Analisar Orcamento"
-              onClick={() => {
-                analisarOrcamento.mutate({ propostaId: id!, model: undefined }, {
+              onClick={(model) => {
+                analisarOrcamento.mutate({ propostaId: id!, model }, {
                   onSuccess: (data) => aiSidebar.open(data),
                 });
               }}

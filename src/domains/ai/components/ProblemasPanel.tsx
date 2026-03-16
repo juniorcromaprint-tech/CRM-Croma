@@ -38,8 +38,8 @@ export default function ProblemasPanel() {
           </Button>
           <AIButton
             label="Analise Completa"
-            onClick={() => {
-              detectar.mutate({ mode: 'manual', model: undefined }, {
+            onClick={(model) => {
+              detectar.mutate({ mode: 'manual', model }, {
                 onSuccess: (data) => setManualResult(data),
               });
             }}

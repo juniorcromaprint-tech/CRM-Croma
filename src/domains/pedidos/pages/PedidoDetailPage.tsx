@@ -291,8 +291,8 @@ export default function PedidoDetailPage() {
           </Button>
           <AIButton
             label="Briefing de Produção"
-            onClick={() => {
-              briefingProducao.mutate({ pedidoId: id!, model: undefined }, {
+            onClick={(model) => {
+              briefingProducao.mutate({ pedidoId: id!, model }, {
                 onSuccess: (data) => aiSidebar.open(data),
               })
             }}

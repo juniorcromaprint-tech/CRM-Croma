@@ -521,8 +521,8 @@ export default function DashboardDiretor() {
         <div className="mt-6 flex justify-end">
           <AIButton
             label="Detectar Problemas"
-            onClick={() => {
-              detectarProblemas.mutate({ mode: 'manual', model: undefined }, {
+            onClick={(model) => {
+              detectarProblemas.mutate({ mode: 'manual', model }, {
                 onSuccess: (data) => aiSidebar.open(data),
               });
             }}
