@@ -132,7 +132,7 @@ export function usePedido(id: string | undefined) {
         .from('pedidos')
         .select('*, version, clientes(nome_fantasia, razao_social)')
         .eq('id', id)
-        .single();
+        .maybeSingle();
       if (error) throw new Error(`Erro ao buscar pedido: ${error.message}`);
       return data as Pedido;
     },
