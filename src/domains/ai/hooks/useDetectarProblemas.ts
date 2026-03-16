@@ -7,9 +7,9 @@ import type { AIActionableResponse } from '../types/ai.types';
 
 export function useDetectarProblemas() {
   return useMutation({
-    mutationFn: async (mode: 'manual' | 'cron' = 'manual'): Promise<AIActionableResponse> => {
+    mutationFn: async ({ mode = 'manual', model }: { mode?: 'manual' | 'cron'; model?: string } = {}): Promise<AIActionableResponse> => {
       const { data, error } = await supabase.functions.invoke('ai-detectar-problemas', {
-        body: { mode },
+        body: { mode, model },
       });
 
       if (error) throw new Error(error.message);

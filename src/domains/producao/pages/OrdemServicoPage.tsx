@@ -120,7 +120,7 @@ export default function OrdemServicoPage() {
           <AIButton
             label="Gerar Briefing"
             onClick={() => {
-              briefingProducao.mutate(pedidoId!, {
+              briefingProducao.mutate({ pedidoId: pedidoId!, model: undefined }, {
                 onSuccess: (data) => setBriefingResult(data),
               });
             }}

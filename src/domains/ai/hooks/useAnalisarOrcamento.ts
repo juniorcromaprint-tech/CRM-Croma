@@ -7,9 +7,9 @@ import type { AIActionableResponse } from '../types/ai.types';
 
 export function useAnalisarOrcamento() {
   return useMutation({
-    mutationFn: async (propostaId: string): Promise<AIActionableResponse> => {
+    mutationFn: async ({ propostaId, model }: { propostaId: string; model?: string }): Promise<AIActionableResponse> => {
       const { data, error } = await supabase.functions.invoke('ai-analisar-orcamento', {
-        body: { proposta_id: propostaId },
+        body: { proposta_id: propostaId, model },
       });
 
       if (error) throw new Error(error.message);
