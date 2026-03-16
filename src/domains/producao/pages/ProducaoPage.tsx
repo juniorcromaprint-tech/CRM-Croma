@@ -668,9 +668,12 @@ export default function ProducaoPage() {
   const opsByColumn = useMemo(() => {
     const result: Record<string, OrdemProducaoRow[]> = {};
     for (const col of KANBAN_COLUMNS) {
-      result[col.key] = filtered.filter((op) =>
-        col.statuses.includes(op.status)
-      );
+      result[col.key] = filtered.filter((op) => {
+        if (!col.statuses.includes(op.status)) return false;
+        // A3: Don't show 100% completed OPs in Fila column
+        if (col.key === 'fila' && getProgressPercent(op.producao_etapas) >= 100) return false;
+        return true;
+      });
     }
     return result;
   }, [filtered]);
