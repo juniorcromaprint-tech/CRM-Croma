@@ -325,7 +325,7 @@ export default function DashboardDiretor() {
         <HeroKpi
           label="Produção"
           value={producao?.emProducao ?? 0}
-          subtitle={`${producao?.aguardando ?? 0} na fila · ${producao?.liberadas ?? 0} liberadas`}
+          subtitle={`${(producao?.aguardando ?? 0) + (producao?.emFila ?? 0)} na fila · ${producao?.liberadas ?? 0} liberadas`}
           icon={<Factory size={24} className="text-white" />}
           gradient="bg-gradient-to-br from-orange-500 to-orange-600"
           iconBg="bg-white/20"
@@ -469,7 +469,7 @@ export default function DashboardDiretor() {
             </div>
             <div className="grid grid-cols-2 gap-3">
               {[
-                { label: "Na fila", value: producao?.aguardando ?? 0, bg: "bg-amber-50", text: "text-amber-600", icon: <Clock size={14} className="text-amber-400" /> },
+                { label: "Na fila", value: (producao?.aguardando ?? 0) + (producao?.emFila ?? 0), bg: "bg-amber-50", text: "text-amber-600", icon: <Clock size={14} className="text-amber-400" /> },
                 { label: "Produzindo", value: producao?.emProducao ?? 0, bg: "bg-orange-50", text: "text-orange-600", icon: <Factory size={14} className="text-orange-400" /> },
                 { label: "Liberadas", value: producao?.liberadas ?? 0, bg: "bg-emerald-50", text: "text-emerald-600", icon: <CheckCircle2 size={14} className="text-emerald-400" /> },
                 { label: "Atrasadas", value: producao?.atrasadas ?? 0, bg: (producao?.atrasadas ?? 0) > 0 ? "bg-red-50" : "bg-slate-50", text: (producao?.atrasadas ?? 0) > 0 ? "text-red-600" : "text-slate-300", icon: <AlertTriangle size={14} className={(producao?.atrasadas ?? 0) > 0 ? "text-red-400" : "text-slate-300"} /> },
