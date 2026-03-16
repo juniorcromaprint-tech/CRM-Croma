@@ -43,8 +43,8 @@ Criar um módulo completo de **importação, exportação e edição em massa** 
 | 2 | Produtos | `produtos` | ✅ | ✅ | ✅ | `id` ou `codigo` | Simples |
 | 3 | Clientes + Contatos | `clientes` + `cliente_contatos` | ✅ | ✅ | ✅ | `id` ou `cnpj_cpf` | Complexa (1:N) |
 | 4 | Fornecedores | `fornecedores` | ✅ | ✅ | ✅ | `id` ou `cnpj_cpf` | Simples |
-| 5 | Composição Material | `modelo_materiais` | ✅ | ✅ | ✅ | `modelo_id` + `material_id` | Média (N:N) |
-| 6 | Composição Processo | `modelo_processos` | ✅ | ✅ | ✅ | `modelo_id` + `processo` | Média (N:N) |
+| 5 | Composição Material | `modelo_materiais` | ✅ | ✅ | ✅ | `modelo_id` + `material_id` (via `produto_codigo` + `material_codigo`) | Média (N:N) |
+| 6 | Composição Processo | `modelo_processos` | ✅ | ✅ | ✅ | `modelo_id` + `etapa` (via `produto_codigo` + `etapa`) | Média (N:N) |
 | 7 | Contas a Receber | `contas_receber` | ✅ | ✅ | ✅ | `id` | Média (FK cliente) |
 | 8 | Contas a Pagar | `contas_pagar` | ✅ | ✅ | ✅ | `id` | Média (FK fornecedor) |
 | 9 | Leads | `leads` | ✅ | ✅ | ✅ | `id` ou `email` | Simples |
@@ -247,23 +247,32 @@ nome | cnpj_cpf | email | telefone | endereco | cidade | estado | contato_1_nome
 
 Planilha separada (não mistura com produtos):
 ```
-modelo_codigo | material_codigo | quantidade | unidade
-BANNER-001    | LONA-380G      | 1.2        | m²
-BANNER-001    | TINTA-SOL      | 0.05       | litro
+produto_codigo | modelo_nome | material_codigo | quantidade_por_unidade | unidade | tipo
+BANNER-001     | Padrão      | LONA-380G      | 1.2                    | m²      | principal
+BANNER-001     | Padrão      | TINTA-SOL      | 0.05                   | litro   | consumivel
 ```
 
-- **Lookup**: `modelo_codigo` → query `produto_modelos` WHERE `codigo = modelo_codigo` para resolver `modelo_id` (UUID). `material_codigo` → query `materiais` WHERE `codigo = material_codigo` para resolver `material_id` (UUID)
-- Se par (`modelo_id` + `material_id`) já existe → atualiza quantidade
+**Colunas reais de `modelo_materiais`**: `modelo_id`, `material_id`, `quantidade_por_unidade`, `unidade`, `tipo`
+
+- **Lookup em 2 passos**: (1) `produto_codigo` → query `produtos` WHERE `codigo = produto_codigo` → get `produto_id`. (2) `modelo_nome` → query `produto_modelos` WHERE `produto_id = produto_id AND nome = modelo_nome` → get `modelo_id` (UUID). Se o produto tem apenas 1 modelo, `modelo_nome` pode ficar vazio e o sistema usa o único modelo existente.
+- `material_codigo` → query `materiais` WHERE `codigo = material_codigo` para resolver `material_id` (UUID)
+- Se par (`modelo_id` + `material_id`) já existe → atualiza `quantidade_por_unidade`, `unidade`, `tipo`
 - Se não existe → insere
-- Erro se modelo ou material não encontrado pelo código
+- Erro se produto, modelo ou material não encontrado pelo código
 
 #### Composições — Modelo ↔ Processos (N:N)
 
+**Colunas reais de `modelo_processos`**: `modelo_id`, `etapa`, `tempo_por_unidade_min`, `tipo_processo`, `ordem`, `centro_custo_id`
+
 ```
-modelo_codigo | processo | tempo_minutos | custo_hora | ordem
-BANNER-001    | impressao | 15           | 120.00     | 1
-BANNER-001    | acabamento | 10          | 80.00      | 2
+produto_codigo | modelo_nome | etapa      | tempo_por_unidade_min | tipo_processo | ordem
+BANNER-001     | Padrão      | impressao  | 15                    | producao      | 1
+BANNER-001     | Padrão      | acabamento | 10                    | acabamento    | 2
 ```
+
+- **Lookup**: mesmo esquema de 2 passos — `produto_codigo` → `produtos` → `produto_modelos` → `modelo_id`
+- Se par (`modelo_id` + `etapa`) já existe → atualiza `tempo_por_unidade_min`, `tipo_processo`, `ordem`
+- Se não existe → insere
 
 ---
 
@@ -443,8 +452,8 @@ O sistema de permissões existente usa matriz `Module × Action` (arquivo: `src/
 | Produtos | `codigo` único, `categoria` válida, `markup` > 0 |
 | Clientes | `cnpj_cpf` formato válido + único, `email` formato válido, `estado` UF válida (2 letras) |
 | Fornecedores | `cnpj_cpf` formato válido + único, `email` formato válido |
-| Modelo↔Mat | `modelo_id`/`codigo` deve existir, `material_id`/`codigo` deve existir, `quantidade` > 0 |
-| Modelo↔Proc | `modelo_id`/`codigo` deve existir, `tempo_minutos` >= 0, `custo_hora` >= 0 |
+| Modelo↔Mat | `produto_codigo` deve existir em `produtos`, `material_codigo` deve existir em `materiais`, `quantidade_por_unidade` > 0, `tipo` em ('principal', 'consumivel', 'auxiliar') |
+| Modelo↔Proc | `produto_codigo` deve existir em `produtos`, `etapa` não vazio, `tempo_por_unidade_min` >= 0, `ordem` >= 1 |
 | Contas Receber | `cliente_id` ou `cnpj_cpf` deve existir, `valor` > 0, `status` em enum válido |
 | Contas Pagar | `fornecedor_id` ou `cnpj_cpf` deve existir, `valor` > 0, `status` em enum válido |
 | Leads | `email` único (quando preenchido), `status` em enum pipeline |
