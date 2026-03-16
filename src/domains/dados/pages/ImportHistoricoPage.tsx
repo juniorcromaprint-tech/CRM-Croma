@@ -35,7 +35,7 @@ function parseErrorDetails(value: unknown): unknown[] {
   return [];
 }
 
-export function ImportHistoricoPage() {
+export default function ImportHistoricoPage() {
   const { rows, total, isLoading, filters, setFilters, page, setPage, totalPages } = useImportHistory();
   const [expandedId, setExpandedId] = useState<string | null>(null);
   const entities = getAllEntities();

@@ -14,7 +14,7 @@ const operationLabel: Record<string, string> = {
   bulk_edit: 'Edição em massa',
 };
 
-export function DadosHubPage() {
+export default function DadosHubPage() {
   const entities = getAllEntities();
 
   const { data: recentOps } = useQuery({
