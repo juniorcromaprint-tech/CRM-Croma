@@ -5,7 +5,6 @@ import PermissionGuard from "@/shared/components/PermissionGuard";
 
 const AdminUsuariosPage = lazy(() => import("@/domains/admin/pages/AdminUsuariosPage"));
 const AdminAuditoriaPage = lazy(() => import("@/domains/admin/pages/AdminAuditoriaPage"));
-const AdminPrecificacaoPage = lazy(() => import("@/domains/admin/pages/AdminPrecificacaoPage"));
 const AdminConfigPage = lazy(() => import("@/domains/admin/pages/AdminConfigPage"));
 const AdminProdutosPage = lazy(() => import("@/domains/admin/pages/AdminProdutosPage"));
 const AdminSetupPage = lazy(() => import("@/domains/admin/pages/AdminSetupPage"));
@@ -13,7 +12,6 @@ const AdminCentrosCustoPage = lazy(() => import("@/domains/admin/pages/AdminCent
 const AdminPlanoContasPage = lazy(() => import("@/domains/admin/pages/AdminPlanoContasPage"));
 const AdminMateriaisPage = lazy(() => import("@/domains/admin/pages/AdminMateriaisPage"));
 const RelatoriosPage = lazy(() => import("@/domains/admin/pages/RelatoriosPage"));
-const ProgressoPage = lazy(() => import("@/domains/admin/pages/ProgressoPage"));
 const Settings = lazy(() => import("@/pages/Settings"));
 const DadosHubPage = lazy(() => import("@/domains/dados/pages/DadosHubPage"));
 const ImportHistoricoPage = lazy(() => import("@/domains/dados/pages/ImportHistoricoPage"));
@@ -23,11 +21,6 @@ export const adminRoutes = (
     <Route path="admin/usuarios" element={
       <PermissionGuard module="admin" action="ver">
         <LazyPage><AdminUsuariosPage /></LazyPage>
-      </PermissionGuard>
-    } />
-    <Route path="admin/precificacao" element={
-      <PermissionGuard module="admin" action="ver">
-        <LazyPage><AdminPrecificacaoPage /></LazyPage>
       </PermissionGuard>
     } />
     <Route path="admin/config" element={
@@ -76,11 +69,6 @@ export const adminRoutes = (
       </PermissionGuard>
     } />
     <Route path="relatorios" element={<LazyPage><RelatoriosPage /></LazyPage>} />
-    <Route path="admin/progresso" element={
-      <PermissionGuard module="admin" action="ver">
-        <LazyPage><ProgressoPage /></LazyPage>
-      </PermissionGuard>
-    } />
     <Route path="settings" element={<LazyPage><Settings /></LazyPage>} />
   </>
 );
