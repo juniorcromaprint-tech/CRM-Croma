@@ -18,6 +18,7 @@ serve(async (req: Request) => {
 
     const body = await req.json().catch(() => ({}));
     const mode = body.mode ?? 'manual'; // 'manual' (with AI) or 'cron' (SQL only)
+    const { model } = body;
 
     const supabase = getServiceClient();
 
@@ -128,7 +129,7 @@ serve(async (req: Request) => {
 
     const systemPrompt = buildSystemPrompt(PROMPTS.detectarProblemas);
     const userPrompt = buildUserPrompt(context);
-    const result = await callOpenRouter(systemPrompt, userPrompt, { max_tokens: 3000 });
+    const result = await callOpenRouter(systemPrompt, userPrompt, { max_tokens: 3000, model: model || undefined });
 
     const aiData = JSON.parse(result.content);
     const response = {
