@@ -4,6 +4,8 @@ export async function quantidadeApplier(action: AIAction, ctx: ApplierContext): 
   const previous = action.valor_atual as { item_id: string; quantidade: number };
   const suggested = action.valor_sugerido as { item_id: string; quantidade: number };
 
+  // NOTE: Volume discount tiers are applied client-side via useItemEditor hook.
+  // Only update `quantidade` here — do NOT write a stale valor_unitario.
   const { error } = await ctx.supabase
     .from('proposta_itens')
     .update({ quantidade: suggested.quantidade })

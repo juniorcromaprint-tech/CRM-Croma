@@ -8,7 +8,7 @@ import {
   calcCustoPorMinuto,
   calcPercentualVendas,
   calcPricing,
-  calcPrecoRapido,
+  calcMarkupReverso,
   calcMargemReal,
   calcBreakEven,
   simularDesconto,
@@ -16,7 +16,12 @@ import {
   type PricingConfig,
   type PricingInput,
 } from "../pricing-engine";
-import { validarDesconto } from "../orcamento-pricing.service";
+import {
+  validarDesconto,
+  calcOrcamentoItem,
+  calcMarkupParaPreco,
+  type OrcamentoItemInput,
+} from "../orcamento-pricing.service";
 
 // ─── Helpers ────────────────────────────────────────────────────────────────
 
@@ -198,6 +203,63 @@ describe("invariantes de negócio", () => {
   });
 });
 
+// ─── calcMarkupReverso ───────────────────────────────────────────────────
+
+describe("calcMarkupReverso", () => {
+  it("retorna markup correto para preco-alvo conhecido", () => {
+    // Primeiro, calcula preco com markup 40%
+    const input = makeInput({ markupPercentual: 40 });
+    const forward = calcPricing(input, CROMA_CONFIG);
+
+    // Agora faz o reverso: dado precoVenda, deve retornar ~40%
+    const reverso = calcMarkupReverso(
+      forward.precoVenda,
+      { materiais: input.materiais, processos: input.processos },
+      CROMA_CONFIG,
+    );
+    expect(reverso.markupPercentual).toBeCloseTo(40, 1);
+    expect(reverso.valido).toBe(true);
+  });
+
+  it("retorna valido=false para preco-alvo <= 0", () => {
+    const input = makeInput();
+    const r = calcMarkupReverso(0, { materiais: input.materiais, processos: input.processos }, CROMA_CONFIG);
+    expect(r.valido).toBe(false);
+    expect(r.markupPercentual).toBe(0);
+  });
+
+  it("retorna valido=false para preco-alvo negativo", () => {
+    const input = makeInput();
+    const r = calcMarkupReverso(-100, { materiais: input.materiais, processos: input.processos }, CROMA_CONFIG);
+    expect(r.valido).toBe(false);
+  });
+
+  it("retorna markup negativo quando preco abaixo do custo", () => {
+    const input = makeInput();
+    // Preco muito baixo (abaixo do Vam)
+    const r = calcMarkupReverso(1, { materiais: input.materiais, processos: input.processos }, CROMA_CONFIG);
+    expect(r.markupPercentual).toBeLessThan(0);
+    expect(r.valido).toBe(false);
+  });
+
+  it("retorna margemBruta coerente com o motor forward", () => {
+    const input = makeInput({ markupPercentual: 50 });
+    const forward = calcPricing(input, CROMA_CONFIG);
+    const reverso = calcMarkupReverso(
+      forward.precoVenda,
+      { materiais: input.materiais, processos: input.processos },
+      CROMA_CONFIG,
+    );
+    expect(reverso.margemBruta).toBeCloseTo(forward.margemBruta, 0);
+  });
+
+  it("funciona com materiais vazios", () => {
+    const r = calcMarkupReverso(100, { materiais: [], processos: [] }, CROMA_CONFIG);
+    // With no costs, base is 0, so any price gives huge markup
+    expect(r.valido).toBe(false); // valorAntesMarkup = 0
+  });
+});
+
 // ─── Orcamento Pricing Service ───────────────────────────────────────────
 
 describe("validarDesconto", () => {
@@ -226,5 +288,111 @@ describe("validarDesconto", () => {
     const result = validarDesconto(8, null, regras, 10000);
     expect(result.valido).toBe(true);
     expect(result.aviso).not.toBeNull();
+  });
+});
+
+// ─── calcOrcamentoItem — acabamentos inside motor ────────────────────────
+
+describe("calcOrcamentoItem — acabamentos inside motor", () => {
+  const baseItem: OrcamentoItemInput = {
+    descricao: "Banner teste",
+    quantidade: 1,
+    largura_cm: 100,
+    altura_cm: 200,
+    materiais: [
+      { descricao: "Lona 440g", quantidade: 2, unidade: "m2", custo_unitario: 15 },
+    ],
+    acabamentos: [
+      { descricao: "Ilhos", quantidade: 10, custo_unitario: 0.5 },
+    ],
+    processos: [
+      { etapa: "Impressao", tempo_minutos: 30 },
+    ],
+    markup_percentual: 40,
+  };
+
+  it("includes acabamentos cost in custoMP (via motor)", () => {
+    const result = calcOrcamentoItem(baseItem);
+    // custoMP should include raw material cost (2*15=30) AND acabamentos (10*0.5=5)
+    expect(result.custoMP).toBeCloseTo(35, 1);
+  });
+
+  it("custosAcabamentos is still available as informational field", () => {
+    const result = calcOrcamentoItem(baseItem);
+    expect(result.custosAcabamentos).toBeCloseTo(5, 1);
+  });
+
+  it("precoUnitario includes acabamentos with full overhead", () => {
+    const withAcab = calcOrcamentoItem(baseItem);
+    const withoutAcab = calcOrcamentoItem({ ...baseItem, acabamentos: [] });
+    // Difference should be MORE than just 5 (acabamento raw cost)
+    // because overhead (custos fixos, impostos, comissao) is applied
+    expect(withAcab.precoUnitario - withoutAcab.precoUnitario).toBeGreaterThan(5);
+  });
+
+  it("works identically with empty acabamentos (regression)", () => {
+    const result = calcOrcamentoItem({ ...baseItem, acabamentos: [] });
+    expect(result.custosAcabamentos).toBe(0);
+    expect(result.precoUnitario).toBeGreaterThan(0);
+  });
+});
+
+// ─── calcOrcamentoItem — setup time ──────────────────────────────────────
+
+describe("calcOrcamentoItem — setup time", () => {
+  it("dilutes setup time across quantity", () => {
+    const item1: OrcamentoItemInput = {
+      descricao: "Placa",
+      quantidade: 1,
+      materiais: [{ descricao: "PVC", quantidade: 1, unidade: "m2", custo_unitario: 20 }],
+      acabamentos: [],
+      processos: [{ etapa: "Corte", tempo_minutos: 10, tempo_setup_min: 30 }],
+      markup_percentual: 40,
+    };
+
+    const item10 = { ...item1, quantidade: 10 };
+
+    const r1 = calcOrcamentoItem(item1);
+    const r10 = calcOrcamentoItem(item10);
+
+    // Price per unit should be lower with 10 qty (setup diluted)
+    expect(r10.precoUnitario).toBeLessThan(r1.precoUnitario);
+  });
+});
+
+// ─── calcMarkupParaPreco ─────────────────────────────────────────────────
+
+describe("calcMarkupParaPreco", () => {
+  const item = {
+    descricao: "Banner",
+    quantidade: 1,
+    largura_cm: 100,
+    altura_cm: 200,
+    materiais: [{ descricao: "Lona", quantidade: 2, unidade: "m2", custo_unitario: 15 }],
+    acabamentos: [],
+    processos: [{ etapa: "Impressao", tempo_minutos: 30 }],
+  };
+
+  it("returns correct markup for unit price target", () => {
+    // First calculate with known markup to get a price
+    const known = calcOrcamentoItem({ ...item, markup_percentual: 40 });
+    const result = calcMarkupParaPreco(known.precoUnitario, "unitario", item, DEFAULT_PRICING_CONFIG);
+    expect(result.markup_percentual).toBeCloseTo(40, 0);
+    expect(result.valido).toBe(true);
+  });
+
+  it("returns correct markup for m2 price target", () => {
+    const known = calcOrcamentoItem({ ...item, markup_percentual: 40 });
+    if (known.precoM2) {
+      const result = calcMarkupParaPreco(known.precoM2, "m2", item, DEFAULT_PRICING_CONFIG);
+      expect(result.markup_percentual).toBeCloseTo(40, 0);
+      expect(result.valido).toBe(true);
+    }
+  });
+
+  it("returns valido=false when no dimensions for m2 type", () => {
+    const noDims = { ...item, largura_cm: undefined, altura_cm: undefined };
+    const result = calcMarkupParaPreco(100, "m2", noDims as any, DEFAULT_PRICING_CONFIG);
+    expect(result.valido).toBe(false);
   });
 });

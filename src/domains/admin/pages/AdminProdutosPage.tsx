@@ -69,7 +69,6 @@ interface ProdutoModelo {
   area_m2: number | null;
   markup_padrao: number;
   margem_minima: number;
-  preco_fixo: number | null;
   tempo_producao_min: number | null;
   ativo: boolean;
   ncm: string | null;
@@ -417,7 +416,6 @@ function DialogModelo({ open, onClose, produtoId, modelo }: DialogModeloProps) {
     altura_cm: "",
     markup_padrao: "45",
     margem_minima: "25",
-    preco_fixo: "",
     tempo_producao_min: "",
     ncm: "",
     descricao_fiscal: "",
@@ -434,7 +432,6 @@ function DialogModelo({ open, onClose, produtoId, modelo }: DialogModeloProps) {
           altura_cm: modelo.altura_cm != null ? String(modelo.altura_cm) : "",
           markup_padrao: String(modelo.markup_padrao),
           margem_minima: String(modelo.margem_minima),
-          preco_fixo: modelo.preco_fixo != null ? String(modelo.preco_fixo) : "",
           tempo_producao_min:
             modelo.tempo_producao_min != null ? String(modelo.tempo_producao_min) : "",
           ncm: modelo.ncm ?? "",
@@ -449,7 +446,6 @@ function DialogModelo({ open, onClose, produtoId, modelo }: DialogModeloProps) {
           altura_cm: "",
           markup_padrao: "45",
           margem_minima: "25",
-          preco_fixo: "",
           tempo_producao_min: "",
           ncm: "",
           descricao_fiscal: "",
@@ -478,7 +474,6 @@ function DialogModelo({ open, onClose, produtoId, modelo }: DialogModeloProps) {
       if (form.largura_cm && form.altura_cm) {
         payload.area_m2 = (parseFloat(form.largura_cm) / 100) * (parseFloat(form.altura_cm) / 100);
       }
-      if (form.preco_fixo) payload.preco_fixo = parseFloat(form.preco_fixo);
       if (form.tempo_producao_min)
         payload.tempo_producao_min = parseInt(form.tempo_producao_min);
 
@@ -597,30 +592,17 @@ function DialogModelo({ open, onClose, produtoId, modelo }: DialogModeloProps) {
             </div>
           </div>
 
-          <div className="grid grid-cols-2 gap-3">
-            <div className="space-y-1">
-              <Label>Preço Fixo (R$)</Label>
-              <Input
-                type="number"
-                step="0.01"
-                value={form.preco_fixo}
-                onChange={(e) => setForm((f) => ({ ...f, preco_fixo: e.target.value }))}
-                placeholder="Opcional"
-                className="rounded-xl"
-              />
-            </div>
-            <div className="space-y-1">
-              <Label>Tempo Produção (min)</Label>
-              <Input
-                type="number"
-                value={form.tempo_producao_min}
-                onChange={(e) =>
-                  setForm((f) => ({ ...f, tempo_producao_min: e.target.value }))
-                }
-                placeholder="Opcional"
-                className="rounded-xl"
-              />
-            </div>
+          <div className="space-y-1">
+            <Label>Tempo Produção (min)</Label>
+            <Input
+              type="number"
+              value={form.tempo_producao_min}
+              onChange={(e) =>
+                setForm((f) => ({ ...f, tempo_producao_min: e.target.value }))
+              }
+              placeholder="Opcional"
+              className="rounded-xl"
+            />
           </div>
 
           <div className="grid grid-cols-2 gap-3">

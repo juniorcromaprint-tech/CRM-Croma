@@ -115,7 +115,7 @@ export function explicarCalculo(
       formula: acabamentosDesc,
       resultado: resultado.custosAcabamentos,
       explicacao:
-        "Acabamentos somados ao custo final (calculados fora do motor Mubisys)",
+        "Acabamentos inclusos no custo de material (recebem overhead do motor Mubisys)",
     },
     {
       passo: 3,

@@ -5,6 +5,8 @@ export async function acabamentoApplier(action: AIAction, ctx: ApplierContext): 
     acabamento_id: string; item_id: string; nome: string; preco: number;
   };
 
+  // NOTE: Acabamentos now participate in the Mubisys motor (overhead applied).
+  // Do NOT write a stale valor_unitario here — the motor recalculates on next render.
   const { data, error } = await ctx.supabase
     .from('proposta_item_acabamentos')
     .insert({

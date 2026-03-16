@@ -398,7 +398,6 @@ function ModeloFormDialog({
     markup_padrao: 40,
     margem_minima: 20,
     tempo_producao_min: 30,
-    preco_fixo: "" as string | number,
     unidade_venda: "m2",
   });
 
@@ -408,7 +407,6 @@ function ModeloFormDialog({
       markup_padrao: editando?.markup_padrao ?? 40,
       margem_minima: editando?.margem_minima ?? 20,
       tempo_producao_min: editando?.tempo_producao_min ?? 30,
-      preco_fixo: editando?.preco_fixo ?? "",
       unidade_venda: editando?.unidade_venda ?? "m2",
     });
   }, [editando, open]);
@@ -419,7 +417,6 @@ function ModeloFormDialog({
       markup_padrao: form.markup_padrao,
       margem_minima: form.margem_minima,
       tempo_producao_min: form.tempo_producao_min,
-      preco_fixo: form.preco_fixo !== "" ? Number(form.preco_fixo) : null,
       unidade_venda: form.unidade_venda,
     };
     if (!dados.nome) return;
@@ -475,25 +472,14 @@ function ModeloFormDialog({
             </div>
           </div>
 
-          <div className="grid grid-cols-2 gap-3">
-            <div className="space-y-1.5">
-              <Label className="text-sm font-semibold text-slate-700 flex justify-between">
-                <span>Tempo produção</span>
-                <span className="text-slate-500">{form.tempo_producao_min} min</span>
-              </Label>
-              <input type="range" min={5} max={600} step={5} value={form.tempo_producao_min}
-                onChange={(e) => setForm((f) => ({ ...f, tempo_producao_min: +e.target.value }))}
-                className="w-full h-2 bg-slate-200 rounded-full appearance-none cursor-pointer accent-slate-500" />
-            </div>
-            <div className="space-y-1.5">
-              <Label className="text-sm font-semibold text-slate-700">Preço fixo (R$)</Label>
-              <div className="relative">
-                <span className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400 text-sm">R$</span>
-                <Input type="number" min={0} step={0.01} value={form.preco_fixo}
-                  onChange={(e) => setForm((f) => ({ ...f, preco_fixo: e.target.value }))}
-                  placeholder="Opcional" className="h-10 rounded-xl border-slate-200 bg-slate-50 pl-9" />
-              </div>
-            </div>
+          <div className="space-y-1.5">
+            <Label className="text-sm font-semibold text-slate-700 flex justify-between">
+              <span>Tempo produção</span>
+              <span className="text-slate-500">{form.tempo_producao_min} min</span>
+            </Label>
+            <input type="range" min={5} max={600} step={5} value={form.tempo_producao_min}
+              onChange={(e) => setForm((f) => ({ ...f, tempo_producao_min: +e.target.value }))}
+              className="w-full h-2 bg-slate-200 rounded-full appearance-none cursor-pointer accent-slate-500" />
           </div>
 
           <div className="space-y-1.5">
@@ -606,7 +592,6 @@ function ModelsDialog({
                           <div className="flex flex-wrap gap-x-3 gap-y-0.5 text-xs text-slate-500 mt-0.5">
                             <span className="flex items-center gap-1"><Settings size={10} /> {m.markup_padrao}% markup</span>
                             {m.tempo_producao_min && <span className="flex items-center gap-1"><Clock size={10} /> {m.tempo_producao_min} min</span>}
-                            {m.preco_fixo && <span className="font-medium text-blue-600">R$ {m.preco_fixo.toFixed(2)}</span>}
                             <span className={`font-medium px-1.5 py-0.5 rounded border text-[10px] ${margemColor(m.margem_minima)}`}>
                               mín {m.margem_minima}%
                             </span>

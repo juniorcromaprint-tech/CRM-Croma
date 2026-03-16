@@ -11,6 +11,7 @@ interface ResumoVendedorProps {
   markup: number;
   markupSugerido: number;
   markupMinimo: number;
+  isPrecoOverride?: boolean;
 }
 
 export default function ResumoVendedor({
@@ -19,6 +20,7 @@ export default function ResumoVendedor({
   markup,
   markupSugerido,
   markupMinimo,
+  isPrecoOverride,
 }: ResumoVendedorProps) {
   const margemOk = resultado.margemBruta >= markupMinimo / 2;
   const margemBoa = resultado.margemBruta >= 25;
@@ -39,6 +41,12 @@ export default function ResumoVendedor({
           </div>
         )}
       </div>
+
+      {isPrecoOverride && (
+        <div className="bg-amber-50 border border-amber-200 rounded-xl px-3 py-1.5 text-center">
+          <span className="text-[10px] font-medium text-amber-700">Preço ajustado manualmente</span>
+        </div>
+      )}
 
       {/* Breakdown de custos */}
       <div className="bg-slate-50 rounded-xl p-4 space-y-2.5">

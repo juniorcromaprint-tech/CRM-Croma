@@ -305,20 +305,45 @@ export function calcPricing(
 }
 
 // ---------------------------------------------------------------------------
-// ATALHOS
+// MARKUP REVERSO — Calcula markup necessario para atingir preco-alvo
 // ---------------------------------------------------------------------------
 
 /**
- * Estimativa rápida de preço (sem processo produtivo detalhado).
- * Aplica markup direto sobre o custo de matéria prima.
+ * Dado um preco-alvo, calcula qual markup % seria necessario.
+ * Faz o calculo reverso: preco → markup (inverso do passo 9).
  *
- * @param custoMP - Custo total de matéria prima
- * @param markupPercent - Percentual de markup (ex: 40 = 40%)
- * @returns Preço estimado de venda
+ * @param precoAlvo - Preco de venda desejado (unitario)
+ * @param input - Materiais e processos (sem markup)
+ * @param config - Configuracao de precificacao
  */
-export function calcPrecoRapido(custoMP: number, markupPercent: number): number {
-  return custoMP * (1 + markupPercent / 100);
+export function calcMarkupReverso(
+  precoAlvo: number,
+  input: Omit<PricingInput, 'markupPercentual'>,
+  config: PricingConfig = DEFAULT_PRICING_CONFIG,
+): { markupPercentual: number; margemBruta: number; valido: boolean } {
+  if (!precoAlvo || precoAlvo <= 0) {
+    return { markupPercentual: 0, margemBruta: 0, valido: false };
+  }
+
+  const base = calcPricing({ ...input, markupPercentual: 0 }, config);
+
+  if (base.valorAntesMarkup <= 0) {
+    return { markupPercentual: 0, margemBruta: 0, valido: false };
+  }
+
+  const markupPercentual = ((precoAlvo / base.valorAntesMarkup) - 1) * 100;
+  const margemBruta = ((precoAlvo - base.custoBase) / precoAlvo) * 100;
+
+  return {
+    markupPercentual: Math.round(markupPercentual * 100) / 100,
+    margemBruta: Math.round(margemBruta * 100) / 100,
+    valido: markupPercentual >= 0,
+  };
 }
+
+// ---------------------------------------------------------------------------
+// ATALHOS
+// ---------------------------------------------------------------------------
 
 /**
  * Calcula a margem real considerando custos efetivos.

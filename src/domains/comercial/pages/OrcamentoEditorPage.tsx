@@ -4,7 +4,7 @@
 // Layout 2 colunas: wizard 3 etapas (esquerda) + pricing em tempo real (direita)
 // ============================================================================
 
-import React, { useState, useEffect, useMemo, useCallback } from "react";
+import React, { useState, useEffect, useMemo } from "react";
 import { useNavigate, useParams, Link } from "react-router-dom";
 import {
   ArrowLeft, Plus, Trash2, Save, Loader2, FileText,
@@ -26,27 +26,19 @@ import {
   useRemoverItemOrcamento,
   useSalvarServicos,
 } from "../hooks/useOrcamentos";
-import { useOrcamentoPricing, useRegrasPrecificacao } from "../hooks/useOrcamentoPricing";
-import { useOrcamentoAlerts } from "../hooks/useOrcamentoAlerts";
+import { useRegrasPrecificacao } from "../hooks/useOrcamentoPricing";
+import { useItemEditor } from "../hooks/useItemEditor";
 import PricingCalculator from "../components/PricingCalculator";
 import ProdutoSelector from "../components/ProdutoSelector";
 import MaterialEditor from "../components/MaterialEditor";
 import AcabamentoSelector from "../components/AcabamentoSelector";
 import ServicoSelector from "../components/ServicoSelector";
 import TemplateSelector from "../components/TemplateSelector";
-import AlertasOrcamento from "../components/AlertasOrcamento";
-import ResumoVendedor from "../components/ResumoVendedor";
+import ItemStep3Revisao from "../components/ItemStep3Revisao";
 import ClienteCombobox from "@/shared/components/ClienteCombobox";
 import type { OrcamentoServicoItem } from "../components/ServicoSelector";
 import type { OrcamentoTemplate } from "../components/TemplateSelector";
-import type { Produto, ProdutoModelo } from "../hooks/useProdutosModelos";
-import type {
-  OrcamentoMaterial,
-  OrcamentoAcabamento,
-  OrcamentoProcesso,
-  OrcamentoItemInput,
-  RegraPrecificacao,
-} from "@/shared/services/orcamento-pricing.service";
+import type { RegraPrecificacao } from "@/shared/services/orcamento-pricing.service";
 import { validarDesconto } from "@/shared/services/orcamento-pricing.service";
 import { brl } from "@/shared/utils/format";
 import { showError, showSuccess } from "@/utils/toast";
@@ -54,8 +46,6 @@ import { toast } from "sonner";
 import { orcamentoService } from "../services/orcamento.service";
 import { CondicoesPagamento, type PaymentConditions } from "../components/CondicoesPagamento";
 import AIButton from '@/domains/ai/components/AIButton';
-/** @deprecated Use AISidebar instead */
-import OrcamentoAnalise from '@/domains/ai/components/OrcamentoAnalise';
 import ComposicaoSugestao from '@/domains/ai/components/ComposicaoSugestao';
 import AISidebar from '@/domains/ai/components/AISidebar';
 import { useAISidebar } from '@/domains/ai/hooks/useAISidebar';
@@ -64,37 +54,7 @@ import { useComposicaoProduto } from '@/domains/ai/hooks/useComposicaoProduto';
 import { useQueryClient } from '@tanstack/react-query';
 import type { AIResponse } from '@/domains/ai/types/ai.types';
 
-// ─── Item editor state ──────────────────────────────────────────────────────
-
-interface ItemEditorState {
-  produto_id: string | null;
-  modelo_id: string | null;
-  descricao: string;
-  especificacao: string;
-  quantidade: number;
-  largura_cm: number | null;
-  altura_cm: number | null;
-  materiais: OrcamentoMaterial[];
-  acabamentos: OrcamentoAcabamento[];
-  processos: OrcamentoProcesso[];
-  markup_percentual: number;
-  categoria: string | null;
-}
-
-const DEFAULT_ITEM: ItemEditorState = {
-  produto_id: null,
-  modelo_id: null,
-  descricao: "",
-  especificacao: "",
-  quantidade: 1,
-  largura_cm: null,
-  altura_cm: null,
-  materiais: [],
-  acabamentos: [],
-  processos: [],
-  markup_percentual: 40,
-  categoria: null,
-};
+import type { ItemEditorState } from "../hooks/useItemEditor";
 
 // ─── Step definitions ────────────────────────────────────────────────────────
 
@@ -217,13 +177,12 @@ export default function OrcamentoEditorPage() {
   const [observacoes, setObservacoes] = useState("");
   const [validadeDias, setValidadeDias] = useState(10);
 
-  // ─── Item editor state ──────────────────────────────────────────────────
-  const [newItem, setNewItem] = useState<ItemEditorState>(DEFAULT_ITEM);
+  // ─── Item editor hook ───────────────────────────────────────────────────
+  const editor = useItemEditor();
+
+  // ─── Item form visibility ───────────────────────────────────────────────
   const [showItemForm, setShowItemForm] = useState(false);
   const [itemFormExpanded, setItemFormExpanded] = useState(true);
-
-  // ─── Wizard step state ──────────────────────────────────────────────────
-  const [currentStep, setCurrentStep] = useState(1);
 
   // ─── Serviços state ─────────────────────────────────────────────────────
   const [servicos, setServicos] = useState<OrcamentoServicoItem[]>([]);
@@ -283,33 +242,11 @@ export default function OrcamentoEditorPage() {
     }
   }, [orcamento]);
 
-  // ─── Pricing for the item being edited ──────────────────────────────────
-  const pricingInput: OrcamentoItemInput | null = useMemo(() => {
-    if (!newItem.descricao && !newItem.produto_id) return null;
-    return {
-      descricao: newItem.descricao || "Item",
-      quantidade: newItem.quantidade,
-      largura_cm: newItem.largura_cm,
-      altura_cm: newItem.altura_cm,
-      materiais: newItem.materiais,
-      acabamentos: newItem.acabamentos,
-      processos: newItem.processos,
-      markup_percentual: newItem.markup_percentual,
-    };
-  }, [newItem]);
-
-  const { resultado: pricingResult, markupSugerido, validacaoMarkup, config: pricingConfig } =
-    useOrcamentoPricing(pricingInput, newItem.categoria);
-
-  // ─── Alerts ─────────────────────────────────────────────────────────────
-  const alerts = useOrcamentoAlerts({
-    materiais: newItem.materiais,
-    acabamentos: newItem.acabamentos,
-    markup: newItem.markup_percentual,
-    markupMinimo: validacaoMarkup.markup_minimo,
-    resultado: pricingResult,
-    config: pricingConfig,
-  });
+  // ─── Pricing & alerts — delegated to useItemEditor ──────────────────────
+  const { pricingResult, markupSugerido, validacaoMarkup, isDefaultConfig } = editor;
+  // newItem shorthand for local convenience
+  const newItem = editor.newItem;
+  const currentStep = editor.currentStep;
 
   // ─── Desconto validation ────────────────────────────────────────────────
   const { data: regrasDesconto = [] } = useRegrasPrecificacao();
@@ -325,69 +262,14 @@ export default function OrcamentoEditorPage() {
     );
   }, [descontoPercentual, regrasDesconto, orcamento?.subtotal]);
 
-  // ─── Handlers ───────────────────────────────────────────────────────────
+  // ─── Item handlers — delegated to useItemEditor ─────────────────────────
 
-  const handleProdutoChange = useCallback((produto: Produto | null) => {
-    setNewItem((s) => ({
-      ...s,
-      produto_id: produto?.id ?? null,
-      categoria: produto?.categoria ?? null,
-      descricao: produto?.nome ?? s.descricao,
-    }));
-  }, []);
+  const handleProdutoChange = editor.handleProdutoChange;
+  const handleModeloChange = editor.handleModeloChange;
+  const handleMateriaisChange = editor.handleMateriaisChange;
+  const handleAcabamentosChange = editor.handleAcabamentosChange;
 
-  const handleModeloChange = useCallback((modelo: ProdutoModelo | null) => {
-    if (!modelo) {
-      setNewItem((s) => ({ ...s, modelo_id: null }));
-      return;
-    }
-
-    // Auto-preenche tudo do modelo selecionado
-    const materiaisFromModelo: OrcamentoMaterial[] = (modelo.materiais ?? []).map((m) => {
-      const precoMedio = Number(m.material?.preco_medio) || 0;
-      if (!precoMedio) {
-        console.warn(`[PRICING] Material "${m.material?.nome ?? m.material_id}" sem preço cadastrado — custo R$ 0,00`);
-      }
-      return {
-        material_id: m.material_id,
-        descricao: m.material?.nome ?? `Material ${m.material_id}`,
-        quantidade: Number(m.quantidade_por_unidade) || 0,
-        unidade: m.unidade ?? "un",
-        custo_unitario: precoMedio,
-        aproveitamento: Number(m.material?.aproveitamento) || 100,
-      };
-    });
-
-    const processosFromModelo: OrcamentoProcesso[] = (modelo.processos ?? []).map((p) => ({
-      etapa: p.etapa,
-      tempo_minutos: Number(p.tempo_por_unidade_min) || 0,
-    }));
-
-    // Usa descritivo_nf como especificacao para NF (fallback para nome do modelo)
-    const especificacaoNF = modelo.descritivo_nf ?? modelo.nome;
-
-    setNewItem((s) => ({
-      ...s,
-      modelo_id: modelo.id,
-      descricao: s.descricao || modelo.nome,
-      especificacao: especificacaoNF,
-      largura_cm: modelo.largura_cm ?? s.largura_cm,
-      altura_cm: modelo.altura_cm ?? s.altura_cm,
-      markup_percentual: modelo.markup_padrao ?? s.markup_percentual,
-      materiais: materiaisFromModelo,
-      processos: processosFromModelo,
-    }));
-  }, []);
-
-  const handleMateriaisChange = useCallback((materiais: OrcamentoMaterial[]) => {
-    setNewItem((s) => ({ ...s, materiais }));
-  }, []);
-
-  const handleAcabamentosChange = useCallback((acabamentos: OrcamentoAcabamento[]) => {
-    setNewItem((s) => ({ ...s, acabamentos }));
-  }, []);
-
-  // ─── Step navigation ─────────────────────────────────────────────────────
+  // ─── Step navigation (with validation) ───────────────────────────────────
 
   const handleNextStep = () => {
     if (currentStep === 1) {
@@ -409,11 +291,11 @@ export default function OrcamentoEditorPage() {
         return;
       }
     }
-    setCurrentStep((s) => Math.min(s + 1, 3));
+    editor.nextStep();
   };
 
   const handlePrevStep = () => {
-    setCurrentStep((s) => Math.max(s - 1, 1));
+    editor.prevStep();
   };
 
   const handleSave = async () => {
@@ -472,6 +354,7 @@ export default function OrcamentoEditorPage() {
   };
 
   const handleAddItem = async () => {
+    if (editor.isDefaultConfig) { showError("Configure os parametros de precificacao antes de adicionar itens"); return; }
     if (!newItem.descricao.trim()) { showError("Informe a descricao do item"); return; }
     if (!id || isNew) { showError("Salve o orcamento antes de adicionar itens"); return; }
     if (pricingResult === null) { showError("Preencha os dados do item corretamente"); return; }
@@ -504,6 +387,7 @@ export default function OrcamentoEditorPage() {
         custo_mo: pricingResult.custoMO,
         custo_fixo: Math.max(0, pricingResult.custoTotal - pricingResult.custoMP - pricingResult.custosAcabamentos - pricingResult.custoMO),
         markup_percentual: newItem.markup_percentual,
+        preco_override: editor.isPrecoOverride,
         valor_unitario: pricingResult.precoUnitario,
         valor_total: pricingResult.precoTotal,
         ordem: (orcamentoItens.length ?? 0) + 1,
@@ -532,9 +416,8 @@ export default function OrcamentoEditorPage() {
     });
 
     await orcamentoService.recalcularTotais(id);
-    setNewItem(DEFAULT_ITEM);
+    editor.reset();
     setShowItemForm(false);
-    setCurrentStep(1); // Reset wizard to step 1
   };
 
   const handleRemoveItem = async (itemId: string) => {
@@ -552,16 +435,16 @@ export default function OrcamentoEditorPage() {
     if (template.itens.length === 1) {
       // Single item: populate the editor form
       const firstItem = template.itens[0];
-      setNewItem({
-        ...DEFAULT_ITEM,
+      editor.reset();
+      editor.setNewItem((s) => ({
+        ...s,
         descricao: firstItem.descricao,
         especificacao: firstItem.especificacao || "",
         quantidade: firstItem.quantidade,
         largura_cm: firstItem.largura_cm,
         altura_cm: firstItem.altura_cm,
         markup_percentual: firstItem.markup_percentual,
-      });
-      setCurrentStep(1);
+      }));
       setShowItemForm(true);
       setShowTemplateModal(false);
       showSuccess(`Template "${template.nome}" aplicado!`);
@@ -803,8 +686,7 @@ export default function OrcamentoEditorPage() {
               className="rounded-xl h-9 gap-2"
               onClick={() => {
                 setShowItemForm((s) => !s);
-                setNewItem(DEFAULT_ITEM);
-                setCurrentStep(1);
+                editor.reset();
               }}
             >
               <Plus size={15} /> Adicionar Item
@@ -917,7 +799,7 @@ export default function OrcamentoEditorPage() {
                                 <Label className="text-xs">Descricao *</Label>
                                 <Input
                                   value={newItem.descricao}
-                                  onChange={(e) => setNewItem((s) => ({ ...s, descricao: e.target.value }))}
+                                  onChange={(e) => editor.setNewItem((s) => ({ ...s, descricao: e.target.value }))}
                                   placeholder="Ex: Banner lona 440g com ilhos"
                                   className="mt-1 rounded-xl h-9 text-sm"
                                 />
@@ -926,7 +808,7 @@ export default function OrcamentoEditorPage() {
                                 <Label className="text-xs">Especificação</Label>
                                 <Input
                                   value={newItem.especificacao}
-                                  onChange={(e) => setNewItem((s) => ({ ...s, especificacao: e.target.value }))}
+                                  onChange={(e) => editor.setNewItem((s) => ({ ...s, especificacao: e.target.value }))}
                                   placeholder="Detalhes adicionais..."
                                   className="mt-1 rounded-xl h-9 text-sm"
                                 />
@@ -941,7 +823,7 @@ export default function OrcamentoEditorPage() {
                                   onChange={(e) => {
                                     // A-08: Garantir quantidade >= 1
                                     const val = Math.max(1, Number(e.target.value) || 1);
-                                    setNewItem((s) => ({ ...s, quantidade: val }));
+                                    editor.setNewItem((s) => ({ ...s, quantidade: val }));
                                   }}
                                   className="mt-1 rounded-xl h-9 text-sm"
                                 />
@@ -978,7 +860,7 @@ export default function OrcamentoEditorPage() {
                                     type="number"
                                     min={1}
                                     value={newItem.largura_cm ?? ""}
-                                    onChange={(e) => setNewItem((s) => ({ ...s, largura_cm: e.target.value ? Number(e.target.value) : null }))}
+                                    onChange={(e) => editor.setNewItem((s) => ({ ...s, largura_cm: e.target.value ? Number(e.target.value) : null }))}
                                     placeholder="Opcional"
                                     className="mt-1 rounded-xl h-9 text-sm"
                                   />
@@ -989,7 +871,7 @@ export default function OrcamentoEditorPage() {
                                     type="number"
                                     min={1}
                                     value={newItem.altura_cm ?? ""}
-                                    onChange={(e) => setNewItem((s) => ({ ...s, altura_cm: e.target.value ? Number(e.target.value) : null }))}
+                                    onChange={(e) => editor.setNewItem((s) => ({ ...s, altura_cm: e.target.value ? Number(e.target.value) : null }))}
                                     placeholder="Opcional"
                                     className="mt-1 rounded-xl h-9 text-sm"
                                   />
@@ -1039,57 +921,26 @@ export default function OrcamentoEditorPage() {
                             {/* Summary of prior steps */}
                             <StepSummaryBadge item={newItem} visibleFrom={3} currentStep={currentStep} />
 
-                            {/* Markup com sugestao */}
-                            <div className="flex items-end gap-4">
-                              <div className="flex-1">
-                                <Label className="text-xs">Markup (%)</Label>
-                                <Input
-                                  type="number"
-                                  min={0}
-                                  step={1}
-                                  value={newItem.markup_percentual}
-                                  onChange={(e) => setNewItem((s) => ({ ...s, markup_percentual: Number(e.target.value) }))}
-                                  className="mt-1 rounded-xl h-9 text-sm"
-                                />
-                              </div>
-                              {markupSugerido !== newItem.markup_percentual && (
-                                <Button
-                                  variant="outline"
-                                  size="sm"
-                                  className="rounded-xl h-9 text-xs"
-                                  onClick={() => setNewItem((s) => ({ ...s, markup_percentual: markupSugerido }))}
-                                >
-                                  Sugerido: {markupSugerido}%
-                                </Button>
-                              )}
-                            </div>
-
-                            {/* Validation warnings */}
-                            {!validacaoMarkup.valido && (
-                              <div className="flex items-center gap-2 text-amber-600 text-xs">
-                                <AlertTriangle size={14} />
-                                {validacaoMarkup.aviso}
-                              </div>
-                            )}
-                            {validacaoMarkup.valido && newItem.markup_percentual < 30 && (
-                              <p className="text-xs text-amber-600">
-                                Markup abaixo de 30% — verifique a rentabilidade
-                              </p>
-                            )}
-
-                            {/* Alertas do orcamento */}
-                            <AlertasOrcamento alerts={alerts} />
-
-                            {/* Resumo vendedor (only when pricing is available) */}
-                            {pricingResult && (
-                              <ResumoVendedor
-                                resultado={pricingResult}
-                                quantidade={newItem.quantidade}
-                                markup={newItem.markup_percentual}
-                                markupSugerido={markupSugerido}
-                                markupMinimo={validacaoMarkup.markup_minimo}
-                              />
-                            )}
+                            <ItemStep3Revisao
+                              markup={newItem.markup_percentual}
+                              markupSugerido={markupSugerido}
+                              markupMinimo={validacaoMarkup.markup_minimo}
+                              validacaoMarkup={validacaoMarkup}
+                              pricingResult={pricingResult}
+                              quantidade={newItem.quantidade}
+                              alerts={editor.alerts}
+                              overrideSource={editor.overrideSource}
+                              isPrecoOverride={editor.isPrecoOverride}
+                              precoOverrideValue={editor.precoOverrideValue}
+                              precoM2OverrideValue={editor.precoM2OverrideValue}
+                              hasArea={!!(newItem.largura_cm && newItem.altura_cm)}
+                              isDefaultConfig={isDefaultConfig}
+                              volumeDiscount={editor.volumeDiscount}
+                              onMarkupChange={editor.handleMarkupChange}
+                              onPrecoOverride={editor.handlePrecoOverride}
+                              onPrecoM2Override={editor.handlePrecoM2Override}
+                              onMarkupSugeridoClick={() => editor.handleMarkupChange(markupSugerido)}
+                            />
 
                             {/* Step 3 — Nav */}
                             <div className="flex justify-between pt-2">
@@ -1102,7 +953,7 @@ export default function OrcamentoEditorPage() {
                               </Button>
                               <Button
                                 onClick={handleAddItem}
-                                disabled={adicionarItem.isPending || !pricingResult}
+                                disabled={editor.isDefaultConfig || adicionarItem.isPending || !pricingResult}
                                 className="rounded-xl bg-blue-600 text-white hover:bg-blue-700 px-6"
                               >
                                 {adicionarItem.isPending
@@ -1154,8 +1005,7 @@ export default function OrcamentoEditorPage() {
                             variant="ghost" size="sm" className="rounded-xl w-full"
                             onClick={() => {
                               setShowItemForm(false);
-                              setNewItem(DEFAULT_ITEM);
-                              setCurrentStep(1);
+                              editor.reset();
                             }}
                           >
                             Cancelar
