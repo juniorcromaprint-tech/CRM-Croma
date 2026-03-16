@@ -36,17 +36,26 @@ serve(async (req) => {
     return new Response(null, { headers: corsHeaders });
   }
 
-  const supabase = createClient(
-    Deno.env.get('SUPABASE_URL')!,
-    Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!
-  );
-
   try {
+    const supabase = createClient(
+      Deno.env.get('SUPABASE_URL')!,
+      Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!
+    );
+
+    const COMPOSIO_API_KEY = Deno.env.get('COMPOSIO_API_KEY');
+    const ONEDRIVE_ACCOUNT_ID = Deno.env.get('ONEDRIVE_CONNECTED_ACCOUNT_ID');
+    if (!COMPOSIO_API_KEY || !ONEDRIVE_ACCOUNT_ID) {
+      return new Response(JSON.stringify({ error: 'Configuração de integração incompleta' }), {
+        status: 500,
+        headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+      });
+    }
+
     // --- Parse FormData ---
     const formData = await req.formData();
     const file = formData.get('file') as File | null;
     const token = formData.get('token') as string | null;
-    const clientNameOverride = formData.get('clientName') as string | null;
+    const clientNameOverride = ((formData.get('clientName') as string | null) || '').trim().slice(0, 200) || null;
 
     if (!file || !token) {
       return new Response(JSON.stringify({ error: 'file e token são obrigatórios' }), {
@@ -75,9 +84,6 @@ serve(async (req) => {
     const uploadedByName = clientNameOverride || nomeCliente;
     const targetFolder = `Croma/Clientes/${nomeCliente}`;
     const fileName = `${proposta.numero}_${file.name}`;
-
-    const COMPOSIO_API_KEY = Deno.env.get('COMPOSIO_API_KEY')!;
-    const ONEDRIVE_ACCOUNT_ID = Deno.env.get('ONEDRIVE_CONNECTED_ACCOUNT_ID')!;
 
     const composioHeaders = {
       'Content-Type': 'application/json',
@@ -111,25 +117,26 @@ serve(async (req) => {
     }
 
     if (!folderExists) {
-      const createRes = await fetch(
-        'https://backend.composio.dev/api/v2/actions/ONE_DRIVE_ONEDRIVE_CREATE_FOLDER/execute',
-        {
-          method: 'POST',
-          headers: composioHeaders,
-          body: JSON.stringify({
-            connectedAccountId: ONEDRIVE_ACCOUNT_ID,
-            input: {
-              parent_folder_path: 'Croma/Clientes',
-              folder_name: nomeCliente,
-            },
-          }),
+      try {
+        const createRes = await fetch(
+          'https://backend.composio.dev/api/v2/actions/ONE_DRIVE_ONEDRIVE_CREATE_FOLDER/execute',
+          {
+            method: 'POST',
+            headers: composioHeaders,
+            body: JSON.stringify({
+              connectedAccountId: ONEDRIVE_ACCOUNT_ID,
+              input: {
+                parent_folder_path: 'Croma/Clientes',
+                folder_name: nomeCliente,
+              },
+            }),
+          }
+        );
+        if (!createRes.ok) {
+          console.warn('CREATE_FOLDER retornou não-OK, continuando upload:', createRes.status);
         }
-      );
-      if (!createRes.ok) {
-        return new Response(JSON.stringify({ error: 'Serviço de upload indisponível' }), {
-          status: 503,
-          headers: { ...corsHeaders, 'Content-Type': 'application/json' },
-        });
+      } catch (createErr) {
+        console.warn('CREATE_FOLDER falhou, continuando upload:', (createErr as Error).message);
       }
     }
 
