@@ -4,6 +4,7 @@ import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
 import { brl } from "@/shared/utils/format";
 import type { OrcamentoMaterial } from "@/shared/services/orcamento-pricing.service";
+import { useAuth } from "@/contexts/AuthContext";
 
 // ─── Props ──────────────────────────────────────────────────────────────────
 
@@ -21,6 +22,8 @@ export default function MaterialEditor({
   readonly = false,
 }: MaterialEditorProps) {
   const newRowRef = useRef<HTMLInputElement>(null);
+  const { user } = useAuth();
+  const canEditCost = user?.role === 'admin' || user?.role === 'gerente';
 
   // Total geral de materia prima (considera aproveitamento)
   const totalMP = materiais.reduce((sum, m) => {
@@ -165,6 +168,7 @@ export default function MaterialEditor({
                 min={0}
                 step={0.01}
                 disabled={readonly}
+                readOnly={!canEditCost}
                 onChange={(e) =>
                   handleFieldChange(
                     index,
@@ -172,7 +176,7 @@ export default function MaterialEditor({
                     parseFloat(e.target.value) || 0,
                   )
                 }
-                className="h-8 text-sm rounded-lg text-right tabular-nums"
+                className={`h-8 text-sm rounded-lg text-right tabular-nums${!canEditCost ? ' bg-slate-100 cursor-not-allowed' : ''}`}
               />
 
               {/* Aproveitamento */}
