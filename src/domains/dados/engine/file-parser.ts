@@ -64,14 +64,12 @@ export function parseXLSX(buffer: ArrayBuffer): ParsedRow[] {
   const workbook = XLSX.read(buffer, { type: 'array' });
   const sheetName = workbook.SheetNames[0];
   const sheet = workbook.Sheets[sheetName];
-  const rawRows: string[][] = XLSX.utils.sheet_to_json(sheet, { header: 1, defval: '' });
-  return rawRows.map(row => {
-    const obj: ParsedRow = {};
-    row.forEach((val, i) => {
-      obj[String(i)] = String(val ?? '');
-    });
-    return obj;
-  });
+  const rows = XLSX.utils.sheet_to_json<Record<string, unknown>>(sheet, { defval: '' });
+  return rows.map(row =>
+    Object.fromEntries(
+      Object.entries(row).map(([k, v]) => [k.replace(/\*$/, '').trim(), String(v ?? '')])
+    )
+  );
 }
 
 /**
@@ -83,6 +81,7 @@ export function detectHeaderRow(
   rows: ParsedRow[],
   knownColumns: string[],
 ): number {
+  if (knownColumns.length === 0) return 0;
   const knownSet = new Set(knownColumns.map(c => c.toLowerCase()));
 
   for (let i = 0; i < Math.min(rows.length, 10); i++) {
