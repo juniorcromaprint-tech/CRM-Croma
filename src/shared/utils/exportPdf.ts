@@ -3,8 +3,6 @@
 // Utilitário para exportar dados como arquivo .pdf via html2pdf.js
 // ============================================================================
 
-import html2pdf = require('html2pdf.js');
-
 interface ExportPdfOptions {
   filename: string;
   title: string;
@@ -50,19 +48,20 @@ function buildTableHtml(
   `;
 }
 
-export function exportPdf({
+export async function exportPdf({
   filename,
   title,
   subtitle,
   headers,
   rows,
-}: ExportPdfOptions): void {
+}: ExportPdfOptions): Promise<void> {
+  const html2pdf = (await import('html2pdf.js')).default;
   const html = buildTableHtml(title, subtitle, headers, rows);
   const container = document.createElement('div');
   container.innerHTML = html;
   document.body.appendChild(container);
 
-  html2pdf()
+  await html2pdf()
     .set({
       margin: [10, 10, 10, 10],
       filename: `${filename}.pdf`,
@@ -74,8 +73,7 @@ export function exportPdf({
       },
     })
     .from(container)
-    .save()
-    .then(() => {
-      document.body.removeChild(container);
-    });
+    .save();
+
+  document.body.removeChild(container);
 }
