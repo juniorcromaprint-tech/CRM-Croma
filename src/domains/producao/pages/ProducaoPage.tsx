@@ -1151,10 +1151,10 @@ export default function ProducaoPage() {
                                       />
                                     )}
                                   </div>
-                                  <h4 className="font-semibold text-slate-800 text-sm truncate leading-tight mt-0.5">
+                                  <h4 className="font-semibold text-slate-800 text-sm truncate leading-tight mt-0.5" title={getClienteName(op)}>
                                     {getClienteName(op)}
                                   </h4>
-                                  <p className="text-[11px] text-slate-500 truncate mt-0.5">
+                                  <p className="text-[11px] text-slate-500 truncate mt-0.5" title={`${getPedidoNumero(op)} • ${getItemDescricao(op)}`}>
                                     {getPedidoNumero(op)}
                                     {" \u2022 "}
                                     {getItemDescricao(op)}
@@ -1255,7 +1255,7 @@ export default function ProducaoPage() {
                               )}
                             </div>
 
-                            <h3 className="font-bold text-slate-800 text-base mt-1 group-hover:text-blue-700 transition-colors truncate">
+                            <h3 className="font-bold text-slate-800 text-base mt-1 group-hover:text-blue-700 transition-colors truncate" title={getClienteName(op)}>
                               {getClienteName(op)}
                             </h3>
 
