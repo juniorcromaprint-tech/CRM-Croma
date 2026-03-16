@@ -19,6 +19,9 @@ import { Badge } from "@/components/ui/badge";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Separator } from "@/components/ui/separator";
 
+import AIModelsTab from '../components/AIModelsTab';
+import { ProgressTracker } from '@/shared/components/ProgressTracker';
+
 import {
   Settings,
   DollarSign,
@@ -29,6 +32,7 @@ import {
   Percent,
   Calculator,
   CheckCircle2,
+  Brain,
 } from "lucide-react";
 
 // ----------------------------------------------------------------------------
@@ -784,6 +788,20 @@ export default function AdminConfigPage() {
             Markup por Categoria
           </TabsTrigger>
           <TabsTrigger
+            value="ia"
+            className="rounded-lg data-[state=active]:bg-white data-[state=active]:shadow-sm px-4 py-2 text-sm"
+          >
+            <Brain className="h-4 w-4 mr-1.5" />
+            Inteligência Artificial
+          </TabsTrigger>
+          <TabsTrigger
+            value="progresso"
+            className="rounded-lg data-[state=active]:bg-white data-[state=active]:shadow-sm px-4 py-2 text-sm"
+          >
+            <BarChart2 className="h-4 w-4 mr-1.5" />
+            Progresso ERP
+          </TabsTrigger>
+          <TabsTrigger
             value="sobre"
             className="rounded-lg data-[state=active]:bg-white data-[state=active]:shadow-sm px-4 py-2 text-sm"
           >
@@ -798,6 +816,14 @@ export default function AdminConfigPage() {
 
         <TabsContent value="markup" className="mt-6">
           <TabMarkupCategoria />
+        </TabsContent>
+
+        <TabsContent value="ia" className="mt-6">
+          <AIModelsTab />
+        </TabsContent>
+
+        <TabsContent value="progresso" className="mt-6">
+          <ProgressTracker compact={false} />
         </TabsContent>
 
         <TabsContent value="sobre" className="mt-6">
