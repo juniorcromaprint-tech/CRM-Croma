@@ -4,7 +4,7 @@
 // Layout 2 colunas: wizard 3 etapas (esquerda) + pricing em tempo real (direita)
 // ============================================================================
 
-import React, { useState, useEffect, useMemo, useCallback } from "react";
+import React, { useState, useEffect, useMemo } from "react";
 import { useNavigate, useParams, Link } from "react-router-dom";
 import {
   ArrowLeft, Plus, Trash2, Save, Loader2, FileText,
@@ -46,8 +46,6 @@ import { toast } from "sonner";
 import { orcamentoService } from "../services/orcamento.service";
 import { CondicoesPagamento, type PaymentConditions } from "../components/CondicoesPagamento";
 import AIButton from '@/domains/ai/components/AIButton';
-/** @deprecated Use AISidebar instead */
-import OrcamentoAnalise from '@/domains/ai/components/OrcamentoAnalise';
 import ComposicaoSugestao from '@/domains/ai/components/ComposicaoSugestao';
 import AISidebar from '@/domains/ai/components/AISidebar';
 import { useAISidebar } from '@/domains/ai/hooks/useAISidebar';
@@ -356,6 +354,7 @@ export default function OrcamentoEditorPage() {
   };
 
   const handleAddItem = async () => {
+    if (editor.isDefaultConfig) { showError("Configure os parametros de precificacao antes de adicionar itens"); return; }
     if (!newItem.descricao.trim()) { showError("Informe a descricao do item"); return; }
     if (!id || isNew) { showError("Salve o orcamento antes de adicionar itens"); return; }
     if (pricingResult === null) { showError("Preencha os dados do item corretamente"); return; }
