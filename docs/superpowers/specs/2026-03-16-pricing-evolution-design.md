@@ -7,7 +7,7 @@
 
 ## 1. Contexto
 
-O ERP Croma Print ja possui um motor de precificacao profissional baseado no metodo Mubisys (Custeio Direto em 9 passos). O motor funciona e tem testes. Esta spec descreve 10 melhorias para tornar os orcamentos 100% reais e funcionais, incluindo override de preco pelo vendedor.
+O ERP Croma Print ja possui um motor de precificacao profissional baseado no metodo Mubisys (Custeio Direto em 9 passos). O motor funciona e tem testes. Esta spec descreve 11 melhorias para tornar os orcamentos 100% reais e funcionais, incluindo override de preco pelo vendedor.
 
 ### Arquivos-chave existentes
 
@@ -90,6 +90,11 @@ export function calcMarkupReverso(
   input: Omit<PricingInput, 'markupPercentual'>,
   config: PricingConfig = DEFAULT_PRICING_CONFIG,
 ): { markupPercentual: number; margemBruta: number; valido: boolean } {
+  // Guard: preco-alvo invalido
+  if (!precoAlvo || precoAlvo <= 0) {
+    return { markupPercentual: 0, margemBruta: 0, valido: false };
+  }
+
   // Roda o motor com markup 0 para obter valorAntesMarkup
   const base = calcPricing({ ...input, markupPercentual: 0 }, config);
 
@@ -170,6 +175,7 @@ No `OrcamentoEditorPage.tsx`, Step 3, adicionar ao lado do campo Markup:
 - Vendedor altera Preco/m² → recalcula preco unitario e markup
 - Ultimo campo editado pelo vendedor "ganha" (sem loop infinito)
 - Flag `overrideSource: 'markup' | 'preco' | 'm2'` controla qual campo foi editado por ultimo
+- **Debounce de 300ms** no recalculo para evitar jank durante digitacao (recalcula no blur ou apos pausa)
 
 **Validacoes**:
 - Se markup reverso < `markup_minimo` da categoria → alerta amarelo
@@ -193,6 +199,8 @@ Adicionar campo `preco_override` BOOLEAN em `proposta_itens` (migration) para au
 3. Remover qualquer referencia no codigo TypeScript
 
 **Risco**: Baixo — campo raramente usado (verificar dados antes).
+
+**NOTA**: A tabela `servicos` tambem tem um campo `preco_fixo` — esse e DIFERENTE e deve ser mantido (indica preco fixo do servico vs hora). Verificar todos os 17+ arquivos que referenciam `preco_fixo` e confirmar qual tabela cada um usa antes de alterar.
 
 ---
 
@@ -239,7 +247,9 @@ Calculo no motor — adicionar ao `orcamento-pricing.service.ts`:
 // O setup e dividido pela quantidade para obter custo/unidade
 const tempoProducao = processos.reduce((t, p) => t + p.tempoMinutos, 0);
 const tempoSetup = processos.reduce((t, p) => t + (p.tempoSetup ?? 0), 0);
-const tempoTotalPorUnidade = tempoProducao + (tempoSetup / quantidade);
+// Guard: quantidade sempre >= 1 (validado no wizard step 1)
+const qtdSafe = Math.max(1, quantidade);
+const tempoTotalPorUnidade = tempoProducao + (tempoSetup / qtdSafe);
 ```
 
 **Interface atualizada**: `OrcamentoProcesso` ganha campo `tempo_setup_min?: number`.
@@ -319,8 +329,8 @@ CREATE OR REPLACE FUNCTION fn_log_preco_material()
 RETURNS TRIGGER AS $$
 BEGIN
   IF OLD.preco_medio IS DISTINCT FROM NEW.preco_medio THEN
-    INSERT INTO materiais_historico_preco (material_id, preco_anterior, preco_novo)
-    VALUES (NEW.id, OLD.preco_medio, NEW.preco_medio);
+    INSERT INTO materiais_historico_preco (material_id, preco_anterior, preco_novo, atualizado_por)
+    VALUES (NEW.id, OLD.preco_medio, NEW.preco_medio, auth.uid());
   END IF;
   RETURN NEW;
 END;
@@ -450,7 +460,8 @@ CREATE TABLE IF NOT EXISTS faixas_quantidade (
   quantidade_minima INTEGER NOT NULL,
   desconto_markup_percentual NUMERIC(5,2) NOT NULL DEFAULT 0,
   ativo BOOLEAN DEFAULT true,
-  created_at TIMESTAMPTZ DEFAULT now()
+  created_at TIMESTAMPTZ DEFAULT now(),
+  CONSTRAINT uq_faixas_regra_qtd UNIQUE (regra_id, quantidade_minima)
 );
 
 CREATE INDEX IF NOT EXISTS idx_faixas_quantidade_regra
@@ -466,7 +477,7 @@ CROSS JOIN (VALUES
   (100, 12.0)
 ) AS faixa(qtd, desconto)
 WHERE r.categoria = 'banner' AND r.ativo = true
-ON CONFLICT DO NOTHING;
+ON CONFLICT ON CONSTRAINT uq_faixas_regra_qtd DO NOTHING;
 
 -- 2.9: Historico de precos
 CREATE TABLE IF NOT EXISTS materiais_historico_preco (
@@ -487,8 +498,8 @@ CREATE OR REPLACE FUNCTION fn_log_preco_material()
 RETURNS TRIGGER AS $$
 BEGIN
   IF OLD.preco_medio IS DISTINCT FROM NEW.preco_medio THEN
-    INSERT INTO materiais_historico_preco (material_id, preco_anterior, preco_novo)
-    VALUES (NEW.id, OLD.preco_medio, NEW.preco_medio);
+    INSERT INTO materiais_historico_preco (material_id, preco_anterior, preco_novo, atualizado_por)
+    VALUES (NEW.id, OLD.preco_medio, NEW.preco_medio, auth.uid());
   END IF;
   RETURN NEW;
 END;
@@ -506,8 +517,10 @@ ALTER TABLE materiais_historico_preco ENABLE ROW LEVEL SECURITY;
 CREATE POLICY "faixas_quantidade_select" ON faixas_quantidade
   FOR SELECT USING (true);
 
-CREATE POLICY "faixas_quantidade_all" ON faixas_quantidade
+CREATE POLICY "faixas_quantidade_manage" ON faixas_quantidade
   FOR ALL USING (
+    EXISTS (SELECT 1 FROM profiles WHERE id = auth.uid() AND role IN ('admin', 'gerente'))
+  ) WITH CHECK (
     EXISTS (SELECT 1 FROM profiles WHERE id = auth.uid() AND role IN ('admin', 'gerente'))
   );
 
@@ -572,10 +585,16 @@ config_snapshot congelada na proposta
 - `calcOrcamentoItem` — acabamentos inclusos no custoMP
 - Validacao de config obrigatoria
 
+### Regressao
+
+- Acabamentos array vazio → motor funciona identico ao comportamento atual
+- Sem config no banco → alerta exibido, botao adicionar desabilitado
+
 ### Integracao
 
 - Fluxo completo: criar orcamento → adicionar item com override → salvar → verificar proposta_itens no banco
 - Conversao proposta→pedido preserva campos de override
+- IA aplica sugestao de preco → markup reverso calculado → margem visivel
 
 ---
 
