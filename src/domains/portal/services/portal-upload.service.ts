@@ -35,5 +35,6 @@ export async function uploadFileToPortal(params: {
   }
 
   const data = await res.json();
+  if (!data.attachmentId) throw new Error('Upload concluído mas registro não foi salvo');
   return { id: data.attachmentId };
 }
