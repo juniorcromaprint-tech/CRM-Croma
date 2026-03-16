@@ -4,10 +4,12 @@ import { z } from "zod";
 
 export const leadStatusEnum = z.enum([
   "novo",
-  "em_contato",
-  "qualificando",
+  "contatado",
   "qualificado",
-  "descartado",
+  "proposta_enviada",
+  "negociando",
+  "convertido",
+  "perdido",
 ]);
 
 export const leadSchema = z.object({

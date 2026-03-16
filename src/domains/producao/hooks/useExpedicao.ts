@@ -1,6 +1,7 @@
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { supabase } from '@/integrations/supabase/client';
 import { showSuccess, showError } from '@/utils/toast';
+import { updateWithLock, OptimisticLockError } from '@/shared/utils/optimistic-lock';
 
 export interface PedidoExpedicao {
   id: string;
@@ -10,6 +11,7 @@ export interface PedidoExpedicao {
   valor_total: number;
   data_prometida: string | null;
   created_at: string;
+  version: number;
   clientes: { nome_fantasia: string | null; razao_social: string } | null;
 }
 
@@ -20,7 +22,7 @@ export function usePedidosParaExpedicao() {
     queryFn: async (): Promise<PedidoExpedicao[]> => {
       const { data, error } = await supabase
         .from('pedidos')
-        .select('id, numero, cliente_id, status, valor_total, data_prometida, created_at, clientes(nome_fantasia, razao_social)')
+        .select('id, numero, cliente_id, status, valor_total, data_prometida, created_at, version, clientes(nome_fantasia, razao_social)')
         .in('status', ['produzido', 'aguardando_instalacao'])
         .is('excluido_em', null)
         .order('data_prometida', { ascending: true, nullsFirst: false });
@@ -34,24 +36,25 @@ export function usePedidosParaExpedicao() {
 export function useLiberarExpedicao() {
   const qc = useQueryClient();
   return useMutation({
-    mutationFn: async ({ pedidoId, tipo }: { pedidoId: string; tipo: 'instalacao' | 'retirada' | 'envio' }) => {
+    mutationFn: async ({ pedidoId, tipo, version }: { pedidoId: string; tipo: 'instalacao' | 'retirada' | 'envio'; version: number }) => {
       const nextStatus = tipo === 'instalacao' ? 'aguardando_instalacao' : 'concluido';
       const label =
         tipo === 'instalacao' ? 'instalação' :
         tipo === 'retirada' ? 'retirada pelo cliente' : 'envio/transportadora';
 
-      const { error } = await supabase
-        .from('pedidos')
-        .update({ status: nextStatus, observacoes: `Liberado para ${label}` })
-        .eq('id', pedidoId);
-
-      if (error) throw new Error(error.message);
+      await updateWithLock('pedidos', pedidoId, { status: nextStatus, observacoes: `Liberado para ${label}` }, version);
     },
     onSuccess: () => {
       qc.invalidateQueries({ queryKey: ['expedicao'] });
       qc.invalidateQueries({ queryKey: ['pedidos'] });
       showSuccess('Pedido liberado com sucesso!');
     },
-    onError: (err: Error) => showError(err.message),
+    onError: (err: Error) => {
+      if (err instanceof OptimisticLockError) {
+        showError('Este pedido foi alterado por outro usuário. Recarregue a página.');
+      } else {
+        showError(err.message);
+      }
+    },
   });
 }

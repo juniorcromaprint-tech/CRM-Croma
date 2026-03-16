@@ -29,20 +29,9 @@ import {
   PaginationNext, PaginationPrevious,
 } from "@/components/ui/pagination";
 import { TEMPERATURA_CONFIG } from "../constants/temperatura";
+import { LEAD_STATUS_CONFIG, getStatusConfig } from "@/shared/constants/status";
 
 const PAGE_SIZE = 20;
-
-// ─── Constants ────────────────────────────────────────────────────────────────
-
-const STATUS_CONFIG: Record<string, { label: string; color: string }> = {
-  novo: { label: "Novo", color: "bg-blue-100 text-blue-700" },
-  contatado: { label: "Contatado", color: "bg-sky-100 text-sky-700" },
-  qualificado: { label: "Qualificado", color: "bg-emerald-100 text-emerald-700" },
-  proposta_enviada: { label: "Proposta Enviada", color: "bg-amber-100 text-amber-700" },
-  negociando: { label: "Negociando", color: "bg-purple-100 text-purple-700" },
-  convertido: { label: "Convertido", color: "bg-green-100 text-green-700" },
-  perdido: { label: "Perdido", color: "bg-red-100 text-red-700" },
-};
 
 // ─── Types ───────────────────────────────────────────────────────────────────
 
@@ -245,7 +234,7 @@ export default function LeadsPage() {
           </SelectTrigger>
           <SelectContent>
             <SelectItem value="all">Todos os status</SelectItem>
-            {Object.entries(STATUS_CONFIG).map(([key, cfg]) => (
+            {Object.entries(LEAD_STATUS_CONFIG).map(([key, cfg]) => (
               <SelectItem key={key} value={key}>{cfg.label}</SelectItem>
             ))}
           </SelectContent>
@@ -274,8 +263,8 @@ export default function LeadsPage() {
                 <div className="flex-1 min-w-0">
                   <div className="flex items-center gap-2 mb-1">
                     <h3 className="font-semibold text-slate-800 truncate">{lead.empresa}</h3>
-                    <span className={`px-2 py-0.5 rounded-full text-[10px] font-medium ${STATUS_CONFIG[lead.status]?.color || "bg-slate-100"}`}>
-                      {STATUS_CONFIG[lead.status]?.label || lead.status}
+                    <span className={`px-2 py-0.5 rounded-full text-[10px] font-medium ${getStatusConfig(LEAD_STATUS_CONFIG, lead.status as any).color}`}>
+                      {getStatusConfig(LEAD_STATUS_CONFIG, lead.status as any).label}
                     </span>
                     <span className={`px-2 py-0.5 rounded-full text-[10px] font-medium ${TEMPERATURA_CONFIG[lead.temperatura as keyof typeof TEMPERATURA_CONFIG]?.badgeColor || "bg-slate-100"}`}>
                       {TEMPERATURA_CONFIG[lead.temperatura as keyof typeof TEMPERATURA_CONFIG]?.label || lead.temperatura}
@@ -404,7 +393,7 @@ export default function LeadsPage() {
                       {lead.empresa && lead.contato_nome ? ` — ${lead.contato_nome}` : ""}
                     </span>
                     <Badge variant="outline" className="text-yellow-600 border-yellow-300 text-[10px]">
-                      {STATUS_CONFIG[lead.status]?.label ?? lead.status}
+                      {getStatusConfig(LEAD_STATUS_CONFIG, lead.status as any).label}
                     </Badge>
                   </div>
                 ))}
@@ -526,8 +515,8 @@ export default function LeadsPage() {
                         {lead.empresa ?? lead.contato_nome}
                         {lead.empresa && lead.contato_nome ? ` — ${lead.contato_nome}` : ""}
                       </span>
-                      <span className={`text-xs px-2 py-0.5 rounded-full font-medium ${STATUS_CONFIG[lead.status]?.color ?? "bg-slate-100 text-slate-600"}`}>
-                        {STATUS_CONFIG[lead.status]?.label ?? lead.status}
+                      <span className={`text-xs px-2 py-0.5 rounded-full font-medium ${getStatusConfig(LEAD_STATUS_CONFIG, lead.status as any).color}`}>
+                        {getStatusConfig(LEAD_STATUS_CONFIG, lead.status as any).label}
                       </span>
                     </li>
                   ))}

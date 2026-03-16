@@ -214,9 +214,9 @@ export default function PedidoDetailPage() {
         return
       }
 
-      const pendentes = ops.filter(op => op.status !== 'concluida')
+      const pendentes = ops.filter(op => !['finalizado', 'cancelada'].includes(op.status))
       if (pendentes.length > 0) {
-        showError(`${pendentes.length} OP(s) ainda não concluída(s). Finalize todas antes de marcar como produzido.`)
+        showError(`${pendentes.length} OP(s) ainda não finalizada(s). Finalize todas antes de marcar como produzido.`)
         return
       }
     }
