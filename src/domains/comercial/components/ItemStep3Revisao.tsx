@@ -5,6 +5,7 @@ import { AlertTriangle, DollarSign } from "lucide-react";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Button } from "@/components/ui/button";
+import { Badge } from "@/components/ui/badge";
 import { Separator } from "@/components/ui/separator";
 import AlertasOrcamento from "./AlertasOrcamento";
 import ResumoVendedor from "./ResumoVendedor";
@@ -55,6 +56,26 @@ export default function ItemStep3Revisao({
   onMarkupSugeridoClick,
 }: ItemStep3RevisaoProps) {
   const debounceRef = useRef<ReturnType<typeof setTimeout>>();
+
+  // Controlled input state — synced from parent when pricingResult or overrideSource changes
+  const [precoInputValue, setPrecoInputValue] = React.useState<string>('');
+  const [precoM2InputValue, setPrecoM2InputValue] = React.useState<string>('');
+
+  React.useEffect(() => {
+    if (overrideSource === 'preco') {
+      setPrecoInputValue(precoOverrideValue != null ? String(precoOverrideValue) : '');
+    } else {
+      setPrecoInputValue(pricingResult?.precoUnitario?.toFixed(2) ?? '');
+    }
+  }, [pricingResult?.precoUnitario, overrideSource, precoOverrideValue]);
+
+  React.useEffect(() => {
+    if (overrideSource === 'm2') {
+      setPrecoM2InputValue(precoM2OverrideValue != null ? String(precoM2OverrideValue) : '');
+    } else {
+      setPrecoM2InputValue(pricingResult?.precoM2?.toFixed(2) ?? '');
+    }
+  }, [pricingResult?.precoM2, overrideSource, precoM2OverrideValue]);
 
   const handlePrecoBlur = (value: string) => {
     const num = parseFloat(value);
@@ -121,13 +142,10 @@ export default function ItemStep3Revisao({
               type="number"
               min={0}
               step={0.01}
-              defaultValue={
-                overrideSource === "preco"
-                  ? (precoOverrideValue ?? "")
-                  : (pricingResult?.precoUnitario?.toFixed(2) ?? "")
-              }
+              value={precoInputValue}
               onBlur={(e) => handlePrecoBlur(e.target.value)}
               onChange={(e) => {
+                setPrecoInputValue(e.target.value);
                 clearTimeout(debounceRef.current);
                 const val = e.target.value;
                 debounceRef.current = setTimeout(() => {
@@ -145,13 +163,10 @@ export default function ItemStep3Revisao({
                 type="number"
                 min={0}
                 step={0.01}
-                defaultValue={
-                  overrideSource === "m2"
-                    ? (precoM2OverrideValue ?? "")
-                    : (pricingResult?.precoM2?.toFixed(2) ?? "")
-                }
+                value={precoM2InputValue}
                 onBlur={(e) => handlePrecoM2Blur(e.target.value)}
                 onChange={(e) => {
+                  setPrecoM2InputValue(e.target.value);
                   clearTimeout(debounceRef.current);
                   const val = e.target.value;
                   debounceRef.current = setTimeout(() => {
@@ -164,6 +179,11 @@ export default function ItemStep3Revisao({
             </div>
           )}
         </div>
+        {isPrecoOverride && (
+          <Badge variant="secondary" className="text-[10px] bg-amber-50 text-amber-700 border-amber-200">
+            Preço ajustado manualmente
+          </Badge>
+        )}
       </div>
 
       {/* Markup validations */}

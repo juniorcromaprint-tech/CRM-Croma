@@ -923,24 +923,24 @@ export default function OrcamentoEditorPage() {
                             <StepSummaryBadge item={newItem} visibleFrom={3} currentStep={currentStep} />
 
                             <ItemStep3Revisao
-                              markup={editor.newItem.markup_percentual}
-                              markupSugerido={editor.markupSugerido}
-                              markupMinimo={editor.validacaoMarkup.markup_minimo}
-                              validacaoMarkup={editor.validacaoMarkup}
-                              pricingResult={editor.pricingResult}
-                              quantidade={editor.newItem.quantidade}
+                              markup={newItem.markup_percentual}
+                              markupSugerido={markupSugerido}
+                              markupMinimo={validacaoMarkup.markup_minimo}
+                              validacaoMarkup={validacaoMarkup}
+                              pricingResult={pricingResult}
+                              quantidade={newItem.quantidade}
                               alerts={editor.alerts}
                               overrideSource={editor.overrideSource}
                               isPrecoOverride={editor.isPrecoOverride}
                               precoOverrideValue={editor.precoOverrideValue}
                               precoM2OverrideValue={editor.precoM2OverrideValue}
-                              hasArea={!!(editor.newItem.largura_cm && editor.newItem.altura_cm)}
-                              isDefaultConfig={editor.isDefaultConfig}
+                              hasArea={!!(newItem.largura_cm && newItem.altura_cm)}
+                              isDefaultConfig={isDefaultConfig}
                               volumeDiscount={editor.volumeDiscount}
                               onMarkupChange={editor.handleMarkupChange}
                               onPrecoOverride={editor.handlePrecoOverride}
                               onPrecoM2Override={editor.handlePrecoM2Override}
-                              onMarkupSugeridoClick={() => editor.handleMarkupChange(editor.markupSugerido)}
+                              onMarkupSugeridoClick={() => editor.handleMarkupChange(markupSugerido)}
                             />
 
                             {/* Step 3 — Nav */}
