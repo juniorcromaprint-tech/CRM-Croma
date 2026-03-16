@@ -41,7 +41,7 @@ Criar um módulo completo de **importação, exportação e edição em massa** 
 |---|---|---|---|---|---|---|---|
 | 1 | Matéria-Prima | `materiais` | ✅ | ✅ | ✅ | `id` ou `codigo` | Simples |
 | 2 | Produtos | `produtos` | ✅ | ✅ | ✅ | `id` ou `codigo` | Simples |
-| 3 | Clientes + Contatos | `clientes` + contatos inline | ✅ | ✅ | ✅ | `id` ou `cnpj_cpf` | Complexa (1:N) |
+| 3 | Clientes + Contatos | `clientes` + `cliente_contatos` | ✅ | ✅ | ✅ | `id` ou `cnpj_cpf` | Complexa (1:N) |
 | 4 | Fornecedores | `fornecedores` | ✅ | ✅ | ✅ | `id` ou `cnpj_cpf` | Simples |
 | 5 | Composição Material | `modelo_materiais` | ✅ | ✅ | ✅ | `modelo_id` + `material_id` | Média (N:N) |
 | 6 | Composição Processo | `modelo_processos` | ✅ | ✅ | ✅ | `modelo_id` + `processo` | Média (N:N) |
@@ -192,7 +192,8 @@ CREATE POLICY "Usuários autenticados podem inserir logs"
 
 - Área de drag & drop (FileDropzone) aceita `.csv` e `.xlsx`
 - `file-parser.ts` converte arquivo para `Array<Record<string, string>>`
-- Mostra preview das primeiras 5 linhas em tabela simples
+- **Detecção de linhas de instrução**: o parser identifica a linha de cabeçalho procurando a primeira linha que contém nomes de colunas conhecidos da entidade (matching contra o config). Linhas anteriores (instruções, exemplos do template) são ignoradas automaticamente. Isso permite que templates reimportados funcionem sem o usuário ter que deletar linhas manualmente.
+- Mostra preview das primeiras 5 linhas de dados (após o cabeçalho) em tabela simples
 - Detecta automaticamente se é CSV (separador `;`) ou XLSX (primeira aba)
 
 ### Etapa 2 — Validação
@@ -228,14 +229,19 @@ CREATE POLICY "Usuários autenticados podem inserir logs"
 
 #### Clientes + Contatos (1:N)
 
+**Tabela de contatos**: `cliente_contatos` (FK: `cliente_id`)
+**Colunas de contato**: `nome` (obrig.), `email`, `telefone`, `whatsapp`, `cargo`, `departamento`, `e_decisor`, `principal`
+
 Template com colunas achatadas:
 ```
-nome | cnpj_cpf | email | telefone | endereco | cidade | estado | contato_1_nome | contato_1_email | contato_1_telefone | contato_2_nome | contato_2_email | contato_2_telefone | contato_3_nome | contato_3_email | contato_3_telefone
+nome | cnpj_cpf | email | telefone | endereco | cidade | estado | contato_1_nome | contato_1_email | contato_1_telefone | contato_1_cargo | contato_2_nome | contato_2_email | contato_2_telefone | contato_2_cargo | contato_3_nome | contato_3_email | contato_3_telefone | contato_3_cargo
 ```
 
-- Importação cria/atualiza o cliente e depois cria/atualiza contatos
+- Importação cria/atualiza o cliente e depois cria/atualiza contatos na tabela `cliente_contatos`
 - Colunas `contato_*` vazias são ignoradas
 - Máximo 3 contatos por linha (suficiente para 99% dos casos)
+- **Mapeamento**: `contato_N_nome` → `cliente_contatos.nome`, `contato_N_email` → `cliente_contatos.email`, etc.
+- **Update de contatos**: matching por `nome` do contato dentro do mesmo cliente. Se nome bate → update. Se não bate → insert novo contato. Contatos existentes que não aparecem na planilha ficam intocados (não deleta).
 
 #### Composições — Modelo ↔ Materiais (N:N)
 
@@ -246,10 +252,10 @@ BANNER-001    | LONA-380G      | 1.2        | m²
 BANNER-001    | TINTA-SOL      | 0.05       | litro
 ```
 
-- Identifica modelo e material pelo código
-- Se par já existe → atualiza quantidade
+- **Lookup**: `modelo_codigo` → query `produto_modelos` WHERE `codigo = modelo_codigo` para resolver `modelo_id` (UUID). `material_codigo` → query `materiais` WHERE `codigo = material_codigo` para resolver `material_id` (UUID)
+- Se par (`modelo_id` + `material_id`) já existe → atualiza quantidade
 - Se não existe → insere
-- Erro se modelo ou material não encontrado
+- Erro se modelo ou material não encontrado pelo código
 
 #### Composições — Modelo ↔ Processos (N:N)
 
@@ -268,6 +274,7 @@ BANNER-001    | acabamento | 10          | 80.00      | 2
 - Dropdown no header da tabela: "Exportar CSV" | "Exportar Excel"
 - Exporta respeitando filtros ativos da tela (busca, status, categoria, período)
 - Usa `exportCsv.ts` e `exportExcel.ts` existentes (sem recriar)
+- `export-engine.ts` é responsável por transformar os resultados da query Supabase no formato `headers: string[]` + `rows: (string | number | null)[][]` que os utilitários existentes esperam. Inclui tradução de nomes de coluna (ex: `preco_medio` → `Preço Médio`) e formatação de valores (datas, moeda)
 - Log registrado em `import_logs` com `operation = 'export'`
 
 ### No Hub central (`/admin/dados`)
@@ -371,7 +378,7 @@ BANNER-001    | acabamento | 10          | 80.00      | 2
 │  │Composição│ │Composição│ │ Contas   │ │ Contas   │      │
 │  │Material  │ │Processo  │ │ Receber  │ │ Pagar    │      │
 │  │ 321 reg  │ │ 362 reg  │ │  XX reg  │ │  XX reg  │      │
-│  │ [↓][↑]   │ │ [↓][↑]   │ │ [↓][↑][✎]│ │ [↓][↑][✎]│      │
+│  │ [↓][↑][✎]│ │ [↓][↑][✎]│ │ [↓][↑][✎]│ │ [↓][↑][✎]│      │
 │  └──────────┘ └──────────┘ └──────────┘ └──────────┘      │
 │                                                             │
 │  ┌──────────┐ ┌──────────┐ ┌──────────┐                   │
@@ -402,13 +409,20 @@ Cada card tem:
 
 ## 10. Permissões
 
-| Permissão | Quem tem | O que pode |
-|---|---|---|
-| `bulk_export` | Admin, Gerente, Comercial | Exportar dados e baixar templates |
-| `bulk_import` | Admin, Gerente | Importar, editar em massa, ver histórico |
+O sistema de permissões existente usa matriz `Module × Action` (arquivo: `src/shared/constants/permissions.ts`). Roles existentes: `admin`, `diretor`, `comercial`, `comercial_senior`, `financeiro`, `producao`, `compras`, `logistica`, `instalador`. Actions existentes: `ver`, `criar`, `editar`, `excluir`, `aprovar`, `exportar`.
 
-- Botões ficam ocultos para quem não tem permissão
-- API valida permissão no backend (RLS + check no service)
+**Mapeamento para bulk operations** (sem criar permissões novas):
+
+| Operação | Permissão usada | Roles com acesso |
+|---|---|---|
+| Exportar dados | `admin.exportar` | `admin`, `diretor` (já tem `exportar` no módulo admin) |
+| Importar dados | `admin.criar` | `admin` (único com `criar` no módulo admin) |
+| Editar em massa | `admin.editar` | `admin` (único com `editar` no módulo admin) |
+| Ver histórico | `admin.ver` | `admin`, `diretor` |
+
+**Proteção de rota**: `<PermissionGuard module="admin" action="ver">` para o Hub. Botões de import/bulk-edit verificam `admin.criar` / `admin.editar`. Botão de export verifica `admin.exportar`.
+
+**Arquivo de rotas**: adicionar em `src/routes/adminRoutes.tsx` seguindo o padrão existente com lazy loading + PermissionGuard.
 
 ---
 
@@ -459,7 +473,32 @@ Essa ordem deve estar visível no Hub e nos templates.
 
 ---
 
-## 13. Stack Técnica
+## 13. Registro de Rotas
+
+Adicionar em `src/routes/adminRoutes.tsx` seguindo o padrão existente:
+
+```tsx
+const DadosHubPage = lazy(() => import("@/domains/dados/pages/DadosHubPage"));
+const ImportHistoricoPage = lazy(() => import("@/domains/dados/pages/ImportHistoricoPage"));
+
+// Dentro do JSX de adminRoutes:
+<Route path="admin/dados" element={
+  <PermissionGuard module="admin" action="ver">
+    <LazyPage><DadosHubPage /></LazyPage>
+  </PermissionGuard>
+} />
+<Route path="admin/dados/historico" element={
+  <PermissionGuard module="admin" action="ver">
+    <LazyPage><ImportHistoricoPage /></LazyPage>
+  </PermissionGuard>
+} />
+```
+
+O Hub também deve ser adicionado ao menu lateral de Admin (verificar `src/shared/components/Sidebar.tsx` ou equivalente).
+
+---
+
+## 14. Stack Técnica
 
 ### Reutilizar do projeto
 
@@ -482,7 +521,7 @@ Essa ordem deve estar visível no Hub e nos templates.
 
 ---
 
-## 14. Riscos e Mitigações
+## 15. Riscos e Mitigações
 
 | Risco | Mitigação |
 |---|---|
@@ -495,7 +534,7 @@ Essa ordem deve estar visível no Hub e nos templates.
 
 ---
 
-## 15. Fora de Escopo (Fase 1)
+## 16. Fora de Escopo (Fase 1)
 
 - Processamento assíncrono / job queue (volumes atuais < 5.000 linhas)
 - Rollback automático de importações
