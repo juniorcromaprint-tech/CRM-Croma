@@ -46,7 +46,7 @@ describe('precoApplier', () => {
     const result = await precoApplier(action, ctx);
     expect(result.success).toBe(true);
     expect(supabase.from).toHaveBeenCalledWith('proposta_itens');
-    expect(supabase.update).toHaveBeenCalledWith(expect.objectContaining({ preco_unitario: 680 }));
+    expect(supabase.update).toHaveBeenCalledWith(expect.objectContaining({ valor_unitario: 680 }));
   });
 });
 
