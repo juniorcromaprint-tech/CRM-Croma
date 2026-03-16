@@ -32,7 +32,7 @@ export type AIFunctionName =
 
 export type AIEntityType = 'proposta' | 'cliente' | 'pedido' | 'geral';
 
-export type AIModel = 'openai/gpt-4.1-mini' | 'anthropic/claude-sonnet-4';
+export type AIModel = string;
 
 export interface AILogEntry {
   user_id: string;
