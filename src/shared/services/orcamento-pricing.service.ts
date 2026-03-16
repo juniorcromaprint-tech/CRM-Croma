@@ -5,6 +5,7 @@
 
 import {
   calcPricing,
+  calcMarkupReverso,
   DEFAULT_PRICING_CONFIG,
   type PricingConfig,
   type PricingResult,
@@ -31,6 +32,7 @@ export interface OrcamentoAcabamento {
 export interface OrcamentoProcesso {
   etapa: string;
   tempo_minutos: number;
+  tempo_setup_min?: number; // Setup time, diluted by quantity
 }
 
 export interface OrcamentoItemInput {
@@ -92,47 +94,51 @@ export function calcOrcamentoItem(
   const quantidade = item.quantidade || 1;
   const areaM2 = calcAreaM2(item.largura_cm, item.altura_cm);
 
-  // Apenas materiais entram no motor Mubisys (acabamentos são calculados separado)
-  const materiaisParaMotor = item.materiais.map((m) => {
-    const aproveitamento = (m.aproveitamento ?? 100) / 100;
-    const quantidadeReal = aproveitamento > 0 ? m.quantidade / aproveitamento : m.quantidade;
-    return {
-      nome: m.descricao,
-      quantidade: quantidadeReal,
-      precoUnitario: m.custo_unitario,
-    };
-  });
+  // Calculate acabamentos cost (informational — for UI breakdown)
+  const custoAcabamentosInfo = item.acabamentos.reduce(
+    (sum, a) => sum + a.quantidade * a.custo_unitario,
+    0,
+  );
 
+  // Materiais + acabamentos go into motor TOGETHER (both get overhead)
+  const materiaisParaMotor = [
+    ...item.materiais.map((m) => {
+      const aproveitamento = (m.aproveitamento ?? 100) / 100;
+      const quantidadeReal = aproveitamento > 0 ? m.quantidade / aproveitamento : m.quantidade;
+      return {
+        nome: m.descricao,
+        quantidade: quantidadeReal,
+        precoUnitario: m.custo_unitario,
+      };
+    }),
+    ...item.acabamentos.map((a) => ({
+      nome: a.descricao,
+      quantidade: a.quantidade,
+      precoUnitario: a.custo_unitario,
+    })),
+  ];
+
+  // Processos with setup time diluted by quantity
+  const qtdSafe = Math.max(1, quantidade);
   const processos = item.processos.map((p) => ({
     etapa: p.etapa,
-    tempoMinutos: p.tempo_minutos,
+    tempoMinutos: p.tempo_minutos + ((p.tempo_setup_min ?? 0) / qtdSafe),
   }));
 
-  // Motor Mubisys processa APENAS materiais + processos — retorna preço UNITÁRIO
+  // Motor Mubisys — returns UNIT price
   const pricingResult = calcPricing(
     { materiais: materiaisParaMotor, processos, markupPercentual: item.markup_percentual },
     config,
   );
 
-  // Acabamentos calculados SEPARADO do motor, sem overhead Mubisys adicional
-  const custoAcabamentos = item.acabamentos.reduce(
-    (sum, a) => sum + a.quantidade * a.custo_unitario,
-    0,
-  );
-
-  // Preço unitário = resultado unitário do motor + acabamentos
-  const precoUnitario = pricingResult.precoVenda + custoAcabamentos;
-
-  // Preço total = preço unitário × quantidade (ÚNICA multiplicação por quantidade)
+  const precoUnitario = pricingResult.precoVenda;
   const precoTotal = precoUnitario * quantidade;
-
   const precoM2 = areaM2 && areaM2 > 0 ? precoUnitario / areaM2 : null;
-
-  const custoTotalUnitario = (pricingResult.custoTotal ?? 0) + custoAcabamentos;
+  const custoTotalUnitario = pricingResult.custoTotal ?? 0;
 
   return {
     custoMP: pricingResult.custoMP,
-    custosAcabamentos: custoAcabamentos,
+    custosAcabamentos: custoAcabamentosInfo,
     custoMO: pricingResult.custoMO,
     custoTotal: custoTotalUnitario,
     precoUnitario,
@@ -143,6 +149,53 @@ export function calcOrcamentoItem(
     areaM2,
     precoM2,
     detalhes: pricingResult,
+  };
+}
+
+/**
+ * Given a target price (unit or m2), returns the required markup.
+ */
+export function calcMarkupParaPreco(
+  precoAlvo: number,
+  tipo: 'unitario' | 'm2',
+  item: Omit<OrcamentoItemInput, 'markup_percentual'>,
+  config: PricingConfig = DEFAULT_PRICING_CONFIG,
+): { markup_percentual: number; margem_bruta: number; valido: boolean } {
+  let precoUnitarioAlvo = precoAlvo;
+
+  if (tipo === 'm2') {
+    const areaM2 = calcAreaM2(item.largura_cm, item.altura_cm);
+    if (!areaM2 || areaM2 <= 0) {
+      return { markup_percentual: 0, margem_bruta: 0, valido: false };
+    }
+    precoUnitarioAlvo = precoAlvo * areaM2;
+  }
+
+  const quantidade = item.quantidade || 1;
+  const qtdSafe = Math.max(1, quantidade);
+
+  const materiaisParaMotor = [
+    ...item.materiais.map((m) => {
+      const aproveitamento = (m.aproveitamento ?? 100) / 100;
+      const quantidadeReal = aproveitamento > 0 ? m.quantidade / aproveitamento : m.quantidade;
+      return { nome: m.descricao, quantidade: quantidadeReal, precoUnitario: m.custo_unitario };
+    }),
+    ...item.acabamentos.map((a) => ({
+      nome: a.descricao, quantidade: a.quantidade, precoUnitario: a.custo_unitario,
+    })),
+  ];
+
+  const processos = item.processos.map((p) => ({
+    etapa: p.etapa,
+    tempoMinutos: p.tempo_minutos + ((p.tempo_setup_min ?? 0) / qtdSafe),
+  }));
+
+  const result = calcMarkupReverso(precoUnitarioAlvo, { materiais: materiaisParaMotor, processos }, config);
+
+  return {
+    markup_percentual: result.markupPercentual,
+    margem_bruta: result.margemBruta,
+    valido: result.valido,
   };
 }
 
