@@ -22,7 +22,7 @@ export async function materialApplier(action: AIAction, ctx: ApplierContext): Pr
     if (error) return { success: false, message: `Erro ao trocar material: ${error.message}` };
 
     // NOTE: Frontend invalidation via queryClient.invalidateQueries handles motor recalculation.
-    // Acabamentos now participate in the Mubisys overhead motor — pricing recomputes on next render.
+    // Materials and acabamentos both participate in the Mubisys overhead — pricing recomputes on next render.
     return {
       success: true,
       message: `Material trocado para "${suggested.nome}"`,

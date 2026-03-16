@@ -4,7 +4,7 @@ export async function precoApplier(action: AIAction, ctx: ApplierContext): Promi
   const suggested = action.valor_sugerido as { item_id: string; preco: number };
   const previous = action.valor_atual as { item_id: string; preco: number };
 
-  if (!suggested?.item_id || !suggested?.preco) {
+  if (!suggested?.item_id || suggested.preco == null) {
     return { success: false, message: 'Dados insuficientes: item_id e preco obrigatorios' };
   }
 
@@ -20,11 +20,14 @@ export async function precoApplier(action: AIAction, ctx: ApplierContext): Promi
   // Update price + valor_total + override flag together
   const { error, count } = await ctx.supabase
     .from('proposta_itens')
-    .update({
-      valor_unitario: suggested.preco,
-      valor_total: suggested.preco * quantidade,
-      preco_override: true,
-    })
+    .update(
+      {
+        valor_unitario: suggested.preco,
+        valor_total: suggested.preco * quantidade,
+        preco_override: true,
+      },
+      { count: 'exact' },
+    )
     .eq('id', suggested.item_id)
     .eq('proposta_id', ctx.entityId);
 
@@ -39,7 +42,8 @@ export async function precoApplier(action: AIAction, ctx: ApplierContext): Promi
         await ctx.supabase
           .from('proposta_itens')
           .update({ valor_unitario: previous.preco, valor_total: previous.preco * quantidade, preco_override: false })
-          .eq('id', suggested.item_id);
+          .eq('id', suggested.item_id)
+          .eq('proposta_id', ctx.entityId);
       }
     },
   };
