@@ -314,7 +314,13 @@ export default function DashboardDiretor() {
         <HeroKpi
           label="Pedidos Ativos"
           value={pedidos?.ativos ?? 0}
-          subtitle={pedidos?.atrasados ? `${pedidos.atrasados} em atraso` : pedidos?.ativos ? "Todos no prazo" : "Nenhum pedido em andamento"}
+          subtitle={
+            (pedidos?.atrasados ?? 0) > 0
+              ? `${pedidos!.atrasados} em atraso`
+              : pedidos?.ativos
+                ? "Todos no prazo"
+                : "Nenhum pedido em andamento"
+          }
           icon={<Package size={24} className="text-white" />}
           gradient="bg-gradient-to-br from-indigo-500 to-indigo-600"
           iconBg="bg-white/20"
