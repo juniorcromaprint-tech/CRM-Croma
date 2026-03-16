@@ -3559,6 +3559,54 @@ export type Database = {
           },
         ]
       }
+      import_logs: {
+        Row: {
+          id: string
+          user_id: string
+          entity: string
+          operation: string
+          filename: string | null
+          total_rows: number
+          inserted: number
+          updated: number
+          skipped: number
+          errors: number
+          error_details: Json
+          metadata: Json
+          created_at: string
+        }
+        Insert: {
+          id?: string
+          user_id: string
+          entity: string
+          operation: string
+          filename?: string | null
+          total_rows?: number
+          inserted?: number
+          updated?: number
+          skipped?: number
+          errors?: number
+          error_details?: Json
+          metadata?: Json
+          created_at?: string
+        }
+        Update: {
+          id?: string
+          user_id?: string
+          entity?: string
+          operation?: string
+          filename?: string | null
+          total_rows?: number
+          inserted?: number
+          updated?: number
+          skipped?: number
+          errors?: number
+          error_details?: Json
+          metadata?: Json
+          created_at?: string
+        }
+        Relationships: []
+      }
       leads: {
         Row: {
           campanha_id: string | null
