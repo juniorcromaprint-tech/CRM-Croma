@@ -14,7 +14,7 @@ export default function OrcamentoAnalise({ result, onClose }: OrcamentoAnalisePr
   const data = result.structured_data as unknown as OrcamentoAnaliseData;
 
   return (
-    <AIResultPanel result={result} title="Analise do Orcamento" onClose={onClose}>
+    <AIResultPanel result={result} title="Análise do Orçamento" onClose={onClose}>
       {data && (
         <div className="grid grid-cols-2 gap-3 mt-3">
           {data.margem_estimada != null && (
@@ -27,7 +27,7 @@ export default function OrcamentoAnalise({ result, onClose }: OrcamentoAnalisePr
           )}
           {data.preco_sugerido != null && data.preco_sugerido > 0 && (
             <div className="bg-slate-50 rounded-xl p-3">
-              <span className="text-[10px] text-slate-400 uppercase tracking-wide">Preco Sugerido</span>
+              <span className="text-[10px] text-slate-400 uppercase tracking-wide">Preço Sugerido</span>
               <p className="text-lg font-bold text-slate-800">{brl(data.preco_sugerido)}</p>
             </div>
           )}

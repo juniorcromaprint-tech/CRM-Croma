@@ -134,7 +134,7 @@ export default function ServicoSelector({
     return (
       <div className="bg-slate-50 rounded-xl p-4 text-center text-sm text-slate-400">
         <Wrench size={16} className="inline-block mr-1.5 -mt-0.5" />
-        Servicos serao carregados quando disponiveis
+        Serviços serão carregados quando disponíveis
       </div>
     );
   }
@@ -145,7 +145,7 @@ export default function ServicoSelector({
       <div className="flex items-center justify-between bg-slate-50 px-4 py-3 border-b border-slate-200">
         <div className="flex items-center gap-2">
           <Wrench size={14} className="text-slate-500" />
-          <span className="text-sm font-semibold text-slate-800">Servicos</span>
+          <span className="text-sm font-semibold text-slate-800">Serviços</span>
           {servicos.length > 0 && (
             <span className="text-xs text-slate-400">
               ({servicos.length})
@@ -255,14 +255,14 @@ export default function ServicoSelector({
           {isLoading ? (
             <div className="flex items-center gap-2 text-sm text-slate-400">
               <Loader2 size={14} className="animate-spin" />
-              Carregando servicos...
+              Carregando serviços...
             </div>
           ) : (
             <Select value={selectValue} onValueChange={handleAdd}>
               <SelectTrigger className="w-full rounded-xl h-9 text-sm border-dashed border-slate-300 text-slate-500 hover:border-blue-400 hover:text-blue-600 transition-colors">
                 <div className="flex items-center gap-2">
                   <Plus size={14} />
-                  <SelectValue placeholder="Adicionar servico" />
+                  <SelectValue placeholder="Adicionar serviço" />
                 </div>
               </SelectTrigger>
               <SelectContent>
@@ -280,7 +280,7 @@ export default function ServicoSelector({
                 ))}
                 <SelectItem value={CUSTOM_SERVICE_KEY}>
                   <span className="text-blue-600 font-medium">
-                    + Servico personalizado
+                    + Serviço personalizado
                   </span>
                 </SelectItem>
               </SelectContent>
@@ -293,7 +293,7 @@ export default function ServicoSelector({
       {servicos.length > 0 && (
         <div className="flex items-center justify-between px-4 py-3 bg-slate-50 border-t border-slate-200">
           <span className="text-sm font-semibold text-slate-600">
-            Total Servicos
+            Total Serviços
           </span>
           <span className="text-base font-bold text-slate-800 tabular-nums">
             {brl(total)}

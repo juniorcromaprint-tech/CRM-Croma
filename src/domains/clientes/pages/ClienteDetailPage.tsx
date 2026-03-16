@@ -94,7 +94,7 @@ const CLASSIFICACAO_CONFIG: Record<
 };
 
 const SEGMENTO_LABELS: Record<string, string> = {
-  calcados: "Calcados",
+  calcados: "Calçados",
   varejo: "Varejo",
   franquia: "Franquia",
   supermercado: "Supermercado",

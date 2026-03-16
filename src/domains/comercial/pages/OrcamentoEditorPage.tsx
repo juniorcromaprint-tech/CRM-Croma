@@ -61,7 +61,7 @@ import type { ItemEditorState } from "../hooks/useItemEditor";
 const WIZARD_STEPS = [
   { label: "Produto", icon: Package },
   { label: "Materiais", icon: Layers },
-  { label: "Revisao", icon: CheckCircle },
+  { label: "Revisão", icon: CheckCircle },
 ] as const;
 
 // ─── StepIndicator component ─────────────────────────────────────────────────
@@ -354,7 +354,7 @@ export default function OrcamentoEditorPage() {
   };
 
   const handleAddItem = async () => {
-    if (editor.isDefaultConfig) { showError("Configure os parametros de precificacao antes de adicionar itens"); return; }
+    if (editor.isDefaultConfig) { showError("Configure os parâmetros de precificação antes de adicionar itens"); return; }
     if (!newItem.descricao.trim()) { showError("Informe a descricao do item"); return; }
     if (!id || isNew) { showError("Salve o orcamento antes de adicionar itens"); return; }
     if (pricingResult === null) { showError("Preencha os dados do item corretamente"); return; }
@@ -803,7 +803,7 @@ export default function OrcamentoEditorPage() {
                             {/* Descricao + Especificacao */}
                             <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
                               <div className="md:col-span-2">
-                                <Label className="text-xs">Descricao *</Label>
+                                <Label className="text-xs">Descrição *</Label>
                                 <Input
                                   value={newItem.descricao}
                                   onChange={(e) => editor.setNewItem((s) => ({ ...s, descricao: e.target.value }))}
@@ -1001,7 +1001,7 @@ export default function OrcamentoEditorPage() {
                               </div>
                               <Separator />
                               <div className="flex justify-between">
-                                <span className="font-semibold text-slate-700">Preco Total</span>
+                                <span className="font-semibold text-slate-700">Preço Total</span>
                                 <span className="font-bold text-blue-700 tabular-nums">{brl(pricingResult.precoTotal)}</span>
                               </div>
                             </div>
@@ -1045,7 +1045,7 @@ export default function OrcamentoEditorPage() {
                   </div>
                   {totalServicos > 0 && (
                     <div className="flex gap-8 w-72">
-                      <span className="text-slate-500 flex-1">Servicos</span>
+                      <span className="text-slate-500 flex-1">Serviços</span>
                       <span className="font-medium tabular-nums text-right">{brl(totalServicos)}</span>
                     </div>
                   )}
@@ -1073,7 +1073,7 @@ export default function OrcamentoEditorPage() {
 
       {isNew && (
         <div className="bg-amber-50 border border-amber-200 rounded-xl p-4 text-sm text-amber-800">
-          Salve o orcamento primeiro para poder adicionar itens com precificacao automatica.
+          Salve o orçamento primeiro para poder adicionar itens com precificação automática.
         </div>
       )}
 
