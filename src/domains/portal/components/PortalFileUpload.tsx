@@ -96,7 +96,7 @@ export function PortalFileUpload({ token, clientName }: Props) {
           />
         </label>
         <p className="text-[11px] text-slate-400 mt-3">
-          PDF, AI, CDR, EPS, JPG, PNG, TIFF, PSD — Máx 50MB por arquivo
+          PDF, AI, CDR, EPS, JPG, PNG, TIFF, PSD — Arquivos de alta qualidade
         </p>
       </div>
 
