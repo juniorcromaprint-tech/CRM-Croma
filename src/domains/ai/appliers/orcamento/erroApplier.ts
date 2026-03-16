@@ -10,12 +10,14 @@ export async function erroApplier(action: AIAction, ctx: ApplierContext): Promis
 
   const updateData = { [field ?? suggested.campo]: suggested.valor };
 
+  if (!suggested?.item_id) {
+    return { success: false, message: 'Dados insuficientes: item_id obrigatório para correção' };
+  }
+
   const { error } = await ctx.supabase
     .from(table)
     .update(updateData)
-    .eq('id', suggested.item_id)
-    .select()
-    .single();
+    .eq('id', suggested.item_id);
 
   if (error) return { success: false, message: `Erro ao corrigir: ${error.message}` };
 

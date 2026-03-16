@@ -10,8 +10,9 @@ export async function acabamentoApplier(action: AIAction, ctx: ApplierContext): 
     .insert({
       proposta_item_id: suggested.item_id,
       acabamento_id: suggested.acabamento_id,
-      nome_acabamento: suggested.nome,
-      preco: suggested.preco,
+      descricao: suggested.nome,
+      custo_unitario: suggested.preco ?? 0,
+      custo_total: suggested.preco ?? 0,
     })
     .select()
     .single();

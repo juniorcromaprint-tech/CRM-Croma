@@ -9,8 +9,9 @@ export async function adicionarItemApplier(action: AIAction, ctx: ApplierContext
       .insert({
         proposta_id: ctx.entityId,
         servico_id: suggested.servico_id ?? null,
-        nome_servico: suggested.nome as string,
-        preco: suggested.valor as number,
+        descricao: suggested.nome as string,
+        valor_unitario: (suggested.valor as number) ?? 0,
+        valor_total: (suggested.valor as number) ?? 0,
       })
       .select()
       .single();
@@ -32,8 +33,8 @@ export async function adicionarItemApplier(action: AIAction, ctx: ApplierContext
       proposta_id: ctx.entityId,
       descricao: suggested.descricao as string,
       quantidade: (suggested.quantidade as number) ?? 1,
-      preco_unitario: suggested.preco as number,
-      preco_total: suggested.preco as number,
+      valor_unitario: (suggested.preco as number) ?? 0,
+      valor_total: (suggested.preco as number) ?? 0,
     })
     .select()
     .single();

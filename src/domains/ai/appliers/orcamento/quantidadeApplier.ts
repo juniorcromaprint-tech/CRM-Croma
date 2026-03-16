@@ -8,9 +8,7 @@ export async function quantidadeApplier(action: AIAction, ctx: ApplierContext): 
     .from('proposta_itens')
     .update({ quantidade: suggested.quantidade })
     .eq('id', suggested.item_id)
-    .eq('proposta_id', ctx.entityId)
-    .select()
-    .single();
+    .eq('proposta_id', ctx.entityId);
 
   if (error) return { success: false, message: `Erro ao ajustar quantidade: ${error.message}` };
 

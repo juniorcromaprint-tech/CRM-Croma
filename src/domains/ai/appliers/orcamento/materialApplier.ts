@@ -13,13 +13,11 @@ export async function materialApplier(action: AIAction, ctx: ApplierContext): Pr
       .from('proposta_item_materiais')
       .update({
         material_id: suggested.material_id,
-        nome_material: suggested.nome,
-        preco_unitario: suggested.preco,
+        descricao: suggested.nome,
+        custo_unitario: suggested.preco,
       })
       .eq('material_id', previous.material_id)
-      .eq('proposta_item_id', previous.item_id)
-      .select()
-      .single();
+      .eq('proposta_item_id', previous.item_id);
 
     if (error) return { success: false, message: `Erro ao trocar material: ${error.message}` };
 
@@ -41,10 +39,11 @@ export async function materialApplier(action: AIAction, ctx: ApplierContext): Pr
     .insert({
       proposta_item_id: (suggested as any).item_id,
       material_id: suggested.material_id,
-      nome_material: suggested.nome,
-      preco_unitario: suggested.preco,
+      descricao: suggested.nome,
+      custo_unitario: suggested.preco ?? 0,
       quantidade: 1,
-      preco_total: suggested.preco,
+      unidade: 'un',
+      custo_total: suggested.preco ?? 0,
     })
     .select()
     .single();
