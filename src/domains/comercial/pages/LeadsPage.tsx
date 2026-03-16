@@ -146,7 +146,7 @@ export default function LeadsPage() {
     mutationFn: async (newLead: typeof form) => {
       const { error } = await supabase.from("leads").insert({
         ...newLead,
-        valor_estimado: newLead.valor_estimado ? Number(newLead.valor_estimado) : null,
+        valor_estimado: newLead.valor_estimado ? Math.max(0, Number(newLead.valor_estimado)) : null,
         proximo_contato: newLead.proximo_contato || null,
       });
       if (error) throw error;
@@ -157,6 +157,7 @@ export default function LeadsPage() {
       showSuccess("Lead criado com sucesso!");
       setShowNewLead(false);
       setLeadsDuplicados([]);
+      setSearch("");
       setForm({
         empresa: "", contato_nome: "", contato_email: "", contato_telefone: "",
         segmento: "", status: "novo", temperatura: "frio", valor_estimado: "",
@@ -433,6 +434,7 @@ export default function LeadsPage() {
                 <Input
                   id="valor_estimado"
                   type="number"
+                  min={0}
                   value={form.valor_estimado}
                   onChange={e => setForm({ ...form, valor_estimado: e.target.value })}
                   placeholder="50000"
