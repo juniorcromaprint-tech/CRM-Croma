@@ -8,6 +8,8 @@ import { useQuery } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import { brl } from "@/shared/utils/format";
 import { showError } from "@/utils/toast";
+import { useDREReal } from "../hooks/useMotorFinanceiro";
+import { Info } from "lucide-react";
 
 import { Card, CardContent } from "@/components/ui/card";
 import { Skeleton } from "@/components/ui/skeleton";
@@ -455,6 +457,64 @@ export default function DrePage() {
 
   const { inicio, fim } = useMemo(() => getPeriodoDates(periodo), [periodo]);
 
+  // Motor Financeiro: DRE com dados reais das categorias de contas a pagar
+  const { data: dreReal } = useDREReal(inicio, fim);
+
+  // Merge: se dreReal tiver dados reais (não zerados), usa-os no lugar dos estimados
+  const dreEfetivo = useMemo(() => {
+    if (!dre) return null;
+    if (!dreReal) return dre;
+
+    const temDadosReais =
+      dreReal.cme > 0 ||
+      dreReal.despesas_comerciais > 0 ||
+      dreReal.despesas_administrativas > 0 ||
+      dreReal.despesas_pessoal > 0;
+
+    if (!temDadosReais) return dre;
+
+    // Recalcula DRE usando categorias reais do motor financeiro
+    const receitaBruta = dre.receitaBruta;
+    const impostos = dre.impostos;
+    const devolucoes = dre.devolucoes;
+    const receitaLiquida = dre.receitaLiquida;
+
+    const cme = dreReal.cme;
+    const lucroBruto = receitaLiquida - cme;
+    const despesasComerciais = dreReal.despesas_comerciais;
+    const despesasAdministrativas = dreReal.despesas_administrativas;
+    const despesasPessoal = dreReal.despesas_pessoal;
+    const ebitda = lucroBruto - despesasComerciais - despesasAdministrativas - despesasPessoal;
+    const depreciacao = dre.depreciacao;
+    const ebit = ebitda - depreciacao;
+    const resultadoFinanceiro = dre.resultadoFinanceiro;
+    const lair = ebit + resultadoFinanceiro;
+    const ir = lair > 0 ? lair * 0.15 : 0;
+    const lucroLiquido = lair - ir;
+
+    const margemBruta = receitaLiquida > 0 ? (lucroBruto / receitaLiquida) * 100 : 0;
+    const margemEbitda = receitaLiquida > 0 ? (ebitda / receitaLiquida) * 100 : 0;
+    const margemLiquida = receitaLiquida > 0 ? (lucroLiquido / receitaLiquida) * 100 : 0;
+
+    return {
+      receitaBruta, impostos, devolucoes, receitaLiquida,
+      cme, lucroBruto, despesasComerciais, despesasAdministrativas,
+      despesasPessoal, ebitda, depreciacao, ebit, resultadoFinanceiro,
+      lair, ir, lucroLiquido, margemBruta, margemEbitda, margemLiquida,
+    };
+  }, [dre, dreReal]);
+
+  // Flag: DRE está usando dados reais ou estimados?
+  const usandoDadosReais = useMemo(() => {
+    if (!dreReal) return false;
+    return (
+      dreReal.cme > 0 ||
+      dreReal.despesas_comerciais > 0 ||
+      dreReal.despesas_administrativas > 0 ||
+      dreReal.despesas_pessoal > 0
+    );
+  }, [dreReal]);
+
   const periodoLabel: Record<string, string> = {
     mes: "Este Mês",
     trimestre: "Este Trimestre",
@@ -466,10 +526,22 @@ export default function DrePage() {
     window.print();
   };
 
-  const lucroPositivo = (dre?.lucroLiquido ?? 0) >= 0;
+  const lucroPositivo = (dreEfetivo?.lucroLiquido ?? 0) >= 0;
 
   return (
     <div className="space-y-6 print:space-y-4">
+      {/* ─── Banner: DRE sem dados reais ───────────────────────── */}
+      {!isLoading && !usandoDadosReais && (
+        <div className="flex items-start gap-2 bg-blue-50 border border-blue-200 rounded-xl px-4 py-3 text-xs text-blue-700 print:hidden">
+          <Info size={14} className="mt-0.5 shrink-0" />
+          <span>
+            <strong>Dica:</strong> Cadastre categorias nas Contas a Pagar (material, comercial,
+            administrativo, pessoal) para um DRE mais preciso. Enquanto isso, os valores de CME
+            e despesas são estimados com base em proporções gerenciais.
+          </span>
+        </div>
+      )}
+
       {/* ─── Cabeçalho ─────────────────────────────────────────── */}
       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 print:hidden">
         <div>
@@ -542,10 +614,10 @@ export default function DrePage() {
               <span className="text-sm text-slate-500">Receita Bruta</span>
             </div>
             <p className="text-2xl font-bold text-slate-800 tabular-nums">
-              {brl(dre?.receitaBruta ?? 0)}
+              {brl(dreEfetivo?.receitaBruta ?? 0)}
             </p>
             <p className="text-xs text-slate-400 mt-1">
-              Líq: {brl(dre?.receitaLiquida ?? 0)}
+              Líq: {brl(dreEfetivo?.receitaLiquida ?? 0)}
             </p>
           </div>
 
@@ -558,13 +630,13 @@ export default function DrePage() {
             </div>
             <p
               className={`text-2xl font-bold tabular-nums ${
-                (dre?.ebitda ?? 0) >= 0 ? "text-slate-800" : "text-red-600"
+                (dreEfetivo?.ebitda ?? 0) >= 0 ? "text-slate-800" : "text-red-600"
               }`}
             >
-              {brl(dre?.ebitda ?? 0)}
+              {brl(dreEfetivo?.ebitda ?? 0)}
             </p>
             <p className="text-xs text-slate-400 mt-1">
-              Margem: {(dre?.margemEbitda ?? 0).toFixed(1).replace(".", ",")}%
+              Margem: {(dreEfetivo?.margemEbitda ?? 0).toFixed(1).replace(".", ",")}%
             </p>
           </div>
 
@@ -602,7 +674,7 @@ export default function DrePage() {
                 lucroPositivo ? "text-emerald-700" : "text-red-700"
               }`}
             >
-              {brl(dre?.lucroLiquido ?? 0)}
+              {brl(dreEfetivo?.lucroLiquido ?? 0)}
             </p>
             <p
               className={`text-xs mt-1 ${
@@ -610,7 +682,7 @@ export default function DrePage() {
               }`}
             >
               Margem líq:{" "}
-              {(dre?.margemLiquida ?? 0).toFixed(1).replace(".", ",")}%
+              {(dreEfetivo?.margemLiquida ?? 0).toFixed(1).replace(".", ",")}%
             </p>
           </div>
         </div>
@@ -659,19 +731,19 @@ export default function DrePage() {
                     {/* RECEITA BRUTA */}
                     <LinhasDRE
                       label="RECEITA BRUTA"
-                      valor={dre?.receitaBruta ?? 0}
+                      valor={dreEfetivo?.receitaBruta ?? 0}
                       nivel={0}
                     />
                     <LinhasDRE
                       label="Impostos e Deduções (ISS/COFINS/PIS)"
-                      valor={dre?.impostos ?? 0}
+                      valor={dreEfetivo?.impostos ?? 0}
                       negativo
                       nivel={2}
                       prefixo="(−)"
                     />
                     <LinhasDRE
                       label="Devoluções e Abatimentos"
-                      valor={dre?.devolucoes ?? 0}
+                      valor={dreEfetivo?.devolucoes ?? 0}
                       negativo
                       nivel={2}
                       prefixo="(−)"
@@ -680,13 +752,13 @@ export default function DrePage() {
                     {/* RECEITA LÍQUIDA */}
                     <LinhasDRE
                       label="= RECEITA LÍQUIDA"
-                      valor={dre?.receitaLiquida ?? 0}
+                      valor={dreEfetivo?.receitaLiquida ?? 0}
                       nivel={1}
                       destaque
                     />
                     <LinhasDRE
                       label="Custo dos Materiais e Serviços (CME)"
-                      valor={dre?.cme ?? 0}
+                      valor={dreEfetivo?.cme ?? 0}
                       negativo
                       nivel={2}
                       prefixo="(−)"
@@ -695,9 +767,9 @@ export default function DrePage() {
                     {/* LUCRO BRUTO */}
                     <LinhasDRE
                       label="= LUCRO BRUTO"
-                      valor={dre?.lucroBruto ?? 0}
+                      valor={dreEfetivo?.lucroBruto ?? 0}
                       nivel={1}
-                      destaque={(dre?.lucroBruto ?? 0) > 0}
+                      destaque={(dreEfetivo?.lucroBruto ?? 0) > 0}
                     />
 
                     {/* DESPESAS OPERACIONAIS */}
@@ -711,21 +783,21 @@ export default function DrePage() {
                     </tr>
                     <LinhasDRE
                       label="Despesas Comerciais (Comissões)"
-                      valor={dre?.despesasComerciais ?? 0}
+                      valor={dreEfetivo?.despesasComerciais ?? 0}
                       negativo
                       nivel={2}
                       prefixo="(−)"
                     />
                     <LinhasDRE
                       label="Despesas Administrativas"
-                      valor={dre?.despesasAdministrativas ?? 0}
+                      valor={dreEfetivo?.despesasAdministrativas ?? 0}
                       negativo
                       nivel={2}
                       prefixo="(−)"
                     />
                     <LinhasDRE
                       label="Despesas com Pessoal (Folha)"
-                      valor={dre?.despesasPessoal ?? 0}
+                      valor={dreEfetivo?.despesasPessoal ?? 0}
                       negativo
                       nivel={2}
                       prefixo="(−)"
@@ -734,13 +806,13 @@ export default function DrePage() {
                     {/* EBITDA */}
                     <LinhasDRE
                       label="= EBITDA"
-                      valor={dre?.ebitda ?? 0}
+                      valor={dreEfetivo?.ebitda ?? 0}
                       nivel={1}
-                      destaque={(dre?.ebitda ?? 0) > 0}
+                      destaque={(dreEfetivo?.ebitda ?? 0) > 0}
                     />
                     <LinhasDRE
                       label="Depreciação e Amortização"
-                      valor={dre?.depreciacao ?? 0}
+                      valor={dreEfetivo?.depreciacao ?? 0}
                       negativo
                       nivel={2}
                       prefixo="(−)"
@@ -749,13 +821,13 @@ export default function DrePage() {
                     {/* EBIT */}
                     <LinhasDRE
                       label="= EBIT / LUCRO OPERACIONAL"
-                      valor={dre?.ebit ?? 0}
+                      valor={dreEfetivo?.ebit ?? 0}
                       nivel={0}
                     />
                     <LinhasDRE
                       label="Resultado Financeiro (Juros/Tarifas)"
-                      valor={dre?.resultadoFinanceiro ?? 0}
-                      negativo={(dre?.resultadoFinanceiro ?? 0) < 0}
+                      valor={dreEfetivo?.resultadoFinanceiro ?? 0}
+                      negativo={(dreEfetivo?.resultadoFinanceiro ?? 0) < 0}
                       nivel={2}
                       prefixo="(+/−)"
                     />
@@ -763,13 +835,13 @@ export default function DrePage() {
                     {/* LAIR */}
                     <LinhasDRE
                       label="= LAIR (Lucro Antes do IR)"
-                      valor={dre?.lair ?? 0}
+                      valor={dreEfetivo?.lair ?? 0}
                       nivel={1}
-                      destaque={(dre?.lair ?? 0) > 0}
+                      destaque={(dreEfetivo?.lair ?? 0) > 0}
                     />
                     <LinhasDRE
                       label="Imposto de Renda e CSLL (15%)"
-                      valor={dre?.ir ?? 0}
+                      valor={dreEfetivo?.ir ?? 0}
                       negativo
                       nivel={2}
                       prefixo="(−)"
@@ -797,7 +869,7 @@ export default function DrePage() {
                             : "text-red-700"
                         }`}
                       >
-                        {brl(dre?.lucroLiquido ?? 0)}
+                        {brl(dreEfetivo?.lucroLiquido ?? 0)}
                       </td>
                     </tr>
                   </>
@@ -817,9 +889,9 @@ export default function DrePage() {
         </div>
       ) : (
         <div className="grid grid-cols-1 sm:grid-cols-3 gap-4 print:grid-cols-3">
-          <MargemBadge label="Margem Bruta" valor={dre?.margemBruta ?? 0} />
-          <MargemBadge label="Margem EBITDA" valor={dre?.margemEbitda ?? 0} />
-          <MargemBadge label="Margem Líquida" valor={dre?.margemLiquida ?? 0} />
+          <MargemBadge label="Margem Bruta" valor={dreEfetivo?.margemBruta ?? 0} />
+          <MargemBadge label="Margem EBITDA" valor={dreEfetivo?.margemEbitda ?? 0} />
+          <MargemBadge label="Margem Líquida" valor={dreEfetivo?.margemLiquida ?? 0} />
         </div>
       )}
 
@@ -899,16 +971,27 @@ export default function DrePage() {
       </Card>
 
       {/* ─── Nota de rodapé ──────────────────────────────────────── */}
-      <div className="flex items-start gap-2 bg-amber-50 border border-amber-200 rounded-xl px-4 py-3 text-xs text-amber-700 print:hidden">
-        <Minus size={14} className="mt-0.5 shrink-0" />
-        <span>
-          <strong>Nota gerencial:</strong> Os valores de CME (Custo dos Materiais e
-          Serviços), Despesas Administrativas e de Pessoal são estimados com base em
-          proporções gerenciais (45%, 25% e 30% dos custos pagos, respectivamente).
-          Para um DRE contábil preciso, configure o Plano de Contas com categorias
-          distintas em Contas a Pagar.
-        </span>
-      </div>
+      {usandoDadosReais ? (
+        <div className="flex items-start gap-2 bg-emerald-50 border border-emerald-200 rounded-xl px-4 py-3 text-xs text-emerald-700 print:hidden">
+          <Info size={14} className="mt-0.5 shrink-0" />
+          <span>
+            <strong>DRE com dados reais:</strong> Os valores de CME, Despesas Comerciais,
+            Administrativas e de Pessoal estão sendo calculados com base nas categorias
+            cadastradas nas Contas a Pagar.
+          </span>
+        </div>
+      ) : (
+        <div className="flex items-start gap-2 bg-amber-50 border border-amber-200 rounded-xl px-4 py-3 text-xs text-amber-700 print:hidden">
+          <Minus size={14} className="mt-0.5 shrink-0" />
+          <span>
+            <strong>Nota gerencial:</strong> Os valores de CME (Custo dos Materiais e
+            Serviços), Despesas Administrativas e de Pessoal são estimados com base em
+            proporções gerenciais (45%, 25% e 30% dos custos pagos, respectivamente).
+            Para um DRE contábil preciso, configure o Plano de Contas com categorias
+            distintas em Contas a Pagar.
+          </span>
+        </div>
+      )}
     </div>
   );
 }
