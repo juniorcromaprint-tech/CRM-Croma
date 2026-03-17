@@ -43,7 +43,7 @@ export function useContatos(clienteId: string | undefined) {
 
       const { data, error } = await supabase
         .from('cliente_contatos')
-        .select('*, cliente_unidades(nome)')
+        .select('*')
         .eq('cliente_id', clienteId)
         .order('nome', { ascending: true });
 
