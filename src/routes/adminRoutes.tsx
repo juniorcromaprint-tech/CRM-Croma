@@ -8,6 +8,7 @@ const AdminAuditoriaPage = lazy(() => import("@/domains/admin/pages/AdminAuditor
 const AdminConfigPage = lazy(() => import("@/domains/admin/pages/AdminConfigPage"));
 const AdminProdutosPage = lazy(() => import("@/domains/admin/pages/AdminProdutosPage"));
 const AdminSetupPage = lazy(() => import("@/domains/admin/pages/AdminSetupPage"));
+const AdminPrecificacaoPage = lazy(() => import("@/domains/admin/pages/AdminPrecificacaoPage"));
 const AdminCentrosCustoPage = lazy(() => import("@/domains/admin/pages/AdminCentrosCustoPage"));
 const AdminPlanoContasPage = lazy(() => import("@/domains/admin/pages/AdminPlanoContasPage"));
 const AdminMateriaisPage = lazy(() => import("@/domains/admin/pages/AdminMateriaisPage"));
@@ -62,6 +63,11 @@ export const adminRoutes = (
     <Route path="admin/maquinas" element={
       <PermissionGuard module="admin" action="ver">
         <LazyPage><AdminMaquinasPage /></LazyPage>
+      </PermissionGuard>
+    } />
+    <Route path="admin/precificacao" element={
+      <PermissionGuard module="admin" action="ver">
+        <LazyPage><AdminPrecificacaoPage /></LazyPage>
       </PermissionGuard>
     } />
     <Route path="admin/dados" element={

@@ -24,8 +24,8 @@ import {
   ClipboardList, Factory, Wrench, Warehouse, ShoppingCart,
   Package, Wallet, BarChart3, BadgeDollarSign, AlertTriangle,
   Users, Settings, Shield, Menu, Receipt, FileCheck, List,
-  SlidersHorizontal, Key, BookOpen, LogOut, Calculator,
-  PanelLeftClose, PanelLeftOpen, Search,
+  SlidersHorizontal, Key, BookOpen, LogOut, Calculator, Cog, Database,
+  PanelLeftClose, PanelLeftOpen, Search, Truck,
   Calendar, Megaphone, Package2, ArrowLeftRight, Building, Layers, BarChart2,
   type LucideIcon,
 } from "lucide-react";
@@ -35,7 +35,7 @@ const ICON_MAP: Record<string, LucideIcon> = {
   ClipboardList, Factory, Wrench, Warehouse, ShoppingCart,
   Package, Wallet, BarChart3, BadgeDollarSign, AlertTriangle,
   Users, Settings, Shield, Receipt, FileCheck, List,
-  SlidersHorizontal, Key, BookOpen, Calculator,
+  SlidersHorizontal, Key, BookOpen, Calculator, Cog, Database, Truck,
   Calendar, Megaphone, Package2, ArrowLeftRight, Building, Layers, BarChart2,
 };
 

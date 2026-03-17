@@ -97,6 +97,8 @@ export const NAV_GROUPS: NavGroup[] = [
     items: [
       { name: 'Usuários', path: '/admin/usuarios', icon: 'Users', module: 'admin' },
       { name: 'Configurações', path: '/admin/config', icon: 'Settings', module: 'admin' },
+      { name: 'Precificação', path: '/admin/precificacao', icon: 'Calculator', module: 'admin' },
+      { name: 'Máquinas', path: '/admin/maquinas', icon: 'Cog', module: 'admin' },
       { name: 'Auditoria', path: '/admin/auditoria', icon: 'Shield', module: 'admin' },
       { name: 'Gestão de Dados', path: '/admin/dados', icon: 'Database', module: 'admin' },
       { name: 'Relatórios', path: '/relatorios', icon: 'BarChart3', module: 'admin' },
