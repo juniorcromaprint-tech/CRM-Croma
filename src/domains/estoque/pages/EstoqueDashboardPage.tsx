@@ -34,9 +34,10 @@ import { Textarea } from "@/components/ui/textarea";
 import { Skeleton } from "@/components/ui/skeleton";
 import { SaldoCard } from "../components/SaldoCard";
 import { AlertaEstoqueMinimo } from "../components/AlertaEstoqueMinimo";
-import { useEstoqueSaldos, useAlertasEstoqueMinimo } from "../hooks/useEstoqueSaldos";
+import { useEstoqueSemaforo, useAlertasEstoqueMinimo } from "../hooks/useEstoqueSaldos";
 import { useMovimentacoes, useCriarMovimentacao } from "../hooks/useMovimentacoes";
-import type { EstoqueMovimentacao } from "../types/estoque.types";
+import { SemaforoBadge } from "@/shared/components/SemaforoBadge";
+import type { EstoqueMovimentacao, SemaforoStatus } from "../types/estoque.types";
 
 const TIPOS_MOV = [
   { value: "entrada", label: "Entrada" },
@@ -99,6 +100,7 @@ function KpiSkeleton() {
 
 export default function EstoqueDashboardPage() {
   const [busca, setBusca] = useState("");
+  const [filtroSemaforo, setFiltroSemaforo] = useState<SemaforoStatus | 'todos'>('todos');
   const [ajusteOpen, setAjusteOpen] = useState(false);
   const [ajusteForm, setAjusteForm] = useState({
     material_id: "",
@@ -107,8 +109,9 @@ export default function EstoqueDashboardPage() {
     observacao: "",
   });
 
-  const { data: saldos = [], isLoading: loadingSaldos } = useEstoqueSaldos({
+  const { data: saldos = [], isLoading: loadingSaldos } = useEstoqueSemaforo({
     busca: busca || undefined,
+    semaforo: filtroSemaforo !== 'todos' ? filtroSemaforo : undefined,
   });
   const { data: alertas = [], isLoading: loadingAlertas } =
     useAlertasEstoqueMinimo();
@@ -121,6 +124,8 @@ export default function EstoqueDashboardPage() {
   // KPI cálculos
   const totalMateriais = saldos.length;
   const abaixoMinimo = alertas.length;
+  const emVermelho = (saldos as any[]).filter((s: any) => s.semaforo === 'vermelho').length;
+  const emAmarelo = (saldos as any[]).filter((s: any) => s.semaforo === 'amarelo').length;
 
   const now = new Date();
   const mesAtual = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, "0")}`;
@@ -202,12 +207,12 @@ export default function EstoqueDashboardPage() {
               iconColor="text-blue-600"
             />
             <KpiCard
-              label="Abaixo do Mínimo"
-              value={abaixoMinimo}
+              label="Crítico (Vermelho)"
+              value={emVermelho}
               icon={AlertTriangle}
-              iconBg={abaixoMinimo > 0 ? "bg-red-100" : "bg-slate-100"}
-              iconColor={abaixoMinimo > 0 ? "text-red-600" : "text-slate-400"}
-              highlight={abaixoMinimo > 0}
+              iconBg={emVermelho > 0 ? "bg-red-100" : "bg-slate-100"}
+              iconColor={emVermelho > 0 ? "text-red-600" : "text-slate-400"}
+              highlight={emVermelho > 0}
             />
             <KpiCard
               label="Entradas no Mês"
@@ -247,6 +252,32 @@ export default function EstoqueDashboardPage() {
             <Button variant="outline" size="icon" className="rounded-xl">
               <SlidersHorizontal size={16} className="text-slate-500" />
             </Button>
+          </div>
+
+          {/* Filtro semáforo */}
+          <div className="flex flex-wrap gap-2">
+            {(['todos', 'vermelho', 'amarelo', 'verde'] as const).map((s) => (
+              <button
+                key={s}
+                onClick={() => setFiltroSemaforo(s)}
+                className={`flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-xs font-medium border transition-colors ${
+                  filtroSemaforo === s
+                    ? 'bg-blue-600 text-white border-blue-600'
+                    : 'bg-white text-slate-600 border-slate-200 hover:border-slate-300'
+                }`}
+              >
+                {s !== 'todos' && (
+                  <SemaforoBadge status={s} size="sm" pulsing={false} />
+                )}
+                {s === 'todos'
+                  ? 'Todos'
+                  : s === 'vermelho'
+                  ? `Crítico (${emVermelho})`
+                  : s === 'amarelo'
+                  ? `Atenção (${emAmarelo})`
+                  : 'Normal'}
+              </button>
+            ))}
           </div>
 
           {loadingSaldos ? (
