@@ -51,6 +51,7 @@ export function useItemEditor() {
   const [precoOverrideValue, setPrecoOverrideValue] = useState<number | null>(null);
   const [precoM2OverrideValue, setPrecoM2OverrideValue] = useState<number | null>(null);
   const [volumeApplied, setVolumeApplied] = useState(false);
+  const [editingItemId, setEditingItemId] = useState<string | null>(null);
 
   // Pricing
   const pricingInput: OrcamentoItemInput | null = useMemo(() => {
@@ -227,6 +228,75 @@ export function useItemEditor() {
   const nextStep = useCallback(() => setCurrentStep((s) => Math.min(s + 1, 3)), []);
   const prevStep = useCallback(() => setCurrentStep((s) => Math.max(s - 1, 1)), []);
 
+  const loadItem = useCallback((item: {
+    id: string;
+    produto_id: string | null;
+    modelo_id?: string | null;
+    descricao: string;
+    especificacao?: string | null;
+    quantidade: number;
+    largura_cm: number | null;
+    altura_cm: number | null;
+    markup_percentual: number;
+    categoria?: string | null;
+    materiais?: Array<{
+      material_id: string | null;
+      descricao: string;
+      quantidade: number;
+      unidade: string;
+      custo_unitario: number;
+      aproveitamento?: number;
+    }>;
+    acabamentos?: Array<{
+      acabamento_id: string | null;
+      descricao: string;
+      quantidade: number;
+      custo_unitario: number;
+    }>;
+    processos?: Array<{
+      etapa: string;
+      tempo_minutos: number;
+      tempo_setup_min?: number;
+    }>;
+  }) => {
+    setEditingItemId(item.id);
+    setNewItem({
+      produto_id: item.produto_id,
+      modelo_id: item.modelo_id ?? null,
+      descricao: item.descricao,
+      especificacao: item.especificacao ?? "",
+      quantidade: item.quantidade,
+      largura_cm: item.largura_cm,
+      altura_cm: item.altura_cm,
+      materiais: (item.materiais ?? []).map((m) => ({
+        material_id: m.material_id,
+        descricao: m.descricao,
+        quantidade: m.quantidade,
+        unidade: m.unidade,
+        custo_unitario: m.custo_unitario,
+        aproveitamento: m.aproveitamento ?? 100,
+      })),
+      acabamentos: (item.acabamentos ?? []).map((a) => ({
+        acabamento_id: a.acabamento_id,
+        descricao: a.descricao,
+        quantidade: a.quantidade,
+        custo_unitario: a.custo_unitario,
+      })),
+      processos: (item.processos ?? []).map((p) => ({
+        etapa: p.etapa,
+        tempo_minutos: p.tempo_minutos,
+        tempo_setup_min: p.tempo_setup_min ?? 0,
+      })),
+      markup_percentual: item.markup_percentual,
+      categoria: item.categoria ?? null,
+    });
+    setCurrentStep(1);
+    setOverrideSource('markup');
+    setPrecoOverrideValue(null);
+    setPrecoM2OverrideValue(null);
+    setVolumeApplied(false);
+  }, []);
+
   const reset = useCallback(() => {
     setNewItem(DEFAULT_ITEM);
     setCurrentStep(1);
@@ -234,6 +304,7 @@ export function useItemEditor() {
     setPrecoOverrideValue(null);
     setPrecoM2OverrideValue(null);
     setVolumeApplied(false);
+    setEditingItemId(null);
   }, []);
 
   return {
@@ -245,6 +316,7 @@ export function useItemEditor() {
     isPrecoOverride,
     precoOverrideValue,
     precoM2OverrideValue,
+    editingItemId,
 
     // Pricing
     pricingInput,
@@ -270,5 +342,6 @@ export function useItemEditor() {
     nextStep,
     prevStep,
     reset,
+    loadItem,
   };
 }

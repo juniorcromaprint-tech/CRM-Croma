@@ -7,8 +7,9 @@ import { brl as formatBRL } from "@/shared/utils/format";
 import { ilikeTerm } from "@/shared/utils/searchUtils";
 import {
   UserPlus, Search, Filter, Plus, Phone, Mail, Building2,
-  Thermometer, ChevronRight, AlertTriangle, Loader2,
+  Thermometer, ChevronRight, AlertTriangle, Loader2, Trash2,
 } from "lucide-react";
+import { useAuth } from "@/contexts/AuthContext";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Input } from "@/components/ui/input";
@@ -47,12 +48,15 @@ interface LeadDuplicado {
 export default function LeadsPage() {
   const navigate = useNavigate();
   const queryClient = useQueryClient();
+  const { profile } = useAuth();
+  const canDelete = profile?.role === 'admin' || profile?.role === 'diretor';
   const [search, setSearch] = useState("");
   const [statusFilter, setStatusFilter] = useState<string>("all");
   const [showNewLead, setShowNewLead] = useState(false);
   const [page, setPage] = useState(1);
   const [showConfirmDup, setShowConfirmDup] = useState(false);
   const [leadsDuplicados, setLeadsDuplicados] = useState<LeadDuplicado[]>([]);
+  const [confirmDeleteLeadId, setConfirmDeleteLeadId] = useState<string | null>(null);
 
   // Form state
   const [form, setForm] = useState({
@@ -165,6 +169,20 @@ export default function LeadsPage() {
       });
     },
     onError: (err: any) => showError(err.message || "Erro ao criar lead"),
+  });
+
+  const deleteLead = useMutation({
+    mutationFn: async (leadId: string) => {
+      const { error } = await supabase.from("leads").delete().eq("id", leadId);
+      if (error) throw error;
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["leads"] });
+      queryClient.invalidateQueries({ queryKey: ["dashboard"] });
+      showSuccess("Lead excluído permanentemente");
+      setConfirmDeleteLeadId(null);
+    },
+    onError: (err: any) => showError(err.message || "Erro ao excluir lead"),
   });
 
   // ── Handlers ─────────────────────────────────────────────────────────────
@@ -286,7 +304,18 @@ export default function LeadsPage() {
                     )}
                   </div>
                 </div>
-                <ChevronRight size={18} className="text-slate-300 group-hover:text-blue-500 transition-colors mt-1" />
+                <div className="flex items-center gap-1">
+                  {canDelete && (
+                    <button
+                      onClick={(e) => { e.stopPropagation(); setConfirmDeleteLeadId(lead.id); }}
+                      className="p-1.5 rounded-lg text-slate-300 hover:text-red-500 hover:bg-red-50 transition-colors opacity-0 group-hover:opacity-100"
+                      title="Excluir lead"
+                    >
+                      <Trash2 size={14} />
+                    </button>
+                  )}
+                  <ChevronRight size={18} className="text-slate-300 group-hover:text-blue-500 transition-colors mt-1" />
+                </div>
               </div>
             </div>
           ))
@@ -498,6 +527,28 @@ export default function LeadsPage() {
           </DialogFooter>
         </DialogContent>
       </Dialog>
+
+      {/* ── Confirmação de exclusão de lead ────────────────────────────── */}
+      <AlertDialog open={!!confirmDeleteLeadId} onOpenChange={(open) => { if (!open) setConfirmDeleteLeadId(null); }}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Excluir lead permanentemente?</AlertDialogTitle>
+            <AlertDialogDescription>
+              Esta ação não pode ser desfeita. O lead será removido permanentemente do sistema.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel>Cancelar</AlertDialogCancel>
+            <AlertDialogAction
+              onClick={() => confirmDeleteLeadId && deleteLead.mutate(confirmDeleteLeadId)}
+              className="bg-red-600 hover:bg-red-700"
+            >
+              {deleteLead.isPending ? <Loader2 size={14} className="animate-spin mr-1" /> : <Trash2 size={14} className="mr-1" />}
+              Excluir
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
 
       {/* ── Confirmação de duplicata ─────────────────────────────────────── */}
       <AlertDialog open={showConfirmDup} onOpenChange={setShowConfirmDup}>

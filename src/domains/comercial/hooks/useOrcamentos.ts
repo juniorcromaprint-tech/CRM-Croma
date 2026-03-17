@@ -184,6 +184,29 @@ export function useAdicionarItemDetalhado() {
   });
 }
 
+// ─── Atualizar item detalhado (com materiais + acabamentos) ──────────────
+
+export function useAtualizarItemDetalhado() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: async ({ itemId, propostaId, item }: {
+      itemId: string;
+      propostaId: string;
+      item: OrcamentoItemCreateDetalhado;
+    }) => {
+      const result = await orcamentoService.atualizarItemDetalhado(itemId, propostaId, item);
+      await orcamentoService.recalcularTotais(propostaId);
+      return result;
+    },
+    onSuccess: (_data, { propostaId }) => {
+      qc.invalidateQueries({ queryKey: [ORCAMENTOS_QUERY_KEY, propostaId] });
+      qc.invalidateQueries({ queryKey: [ORCAMENTOS_QUERY_KEY] });
+      showSuccess("Item atualizado com sucesso!");
+    },
+    onError: (err: Error) => showError(err.message || "Erro ao atualizar item"),
+  });
+}
+
 // ─── Salvar serviços do orçamento ────────────────────────────────────────────
 
 export function useSalvarServicos() {

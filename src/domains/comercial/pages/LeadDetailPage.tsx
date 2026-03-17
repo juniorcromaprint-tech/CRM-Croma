@@ -2,8 +2,9 @@ import { useState } from "react";
 import { useParams, Link, useNavigate } from "react-router-dom";
 import {
   ArrowLeft, Building2, Phone, Mail, Thermometer, Edit2, Save, X,
-  TrendingUp, Calendar, FileText, UserCheck,
+  TrendingUp, Calendar, FileText, UserCheck, Trash2,
 } from "lucide-react";
+import { useAuth } from "@/contexts/AuthContext";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
@@ -16,6 +17,7 @@ import {
   AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent,
   AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle,
 } from "@/components/ui/alert-dialog";
+import { useMutation, useQueryClient } from "@tanstack/react-query";
 import { useLead, useUpdateLead } from "../hooks/useLeads";
 import { useCreateCliente } from "@/domains/clientes/hooks/useClientes";
 import { brl, formatDate } from "@/shared/utils/format";
@@ -30,9 +32,26 @@ export default function LeadDetailPage() {
   const { data: lead, isLoading } = useLead(id);
   const updateLead = useUpdateLead();
   const createCliente = useCreateCliente();
+  const queryClient = useQueryClient();
+  const { profile } = useAuth();
+  const canDelete = profile?.role === 'admin' || profile?.role === 'diretor';
 
   const [editing, setEditing] = useState(false);
   const [convertOpen, setConvertOpen] = useState(false);
+  const [confirmDelete, setConfirmDelete] = useState(false);
+
+  const deleteLead = useMutation({
+    mutationFn: async (leadId: string) => {
+      const { error } = await supabase.from("leads").delete().eq("id", leadId);
+      if (error) throw error;
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["leads"] });
+      showSuccess("Lead excluído permanentemente");
+      navigate("/leads");
+    },
+    onError: (err: any) => showError(err.message || "Erro ao excluir lead"),
+  });
   const [convertCnpj, setConvertCnpj] = useState("");
   const [form, setForm] = useState<{
     empresa: string;
@@ -181,6 +200,16 @@ export default function LeadDetailPage() {
           )}
         </div>
         <div className="flex gap-2">
+          {canDelete && !editing && (
+            <Button
+              variant="outline"
+              size="sm"
+              className="rounded-xl gap-1.5 text-red-600 hover:text-red-700 hover:bg-red-50 border-red-200"
+              onClick={() => setConfirmDelete(true)}
+            >
+              <Trash2 size={14} /> Excluir
+            </Button>
+          )}
           {lead.status !== "convertido" && lead.status !== "perdido" && !editing && (
             <Button
               size="sm"
@@ -423,6 +452,28 @@ export default function LeadDetailPage() {
               onClick={handleConverter}
             >
               <UserCheck size={14} className="mr-1.5" /> Converter
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
+
+      {/* Confirmação de exclusão */}
+      <AlertDialog open={confirmDelete} onOpenChange={setConfirmDelete}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Excluir lead permanentemente?</AlertDialogTitle>
+            <AlertDialogDescription>
+              Esta ação não pode ser desfeita. O lead "{lead.empresa}" será removido permanentemente do sistema.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel>Cancelar</AlertDialogCancel>
+            <AlertDialogAction
+              onClick={() => id && deleteLead.mutate(id)}
+              className="bg-red-600 hover:bg-red-700"
+            >
+              {deleteLead.isPending ? <Loader2 size={14} className="animate-spin mr-1" /> : <Trash2 size={14} className="mr-1" />}
+              Excluir
             </AlertDialogAction>
           </AlertDialogFooter>
         </AlertDialogContent>

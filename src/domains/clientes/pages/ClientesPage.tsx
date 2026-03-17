@@ -10,6 +10,7 @@ import {
   ChevronRight, Star, Filter, Globe, Loader2
 } from "lucide-react";
 import { useCnpjLookup } from "@/domains/clientes/hooks/useCnpjLookup";
+import { useCnpjDuplicate } from "@/domains/clientes/hooks/useCnpjDuplicate";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Badge } from "@/components/ui/badge";
@@ -51,6 +52,7 @@ export default function ClientesPage() {
   const [page, setPage] = useState(1);
 
   const { lookup: lookupCnpj, loading: cnpjLoading } = useCnpjLookup();
+  const cnpjDup = useCnpjDuplicate();
 
   const [form, setForm] = useState({
     razao_social: "", nome_fantasia: "", cnpj: "", segmento: "",
@@ -295,12 +297,15 @@ export default function ClientesPage() {
               <div>
                 <Label>CNPJ</Label>
                 <div className="flex gap-2">
-                  <Input value={form.cnpj} onChange={e => setForm({...form, cnpj: e.target.value})} placeholder="00.000.000/0001-00" className="flex-1" />
+                  <Input value={form.cnpj} onChange={e => { setForm({...form, cnpj: e.target.value}); cnpjDup.reset(); }} onBlur={() => form.cnpj && cnpjDup.check(form.cnpj)} placeholder="00.000.000/0001-00" className={`flex-1 ${cnpjDup.isDuplicate ? "border-red-300 focus-visible:ring-red-400" : ""}`} />
                   <Button type="button" variant="outline" size="sm" onClick={handleCnpjBuscar} disabled={cnpjLoading || !form.cnpj} className="shrink-0">
                     {cnpjLoading ? <Loader2 size={14} className="animate-spin" /> : <Search size={14} />}
                     <span className="ml-1">{cnpjLoading ? "Buscando..." : "Buscar"}</span>
                   </Button>
                 </div>
+                {cnpjDup.isDuplicate && (
+                  <p className="text-xs text-red-500 mt-1">CNPJ já cadastrado em: <strong>{cnpjDup.clienteNome}</strong></p>
+                )}
               </div>
             </div>
             <div className="grid grid-cols-2 gap-3">
@@ -359,7 +364,7 @@ export default function ClientesPage() {
             <Button variant="outline" onClick={() => setShowNew(false)}>Cancelar</Button>
             <Button
               onClick={() => createCliente.mutate(form)}
-              disabled={!form.razao_social || createCliente.isPending || (!!form.email && !isValidEmail(form.email))}
+              disabled={!form.razao_social || createCliente.isPending || (!!form.email && !isValidEmail(form.email)) || cnpjDup.isDuplicate}
               className="bg-blue-600 hover:bg-blue-700"
             >
               {createCliente.isPending ? <><Loader2 size={16} className="animate-spin mr-2" />Salvando...</> : "Criar Cliente"}
