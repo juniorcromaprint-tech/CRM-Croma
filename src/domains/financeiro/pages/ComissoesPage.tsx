@@ -308,8 +308,8 @@ function TabPorVendedor({
     return (
       <EmptyState
         icon={Users}
-        title="Nenhuma comissao registrada ainda"
-        description="As comissoes sao geradas automaticamente quando pedidos sao pagos. Assim que houver faturamento com vendedor vinculado, as comissoes aparecerao aqui."
+        title="Nenhuma comissão registrada ainda"
+        description="As comissões são geradas automaticamente quando pedidos são pagos. Assim que houver faturamento com vendedor vinculado, as comissões aparecerão aqui."
       />
     );
   }
@@ -388,7 +388,7 @@ function TabPorVendedor({
                   </p>
                   <p className="text-xs text-slate-400">
                     {v.countGerada + v.countPaga} comiss
-                    {v.countGerada + v.countPaga !== 1 ? "oes" : "ao"} no total
+                    {v.countGerada + v.countPaga !== 1 ? "ões" : "ão"} no total
                   </p>
                 </div>
                 <div className="text-right flex-shrink-0">
@@ -511,7 +511,7 @@ function TabDetalhamento({
                   "Cliente",
                   "Valor Base",
                   "%",
-                  "Comissao",
+                  "Comissão",
                   "Status",
                   "Data",
                 ].map((h) => (
@@ -582,10 +582,10 @@ function TabDetalhamento({
       {filtered.length === 0 ? (
         <EmptyState
           icon={DollarSign}
-          title="Nenhuma comissao encontrada"
+          title="Nenhuma comissão encontrada"
           description={
             comissoes.length === 0
-              ? "As comissoes sao geradas automaticamente quando pedidos sao pagos. Assim que houver faturamento com vendedor vinculado, os registros aparecerao aqui."
+              ? "As comissões são geradas automaticamente quando pedidos são pagos. Assim que houver faturamento com vendedor vinculado, os registros aparecerão aqui."
               : "Nenhum resultado para os filtros aplicados. Tente ajustar os filtros de busca."
           }
         />
@@ -611,7 +611,7 @@ function TabDetalhamento({
                     %
                   </th>
                   <th className="text-right px-4 py-3 text-xs font-bold text-slate-500 uppercase tracking-wide">
-                    Comissao
+                    Comissão
                   </th>
                   <th className="text-center px-4 py-3 text-xs font-bold text-slate-500 uppercase tracking-wide">
                     Status
@@ -746,7 +746,7 @@ function TabMetas({
       <EmptyState
         icon={Target}
         title="Nenhuma meta de vendas configurada"
-        description="As metas de vendas serao configuradas pelo administrador. Cada vendedor tera metas mensais de valor e quantidade de pedidos para acompanhamento de desempenho."
+        description="As metas de vendas serão configuradas pelo administrador. Cada vendedor terá metas mensais de valor e quantidade de pedidos para acompanhamento de desempenho."
       />
     );
   }
@@ -758,7 +758,7 @@ function TabMetas({
           Metas de Vendas
         </h3>
         <p className="text-xs text-slate-400 mt-0.5">
-          Acompanhamento de metas por vendedor e periodo
+          Acompanhamento de metas por vendedor e período
         </p>
       </div>
       <div className="overflow-x-auto">
@@ -879,10 +879,10 @@ export default function ComissoesPage() {
             <div className="w-10 h-10 bg-blue-50 rounded-xl flex items-center justify-center">
               <Award size={20} className="text-blue-600" />
             </div>
-            Comissoes
+            Comissões
           </h1>
           <p className="text-slate-500 mt-1 ml-1">
-            Gestao de comissoes e metas de vendedores
+            Gestão de comissões e metas de vendedores
           </p>
         </div>
       </div>
@@ -894,7 +894,7 @@ export default function ComissoesPage() {
         ) : (
           <>
             <KpiCard
-              label="Comissoes Geradas"
+              label="Comissões Geradas"
               value={brl(totalGerada)}
               icon={DollarSign}
               iconBg="bg-blue-50"
@@ -902,7 +902,7 @@ export default function ComissoesPage() {
               sub={`${comissoes.filter((c) => c.status === "gerada" || c.status === "aprovada").length} registros`}
             />
             <KpiCard
-              label="Comissoes Pagas"
+              label="Comissões Pagas"
               value={brl(totalPaga)}
               icon={CheckCircle2}
               iconBg="bg-emerald-50"
@@ -926,17 +926,17 @@ export default function ComissoesPage() {
                           0
                         )
                     )
-                  : "Nenhuma pendencia"
+                  : "Nenhuma pendência"
               }
               subColor={pendentes > 0 ? "text-amber-600" : "text-slate-400"}
             />
             <KpiCard
-              label="Taxa Media"
+              label="Taxa Média"
               value={`${taxaMedia.toFixed(1).replace(".", ",")}%`}
               icon={Percent}
               iconBg="bg-slate-100"
               iconColor="text-slate-600"
-              sub={`${comissoes.length} comiss${comissoes.length !== 1 ? "oes" : "ao"} total`}
+              sub={`${comissoes.length} comiss${comissoes.length !== 1 ? "ões" : "ão"} total`}
             />
           </>
         )}

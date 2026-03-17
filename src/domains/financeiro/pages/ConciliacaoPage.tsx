@@ -3,7 +3,7 @@
 // Comparação extrato bancário (CSV) vs lançamentos do sistema
 // ============================================================================
 
-import { useState, useMemo, useRef, useCallback } from "react";
+import { useState, useEffect, useMemo, useRef, useCallback } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import { showError } from "@/utils/toast";
@@ -353,9 +353,8 @@ export default function ConciliacaoPage() {
   const [lancamentos, setLancamentos] = useState<LancamentoRow[]>([]);
 
   // Sync lancamentosRaw into state (reset conciliado when fresh data arrives)
-  useMemo(() => {
+  useEffect(() => {
     setLancamentos(lancamentosRaw.map((r) => ({ ...r, conciliado: false })));
-    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [lancamentosRaw]);
 
   // ── Totais ─────────────────────────────────────────────────────────────────

@@ -61,7 +61,7 @@ import type { ItemEditorState } from "../hooks/useItemEditor";
 const WIZARD_STEPS = [
   { label: "Produto", icon: Package },
   { label: "Materiais", icon: Layers },
-  { label: "Revisao", icon: CheckCircle },
+  { label: "Revisão", icon: CheckCircle },
 ] as const;
 
 // ─── StepIndicator component ─────────────────────────────────────────────────
@@ -354,7 +354,7 @@ export default function OrcamentoEditorPage() {
   };
 
   const handleAddItem = async () => {
-    if (editor.isDefaultConfig) { showError("Configure os parametros de precificacao antes de adicionar itens"); return; }
+    if (editor.isDefaultConfig) { showError("Configure os parâmetros de precificação antes de adicionar itens"); return; }
     if (!newItem.descricao.trim()) { showError("Informe a descricao do item"); return; }
     if (!id || isNew) { showError("Salve o orcamento antes de adicionar itens"); return; }
     if (pricingResult === null) { showError("Preencha os dados do item corretamente"); return; }
@@ -371,53 +371,60 @@ export default function OrcamentoEditorPage() {
       return;
     }
 
-    await adicionarItem.mutateAsync({
-      propostaId: id,
-      item: {
-        produto_id: newItem.produto_id,
-        modelo_id: newItem.modelo_id ?? undefined,
-        descricao: newItem.descricao,
-        especificacao: newItem.especificacao || null,
-        quantidade: newItem.quantidade,
-        unidade: "un",
-        largura_cm: newItem.largura_cm,
-        altura_cm: newItem.altura_cm,
-        area_m2: pricingResult.areaM2,
-        custo_mp: pricingResult.custoMP,
-        custo_mo: pricingResult.custoMO,
-        custo_fixo: Math.max(0, pricingResult.custoTotal - pricingResult.custoMP - pricingResult.custoMO),
-        markup_percentual: newItem.markup_percentual,
-        preco_override: editor.isPrecoOverride,
-        valor_unitario: pricingResult.precoUnitario,
-        valor_total: pricingResult.precoTotal,
-        ordem: (orcamentoItens.length ?? 0) + 1,
-        // Detalhes do item
-        materiais: newItem.materiais.map((m) => ({
-          material_id: m.material_id ?? null,
-          descricao: m.descricao,
-          quantidade: m.quantidade,
-          unidade: m.unidade,
-          custo_unitario: m.custo_unitario,
-          custo_total: m.quantidade * m.custo_unitario,
-        })),
-        acabamentos: newItem.acabamentos.map((a) => ({
-          acabamento_id: a.acabamento_id ?? null,
-          descricao: a.descricao,
-          quantidade: a.quantidade,
-          custo_unitario: a.custo_unitario,
-          custo_total: a.quantidade * a.custo_unitario,
-        })),
-        processos: newItem.processos.map((p, idx) => ({
-          etapa: p.etapa,
-          tempo_minutos: p.tempo_minutos,
-          ordem: idx,
-        })),
-      },
-    });
+    try {
+      await adicionarItem.mutateAsync({
+        propostaId: id,
+        item: {
+          produto_id: newItem.produto_id,
+          modelo_id: newItem.modelo_id ?? undefined,
+          descricao: newItem.descricao,
+          especificacao: newItem.especificacao || null,
+          quantidade: newItem.quantidade,
+          unidade: "un",
+          largura_cm: newItem.largura_cm,
+          altura_cm: newItem.altura_cm,
+          area_m2: pricingResult.areaM2,
+          custo_mp: pricingResult.custoMP,
+          custo_mo: pricingResult.custoMO,
+          custo_fixo: Math.max(0, pricingResult.custoTotal - pricingResult.custoMP - pricingResult.custoMO),
+          markup_percentual: newItem.markup_percentual,
+          preco_override: editor.isPrecoOverride,
+          valor_unitario: pricingResult.precoUnitario,
+          valor_total: pricingResult.precoTotal,
+          ordem: (orcamentoItens.length ?? 0) + 1,
+          // Detalhes do item
+          materiais: newItem.materiais.map((m) => ({
+            material_id: m.material_id ?? null,
+            descricao: m.descricao,
+            quantidade: m.quantidade,
+            unidade: m.unidade,
+            custo_unitario: m.custo_unitario,
+            custo_total: m.quantidade * m.custo_unitario,
+          })),
+          acabamentos: newItem.acabamentos.map((a) => ({
+            acabamento_id: a.acabamento_id ?? null,
+            descricao: a.descricao,
+            quantidade: a.quantidade,
+            custo_unitario: a.custo_unitario,
+            custo_total: a.quantidade * a.custo_unitario,
+          })),
+          processos: newItem.processos.map((p, idx) => ({
+            etapa: p.etapa,
+            tempo_minutos: p.tempo_minutos,
+            ordem: idx,
+          })),
+        },
+      });
 
-    await orcamentoService.recalcularTotais(id);
-    editor.reset();
-    setShowItemForm(false);
+      // NOTE: recalcularTotais + cache invalidation already handled by
+      // useAdicionarItemDetalhado hook's mutationFn and onSuccess
+      editor.reset();
+      setShowItemForm(false);
+      showSuccess("Item adicionado com sucesso!");
+    } catch (err: any) {
+      console.error("[handleAddItem] Falha ao adicionar item:", err);
+      showError(err?.message || "Erro ao adicionar item ao orçamento");
+    }
   };
 
   const handleRemoveItem = async (itemId: string) => {
@@ -796,7 +803,7 @@ export default function OrcamentoEditorPage() {
                             {/* Descricao + Especificacao */}
                             <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
                               <div className="md:col-span-2">
-                                <Label className="text-xs">Descricao *</Label>
+                                <Label className="text-xs">Descrição *</Label>
                                 <Input
                                   value={newItem.descricao}
                                   onChange={(e) => editor.setNewItem((s) => ({ ...s, descricao: e.target.value }))}
@@ -994,7 +1001,7 @@ export default function OrcamentoEditorPage() {
                               </div>
                               <Separator />
                               <div className="flex justify-between">
-                                <span className="font-semibold text-slate-700">Preco Total</span>
+                                <span className="font-semibold text-slate-700">Preço Total</span>
                                 <span className="font-bold text-blue-700 tabular-nums">{brl(pricingResult.precoTotal)}</span>
                               </div>
                             </div>
@@ -1038,7 +1045,7 @@ export default function OrcamentoEditorPage() {
                   </div>
                   {totalServicos > 0 && (
                     <div className="flex gap-8 w-72">
-                      <span className="text-slate-500 flex-1">Servicos</span>
+                      <span className="text-slate-500 flex-1">Serviços</span>
                       <span className="font-medium tabular-nums text-right">{brl(totalServicos)}</span>
                     </div>
                   )}
@@ -1066,7 +1073,7 @@ export default function OrcamentoEditorPage() {
 
       {isNew && (
         <div className="bg-amber-50 border border-amber-200 rounded-xl p-4 text-sm text-amber-800">
-          Salve o orcamento primeiro para poder adicionar itens com precificacao automatica.
+          Salve o orçamento primeiro para poder adicionar itens com precificação automática.
         </div>
       )}
 

@@ -103,6 +103,11 @@ export default function LeadDetailPage() {
   const handleConverter = async () => {
     if (!id || !lead) return;
 
+    if (!lead.empresa?.trim()) {
+      showError("Lead precisa ter nome da empresa para ser convertido.");
+      return;
+    }
+
     const cnpjLimpo = convertCnpj.trim() || null;
     if (cnpjLimpo && !validarCNPJ(cnpjLimpo)) {
       showError("CNPJ inválido. Verifique os dígitos.");
@@ -124,8 +129,9 @@ export default function LeadDetailPage() {
       setConvertOpen(false);
       showSuccess("Lead convertido! Complete o endereço e IE para emitir NF-e.");
       navigate(`/clientes/${novoCliente.id}`);
-    } catch (err) {
-      showError("Erro ao converter lead em cliente.");
+    } catch (err: any) {
+      console.error("[handleConverter] Erro:", err);
+      showError(err?.message || "Erro ao converter lead em cliente.");
     }
   };
 

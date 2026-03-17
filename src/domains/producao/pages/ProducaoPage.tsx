@@ -668,9 +668,12 @@ export default function ProducaoPage() {
   const opsByColumn = useMemo(() => {
     const result: Record<string, OrdemProducaoRow[]> = {};
     for (const col of KANBAN_COLUMNS) {
-      result[col.key] = filtered.filter((op) =>
-        col.statuses.includes(op.status)
-      );
+      result[col.key] = filtered.filter((op) => {
+        if (!col.statuses.includes(op.status)) return false;
+        // A3: Don't show 100% completed OPs in Fila column
+        if (col.key === 'fila' && getProgressPercent(op.producao_etapas) >= 100) return false;
+        return true;
+      });
     }
     return result;
   }, [filtered]);
@@ -1148,10 +1151,10 @@ export default function ProducaoPage() {
                                       />
                                     )}
                                   </div>
-                                  <h4 className="font-semibold text-slate-800 text-sm truncate leading-tight mt-0.5">
+                                  <h4 className="font-semibold text-slate-800 text-sm truncate leading-tight mt-0.5" title={getClienteName(op)}>
                                     {getClienteName(op)}
                                   </h4>
-                                  <p className="text-[11px] text-slate-500 truncate mt-0.5">
+                                  <p className="text-[11px] text-slate-500 truncate mt-0.5" title={`${getPedidoNumero(op)} • ${getItemDescricao(op)}`}>
                                     {getPedidoNumero(op)}
                                     {" \u2022 "}
                                     {getItemDescricao(op)}
@@ -1252,7 +1255,7 @@ export default function ProducaoPage() {
                               )}
                             </div>
 
-                            <h3 className="font-bold text-slate-800 text-base mt-1 group-hover:text-blue-700 transition-colors truncate">
+                            <h3 className="font-bold text-slate-800 text-base mt-1 group-hover:text-blue-700 transition-colors truncate" title={getClienteName(op)}>
                               {getClienteName(op)}
                             </h3>
 

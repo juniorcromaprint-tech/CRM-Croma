@@ -660,7 +660,7 @@ export default function RelatoriosPage() {
       } else if (format === "excel") {
         exportExcel({ filename, sheetName: relatorio.label, headers, rows });
       } else {
-        exportPdf({
+        await exportPdf({
           filename,
           title: relatorio.label,
           subtitle: `Período: ${de} a ${ate}`,

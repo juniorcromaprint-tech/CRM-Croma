@@ -94,7 +94,7 @@ export default function ItemStep3Revisao({
       {isDefaultConfig && (
         <div className="bg-red-50 border border-red-200 rounded-xl p-3 text-xs text-red-700 flex items-center gap-2">
           <AlertTriangle size={14} />
-          Configure os parametros de precificacao em Admin &gt; Configuracoes antes de criar orcamentos.
+          Configure os parâmetros de precificação em Admin &gt; Configurações antes de criar orçamentos.
         </div>
       )}
 
@@ -135,10 +135,10 @@ export default function ItemStep3Revisao({
       {/* Price override section */}
       <div className="space-y-3">
         <Separator />
-        <p className="text-xs font-medium text-slate-500">Ou defina o preco diretamente</p>
+        <p className="text-xs font-medium text-slate-500">Ou defina o preço diretamente</p>
         <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
           <div>
-            <Label className="text-xs">Preco Unitario (R$)</Label>
+            <Label className="text-xs">Preço Unitário (R$)</Label>
             <Input
               type="number"
               min={0}
@@ -159,7 +159,7 @@ export default function ItemStep3Revisao({
           </div>
           {hasArea && (
             <div>
-              <Label className="text-xs">Preco/m² (R$)</Label>
+              <Label className="text-xs">Preço/m² (R$)</Label>
               <Input
                 type="number"
                 min={0}
@@ -202,7 +202,7 @@ export default function ItemStep3Revisao({
       {markup < 0 && (
         <div className="flex items-center gap-2 text-red-600 text-xs font-semibold">
           <AlertTriangle size={14} />
-          Preco abaixo do custo! Margem negativa.
+          Preço abaixo do custo! Margem negativa.
         </div>
       )}
 

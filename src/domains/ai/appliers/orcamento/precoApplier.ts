@@ -36,7 +36,7 @@ export async function precoApplier(action: AIAction, ctx: ApplierContext): Promi
 
   return {
     success: true,
-    message: `Preco atualizado de R$ ${previous?.preco?.toFixed(2) ?? '?'} para R$ ${suggested.preco.toFixed(2)} (override IA)`,
+    message: `Preço atualizado de R$ ${previous?.preco?.toFixed(2) ?? '?'} para R$ ${suggested.preco.toFixed(2)} (override IA)`,
     rollback: async () => {
       if (previous?.preco) {
         await ctx.supabase

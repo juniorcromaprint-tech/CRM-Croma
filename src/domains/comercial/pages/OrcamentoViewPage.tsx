@@ -42,7 +42,7 @@ import { CondicoesPagamentoView } from '../components/CondicoesPagamentoView';
 const STATUS_CONFIG: Record<OrcamentoStatus, { label: string; cls: string }> = {
   rascunho:   { label: "Rascunho",   cls: "bg-slate-100 text-slate-600" },
   enviada:    { label: "Enviada",    cls: "bg-blue-100 text-blue-700" },
-  em_revisao: { label: "Em Revisao", cls: "bg-amber-100 text-amber-700" },
+  em_revisao: { label: "Em Revisão", cls: "bg-amber-100 text-amber-700" },
   aprovada:   { label: "Aprovada",   cls: "bg-emerald-100 text-emerald-700" },
   recusada:   { label: "Recusada",   cls: "bg-red-100 text-red-700" },
   expirada:   { label: "Expirada",   cls: "bg-slate-100 text-slate-500" },
@@ -492,12 +492,12 @@ export default function OrcamentoViewPage() {
         {/* ──── Servicos ──── */}
         {orcamentoServicos.length > 0 && (
           <div className="mb-8">
-            <p className="text-xs font-semibold text-slate-400 uppercase tracking-wider mb-3">Servicos</p>
+            <p className="text-xs font-semibold text-slate-400 uppercase tracking-wider mb-3">Serviços</p>
             <div className="rounded-xl border border-slate-200 overflow-hidden">
               <table className="w-full text-sm">
                 <thead>
                   <tr className="bg-slate-50 border-b border-slate-200">
-                    <th className="text-left py-2.5 px-4 text-xs font-semibold text-slate-500">Servico</th>
+                    <th className="text-left py-2.5 px-4 text-xs font-semibold text-slate-500">Serviço</th>
                     <th className="text-right py-2.5 px-4 text-xs font-semibold text-slate-500">Horas</th>
                     <th className="text-right py-2.5 px-4 text-xs font-semibold text-slate-500">Valor/h</th>
                     <th className="text-right py-2.5 px-4 text-xs font-semibold text-slate-500">Total</th>
@@ -527,7 +527,7 @@ export default function OrcamentoViewPage() {
             </div>
             {totalServicos > 0 && (
               <div className="flex justify-between">
-                <span className="text-slate-500">Servicos</span>
+                <span className="text-slate-500">Serviços</span>
                 <span className="font-medium tabular-nums">{brl(totalServicos)}</span>
               </div>
             )}
