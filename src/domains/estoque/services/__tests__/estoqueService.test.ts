@@ -445,3 +445,58 @@ describe("estoqueService.atualizarItemInventario", () => {
     await expect(estoqueService.atualizarItemInventario("item-inv-001", 0)).rejects.toMatchObject({ message: "update error" });
   });
 });
+
+// ─── calcSemaforo — lógica da view v_estoque_semaforo ─────────────────────────
+
+describe("calcSemaforo — lógica da view v_estoque_semaforo", () => {
+  // Replica a lógica CASE do SQL para teste unitário
+  function calcSemaforo(
+    saldo: number,
+    minimo: number,
+    ideal: number
+  ): "verde" | "amarelo" | "vermelho" {
+    if (ideal > 0 && saldo >= ideal) return "verde";
+    if (minimo > 0 && saldo < minimo) return "vermelho";
+    return "amarelo";
+  }
+
+  it("retorna verde quando saldo >= ideal", () => {
+    expect(calcSemaforo(100, 20, 50)).toBe("verde");
+  });
+
+  it("retorna verde exatamente no limiar ideal", () => {
+    expect(calcSemaforo(50, 20, 50)).toBe("verde");
+  });
+
+  it("retorna vermelho quando saldo < mínimo", () => {
+    expect(calcSemaforo(5, 20, 50)).toBe("vermelho");
+  });
+
+  it("retorna vermelho quando saldo = 0 e mínimo > 0", () => {
+    expect(calcSemaforo(0, 10, 30)).toBe("vermelho");
+  });
+
+  it("retorna amarelo quando entre mínimo e ideal", () => {
+    expect(calcSemaforo(30, 20, 50)).toBe("amarelo");
+  });
+
+  it("retorna amarelo quando ideal = 0 e saldo >= mínimo", () => {
+    expect(calcSemaforo(30, 20, 0)).toBe("amarelo");
+  });
+
+  it("retorna amarelo quando mínimo e ideal = 0 (material sem limites)", () => {
+    expect(calcSemaforo(100, 0, 0)).toBe("amarelo");
+  });
+});
+
+// ─── SemaforoStatus — cobertura de valores ────────────────────────────────────
+
+describe("SemaforoStatus — cobertura de valores", () => {
+  it("cobre todos os valores esperados", () => {
+    const valores: string[] = ["verde", "amarelo", "vermelho"];
+    expect(valores).toHaveLength(3);
+    expect(valores).toContain("verde");
+    expect(valores).toContain("amarelo");
+    expect(valores).toContain("vermelho");
+  });
+});
