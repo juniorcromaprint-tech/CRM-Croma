@@ -45,6 +45,7 @@ export const NAV_GROUPS: NavGroup[] = [
       { name: 'Instalações', path: '/instalacoes', icon: 'Wrench', module: 'instalacao' },
       { name: 'Almoxarife', path: '/almoxarife', icon: 'Package2', module: 'producao' },
       { name: 'Diário de Bordo', path: '/producao/diario-bordo', icon: 'BookOpen', module: 'producao' },
+      { name: 'PCP', path: '/producao/pcp', icon: 'Gantt', module: 'producao' },
     ],
   },
   {
