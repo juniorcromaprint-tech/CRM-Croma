@@ -82,6 +82,32 @@ export function useCreateContato() {
 }
 
 /**
+ * Hard-delete a contato permanently. Admin/diretor only.
+ */
+export function useDeleteContato() {
+  const queryClient = useQueryClient();
+
+  return useMutation({
+    mutationFn: async ({ id, clienteId }: { id: string; clienteId: string }) => {
+      const { error } = await supabase
+        .from('cliente_contatos')
+        .delete()
+        .eq('id', id);
+
+      if (error) throw error;
+      return clienteId;
+    },
+    onSuccess: (clienteId) => {
+      queryClient.invalidateQueries({ queryKey: [CONTATOS_KEY, clienteId] });
+      showSuccess('Contato excluído permanentemente');
+    },
+    onError: (error: Error) => {
+      showError(`Erro ao excluir contato: ${error.message}`);
+    },
+  });
+}
+
+/**
  * Update an existing contato.
  */
 export function useUpdateContato() {

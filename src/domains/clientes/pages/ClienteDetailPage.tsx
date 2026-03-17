@@ -1,12 +1,12 @@
 import { useState } from "react";
-import { useParams, Link } from "react-router-dom";
+import { useParams, Link, useNavigate } from "react-router-dom";
 import { supabase } from "@/integrations/supabase/client";
 import { useQuery } from "@tanstack/react-query";
 import { showSuccess, showError } from "@/utils/toast";
-import { brl, formatCNPJ, formatPhone, formatDate } from "@/shared/utils/format";
+import { brl, formatCNPJ, formatPhone, formatDate, maskPhone, isValidEmail } from "@/shared/utils/format";
 import { formatDateTime } from "@/shared/utils/format";
 
-import { useCliente, useUpdateCliente } from "@/domains/clientes/hooks/useClientes";
+import { useCliente, useUpdateCliente, useHardDeleteCliente } from "@/domains/clientes/hooks/useClientes";
 import AIButton from '@/domains/ai/components/AIButton';
 /** @deprecated Use AISidebar instead */
 import ClienteResumo from '@/domains/ai/components/ClienteResumo';
@@ -16,7 +16,8 @@ import { useResumoCliente } from '@/domains/ai/hooks/useResumoCliente';
 import { useQueryClient } from '@tanstack/react-query';
 import type { AIResponse } from '@/domains/ai/types/ai.types';
 import { useUnidades, useCreateUnidade } from "@/domains/clientes/hooks/useUnidades";
-import { useContatos, useCreateContato } from "@/domains/clientes/hooks/useContatos";
+import { useContatos, useCreateContato, useDeleteContato } from "@/domains/clientes/hooks/useContatos";
+import { useAuth } from "@/contexts/AuthContext";
 import { useCepLookup } from "@/domains/clientes/hooks/useCepLookup";
 import { useCnpjLookup } from "@/domains/clientes/hooks/useCnpjLookup";
 
@@ -64,6 +65,7 @@ import {
   AlertCircle,
   Loader2,
   Search,
+  Trash2,
 } from "lucide-react";
 
 // ---------------------------------------------------------------------------
@@ -214,6 +216,7 @@ function DetailSkeleton() {
 
 export default function ClienteDetailPage() {
   const { id } = useParams<{ id: string }>();
+  const navigate = useNavigate();
 
   // ---- Data hooks ----
   const {
@@ -224,10 +227,14 @@ export default function ClienteDetailPage() {
   const { data: unidades, isLoading: loadingUnidades } = useUnidades(id);
   const { data: contatos, isLoading: loadingContatos } = useContatos(id);
   const updateCliente = useUpdateCliente();
+  const hardDeleteCliente = useHardDeleteCliente();
   const createUnidade = useCreateUnidade();
   const createContato = useCreateContato();
+  const deleteContato = useDeleteContato();
   const { lookup: lookupCep, loading: cepLoading } = useCepLookup();
   const { lookup: lookupCnpj, loading: cnpjLoading } = useCnpjLookup();
+  const { profile } = useAuth();
+  const canDelete = profile?.role === 'admin' || profile?.role === 'diretor';
 
   // ---- AI ----
   const queryClient = useQueryClient();
@@ -320,6 +327,9 @@ export default function ClienteDetailPage() {
     responsavel: "",
   });
 
+  const [confirmDeleteCliente, setConfirmDeleteCliente] = useState(false);
+  const [confirmDeleteContatoId, setConfirmDeleteContatoId] = useState<string | null>(null);
+
   const [showNewContato, setShowNewContato] = useState(false);
   const [contatoForm, setContatoForm] = useState({
     nome: "",
@@ -341,13 +351,13 @@ export default function ClienteDetailPage() {
       classificacao: cliente.classificacao ?? "bronze",
       email: cliente.email ?? "",
       telefone: cliente.telefone ?? "",
-      website: cliente.website ?? "",
-      endereco_rua: cliente.endereco_rua ?? "",
-      endereco_numero: cliente.endereco_numero ?? "",
-      endereco_bairro: cliente.endereco_bairro ?? "",
-      endereco_cidade: cliente.endereco_cidade ?? "",
-      endereco_estado: cliente.endereco_estado ?? "",
-      endereco_cep: cliente.endereco_cep ?? "",
+      website: cliente.site ?? "",
+      endereco_rua: cliente.endereco ?? "",
+      endereco_numero: cliente.numero ?? "",
+      endereco_bairro: cliente.bairro ?? "",
+      endereco_cidade: cliente.cidade ?? "",
+      endereco_estado: cliente.estado ?? "",
+      endereco_cep: cliente.cep ?? "",
       inscricao_estadual: cliente.inscricao_estadual ?? "",
       observacoes: cliente.observacoes ?? "",
     });
@@ -361,8 +371,19 @@ export default function ClienteDetailPage() {
 
   function handleSave() {
     if (!id) return;
+    const { website, endereco_rua, endereco_numero, endereco_bairro, endereco_cidade, endereco_estado, endereco_cep, ...rest } = editForm;
     updateCliente.mutate(
-      { id, ...editForm },
+      {
+        id,
+        ...rest,
+        site: website || null,
+        endereco: endereco_rua || null,
+        numero: endereco_numero || null,
+        bairro: endereco_bairro || null,
+        cidade: endereco_cidade || null,
+        estado: endereco_estado || null,
+        cep: endereco_cep || null,
+      },
       { onSuccess: () => setEditing(false) }
     );
   }
@@ -541,6 +562,16 @@ export default function ClienteDetailPage() {
           >
             <Edit size={14} className="mr-1.5" /> Editar
           </Button>
+          {canDelete && (
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={() => setConfirmDeleteCliente(true)}
+              className="text-red-600 border-red-200 hover:bg-red-50 hover:text-red-700"
+            >
+              <Trash2 size={14} className="mr-1.5" /> Excluir
+            </Button>
+          )}
         </div>
       </div>
 
@@ -719,15 +750,20 @@ export default function ClienteDetailPage() {
                       onChange={(e) =>
                         setEditForm({ ...editForm, email: e.target.value })
                       }
+                      className={editForm.email && !isValidEmail(editForm.email) ? "border-red-300 focus-visible:ring-red-400" : ""}
                     />
+                    {editForm.email && !isValidEmail(editForm.email) && (
+                      <p className="text-xs text-red-500 mt-1">Email inválido</p>
+                    )}
                   </div>
                   <div>
                     <Label>Telefone</Label>
                     <Input
                       value={editForm.telefone ?? ""}
                       onChange={(e) =>
-                        setEditForm({ ...editForm, telefone: e.target.value })
+                        setEditForm({ ...editForm, telefone: maskPhone(e.target.value) })
                       }
+                      placeholder="(11) 98154-8888"
                     />
                   </div>
                   <div>
@@ -901,7 +937,7 @@ export default function ClienteDetailPage() {
                   />
                   <InfoField
                     label="Website"
-                    value={cliente.website}
+                    value={cliente.site}
                     icon={<Globe size={14} className="text-slate-400" />}
                   />
                   <InfoField
@@ -911,30 +947,30 @@ export default function ClienteDetailPage() {
                 </div>
 
                 {/* Address block */}
-                {(cliente.endereco_rua ||
-                  cliente.endereco_cidade ||
-                  cliente.endereco_estado) && (
+                {(cliente.endereco ||
+                  cliente.cidade ||
+                  cliente.estado) && (
                   <div className="border-t border-slate-100 pt-4">
                     <h3 className="text-sm font-semibold text-slate-500 mb-3 flex items-center gap-1.5">
                       <MapPin size={14} /> Endereco
                     </h3>
                     <p className="text-sm text-slate-700">
                       {[
-                        cliente.endereco_rua,
-                        cliente.endereco_numero
-                          ? `n ${cliente.endereco_numero}`
+                        cliente.endereco,
+                        cliente.numero
+                          ? `n ${cliente.numero}`
                           : null,
-                        cliente.endereco_complemento,
+                        cliente.complemento,
                       ]
                         .filter(Boolean)
                         .join(", ")}
                     </p>
                     <p className="text-sm text-slate-500">
                       {[
-                        cliente.endereco_bairro,
-                        cliente.endereco_cidade,
-                        cliente.endereco_estado,
-                        cliente.endereco_cep,
+                        cliente.bairro,
+                        cliente.cidade,
+                        cliente.estado,
+                        cliente.cep,
                       ]
                         .filter(Boolean)
                         .join(" - ")}
@@ -1188,11 +1224,20 @@ export default function ClienteDetailPage() {
                         <p className="text-xs text-slate-400">{c.cargo}</p>
                       )}
                     </div>
-                    <div className="flex gap-1.5">
+                    <div className="flex items-center gap-1.5">
                       {c.e_decisor && (
                         <Badge className="text-[10px] bg-amber-100 text-amber-700 border-amber-200 hover:bg-amber-100">
                           Decisor
                         </Badge>
+                      )}
+                      {canDelete && (
+                        <button
+                          onClick={() => setConfirmDeleteContatoId(c.id)}
+                          className="p-1 rounded hover:bg-red-50 text-slate-300 hover:text-red-500 transition-colors"
+                          title="Excluir contato"
+                        >
+                          <Trash2 size={14} />
+                        </button>
                       )}
                     </div>
                   </div>
@@ -1271,10 +1316,10 @@ export default function ClienteDetailPage() {
                       onChange={(e) =>
                         setContatoForm({
                           ...contatoForm,
-                          telefone: e.target.value,
+                          telefone: maskPhone(e.target.value),
                         })
                       }
-                      placeholder="(51) 3333-3333"
+                      placeholder="(11) 3333-3333"
                     />
                   </div>
                   <div>
@@ -1284,10 +1329,10 @@ export default function ClienteDetailPage() {
                       onChange={(e) =>
                         setContatoForm({
                           ...contatoForm,
-                          whatsapp: e.target.value,
+                          whatsapp: maskPhone(e.target.value),
                         })
                       }
-                      placeholder="(51) 99999-9999"
+                      placeholder="(11) 99999-9999"
                     />
                   </div>
                 </div>
@@ -1303,7 +1348,11 @@ export default function ClienteDetailPage() {
                       })
                     }
                     placeholder="contato@empresa.com"
+                    className={contatoForm.email && !isValidEmail(contatoForm.email) ? "border-red-300 focus-visible:ring-red-400" : ""}
                   />
+                  {contatoForm.email && !isValidEmail(contatoForm.email) && (
+                    <p className="text-xs text-red-500 mt-1">Email inválido</p>
+                  )}
                 </div>
                 <div className="flex items-center gap-2 pt-1">
                   <Checkbox
@@ -1580,6 +1629,77 @@ export default function ClienteDetailPage() {
           )}
         </TabsContent>
       </Tabs>
+
+      {/* Confirm Delete Cliente Dialog */}
+      <Dialog open={confirmDeleteCliente} onOpenChange={setConfirmDeleteCliente}>
+        <DialogContent className="sm:max-w-md">
+          <DialogHeader>
+            <DialogTitle className="text-red-600">Excluir Cliente Permanentemente</DialogTitle>
+          </DialogHeader>
+          <p className="text-sm text-slate-600 py-2">
+            Tem certeza que deseja excluir <strong>{cliente?.nome_fantasia || cliente?.razao_social}</strong> permanentemente?
+            Esta ação não pode ser desfeita e removerá todos os dados associados.
+          </p>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setConfirmDeleteCliente(false)}>
+              Cancelar
+            </Button>
+            <Button
+              variant="destructive"
+              onClick={() => {
+                if (!id) return;
+                hardDeleteCliente.mutate(id, {
+                  onSuccess: () => {
+                    setConfirmDeleteCliente(false);
+                    navigate('/clientes');
+                  },
+                });
+              }}
+              disabled={hardDeleteCliente.isPending}
+            >
+              {hardDeleteCliente.isPending ? (
+                <><Loader2 size={14} className="animate-spin mr-1" />Excluindo...</>
+              ) : (
+                <><Trash2 size={14} className="mr-1" />Excluir Permanentemente</>
+              )}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {/* Confirm Delete Contato Dialog */}
+      <Dialog open={!!confirmDeleteContatoId} onOpenChange={(open) => !open && setConfirmDeleteContatoId(null)}>
+        <DialogContent className="sm:max-w-md">
+          <DialogHeader>
+            <DialogTitle className="text-red-600">Excluir Contato</DialogTitle>
+          </DialogHeader>
+          <p className="text-sm text-slate-600 py-2">
+            Tem certeza que deseja excluir este contato permanentemente? Esta ação não pode ser desfeita.
+          </p>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setConfirmDeleteContatoId(null)}>
+              Cancelar
+            </Button>
+            <Button
+              variant="destructive"
+              onClick={() => {
+                if (!confirmDeleteContatoId || !id) return;
+                deleteContato.mutate(
+                  { id: confirmDeleteContatoId, clienteId: id },
+                  { onSuccess: () => setConfirmDeleteContatoId(null) },
+                );
+              }}
+              disabled={deleteContato.isPending}
+            >
+              {deleteContato.isPending ? (
+                <><Loader2 size={14} className="animate-spin mr-1" />Excluindo...</>
+              ) : (
+                <><Trash2 size={14} className="mr-1" />Excluir</>
+              )}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
 
       <AISidebar
         isOpen={aiSidebar.isOpen}
