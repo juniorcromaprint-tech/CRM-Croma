@@ -23,11 +23,11 @@ export interface PedidoCompra {
   fornecedor?: Fornecedor;
   status: PedidoCompraStatus;
   valor_total: number;
-  previsao_entrega?: string;
+  data_emissao?: string;
+  data_vencimento?: string;
   observacoes?: string;
-  criado_por?: string;
-  aprovado_por?: string;
   created_at: string;
+  updated_at?: string;
   itens?: PedidoCompraItem[];
 }
 
@@ -37,9 +37,11 @@ export interface PedidoCompraItem {
   material_id: string;
   material?: { nome: string; unidade: string };
   quantidade: number;
-  preco_unitario: number;
-  subtotal: number;
+  valor_unitario: number;
+  valor_total: number;
+  quantidade_recebida?: number;
+  created_at?: string;
 }
 
-export type PedidoCompraCreate = Omit<PedidoCompra, 'id' | 'created_at' | 'fornecedor' | 'itens'>;
-export type PedidoCompraItemCreate = Omit<PedidoCompraItem, 'id' | 'material'>;
+export type PedidoCompraCreate = Omit<PedidoCompra, 'id' | 'created_at' | 'updated_at' | 'fornecedor' | 'itens'>;
+export type PedidoCompraItemCreate = Omit<PedidoCompraItem, 'id' | 'created_at' | 'material'>;

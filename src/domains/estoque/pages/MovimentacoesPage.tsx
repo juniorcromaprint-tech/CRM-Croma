@@ -31,32 +31,12 @@ const TIPO_BADGE: Record<
     label: "Saída",
     className: "bg-red-50 text-red-700 border-red-200",
   },
-  reserva: {
-    label: "Reserva",
-    className: "bg-yellow-50 text-yellow-700 border-yellow-200",
-  },
-  liberacao_reserva: {
-    label: "Lib. Reserva",
-    className: "bg-blue-50 text-blue-700 border-blue-200",
-  },
-  ajuste: {
-    label: "Ajuste",
-    className: "bg-slate-50 text-slate-700 border-slate-200",
-  },
-  devolucao: {
-    label: "Devolução",
-    className: "bg-purple-50 text-purple-700 border-purple-200",
-  },
 };
 
 const TIPOS_FILTRO = [
   { value: "todos", label: "Todos os tipos" },
   { value: "entrada", label: "Entrada" },
   { value: "saida", label: "Saída" },
-  { value: "reserva", label: "Reserva" },
-  { value: "liberacao_reserva", label: "Lib. Reserva" },
-  { value: "ajuste", label: "Ajuste" },
-  { value: "devolucao", label: "Devolução" },
 ];
 
 const PAGE_SIZE = 20;
@@ -94,7 +74,7 @@ export default function MovimentacoesPage() {
   }
 
   return (
-    <div className="space-y-6 p-6">
+    <div className="space-y-6">
       {/* Header */}
       <div>
         <h1 className="text-2xl font-bold text-slate-800">Movimentações</h1>
@@ -182,7 +162,7 @@ export default function MovimentacoesPage() {
               <tbody className="divide-y divide-slate-100">
                 {paginado.map((mov) => {
                   const tipoBadge =
-                    TIPO_BADGE[mov.tipo] ?? TIPO_BADGE.ajuste;
+                    TIPO_BADGE[mov.tipo] ?? { label: mov.tipo, className: "bg-slate-50 text-slate-700 border-slate-200" };
                   const unidade = mov.material?.unidade ?? "";
 
                   return (
@@ -220,7 +200,7 @@ export default function MovimentacoesPage() {
                         )}
                       </td>
                       <td className="px-4 py-3 text-slate-500 text-xs hidden lg:table-cell max-w-xs truncate">
-                        {mov.motivo ?? (
+                        {mov.observacao ?? (
                           <span className="text-slate-300">—</span>
                         )}
                       </td>

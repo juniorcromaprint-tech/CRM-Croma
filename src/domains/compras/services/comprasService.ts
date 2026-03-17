@@ -107,10 +107,14 @@ export const comprasService = {
   },
 
   async atualizarPedidoCompra(id: string, dados: Record<string, any>) {
-    // Normalize data_entrega → previsao_entrega if caller used old field name
+    // Normalize legacy field names → actual schema columns
     if ('data_entrega' in dados) {
-      dados = { ...dados, previsao_entrega: dados.data_entrega };
+      dados = { ...dados, data_vencimento: dados.data_entrega };
       delete dados.data_entrega;
+    }
+    if ('previsao_entrega' in dados) {
+      dados = { ...dados, data_vencimento: dados.previsao_entrega };
+      delete dados.previsao_entrega;
     }
     const { data, error } = await db
       .from("pedidos_compra")

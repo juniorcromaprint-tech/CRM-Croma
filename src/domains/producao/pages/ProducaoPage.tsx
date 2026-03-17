@@ -1,4 +1,5 @@
 import React, { useState, useMemo, useCallback, useRef, useEffect, type DragEvent } from "react";
+import { cn } from "@/lib/utils";
 import { useNavigate } from "react-router-dom";
 import { ilikeTerm } from "@/shared/utils/searchUtils";
 import { supabase } from "@/integrations/supabase/client";
@@ -670,8 +671,9 @@ export default function ProducaoPage() {
     for (const col of KANBAN_COLUMNS) {
       result[col.key] = filtered.filter((op) => {
         if (!col.statuses.includes(op.status)) return false;
-        // A3: Don't show 100% completed OPs in Fila column
-        if (col.key === 'fila' && getProgressPercent(op.producao_etapas) >= 100) return false;
+        // Don't show 100% completed OPs in non-terminal columns
+        const progress = getProgressPercent(op.producao_etapas);
+        if (progress >= 100 && col.key !== 'liberado' && col.key !== 'retrabalho') return false;
         return true;
       });
     }
@@ -1123,12 +1125,13 @@ export default function ProducaoPage() {
                               onDragStart={(e) => handleDragStart(e, op.id)}
                               onDragEnd={handleDragEnd}
                               onClick={() => setSelectedOP(op)}
-                              className={`
-                                bg-white rounded-2xl border border-slate-200 p-3 cursor-grab
-                                hover:shadow-md transition-all duration-150 group
-                                active:cursor-grabbing select-none
-                                ${isDragging ? "opacity-50 rotate-2 shadow-lg" : "shadow-sm"}
-                              `}
+                              className={cn(
+                                "bg-white rounded-2xl p-3 cursor-grab transition-all duration-150 group active:cursor-grabbing select-none",
+                                isDragging ? "opacity-50 rotate-2 shadow-lg border border-slate-200" : "shadow-sm",
+                                !isDragging && overdue && op.status !== "finalizado" && op.status !== "liberado"
+                                  ? "border border-red-300 ring-1 ring-red-200"
+                                  : !isDragging ? "border border-slate-100 hover:shadow-md" : ""
+                              )}
                             >
                               {/* Card header */}
                               <div className="flex items-start justify-between gap-1 mb-2">

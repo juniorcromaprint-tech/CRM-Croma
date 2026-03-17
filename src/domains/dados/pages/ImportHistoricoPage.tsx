@@ -41,7 +41,7 @@ export default function ImportHistoricoPage() {
   const entities = getAllEntities();
 
   return (
-    <div className="space-y-6 p-6">
+    <div className="space-y-6">
       {/* Header */}
       <div className="flex items-center gap-3">
         <Link to="/admin/dados">

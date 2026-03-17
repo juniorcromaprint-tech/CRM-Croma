@@ -148,7 +148,7 @@ export default function OcorrenciaDetailPage() {
   const tratativas = ocorrencia.tratativas ?? [];
 
   return (
-    <div className="p-6 space-y-6">
+    <div className="space-y-6">
       {/* Back button */}
       <Button
         variant="ghost"

@@ -132,10 +132,10 @@ export default function PedidoCompraDetailPage() {
                 <Building2 size={15} className="text-slate-400" />
                 <span className="font-semibold">{fornecedorNome}</span>
               </div>
-              {pedido.previsao_entrega && (
+              {pedido.data_vencimento && (
                 <div className="flex items-center gap-2 mt-1 text-sm text-slate-500">
                   <Calendar size={14} className="text-slate-400" />
-                  Entrega prevista: {formatDate(pedido.previsao_entrega)}
+                  Entrega prevista: {formatDate(pedido.data_vencimento)}
                 </div>
               )}
             </div>
@@ -183,7 +183,7 @@ export default function PedidoCompraDetailPage() {
                 {itens.map((item: any) => {
                   const materialNome = item.material?.nome ?? "—";
                   const unidade = item.material?.unidade;
-                  const subtotal = item.subtotal ?? item.preco_unitario * item.quantidade ?? 0;
+                  const subtotal = item.valor_total ?? item.valor_unitario * item.quantidade ?? 0;
 
                   return (
                     <tr key={item.id} className="hover:bg-slate-50 transition-colors">
@@ -197,7 +197,7 @@ export default function PedidoCompraDetailPage() {
                         )}
                       </td>
                       <td className="px-4 py-4 text-right text-slate-700">
-                        {brl(item.preco_unitario ?? 0)}
+                        {brl(item.valor_unitario ?? 0)}
                       </td>
                       <td className="px-6 py-4 text-right font-semibold text-slate-800">
                         {brl(subtotal)}

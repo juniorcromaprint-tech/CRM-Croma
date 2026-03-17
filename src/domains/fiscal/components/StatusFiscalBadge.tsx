@@ -8,7 +8,7 @@ const STATUS_CONFIG: Record<string, { label: string; className: string }> = {
   emitindo: { label: '⏳ Emitindo', className: 'bg-amber-100 text-amber-700 border-amber-300 animate-pulse' },
   autorizado: { label: '🟢 Autorizado', className: 'bg-green-100 text-green-800 border-green-400 font-semibold' },
   rejeitado: { label: '❌ Rejeitado', className: 'bg-red-100 text-red-700 border-red-400' },
-  cancelado: { label: '🚫 Cancelado', className: 'bg-gray-100 text-gray-500 border-gray-300 line-through' },
+  cancelado: { label: '🚫 Cancelado', className: 'bg-slate-100 text-slate-500 border-slate-300 line-through' },
   denegado: { label: '🔴 Denegado', className: 'bg-red-200 text-red-900 border-red-500' },
   inutilizado: { label: '⚠️ Inutilizado', className: 'bg-orange-100 text-orange-700 border-orange-300' },
   erro_transmissao: { label: '💥 Erro Transmissão', className: 'bg-red-50 text-red-600 border-red-300' },

@@ -14,6 +14,13 @@ function localDateStr(d: Date = new Date()): string {
   return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`;
 }
 
+/** Validates that a date string is parseable and within a reasonable year range. */
+function isValidDate(dateStr: string): boolean {
+  if (!dateStr) return false;
+  const d = new Date(dateStr);
+  return !isNaN(d.getTime()) && d.getFullYear() >= 2000 && d.getFullYear() <= 2100;
+}
+
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Input } from "@/components/ui/input";
@@ -157,7 +164,7 @@ const STATUS_RECEBER_CONFIG: Record<
   },
   cancelado: {
     label: "Cancelado",
-    className: "bg-gray-50 text-gray-500 border-gray-200",
+    className: "bg-slate-50 text-slate-500 border-slate-200",
   },
 };
 
@@ -183,7 +190,7 @@ const STATUS_PAGAR_CONFIG: Record<
   },
   cancelado: {
     label: "Cancelado",
-    className: "bg-gray-50 text-gray-500 border-gray-200",
+    className: "bg-slate-50 text-slate-500 border-slate-200",
   },
 };
 
@@ -541,6 +548,10 @@ function TabContasReceber() {
   const handleCreateCR = () => {
     if (!formCR.cliente_id || !formCR.valor_original || !formCR.data_vencimento) {
       showError("Preencha os campos obrigatorios");
+      return;
+    }
+    if (!isValidDate(formCR.data_vencimento)) {
+      showError("Data inválida");
       return;
     }
     createMutation.mutate({
@@ -1182,6 +1193,10 @@ function TabContasPagar() {
   const handleCreateCP = () => {
     if (!formCP.categoria || !formCP.valor_original || !formCP.data_vencimento) {
       showError("Preencha os campos obrigatorios");
+      return;
+    }
+    if (!isValidDate(formCP.data_vencimento)) {
+      showError("Data inválida");
       return;
     }
     createMutation.mutate({

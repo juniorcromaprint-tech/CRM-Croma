@@ -275,9 +275,9 @@ export default function PipelinePage() {
   const totalValor = leads
     .filter((l) => l.status !== "descartado")
     .reduce((sum, l) => sum + (l.valor_estimado ?? 0), 0);
-  const qualificados = leads.filter((l) => l.status === "qualificado").length;
+  const convertidos = leads.filter((l) => l.status === "convertido").length;
   const conversionRate =
-    totalLeads > 0 ? ((qualificados / totalLeads) * 100).toFixed(1) : "0.0";
+    leads.length > 0 ? ((convertidos / leads.length) * 100).toFixed(1) : "0.0";
   const ticketMedio = totalLeads > 0 ? totalValor / totalLeads : 0;
 
   // ─── Drag & Drop Handlers ────────────────────────────────────────────────

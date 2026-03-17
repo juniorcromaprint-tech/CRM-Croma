@@ -11,12 +11,11 @@ export interface EstoqueMovimentacao {
   id: string;
   material_id: string;
   material?: { nome: string; unidade: string };
-  tipo: 'entrada' | 'saida' | 'reserva' | 'liberacao_reserva' | 'ajuste' | 'devolucao';
+  tipo: 'entrada' | 'saida';
   quantidade: number;
   referencia_tipo?: string;
   referencia_id?: string;
-  motivo?: string;
-  usuario_id?: string;
+  observacao?: string;
   created_at: string;
 }
 
@@ -49,5 +48,6 @@ export interface EstoqueKPIs {
 }
 
 export type MovimentacaoCreate = Omit<EstoqueMovimentacao, 'id' | 'created_at' | 'material'>;
+// Note: estoque_movimentacoes.tipo only supports 'entrada' | 'saida' per schema
 export type InventarioCreate = Omit<Inventario, 'id' | 'created_at' | 'itens'>;
 export type InventarioItemCreate = Omit<InventarioItem, 'id' | 'diferenca' | 'material'>;

@@ -45,7 +45,7 @@ export const estoqueService = {
     return data ?? [];
   },
 
-  async criarMovimentacao(dados: { material_id: string; tipo: string; quantidade: number; motivo?: string }) {
+  async criarMovimentacao(dados: { material_id: string; tipo: 'entrada' | 'saida'; quantidade: number; observacao?: string; referencia_tipo?: string; referencia_id?: string }) {
     const { data, error } = await db
       .from("estoque_movimentacoes")
       .insert(dados)

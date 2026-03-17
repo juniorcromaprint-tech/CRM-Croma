@@ -28,7 +28,7 @@ interface PedidoCompra {
   fornecedor?: { nome_fantasia?: string | null; razao_social?: string } | null;
   status: PCStatus;
   valor_total: number;
-  previsao_entrega?: string | null;
+  data_vencimento?: string | null;
   created_at: string;
   itens?: any[];
 }
@@ -195,10 +195,10 @@ export default function PedidosCompraPage() {
                                 {fornecedorNome}
                               </h3>
                               <div className="flex flex-wrap items-center gap-3 mt-1">
-                                {pc.previsao_entrega && (
+                                {pc.data_vencimento && (
                                   <span className="text-xs text-slate-500 flex items-center gap-1">
                                     <Calendar size={12} />
-                                    Entrega: {formatDate(pc.previsao_entrega)}
+                                    Entrega: {formatDate(pc.data_vencimento)}
                                   </span>
                                 )}
                                 {pc.itens && (

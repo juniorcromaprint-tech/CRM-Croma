@@ -135,14 +135,14 @@ export default function PedidoCompraForm({ open, onClose }: PedidoCompraFormProp
         fornecedor_id: fornecedorId,
         status: "rascunho" as const,
         valor_total: valorTotal,
-        previsao_entrega: previsaoEntrega || undefined,
+        data_vencimento: previsaoEntrega || undefined,
         observacoes: observacoes || undefined,
       },
       itens: itens.map((item) => ({
         material_id: item.material_id,
         quantidade: item.quantidade,
-        preco_unitario: item.valor_unitario,
-        subtotal: item.quantidade * item.valor_unitario,
+        valor_unitario: item.valor_unitario,
+        valor_total: item.quantidade * item.valor_unitario,
       })),
     });
     resetForm();

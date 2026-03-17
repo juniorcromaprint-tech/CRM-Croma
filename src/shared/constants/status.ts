@@ -70,7 +70,7 @@ export const PROPOSTA_STATUS_CONFIG: Record<PropostaStatus, StatusConfig> = {
   em_revisao: { label: 'Em revisão', color: 'bg-amber-50 text-amber-700 border-amber-100', icon: 'Eye' },
   aprovada: { label: 'Aprovada', color: 'bg-emerald-50 text-emerald-700 border-emerald-100', icon: 'CheckCircle2' },
   recusada: { label: 'Recusada', color: 'bg-red-50 text-red-700 border-red-100', icon: 'XCircle' },
-  expirada: { label: 'Expirada', color: 'bg-gray-50 text-gray-500 border-gray-100', icon: 'Clock' },
+  expirada: { label: 'Expirada', color: 'bg-slate-50 text-slate-500 border-slate-100', icon: 'Clock' },
 } as const;
 
 // ---------------------------------------------------------------------------
@@ -242,7 +242,7 @@ export const FINANCEIRO_STATUS_RECEBER_CONFIG: Record<FinanceiroStatusReceber, S
   vencido: { label: 'Vencido', color: 'bg-red-50 text-red-700 border-red-100', icon: 'AlertTriangle' },
   parcial: { label: 'Parcial', color: 'bg-orange-50 text-orange-700 border-orange-100', icon: 'CircleDashed' },
   pago: { label: 'Pago', color: 'bg-emerald-50 text-emerald-700 border-emerald-100', icon: 'CheckCircle2' },
-  cancelado: { label: 'Cancelado', color: 'bg-gray-50 text-gray-500 border-gray-100', icon: 'Ban' },
+  cancelado: { label: 'Cancelado', color: 'bg-slate-50 text-slate-500 border-slate-100', icon: 'Ban' },
 } as const;
 
 // ---------------------------------------------------------------------------
@@ -262,7 +262,7 @@ export const FINANCEIRO_STATUS_PAGAR_CONFIG: Record<FinanceiroStatusPagar, Statu
   vencido: { label: 'Vencido', color: 'bg-red-50 text-red-700 border-red-100', icon: 'AlertTriangle' },
   parcial: { label: 'Parcial', color: 'bg-orange-50 text-orange-700 border-orange-100', icon: 'CircleDashed' },
   pago: { label: 'Pago', color: 'bg-emerald-50 text-emerald-700 border-emerald-100', icon: 'CheckCircle2' },
-  cancelado: { label: 'Cancelado', color: 'bg-gray-50 text-gray-500 border-gray-100', icon: 'Ban' },
+  cancelado: { label: 'Cancelado', color: 'bg-slate-50 text-slate-500 border-slate-100', icon: 'Ban' },
 } as const;
 
 // ---------------------------------------------------------------------------
@@ -280,7 +280,7 @@ export const COMISSAO_STATUS_CONFIG: Record<ComissaoStatus, StatusConfig> = {
   gerada: { label: 'Gerada', color: 'bg-blue-50 text-blue-700 border-blue-100', icon: 'FileText' },
   aprovada: { label: 'Aprovada', color: 'bg-amber-50 text-amber-700 border-amber-100', icon: 'CheckCircle' },
   paga: { label: 'Paga', color: 'bg-emerald-50 text-emerald-700 border-emerald-100', icon: 'BadgeDollarSign' },
-  cancelada: { label: 'Cancelada', color: 'bg-gray-50 text-gray-500 border-gray-100', icon: 'Ban' },
+  cancelada: { label: 'Cancelada', color: 'bg-slate-50 text-slate-500 border-slate-100', icon: 'Ban' },
 } as const;
 
 // ---------------------------------------------------------------------------
@@ -306,7 +306,7 @@ export const COMPRA_STATUS_CONFIG: Record<CompraStatus, StatusConfig> = {
   pedido_enviado: { label: 'Pedido enviado', color: 'bg-purple-50 text-purple-700 border-purple-100', icon: 'Send' },
   parcialmente_recebida: { label: 'Parcialmente recebida', color: 'bg-orange-50 text-orange-700 border-orange-100', icon: 'PackageOpen' },
   recebida: { label: 'Recebida', color: 'bg-emerald-50 text-emerald-700 border-emerald-100', icon: 'PackageCheck' },
-  cancelada: { label: 'Cancelada', color: 'bg-gray-50 text-gray-500 border-gray-100', icon: 'Ban' },
+  cancelada: { label: 'Cancelada', color: 'bg-slate-50 text-slate-500 border-slate-100', icon: 'Ban' },
 } as const;
 
 // ---------------------------------------------------------------------------
@@ -428,7 +428,7 @@ export const TAREFA_STATUS_CONFIG: Record<TarefaStatus, StatusConfig> = {
   em_andamento: { label: 'Em andamento', color: 'bg-blue-50 text-blue-700 border-blue-100', icon: 'Play' },
   aguardando: { label: 'Aguardando', color: 'bg-amber-50 text-amber-700 border-amber-100', icon: 'Clock' },
   concluida: { label: 'Concluída', color: 'bg-emerald-50 text-emerald-700 border-emerald-100', icon: 'CheckCircle2' },
-  cancelada: { label: 'Cancelada', color: 'bg-gray-50 text-gray-500 border-gray-100', icon: 'Ban' },
+  cancelada: { label: 'Cancelada', color: 'bg-slate-50 text-slate-500 border-slate-100', icon: 'Ban' },
 } as const;
 
 // ---------------------------------------------------------------------------

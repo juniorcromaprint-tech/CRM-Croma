@@ -25,6 +25,7 @@ import { showError, showSuccess } from "@/utils/toast";
 import { validarCNPJ } from '@/shared/utils/cnpj';
 import { TEMPERATURA_CONFIG } from "../constants/temperatura";
 import { LEAD_STATUS_CONFIG, getStatusConfig } from "@/shared/constants/status";
+import { supabase } from "@/integrations/supabase/client";
 
 export default function LeadDetailPage() {
   const { id } = useParams<{ id: string }>();
@@ -42,12 +43,18 @@ export default function LeadDetailPage() {
 
   const deleteLead = useMutation({
     mutationFn: async (leadId: string) => {
-      const { error } = await supabase.from("leads").delete().eq("id", leadId);
+      const { error } = await supabase
+        .from("leads")
+        .update({
+          excluido_em: new Date().toISOString(),
+          excluido_por: profile?.id ?? null,
+        })
+        .eq("id", leadId);
       if (error) throw error;
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["leads"] });
-      showSuccess("Lead excluído permanentemente");
+      showSuccess("Lead excluído com sucesso");
       navigate("/leads");
     },
     onError: (err: any) => showError(err.message || "Erro ao excluir lead"),
@@ -112,7 +119,7 @@ export default function LeadDetailPage() {
         segmento: form.segmento || null,
         status: form.status as any,
         temperatura: form.temperatura as any,
-        valor_estimado: form.valor_estimado ? Number(form.valor_estimado) : null,
+        valor_estimado: form.valor_estimado ? Math.max(0, Number(form.valor_estimado)) : null,
         observacoes: form.observacoes || null,
       },
       { onSuccess: () => setEditing(false) }
@@ -384,6 +391,7 @@ export default function LeadDetailPage() {
                 <Input
                   id="valor_estimado"
                   type="number"
+                  min="0"
                   value={form.valor_estimado}
                   onChange={e => setForm({ ...form, valor_estimado: e.target.value })}
                   placeholder="50000"

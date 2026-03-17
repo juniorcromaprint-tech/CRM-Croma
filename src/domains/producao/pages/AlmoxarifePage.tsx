@@ -141,10 +141,10 @@ function FerramentaCard({ ferramenta, onRetirar, checkouts }: FerramentaCardProp
   )
 
   return (
-    <div className="bg-white rounded-2xl border border-gray-100 shadow-sm p-4 flex flex-col gap-3">
+    <div className="bg-white rounded-2xl border border-slate-100 shadow-sm p-4 flex flex-col gap-3">
       {/* Header */}
       <div className="flex items-start justify-between gap-2">
-        <span className="font-semibold text-sm text-gray-900 leading-tight">
+        <span className="font-semibold text-sm text-slate-900 leading-tight">
           {ferramenta.nome}
         </span>
         {ferramenta.em_uso ? (
@@ -220,41 +220,41 @@ function HistoricoTable({ checkouts, ferramentas }: HistoricoTableProps) {
   }
 
   return (
-    <div className="bg-white rounded-2xl border border-gray-100 shadow-sm overflow-hidden">
+    <div className="bg-white rounded-2xl border border-slate-100 shadow-sm overflow-hidden">
       <div className="overflow-x-auto">
         <table className="w-full text-sm">
           <thead>
-            <tr className="bg-gray-50 border-b border-gray-100">
-              <th className="text-left px-4 py-3 font-medium text-gray-600">Ferramenta</th>
-              <th className="text-left px-4 py-3 font-medium text-gray-600">Pedido</th>
-              <th className="text-left px-4 py-3 font-medium text-gray-600">Usuário</th>
-              <th className="text-left px-4 py-3 font-medium text-gray-600">Saída</th>
-              <th className="text-left px-4 py-3 font-medium text-gray-600">Retorno</th>
+            <tr className="bg-slate-50 border-b border-slate-100">
+              <th className="text-left px-4 py-3 font-medium text-slate-600">Ferramenta</th>
+              <th className="text-left px-4 py-3 font-medium text-slate-600">Pedido</th>
+              <th className="text-left px-4 py-3 font-medium text-slate-600">Usuário</th>
+              <th className="text-left px-4 py-3 font-medium text-slate-600">Saída</th>
+              <th className="text-left px-4 py-3 font-medium text-slate-600">Retorno</th>
               <th className="px-4 py-3" />
             </tr>
           </thead>
-          <tbody className="divide-y divide-gray-50">
+          <tbody className="divide-y divide-slate-50">
             {checkouts.map((c) => {
               const ferramenta = ferramentas.find((f) => f.id === c.ferramenta_id)
               const pendente = c.retorno_em === null && ferramenta?.em_uso === true
 
               return (
-                <tr key={c.id} className="hover:bg-gray-50/60 transition-colors">
-                  <td className="px-4 py-3 font-medium text-gray-900">
+                <tr key={c.id} className="hover:bg-slate-50/60 transition-colors">
+                  <td className="px-4 py-3 font-medium text-slate-900">
                     {c.ferramentas?.nome ?? '—'}
                   </td>
-                  <td className="px-4 py-3 text-gray-600">
+                  <td className="px-4 py-3 text-slate-600">
                     {c.pedidos?.numero ? `#${c.pedidos.numero}` : '—'}
                   </td>
-                  <td className="px-4 py-3 text-gray-600">
+                  <td className="px-4 py-3 text-slate-600">
                     {c.profiles?.full_name ?? '—'}
                   </td>
-                  <td className="px-4 py-3 text-gray-600 whitespace-nowrap">
+                  <td className="px-4 py-3 text-slate-600 whitespace-nowrap">
                     {formatDateTime(c.saida_em)}
                   </td>
                   <td className="px-4 py-3 whitespace-nowrap">
                     {c.retorno_em ? (
-                      <span className="text-gray-600">{formatDateTime(c.retorno_em)}</span>
+                      <span className="text-slate-600">{formatDateTime(c.retorno_em)}</span>
                     ) : (
                       <Badge className="bg-amber-100 text-amber-700 border-amber-200">
                         Em campo
@@ -299,14 +299,14 @@ export default function AlmoxarifePage() {
   const { data: checkouts = [], isLoading: loadingCheckouts } = useCheckouts()
 
   return (
-    <div className="p-6 space-y-6 max-w-7xl mx-auto">
+    <div className="space-y-6 max-w-7xl mx-auto">
       {/* Page header */}
       <div className="flex items-center gap-3">
         <div className="p-2 bg-orange-50 rounded-xl">
           <Package2 className="h-6 w-6 text-orange-600" />
         </div>
         <div>
-          <h1 className="text-xl font-semibold text-gray-900">Almoxarife</h1>
+          <h1 className="text-xl font-semibold text-slate-900">Almoxarife</h1>
           <p className="text-sm text-muted-foreground">
             Controle de ferramentas e veículos por ordem de serviço
           </p>
@@ -315,7 +315,7 @@ export default function AlmoxarifePage() {
 
       {/* Tabs */}
       <Tabs defaultValue="ferramentas">
-        <TabsList className="bg-gray-100">
+        <TabsList className="bg-slate-100">
           <TabsTrigger value="ferramentas">Ferramentas</TabsTrigger>
           <TabsTrigger value="historico">Histórico</TabsTrigger>
         </TabsList>

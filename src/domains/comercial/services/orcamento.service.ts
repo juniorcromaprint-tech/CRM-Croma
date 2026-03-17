@@ -785,7 +785,7 @@ export const orcamentoService = {
         proposta_id: orcamentoId,
         cliente_id: orc.cliente_id,
         vendedor_id: orc.vendedor_id,
-        status: "aguardando_aprovacao",
+        status: "aprovado",
         valor_total: orc.total,
       })
       .select("id")

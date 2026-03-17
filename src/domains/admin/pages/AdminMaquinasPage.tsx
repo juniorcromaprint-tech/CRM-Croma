@@ -376,7 +376,7 @@ export function AdminMaquinasPage() {
   // --------------------------------------------------------------------------
 
   return (
-    <div className="p-6 space-y-6 max-w-screen-xl mx-auto">
+    <div className="space-y-6 max-w-screen-xl mx-auto">
       {/* Header */}
       <div className="flex items-center gap-3">
         <div className="p-2 bg-blue-100 rounded-xl">

@@ -41,10 +41,6 @@ import type { EstoqueMovimentacao } from "../types/estoque.types";
 const TIPOS_MOV = [
   { value: "entrada", label: "Entrada" },
   { value: "saida", label: "Saída" },
-  { value: "ajuste", label: "Ajuste" },
-  { value: "reserva", label: "Reserva" },
-  { value: "liberacao_reserva", label: "Liberação de Reserva" },
-  { value: "devolucao", label: "Devolução" },
 ];
 
 function KpiCard({
@@ -106,9 +102,9 @@ export default function EstoqueDashboardPage() {
   const [ajusteOpen, setAjusteOpen] = useState(false);
   const [ajusteForm, setAjusteForm] = useState({
     material_id: "",
-    tipo: "ajuste",
+    tipo: "entrada" as 'entrada' | 'saida',
     quantidade: "",
-    motivo: "",
+    observacao: "",
   });
 
   const { data: saldos = [], isLoading: loadingSaldos } = useEstoqueSaldos({
@@ -152,16 +148,16 @@ export default function EstoqueDashboardPage() {
         material_id: ajusteForm.material_id,
         tipo: ajusteForm.tipo,
         quantidade: parseFloat(ajusteForm.quantidade),
-        motivo: ajusteForm.motivo || undefined,
+        observacao: ajusteForm.observacao || undefined,
       },
       {
         onSuccess: () => {
           setAjusteOpen(false);
           setAjusteForm({
             material_id: "",
-            tipo: "ajuste",
+            tipo: "entrada",
             quantidade: "",
-            motivo: "",
+            observacao: "",
           });
         },
       }
@@ -169,7 +165,7 @@ export default function EstoqueDashboardPage() {
   }
 
   return (
-    <div className="space-y-6 p-6">
+    <div className="space-y-6">
       {/* Header */}
       <div className="flex items-center justify-between">
         <div>
@@ -334,7 +330,7 @@ export default function EstoqueDashboardPage() {
               <Select
                 value={ajusteForm.tipo}
                 onValueChange={(v) =>
-                  setAjusteForm((p) => ({ ...p, tipo: v }))
+                  setAjusteForm((p) => ({ ...p, tipo: v as 'entrada' | 'saida' }))
                 }
               >
                 <SelectTrigger className="rounded-xl">
@@ -368,9 +364,9 @@ export default function EstoqueDashboardPage() {
               <Label className="text-sm font-medium">Observação</Label>
               <Textarea
                 placeholder="Motivo do ajuste..."
-                value={ajusteForm.motivo}
+                value={ajusteForm.observacao}
                 onChange={(e) =>
-                  setAjusteForm((p) => ({ ...p, motivo: e.target.value }))
+                  setAjusteForm((p) => ({ ...p, observacao: e.target.value }))
                 }
                 className="rounded-xl resize-none"
                 rows={3}
