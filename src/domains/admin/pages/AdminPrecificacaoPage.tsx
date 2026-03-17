@@ -51,6 +51,7 @@ interface ConfigPrecificacao {
   percentual_comissao: number;
   percentual_impostos: number;
   percentual_juros: number;
+  percentual_encargos: number;
   updated_at: string;
 }
 
@@ -62,6 +63,7 @@ interface RegrasPrecificacao {
   desconto_maximo: number | null;
   preco_m2_minimo: number | null;
   taxa_urgencia: number | null;
+  aproveitamento_padrao: number | null;
   ativo: boolean;
   created_at: string;
   updated_at: string;
@@ -107,6 +109,7 @@ function NovaRegraForm({ onSave, onCancel, isSaving }: NovaRegraFormProps) {
   const [descontoMaximo, setDescontoMaximo] = useState("");
   const [precoM2Minimo, setPrecoM2Minimo] = useState("");
   const [taxaUrgencia, setTaxaUrgencia] = useState("");
+  const [aproveitamentoPadrao, setAproveitamentoPadrao] = useState("");
   const [ativo, setAtivo] = useState(true);
 
   function handleSubmit() {
@@ -127,6 +130,7 @@ function NovaRegraForm({ onSave, onCancel, isSaving }: NovaRegraFormProps) {
       desconto_maximo: descontoMaximo ? parseFloat(descontoMaximo) : null,
       preco_m2_minimo: precoM2Minimo ? parseFloat(precoM2Minimo) : null,
       taxa_urgencia: taxaUrgencia ? parseFloat(taxaUrgencia) : null,
+      aproveitamento_padrao: aproveitamentoPadrao ? parseFloat(aproveitamentoPadrao) : null,
       ativo,
     });
   }
@@ -192,6 +196,16 @@ function NovaRegraForm({ onSave, onCancel, isSaving }: NovaRegraFormProps) {
         />
       </td>
       <td className="px-4 py-2">
+        <Input
+          type="number"
+          step="0.01"
+          value={aproveitamentoPadrao}
+          onChange={(e) => setAproveitamentoPadrao(e.target.value)}
+          placeholder="80"
+          className="h-9 w-20"
+        />
+      </td>
+      <td className="px-4 py-2">
         <Switch checked={ativo} onCheckedChange={setAtivo} />
       </td>
       <td className="px-4 py-2">
@@ -226,6 +240,7 @@ function EditRegraRow({ regra, onSave, onCancel, isSaving }: EditRegraRowProps) 
   const [descontoMaximo, setDescontoMaximo] = useState(regra.desconto_maximo != null ? String(regra.desconto_maximo) : "");
   const [precoM2Minimo, setPrecoM2Minimo] = useState(regra.preco_m2_minimo != null ? String(regra.preco_m2_minimo) : "");
   const [taxaUrgencia, setTaxaUrgencia] = useState(regra.taxa_urgencia != null ? String(regra.taxa_urgencia) : "");
+  const [aproveitamentoPadrao, setAproveitamentoPadrao] = useState(regra.aproveitamento_padrao != null ? String(regra.aproveitamento_padrao) : "");
   const [ativo, setAtivo] = useState(regra.ativo);
 
   function handleSubmit() {
@@ -237,6 +252,7 @@ function EditRegraRow({ regra, onSave, onCancel, isSaving }: EditRegraRowProps) 
       desconto_maximo: descontoMaximo ? parseFloat(descontoMaximo) : null,
       preco_m2_minimo: precoM2Minimo ? parseFloat(precoM2Minimo) : null,
       taxa_urgencia: taxaUrgencia ? parseFloat(taxaUrgencia) : null,
+      aproveitamento_padrao: aproveitamentoPadrao ? parseFloat(aproveitamentoPadrao) : null,
       ativo,
     });
   }
@@ -295,6 +311,16 @@ function EditRegraRow({ regra, onSave, onCancel, isSaving }: EditRegraRowProps) 
         />
       </td>
       <td className="px-4 py-2">
+        <Input
+          type="number"
+          step="0.01"
+          value={aproveitamentoPadrao}
+          onChange={(e) => setAproveitamentoPadrao(e.target.value)}
+          placeholder="—"
+          className="h-9 w-20"
+        />
+      </td>
+      <td className="px-4 py-2">
         <Switch checked={ativo} onCheckedChange={setAtivo} />
       </td>
       <td className="px-4 py-2">
@@ -323,7 +349,7 @@ export function AdminPrecificacaoPage() {
   // --------------------------------------------------------------------------
 
   const { data: config, isLoading: loadingConfig } = useQuery({
-    queryKey: ["config-precificacao"],
+    queryKey: ["config_precificacao"],
     queryFn: async () => {
       const { data, error } = await (supabase as unknown as any)
         .from("config_precificacao")
@@ -344,7 +370,7 @@ export function AdminPrecificacaoPage() {
     queryFn: async () => {
       const { data, error } = await (supabase as unknown as any)
         .from("regras_precificacao")
-        .select("id, categoria, markup_minimo, markup_sugerido, desconto_maximo, preco_m2_minimo, taxa_urgencia, ativo, created_at, updated_at")
+        .select("id, categoria, markup_minimo, markup_sugerido, desconto_maximo, preco_m2_minimo, taxa_urgencia, aproveitamento_padrao, ativo, created_at, updated_at")
         .order("categoria");
       if (error) throw error;
       return (data || []) as RegrasPrecificacao[];
@@ -377,6 +403,9 @@ export function AdminPrecificacaoPage() {
   const [percentualJuros, setPercentualJuros] = useState(
     String(DEFAULT_PRICING_CONFIG.percentualJuros)
   );
+  const [percentualEncargos, setPercentualEncargos] = useState(
+    String(DEFAULT_PRICING_CONFIG.percentualEncargos)
+  );
 
   // Sync form when config loads
   useEffect(() => {
@@ -389,6 +418,7 @@ export function AdminPrecificacaoPage() {
     setPercentualComissao(String(config.percentual_comissao));
     setPercentualImpostos(String(config.percentual_impostos));
     setPercentualJuros(String(config.percentual_juros));
+    setPercentualEncargos(String(config.percentual_encargos ?? 0));
   }, [config]);
 
   // --------------------------------------------------------------------------
@@ -404,6 +434,7 @@ export function AdminPrecificacaoPage() {
     percentualComissao: parseFloat(percentualComissao) || 0,
     percentualImpostos: parseFloat(percentualImpostos) || 0,
     percentualJuros: parseFloat(percentualJuros) || 0,
+    percentualEncargos: parseFloat(percentualEncargos) || 0,
   }), [
     faturamentoMedio,
     custoOperacional,
@@ -413,6 +444,7 @@ export function AdminPrecificacaoPage() {
     percentualComissao,
     percentualImpostos,
     percentualJuros,
+    percentualEncargos,
   ]);
 
   const custoPorMinuto = useMemo(() => calcCustoPorMinuto(previewConfig), [previewConfig]);
@@ -434,6 +466,7 @@ export function AdminPrecificacaoPage() {
         percentual_comissao: parseFloat(percentualComissao) || 0,
         percentual_impostos: parseFloat(percentualImpostos) || 0,
         percentual_juros: parseFloat(percentualJuros) || 0,
+        percentual_encargos: parseFloat(percentualEncargos) || 0,
       };
       if (config?.id) {
         const { error } = await (supabase as unknown as any)
@@ -449,7 +482,7 @@ export function AdminPrecificacaoPage() {
       }
     },
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ["config-precificacao"] });
+      queryClient.invalidateQueries({ queryKey: ["config_precificacao"] });
       showSuccess("Parâmetros salvos com sucesso!");
     },
     onError: () => showError("Erro ao salvar parâmetros."),
@@ -490,6 +523,7 @@ export function AdminPrecificacaoPage() {
           desconto_maximo: values.desconto_maximo ?? null,
           preco_m2_minimo: values.preco_m2_minimo ?? null,
           taxa_urgencia: values.taxa_urgencia ?? null,
+          aproveitamento_padrao: values.aproveitamento_padrao ?? null,
           ativo: values.ativo,
         });
       if (error) throw error;
@@ -700,6 +734,24 @@ export function AdminPrecificacaoPage() {
                     </div>
                   </div>
 
+                  {/* Encargos Trabalhistas */}
+                  <div className="space-y-1.5">
+                    <Label className="text-slate-700 font-medium">
+                      Encargos Trabalhistas (%)
+                    </Label>
+                    <Input
+                      type="number"
+                      step="0.01"
+                      value={percentualEncargos}
+                      onChange={(e) => setPercentualEncargos(e.target.value)}
+                      className="h-11"
+                      placeholder="0"
+                    />
+                    <p className="text-xs text-slate-400">
+                      0% se sem CLT, ~70% com registro
+                    </p>
+                  </div>
+
                   <Button
                     onClick={() => saveConfigMutation.mutate()}
                     disabled={saveConfigMutation.isPending}
@@ -842,6 +894,7 @@ export function AdminPrecificacaoPage() {
                       <th className="px-4 py-3 text-left font-semibold text-slate-600">Desc. Máx.</th>
                       <th className="px-4 py-3 text-left font-semibold text-slate-600">Preço Mín./m²</th>
                       <th className="px-4 py-3 text-left font-semibold text-slate-600">Taxa Urgência</th>
+                      <th className="px-4 py-3 text-left font-semibold text-slate-600">Aprov. Padrão</th>
                       <th className="px-4 py-3 text-left font-semibold text-slate-600">Status</th>
                       <th className="px-4 py-3 text-left font-semibold text-slate-600">Ações</th>
                     </tr>
@@ -858,7 +911,7 @@ export function AdminPrecificacaoPage() {
 
                     {regras.length === 0 && !addingNew ? (
                       <tr>
-                        <td colSpan={8} className="px-4 py-10 text-center text-slate-400">
+                        <td colSpan={9} className="px-4 py-10 text-center text-slate-400">
                           Nenhuma regra de markup configurada. Clique em "Nova Regra" para adicionar.
                         </td>
                       </tr>
@@ -906,6 +959,11 @@ export function AdminPrecificacaoPage() {
                             <td className="px-4 py-3">
                               <span className="font-mono tabular-nums text-slate-600 text-xs">
                                 {regra.taxa_urgencia != null ? formatPct(regra.taxa_urgencia) : "—"}
+                              </span>
+                            </td>
+                            <td className="px-4 py-3">
+                              <span className="font-mono tabular-nums text-slate-600 text-xs">
+                                {regra.aproveitamento_padrao != null ? `${regra.aproveitamento_padrao}%` : "—"}
                               </span>
                             </td>
                             <td className="px-4 py-3">

@@ -13,6 +13,7 @@ const AdminPlanoContasPage = lazy(() => import("@/domains/admin/pages/AdminPlano
 const AdminMateriaisPage = lazy(() => import("@/domains/admin/pages/AdminMateriaisPage"));
 const RelatoriosPage = lazy(() => import("@/domains/admin/pages/RelatoriosPage"));
 const Settings = lazy(() => import("@/pages/Settings"));
+const AdminMaquinasPage = lazy(() => import("@/domains/admin/pages/AdminMaquinasPage"));
 const DadosHubPage = lazy(() => import("@/domains/dados/pages/DadosHubPage"));
 const ImportHistoricoPage = lazy(() => import("@/domains/dados/pages/ImportHistoricoPage"));
 
@@ -56,6 +57,11 @@ export const adminRoutes = (
     <Route path="admin/materiais" element={
       <PermissionGuard module="admin" action="ver">
         <LazyPage><AdminMateriaisPage /></LazyPage>
+      </PermissionGuard>
+    } />
+    <Route path="admin/maquinas" element={
+      <PermissionGuard module="admin" action="ver">
+        <LazyPage><AdminMaquinasPage /></LazyPage>
       </PermissionGuard>
     } />
     <Route path="admin/dados" element={

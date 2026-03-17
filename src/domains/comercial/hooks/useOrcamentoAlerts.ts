@@ -26,6 +26,7 @@ interface UseOrcamentoAlertsParams {
   markupMinimo: number;
   resultado: OrcamentoItemPricingResult | null;
   config: PricingConfig;
+  precoM2Minimo?: number | null;
 }
 
 export function useOrcamentoAlerts({
@@ -35,6 +36,7 @@ export function useOrcamentoAlerts({
   markupMinimo,
   resultado,
   config,
+  precoM2Minimo,
 }: UseOrcamentoAlertsParams): OrcamentoAlert[] {
   return useMemo(() => {
     const alerts: OrcamentoAlert[] = [];
@@ -96,6 +98,16 @@ export function useOrcamentoAlerts({
       });
     }
 
+    // 6. Preço/m² abaixo do mínimo — BLOQUEANTE
+    if (precoM2Minimo && precoM2Minimo > 0 && resultado && resultado.precoM2 != null && resultado.precoM2 < precoM2Minimo) {
+      alerts.push({
+        id: "preco-m2-abaixo-minimo",
+        severity: "error",
+        title: "Preço/m² abaixo do mínimo",
+        message: `Preço de R$ ${resultado.precoM2.toFixed(2)}/m² está abaixo do mínimo de R$ ${precoM2Minimo.toFixed(2)}/m². Aumente o markup ou o preço unitário.`,
+      });
+    }
+
     return alerts;
-  }, [materiais, acabamentos, markup, markupMinimo, resultado, config]);
+  }, [materiais, acabamentos, markup, markupMinimo, resultado, config, precoM2Minimo]);
 }

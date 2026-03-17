@@ -35,6 +35,8 @@ export interface PricingConfig {
   percentualImpostos: number;
   /** Percentual de juros / custo financeiro */
   percentualJuros: number;
+  /** Percentual de encargos trabalhistas (0% se sem CLT, ~70% com registro) */
+  percentualEncargos: number;
 }
 
 export interface MaterialItem {
@@ -52,6 +54,8 @@ export interface PricingInput {
   materiais: MaterialItem[];
   processos: ProcessoItem[];
   markupPercentual: number;
+  /** Custo total de máquinas para este item (já calculado externamente) */
+  custoMaquinas?: number;
 }
 
 export interface PricingResult {
@@ -89,9 +93,13 @@ export interface PricingResult {
   custoTotal: number;
   lucroEstimado: number;
 
+  // Custo de máquinas
+  custoMaquinas: number;
+
   // Breakdown percentual (sobre o preço de venda)
   percMP: number;
   percMO: number;
+  percMaquinas: number;
   percFixo: number;
   percImpostos: number;
   percComissao: number;
@@ -103,14 +111,15 @@ export interface PricingResult {
 // ---------------------------------------------------------------------------
 
 export const DEFAULT_PRICING_CONFIG: PricingConfig = {
-  faturamentoMedio: 110_000,
-  custoOperacional: 36_800,
-  custoProdutivo: 23_744,
-  qtdFuncionarios: 6,
+  faturamentoMedio: 30_000,
+  custoOperacional: 24_850,
+  custoProdutivo: 16_400,
+  qtdFuncionarios: 3,
   horasMes: 176,
   percentualComissao: 5,
   percentualImpostos: 12,
   percentualJuros: 2,
+  percentualEncargos: 0,
 };
 
 // ---------------------------------------------------------------------------
@@ -144,11 +153,14 @@ export function calcPercentualFixo(config: PricingConfig): number {
 // ---------------------------------------------------------------------------
 
 export function calcCustoPorMinuto(config: PricingConfig): number {
-  const { custoProdutivo, qtdFuncionarios, horasMes } = config;
+  const { custoProdutivo, qtdFuncionarios, horasMes, percentualEncargos } = config;
 
   if (qtdFuncionarios === 0 || horasMes === 0) return 0;
 
-  const custoPorFuncionario = custoProdutivo / qtdFuncionarios;
+  // Aplica encargos trabalhistas sobre o custo produtivo
+  const custoComEncargos = custoProdutivo * (1 + (percentualEncargos ?? 0) / 100);
+
+  const custoPorFuncionario = custoComEncargos / qtdFuncionarios;
   const custoPorHora = custoPorFuncionario / horasMes;
   const custoPorMinuto = custoPorHora / 60;
 
@@ -217,12 +229,18 @@ export function calcPricing(
   const percentualVendas = calcPercentualVendas(config);
 
   // =========================================================================
+  // PASSO 5.5: Custo de Máquinas
+  // Passado externamente (calculado por orcamento-pricing.service)
+  // =========================================================================
+  const custoMaquinas = input.custoMaquinas ?? 0;
+
+  // =========================================================================
   // PASSO 6: Custo Base (Vb)
-  // Vb = (Vmp + MO) × (1 + P/100)
+  // Vb = (Vmp + MO + Máquinas) × (1 + P/100)
   //
   // Aplica o percentual de custos fixos sobre os custos diretos
   // =========================================================================
-  const custoBase = (custoMP + custoMO) * (1 + percentualFixo / 100);
+  const custoBase = (custoMP + custoMO + custoMaquinas) * (1 + percentualFixo / 100);
 
   // =========================================================================
   // PASSO 7: Valor Antes do Markup (Vam)
@@ -270,16 +288,17 @@ export function calcPricing(
   const pv = precoVenda > 0 ? precoVenda : 1;
   const percMP = (custoMP / pv) * 100;
   const percMO = (custoMO / pv) * 100;
+  const percMaquinas = (custoMaquinas / pv) * 100;
 
   // Custo fixo rateado no produto
-  const custoFixoNoProduto = (custoMP + custoMO) * (percentualFixo / 100);
+  const custoFixoNoProduto = (custoMP + custoMO + custoMaquinas) * (percentualFixo / 100);
   const percFixo = (custoFixoNoProduto / pv) * 100;
 
   const percImpostos = config.percentualImpostos;
   const percComissao = config.percentualComissao;
 
   // Margem líquida efetiva
-  const percMargem = 100 - percMP - percMO - percFixo - percImpostos - percComissao - config.percentualJuros;
+  const percMargem = 100 - percMP - percMO - percMaquinas - percFixo - percImpostos - percComissao - config.percentualJuros;
 
   return {
     custoMP,
@@ -295,8 +314,10 @@ export function calcPricing(
     margemBruta,
     custoTotal,
     lucroEstimado,
+    custoMaquinas,
     percMP,
     percMO,
+    percMaquinas,
     percFixo,
     percImpostos,
     percComissao,

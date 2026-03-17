@@ -35,6 +35,15 @@ export interface OrcamentoProcesso {
   tempo_setup_min?: number; // Setup time, diluted by quantity
 }
 
+export interface OrcamentoMaquina {
+  maquina_id: string;
+  nome: string;
+  tipo: string;
+  custo_hora: number;
+  custo_m2: number;
+  tempo_minutos?: number;
+}
+
 export interface OrcamentoItemInput {
   descricao: string;
   quantidade: number;
@@ -44,12 +53,14 @@ export interface OrcamentoItemInput {
   acabamentos: OrcamentoAcabamento[];
   processos: OrcamentoProcesso[];
   markup_percentual: number;
+  maquinas?: OrcamentoMaquina[];
 }
 
 export interface OrcamentoItemPricingResult {
   custoMP: number;
   custosAcabamentos: number;
   custoMO: number;
+  custoMaquinas: number;
   custoTotal: number;
   precoUnitario: number;
   precoTotal: number;
@@ -85,11 +96,14 @@ export function calcAreaM2(largura_cm?: number | null, altura_cm?: number | null
 
 /**
  * Precifica um item de orçamento usando o motor Mubisys
- * Incorpora materiais + acabamentos + processos
+ * Incorpora materiais + acabamentos + processos + máquinas
+ *
+ * @param aproveitamentoPadrao - Aproveitamento padrão da categoria (0-100), usado quando material não tem aproveitamento próprio
  */
 export function calcOrcamentoItem(
   item: OrcamentoItemInput,
   config: PricingConfig = DEFAULT_PRICING_CONFIG,
+  aproveitamentoPadrao: number = 85,
 ): OrcamentoItemPricingResult {
   const quantidade = item.quantidade || 1;
   const areaM2 = calcAreaM2(item.largura_cm, item.altura_cm);
@@ -103,7 +117,8 @@ export function calcOrcamentoItem(
   // Materiais + acabamentos go into motor TOGETHER (both get overhead)
   const materiaisParaMotor = [
     ...item.materiais.map((m) => {
-      const aproveitamento = (m.aproveitamento ?? 100) / 100;
+      // Usa aproveitamento do material se disponível, senão usa o padrão da categoria
+      const aproveitamento = (m.aproveitamento ?? aproveitamentoPadrao) / 100;
       const quantidadeReal = aproveitamento > 0 ? m.quantidade / aproveitamento : m.quantidade;
       return {
         nome: m.descricao,
@@ -125,9 +140,27 @@ export function calcOrcamentoItem(
     tempoMinutos: p.tempo_minutos + ((p.tempo_setup_min ?? 0) / qtdSafe),
   }));
 
+  // Calcular custo de máquinas
+  let custoMaquinasTotal = 0;
+  if (item.maquinas && item.maquinas.length > 0) {
+    for (const maq of item.maquinas) {
+      // Custo por tempo (custo_hora * tempo em horas)
+      const custoTempo = maq.custo_hora * ((maq.tempo_minutos ?? 0) / 60);
+      // Custo por área (custo_m2 * área do item)
+      const custoArea = maq.custo_m2 * (areaM2 ?? 0);
+      // Usa o maior dos dois (ou a soma se ambos são relevantes)
+      custoMaquinasTotal += custoTempo + custoArea;
+    }
+  }
+
   // Motor Mubisys — returns UNIT price
   const pricingResult = calcPricing(
-    { materiais: materiaisParaMotor, processos, markupPercentual: item.markup_percentual },
+    {
+      materiais: materiaisParaMotor,
+      processos,
+      markupPercentual: item.markup_percentual,
+      custoMaquinas: custoMaquinasTotal,
+    },
     config,
   );
 
@@ -140,6 +173,7 @@ export function calcOrcamentoItem(
     custoMP: pricingResult.custoMP,
     custosAcabamentos: custoAcabamentosInfo,
     custoMO: pricingResult.custoMO,
+    custoMaquinas: pricingResult.custoMaquinas,
     custoTotal: custoTotalUnitario,
     precoUnitario,
     precoTotal,
@@ -160,6 +194,7 @@ export function calcMarkupParaPreco(
   tipo: 'unitario' | 'm2',
   item: Omit<OrcamentoItemInput, 'markup_percentual'>,
   config: PricingConfig = DEFAULT_PRICING_CONFIG,
+  aproveitamentoPadrao: number = 85,
 ): { markup_percentual: number; margem_bruta: number; valido: boolean } {
   let precoUnitarioAlvo = precoAlvo;
 
@@ -176,7 +211,7 @@ export function calcMarkupParaPreco(
 
   const materiaisParaMotor = [
     ...item.materiais.map((m) => {
-      const aproveitamento = (m.aproveitamento ?? 100) / 100;
+      const aproveitamento = (m.aproveitamento ?? aproveitamentoPadrao) / 100;
       const quantidadeReal = aproveitamento > 0 ? m.quantidade / aproveitamento : m.quantidade;
       return { nome: m.descricao, quantidade: quantidadeReal, precoUnitario: m.custo_unitario };
     }),

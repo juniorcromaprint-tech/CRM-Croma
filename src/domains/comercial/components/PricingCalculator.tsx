@@ -28,6 +28,9 @@ export default function PricingCalculator({ resultado, quantidade = 1 }: Pricing
       ? [{ label: "Acabamentos", value: resultado.custosAcabamentos, color: "text-slate-600" }]
       : []),
     { label: "Custo de Produção", value: resultado.custoMO, color: "text-slate-600" },
+    ...(resultado.custoMaquinas > 0
+      ? [{ label: "Máquinas", value: resultado.custoMaquinas, color: "text-slate-600" }]
+      : []),
     { label: "Custo de Produção Total", value: resultado.custoTotal, color: "text-slate-800 font-semibold" },
     { label: "Preço Unitário", value: resultado.precoUnitario, color: "text-blue-700 font-bold" },
     { label: "Preço Total", value: resultado.precoTotal, color: "text-blue-700 font-bold" },
@@ -90,6 +93,9 @@ export default function PricingCalculator({ resultado, quantidade = 1 }: Pricing
             <div className="flex h-3 rounded-full overflow-hidden gap-0.5">
               <div className="bg-blue-400 transition-all" style={{ width: `${resultado.detalhes.percMP}%` }} title={`MP: ${resultado.detalhes.percMP.toFixed(1)}%`} />
               <div className="bg-orange-400 transition-all" style={{ width: `${resultado.detalhes.percMO}%` }} title={`MO: ${resultado.detalhes.percMO.toFixed(1)}%`} />
+              {resultado.detalhes.percMaquinas > 0 && (
+                <div className="bg-purple-400 transition-all" style={{ width: `${resultado.detalhes.percMaquinas}%` }} title={`Máquinas: ${resultado.detalhes.percMaquinas.toFixed(1)}%`} />
+              )}
               <div className="bg-slate-300 transition-all" style={{ width: `${resultado.detalhes.percFixo}%` }} title={`Fixo: ${resultado.detalhes.percFixo.toFixed(1)}%`} />
               <div className="bg-emerald-400 transition-all" style={{ width: `${resultado.detalhes.percMargem}%` }} title={`Margem: ${resultado.detalhes.percMargem.toFixed(1)}%`} />
             </div>
@@ -97,6 +103,9 @@ export default function PricingCalculator({ resultado, quantidade = 1 }: Pricing
               {[
                 { color: "bg-blue-400", label: "MP", pct: resultado.detalhes.percMP },
                 { color: "bg-orange-400", label: "MO", pct: resultado.detalhes.percMO },
+                ...(resultado.detalhes.percMaquinas > 0
+                  ? [{ color: "bg-purple-400", label: "Máquinas", pct: resultado.detalhes.percMaquinas }]
+                  : []),
                 { color: "bg-slate-300", label: "Fixo", pct: resultado.detalhes.percFixo },
                 { color: "bg-emerald-400", label: "Margem", pct: resultado.detalhes.percMargem },
               ].map(({ color, label, pct }) => (

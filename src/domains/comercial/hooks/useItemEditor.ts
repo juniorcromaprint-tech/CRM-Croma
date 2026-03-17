@@ -67,7 +67,7 @@ export function useItemEditor() {
     };
   }, [newItem]);
 
-  const { resultado: pricingResult, markupSugerido, validacaoMarkup, config, isDefaultConfig, regras } =
+  const { resultado: pricingResult, markupSugerido, validacaoMarkup, config, isDefaultConfig, regras, aproveitamentoPadrao } =
     useOrcamentoPricing(pricingInput, newItem.categoria);
 
   // Volume discount
@@ -99,6 +99,11 @@ export function useItemEditor() {
     setVolumeApplied(true);
   }, [volumeDiscount.desconto, overrideSource, markupSugerido]);
 
+  // Preço/m² mínimo da regra da categoria
+  const precoM2Minimo = useMemo(() => {
+    return (regraCategoria as any)?.preco_m2_minimo ?? null;
+  }, [regraCategoria]);
+
   // Alerts
   const alerts = useOrcamentoAlerts({
     materiais: newItem.materiais,
@@ -107,7 +112,14 @@ export function useItemEditor() {
     markupMinimo: validacaoMarkup.markup_minimo,
     resultado: pricingResult,
     config,
+    precoM2Minimo,
   });
+
+  // Has blocking alerts (severity === "error" that should block save)
+  const hasBlockingAlert = useMemo(
+    () => alerts.some(a => a.id === "preco-m2-abaixo-minimo"),
+    [alerts],
+  );
 
   // Is price overridden by user?
   const isPrecoOverride = overrideSource !== 'markup';
@@ -184,7 +196,7 @@ export function useItemEditor() {
     setPrecoOverrideValue(preco);
     setOverrideSource('preco');
     if (!pricingInput) return;
-    const result = calcMarkupParaPreco(preco, 'unitario', pricingInput, config);
+    const result = calcMarkupParaPreco(preco, 'unitario', pricingInput, config, aproveitamentoPadrao);
     if (result.valido || result.markup_percentual < 0) {
       setNewItem((s) => ({ ...s, markup_percentual: Math.round(result.markup_percentual * 100) / 100 }));
     }
@@ -193,14 +205,14 @@ export function useItemEditor() {
     if (area && area > 0) {
       setPrecoM2OverrideValue(Math.round((preco / area) * 100) / 100);
     }
-  }, [pricingInput, config, newItem.largura_cm, newItem.altura_cm]);
+  }, [pricingInput, config, aproveitamentoPadrao, newItem.largura_cm, newItem.altura_cm]);
 
   // Price/m2 override (user types price per m2)
   const handlePrecoM2Override = useCallback((precoM2: number) => {
     setPrecoM2OverrideValue(precoM2);
     setOverrideSource('m2');
     if (!pricingInput) return;
-    const result = calcMarkupParaPreco(precoM2, 'm2', pricingInput, config);
+    const result = calcMarkupParaPreco(precoM2, 'm2', pricingInput, config, aproveitamentoPadrao);
     if (result.valido || result.markup_percentual < 0) {
       setNewItem((s) => ({ ...s, markup_percentual: Math.round(result.markup_percentual * 100) / 100 }));
     }
@@ -209,7 +221,7 @@ export function useItemEditor() {
     if (area && area > 0) {
       setPrecoOverrideValue(Math.round(precoM2 * area * 100) / 100);
     }
-  }, [pricingInput, config, newItem.largura_cm, newItem.altura_cm]);
+  }, [pricingInput, config, aproveitamentoPadrao, newItem.largura_cm, newItem.altura_cm]);
 
   // Navigation
   const nextStep = useCallback(() => setCurrentStep((s) => Math.min(s + 1, 3)), []);
@@ -242,6 +254,7 @@ export function useItemEditor() {
     markupSugerido,
     validacaoMarkup,
     alerts,
+    hasBlockingAlert,
     volumeDiscount,
 
     // Handlers

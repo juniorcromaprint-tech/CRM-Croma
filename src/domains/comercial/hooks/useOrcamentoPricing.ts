@@ -49,16 +49,18 @@ export function useConfigPrecificacao(): { config: PricingConfig; isDefault: boo
 
   return useMemo(() => {
     if (!data) return { config: DEFAULT_PRICING_CONFIG, isDefault: true };
+    const d = data as Record<string, unknown>;
     return {
       config: {
-        faturamentoMedio: (data as Record<string, unknown>).faturamento_medio as number ?? DEFAULT_PRICING_CONFIG.faturamentoMedio,
-        custoOperacional: (data as Record<string, unknown>).custo_operacional as number ?? DEFAULT_PRICING_CONFIG.custoOperacional,
-        custoProdutivo: (data as Record<string, unknown>).custo_produtivo as number ?? DEFAULT_PRICING_CONFIG.custoProdutivo,
-        qtdFuncionarios: (data as Record<string, unknown>).qtd_funcionarios as number ?? DEFAULT_PRICING_CONFIG.qtdFuncionarios,
-        horasMes: (data as Record<string, unknown>).horas_mes as number ?? DEFAULT_PRICING_CONFIG.horasMes,
-        percentualComissao: (data as Record<string, unknown>).percentual_comissao as number ?? DEFAULT_PRICING_CONFIG.percentualComissao,
-        percentualImpostos: (data as Record<string, unknown>).percentual_impostos as number ?? DEFAULT_PRICING_CONFIG.percentualImpostos,
-        percentualJuros: (data as Record<string, unknown>).percentual_juros as number ?? DEFAULT_PRICING_CONFIG.percentualJuros,
+        faturamentoMedio: d.faturamento_medio as number ?? DEFAULT_PRICING_CONFIG.faturamentoMedio,
+        custoOperacional: d.custo_operacional as number ?? DEFAULT_PRICING_CONFIG.custoOperacional,
+        custoProdutivo: d.custo_produtivo as number ?? DEFAULT_PRICING_CONFIG.custoProdutivo,
+        qtdFuncionarios: d.qtd_funcionarios as number ?? DEFAULT_PRICING_CONFIG.qtdFuncionarios,
+        horasMes: d.horas_mes as number ?? DEFAULT_PRICING_CONFIG.horasMes,
+        percentualComissao: d.percentual_comissao as number ?? DEFAULT_PRICING_CONFIG.percentualComissao,
+        percentualImpostos: d.percentual_impostos as number ?? DEFAULT_PRICING_CONFIG.percentualImpostos,
+        percentualJuros: d.percentual_juros as number ?? DEFAULT_PRICING_CONFIG.percentualJuros,
+        percentualEncargos: d.percentual_encargos as number ?? DEFAULT_PRICING_CONFIG.percentualEncargos,
       },
       isDefault: false,
     };
@@ -74,14 +76,21 @@ export function useOrcamentoPricing(
   const { config, isDefault: isDefaultConfig } = useConfigPrecificacao();
   const { data: regras = [] } = useRegrasPrecificacao();
 
+  // Buscar aproveitamento_padrao da regra da categoria
+  const aproveitamentoPadrao = useMemo(() => {
+    const ativas = (regras as any[]).filter((r: any) => r.ativo !== false);
+    const regra = ativas.find((r: any) => r.categoria === categoria) ?? ativas.find((r: any) => r.categoria === 'geral');
+    return (regra as any)?.aproveitamento_padrao ?? 85;
+  }, [regras, categoria]);
+
   const resultado = useMemo((): OrcamentoItemPricingResult | null => {
     if (!item) return null;
     try {
-      return calcOrcamentoItem(item, config);
+      return calcOrcamentoItem(item, config, aproveitamentoPadrao);
     } catch {
       return null;
     }
-  }, [item, config]);
+  }, [item, config, aproveitamentoPadrao]);
 
   const markupSugerido = useMemo(
     () => sugerirMarkup(categoria, regras as RegraPrecificacao[]),
@@ -103,5 +112,6 @@ export function useOrcamentoPricing(
     regras,
     markupSugerido,
     validacaoMarkup,
+    aproveitamentoPadrao,
   };
 }
