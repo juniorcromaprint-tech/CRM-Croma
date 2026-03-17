@@ -541,6 +541,97 @@ export const orcamentoService = {
     return data as OrcamentoItem;
   },
 
+  // ─── Atualizar item COM materiais, acabamentos e processos ───────────────
+  async atualizarItemDetalhado(
+    itemId: string,
+    propostaId: string,
+    item: OrcamentoItemCreateDetalhado,
+  ): Promise<OrcamentoItem> {
+    const { materiais, acabamentos, processos, ...itemBase } = item;
+
+    // 1. Atualizar item principal
+    const { data: updatedItem, error } = await supabase
+      .from("proposta_itens")
+      .update({ ...itemBase, proposta_id: propostaId })
+      .eq("id", itemId)
+      .select()
+      .single();
+
+    if (error) throw error;
+    const itemResult = updatedItem as OrcamentoItem;
+
+    // 2. Substituir materiais (DELETE + INSERT)
+    try {
+      await supabase
+        .from("proposta_item_materiais")
+        .delete()
+        .eq("proposta_item_id", itemId);
+
+      if (materiais && materiais.length > 0) {
+        await supabase.from("proposta_item_materiais").insert(
+          materiais.map((m) => ({
+            proposta_item_id: itemId,
+            material_id: m.material_id ?? null,
+            descricao: m.descricao,
+            quantidade: m.quantidade,
+            unidade: m.unidade,
+            custo_unitario: m.custo_unitario,
+            custo_total: m.custo_total,
+          })),
+        );
+      }
+    } catch {
+      // Tabela pode não existir ainda (migration 006 pendente)
+      console.warn("[orcamento.service] proposta_item_materiais não disponível");
+    }
+
+    // 3. Substituir acabamentos (DELETE + INSERT)
+    try {
+      await supabase
+        .from("proposta_item_acabamentos")
+        .delete()
+        .eq("proposta_item_id", itemId);
+
+      if (acabamentos && acabamentos.length > 0) {
+        await supabase.from("proposta_item_acabamentos").insert(
+          acabamentos.map((a) => ({
+            proposta_item_id: itemId,
+            acabamento_id: a.acabamento_id ?? null,
+            descricao: a.descricao,
+            quantidade: a.quantidade,
+            custo_unitario: a.custo_unitario,
+            custo_total: a.custo_total,
+          })),
+        );
+      }
+    } catch {
+      console.warn("[orcamento.service] proposta_item_acabamentos não disponível");
+    }
+
+    // 4. Substituir processos (DELETE + INSERT — migration 018)
+    try {
+      await supabase
+        .from("proposta_item_processos")
+        .delete()
+        .eq("proposta_item_id", itemId);
+
+      if (processos && processos.length > 0) {
+        await supabase.from("proposta_item_processos").insert(
+          processos.map((p, idx) => ({
+            proposta_item_id: itemId,
+            etapa: p.etapa,
+            tempo_minutos: p.tempo_minutos,
+            ordem: p.ordem ?? idx,
+          })),
+        );
+      }
+    } catch {
+      console.warn("[orcamento.service] proposta_item_processos não disponível (migration 018 pendente?)");
+    }
+
+    return itemResult;
+  },
+
   // ─── Remover item ────────────────────────────────────────────────────────
   async removerItem(id: string): Promise<void> {
     const { error } = await supabase

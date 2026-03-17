@@ -9,6 +9,7 @@ import { useNavigate, useParams, Link } from "react-router-dom";
 import {
   ArrowLeft, Plus, Trash2, Save, Loader2, FileText,
   ChevronDown, ChevronUp, AlertTriangle, Package, Layers, CheckCircle,
+  Pencil,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -23,8 +24,10 @@ import {
   useCriarOrcamento,
   useAtualizarOrcamento,
   useAdicionarItemDetalhado,
+  useAtualizarItemDetalhado,
   useRemoverItemOrcamento,
   useSalvarServicos,
+  ORCAMENTOS_QUERY_KEY,
 } from "../hooks/useOrcamentos";
 import { useRegrasPrecificacao } from "../hooks/useOrcamentoPricing";
 import { useItemEditor } from "../hooks/useItemEditor";
@@ -167,6 +170,7 @@ export default function OrcamentoEditorPage() {
   const atualizar = useAtualizarOrcamento();
   const adicionarItem = useAdicionarItemDetalhado();
   const removerItem = useRemoverItemOrcamento();
+  const atualizarItemDet = useAtualizarItemDetalhado();
   const salvarServicos = useSalvarServicos();
 
   // ─── Form state (header) ────────────────────────────────────────────────
@@ -189,6 +193,10 @@ export default function OrcamentoEditorPage() {
 
   // ─── Template modal ─────────────────────────────────────────────────────
   const [showTemplateModal, setShowTemplateModal] = useState(false);
+
+  // ─── Inline price edit ──────────────────────────────────────────────────
+  const [inlineEditId, setInlineEditId] = useState<string | null>(null);
+  const [inlinePrice, setInlinePrice] = useState("");
 
   // ─── AI state ────────────────────────────────────────────────────────────
   const queryClient = useQueryClient();
@@ -353,7 +361,7 @@ export default function OrcamentoEditorPage() {
     }
   };
 
-  const handleAddItem = async () => {
+  const handleSaveItem = async () => {
     if (editor.isDefaultConfig) { showError("Configure os parâmetros de precificação antes de adicionar itens"); return; }
     if (!newItem.descricao.trim()) { showError("Informe a descricao do item"); return; }
     if (!id || isNew) { showError("Salve o orcamento antes de adicionar itens"); return; }
@@ -371,59 +379,108 @@ export default function OrcamentoEditorPage() {
       return;
     }
 
+    const isEditing = !!editor.editingItemId;
+
     try {
-      await adicionarItem.mutateAsync({
-        propostaId: id,
-        item: {
-          produto_id: newItem.produto_id,
-          modelo_id: newItem.modelo_id ?? undefined,
-          descricao: newItem.descricao,
-          especificacao: newItem.especificacao || null,
-          quantidade: newItem.quantidade,
-          unidade: "un",
-          largura_cm: newItem.largura_cm,
-          altura_cm: newItem.altura_cm,
-          area_m2: pricingResult.areaM2,
-          custo_mp: pricingResult.custoMP,
-          custo_mo: pricingResult.custoMO,
-          custo_fixo: Math.max(0, pricingResult.custoTotal - pricingResult.custoMP - pricingResult.custoMO),
-          markup_percentual: newItem.markup_percentual,
-          preco_override: editor.isPrecoOverride,
-          valor_unitario: pricingResult.precoUnitario,
-          valor_total: pricingResult.precoTotal,
-          ordem: (orcamentoItens.length ?? 0) + 1,
-          // Detalhes do item
-          materiais: newItem.materiais.map((m) => ({
-            material_id: m.material_id ?? null,
-            descricao: m.descricao,
-            quantidade: m.quantidade,
-            unidade: m.unidade,
-            custo_unitario: m.custo_unitario,
-            custo_total: m.quantidade * m.custo_unitario,
-          })),
-          acabamentos: newItem.acabamentos.map((a) => ({
-            acabamento_id: a.acabamento_id ?? null,
-            descricao: a.descricao,
-            quantidade: a.quantidade,
-            custo_unitario: a.custo_unitario,
-            custo_total: a.quantidade * a.custo_unitario,
-          })),
-          processos: newItem.processos.map((p, idx) => ({
-            etapa: p.etapa,
-            tempo_minutos: p.tempo_minutos,
-            ordem: idx,
-          })),
-        },
-      });
+      if (editor.editingItemId) {
+        // ── EDIT MODE ──
+        await atualizarItemDet.mutateAsync({
+          itemId: editor.editingItemId,
+          propostaId: id,
+          item: {
+            produto_id: newItem.produto_id,
+            modelo_id: newItem.modelo_id ?? undefined,
+            descricao: newItem.descricao,
+            especificacao: newItem.especificacao || null,
+            quantidade: newItem.quantidade,
+            unidade: "un",
+            largura_cm: newItem.largura_cm,
+            altura_cm: newItem.altura_cm,
+            area_m2: pricingResult.areaM2,
+            custo_mp: pricingResult.custoMP,
+            custo_mo: pricingResult.custoMO,
+            custo_fixo: Math.max(0, pricingResult.custoTotal - pricingResult.custoMP - pricingResult.custoMO),
+            markup_percentual: newItem.markup_percentual,
+            preco_override: editor.isPrecoOverride,
+            valor_unitario: pricingResult.precoUnitario,
+            valor_total: pricingResult.precoTotal,
+            materiais: newItem.materiais.map((m) => ({
+              material_id: m.material_id ?? null,
+              descricao: m.descricao,
+              quantidade: m.quantidade,
+              unidade: m.unidade,
+              custo_unitario: m.custo_unitario,
+              custo_total: m.quantidade * m.custo_unitario,
+            })),
+            acabamentos: newItem.acabamentos.map((a) => ({
+              acabamento_id: a.acabamento_id ?? null,
+              descricao: a.descricao,
+              quantidade: a.quantidade,
+              custo_unitario: a.custo_unitario,
+              custo_total: a.quantidade * a.custo_unitario,
+            })),
+            processos: newItem.processos.map((p, idx) => ({
+              etapa: p.etapa,
+              tempo_minutos: p.tempo_minutos,
+              ordem: idx,
+            })),
+          },
+        });
+      } else {
+        // ── ADD MODE ──
+        await adicionarItem.mutateAsync({
+          propostaId: id,
+          item: {
+            produto_id: newItem.produto_id,
+            modelo_id: newItem.modelo_id ?? undefined,
+            descricao: newItem.descricao,
+            especificacao: newItem.especificacao || null,
+            quantidade: newItem.quantidade,
+            unidade: "un",
+            largura_cm: newItem.largura_cm,
+            altura_cm: newItem.altura_cm,
+            area_m2: pricingResult.areaM2,
+            custo_mp: pricingResult.custoMP,
+            custo_mo: pricingResult.custoMO,
+            custo_fixo: Math.max(0, pricingResult.custoTotal - pricingResult.custoMP - pricingResult.custoMO),
+            markup_percentual: newItem.markup_percentual,
+            preco_override: editor.isPrecoOverride,
+            valor_unitario: pricingResult.precoUnitario,
+            valor_total: pricingResult.precoTotal,
+            ordem: (orcamentoItens.length ?? 0) + 1,
+            // Detalhes do item
+            materiais: newItem.materiais.map((m) => ({
+              material_id: m.material_id ?? null,
+              descricao: m.descricao,
+              quantidade: m.quantidade,
+              unidade: m.unidade,
+              custo_unitario: m.custo_unitario,
+              custo_total: m.quantidade * m.custo_unitario,
+            })),
+            acabamentos: newItem.acabamentos.map((a) => ({
+              acabamento_id: a.acabamento_id ?? null,
+              descricao: a.descricao,
+              quantidade: a.quantidade,
+              custo_unitario: a.custo_unitario,
+              custo_total: a.quantidade * a.custo_unitario,
+            })),
+            processos: newItem.processos.map((p, idx) => ({
+              etapa: p.etapa,
+              tempo_minutos: p.tempo_minutos,
+              ordem: idx,
+            })),
+          },
+        });
+      }
 
       // NOTE: recalcularTotais + cache invalidation already handled by
-      // useAdicionarItemDetalhado hook's mutationFn and onSuccess
+      // useAdicionarItemDetalhado / useAtualizarItemDetalhado hooks
       editor.reset();
       setShowItemForm(false);
-      showSuccess("Item adicionado com sucesso!");
+      showSuccess(isEditing ? "Item atualizado!" : "Item adicionado com sucesso!");
     } catch (err: any) {
-      console.error("[handleAddItem] Falha ao adicionar item:", err);
-      showError(err?.message || "Erro ao adicionar item ao orçamento");
+      console.error("[handleSaveItem] Falha:", err);
+      showError(err?.message || "Erro ao salvar item");
     }
   };
 
@@ -431,6 +488,71 @@ export default function OrcamentoEditorPage() {
     if (!id) return;
     await removerItem.mutateAsync({ itemId, propostaId: id });
     await orcamentoService.recalcularTotais(id);
+  };
+
+  const handleEditItem = (item: any) => {
+    editor.loadItem({
+      id: item.id,
+      produto_id: item.produto_id,
+      modelo_id: item.modelo_id,
+      descricao: item.descricao,
+      especificacao: item.especificacao,
+      quantidade: item.quantidade,
+      largura_cm: item.largura_cm,
+      altura_cm: item.altura_cm,
+      markup_percentual: item.markup_percentual,
+      categoria: item.categoria,
+      materiais: item.materiais?.map((m: any) => ({
+        material_id: m.material_id,
+        descricao: m.descricao,
+        quantidade: m.quantidade,
+        unidade: m.unidade,
+        custo_unitario: m.custo_unitario,
+        aproveitamento: m.aproveitamento ?? 100,
+      })),
+      acabamentos: item.acabamentos?.map((a: any) => ({
+        acabamento_id: a.acabamento_id,
+        descricao: a.descricao,
+        quantidade: a.quantidade,
+        custo_unitario: a.custo_unitario,
+      })),
+      processos: item.processos?.map((p: any) => ({
+        etapa: p.etapa,
+        tempo_minutos: p.tempo_minutos,
+        tempo_setup_min: p.tempo_setup_min ?? 0,
+      })),
+    });
+    setShowItemForm(true);
+    setItemFormExpanded(true);
+  };
+
+  const handleInlinePriceSave = async (itemId: string) => {
+    if (!id) return;
+    const valor = parseFloat(inlinePrice.replace(",", "."));
+    if (isNaN(valor) || valor <= 0) {
+      showError("Valor inválido");
+      setInlineEditId(null);
+      setInlinePrice("");
+      return;
+    }
+    const item = orcamentoItens.find((i) => i.id === itemId);
+    if (!item) return;
+    const novoTotal = valor * item.quantidade;
+
+    try {
+      await orcamentoService.atualizarItem(itemId, {
+        valor_unitario: valor,
+        valor_total: novoTotal,
+      });
+      await orcamentoService.recalcularTotais(id);
+      queryClient.invalidateQueries({ queryKey: [ORCAMENTOS_QUERY_KEY, id] });
+      queryClient.invalidateQueries({ queryKey: [ORCAMENTOS_QUERY_KEY] });
+      showSuccess("Preço atualizado!");
+    } catch (err: any) {
+      showError(err?.message || "Erro ao atualizar preço");
+    }
+    setInlineEditId(null);
+    setInlinePrice("");
   };
 
   const handleTemplateSelect = async (template: OrcamentoTemplate) => {
@@ -739,16 +861,55 @@ export default function OrcamentoEditorPage() {
                           ) : null}
                         </td>
                         <td className="py-3 px-3 text-right text-slate-600 tabular-nums hidden md:table-cell">{item.quantidade}</td>
-                        <td className="py-3 px-3 text-right text-slate-600 tabular-nums hidden md:table-cell">{brl(item.valor_unitario)}</td>
+                        <td className="py-3 px-3 text-right text-slate-600 tabular-nums hidden md:table-cell">
+                          {inlineEditId === item.id ? (
+                            <div className="flex items-center justify-end gap-1">
+                              <Input
+                                type="text"
+                                value={inlinePrice}
+                                onChange={(e) => setInlinePrice(e.target.value)}
+                                onKeyDown={(e) => {
+                                  if (e.key === "Enter") handleInlinePriceSave(item.id);
+                                  if (e.key === "Escape") { setInlineEditId(null); setInlinePrice(""); }
+                                }}
+                                onBlur={() => handleInlinePriceSave(item.id)}
+                                className="w-24 h-7 text-right text-xs rounded-lg"
+                                autoFocus
+                              />
+                            </div>
+                          ) : (
+                            <span
+                              className="cursor-pointer hover:text-blue-600 hover:underline"
+                              onClick={() => {
+                                setInlineEditId(item.id);
+                                setInlinePrice(String(item.valor_unitario));
+                              }}
+                              title="Clique para editar o preço"
+                            >
+                              {brl(item.valor_unitario)}
+                            </span>
+                          )}
+                        </td>
                         <td className="py-3 px-3 text-right font-semibold text-slate-800 tabular-nums">{brl(item.valor_total)}</td>
                         <td className="py-3 px-3">
-                          <Button
-                            variant="ghost" size="icon"
-                            className="h-7 w-7 rounded-lg text-slate-300 hover:text-red-600 hover:bg-red-50 opacity-0 group-hover:opacity-100 transition-opacity"
-                            onClick={() => handleRemoveItem(item.id)}
-                          >
-                            <Trash2 size={14} />
-                          </Button>
+                          <div className="flex items-center gap-1">
+                            <Button
+                              variant="ghost" size="icon"
+                              className="h-7 w-7 rounded-lg text-slate-300 hover:text-blue-600 hover:bg-blue-50 opacity-0 group-hover:opacity-100 transition-opacity"
+                              onClick={() => handleEditItem(item)}
+                              title="Editar item"
+                            >
+                              <Pencil size={14} />
+                            </Button>
+                            <Button
+                              variant="ghost" size="icon"
+                              className="h-7 w-7 rounded-lg text-slate-300 hover:text-red-600 hover:bg-red-50 opacity-0 group-hover:opacity-100 transition-opacity"
+                              onClick={() => handleRemoveItem(item.id)}
+                              title="Remover item"
+                            >
+                              <Trash2 size={14} />
+                            </Button>
+                          </div>
                         </td>
                       </tr>
                     ))}
@@ -769,7 +930,7 @@ export default function OrcamentoEditorPage() {
                   className="flex items-center justify-between px-5 py-3 bg-blue-50 border-b border-blue-200 cursor-pointer"
                   onClick={() => setItemFormExpanded((e) => !e)}
                 >
-                  <p className="text-sm font-semibold text-blue-800">Novo Item — Etapa {currentStep} de 3</p>
+                  <p className="text-sm font-semibold text-blue-800">{editor.editingItemId ? "Editar Item" : "Novo Item"} — Etapa {currentStep} de 3</p>
                   <div className="flex items-center gap-2">
                     {pricingResult && (
                       <Badge className="bg-blue-100 text-blue-700 border-blue-200 text-xs">
@@ -959,15 +1120,17 @@ export default function OrcamentoEditorPage() {
                                 Voltar
                               </Button>
                               <Button
-                                onClick={handleAddItem}
-                                disabled={editor.isDefaultConfig || adicionarItem.isPending || !pricingResult}
+                                onClick={handleSaveItem}
+                                disabled={editor.isDefaultConfig || adicionarItem.isPending || atualizarItemDet.isPending || !pricingResult}
                                 className="rounded-xl bg-blue-600 text-white hover:bg-blue-700 px-6"
                               >
-                                {adicionarItem.isPending
+                                {(adicionarItem.isPending || atualizarItemDet.isPending)
                                   ? <Loader2 className="animate-spin mr-2" size={14} />
-                                  : <Plus size={14} className="mr-2" />
+                                  : editor.editingItemId
+                                    ? <Pencil size={14} className="mr-2" />
+                                    : <Plus size={14} className="mr-2" />
                                 }
-                                Adicionar Item
+                                {editor.editingItemId ? "Salvar Alterações" : "Adicionar Item"}
                               </Button>
                             </div>
                           </>

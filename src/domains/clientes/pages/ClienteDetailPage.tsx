@@ -20,6 +20,7 @@ import { useContatos, useCreateContato, useDeleteContato } from "@/domains/clien
 import { useAuth } from "@/contexts/AuthContext";
 import { useCepLookup } from "@/domains/clientes/hooks/useCepLookup";
 import { useCnpjLookup } from "@/domains/clientes/hooks/useCnpjLookup";
+import { useCnpjDuplicate } from "@/domains/clientes/hooks/useCnpjDuplicate";
 
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
@@ -233,6 +234,7 @@ export default function ClienteDetailPage() {
   const deleteContato = useDeleteContato();
   const { lookup: lookupCep, loading: cepLoading } = useCepLookup();
   const { lookup: lookupCnpj, loading: cnpjLoading } = useCnpjLookup();
+  const cnpjDup = useCnpjDuplicate();
   const { profile } = useAuth();
   const canDelete = profile?.role === 'admin' || profile?.role === 'diretor';
 
@@ -623,7 +625,7 @@ export default function ClienteDetailPage() {
                     <Button
                       size="sm"
                       onClick={handleSave}
-                      disabled={updateCliente.isPending}
+                      disabled={updateCliente.isPending || cnpjDup.isDuplicate}
                       className="bg-blue-600 hover:bg-blue-700"
                     >
                       {updateCliente.isPending ? (
@@ -667,11 +669,13 @@ export default function ClienteDetailPage() {
                     <div className="flex gap-2">
                       <Input
                         value={editForm.cnpj ?? ""}
-                        onChange={(e) =>
-                          setEditForm({ ...editForm, cnpj: e.target.value })
-                        }
+                        onChange={(e) => {
+                          setEditForm({ ...editForm, cnpj: e.target.value });
+                          cnpjDup.reset();
+                        }}
+                        onBlur={() => editForm.cnpj && cnpjDup.check(editForm.cnpj, id)}
                         placeholder="00.000.000/0000-00"
-                        className="flex-1"
+                        className={`flex-1 ${cnpjDup.isDuplicate ? "border-red-300 focus-visible:ring-red-400" : ""}`}
                       />
                       <Button
                         type="button"
@@ -689,6 +693,9 @@ export default function ClienteDetailPage() {
                         <span className="ml-1">{cnpjLoading ? "Buscando..." : "Buscar"}</span>
                       </Button>
                     </div>
+                    {cnpjDup.isDuplicate && (
+                      <p className="text-xs text-red-500 mt-1">CNPJ já cadastrado em: <strong>{cnpjDup.clienteNome}</strong></p>
+                    )}
                   </div>
 
                   {/* Inscrição Estadual */}
