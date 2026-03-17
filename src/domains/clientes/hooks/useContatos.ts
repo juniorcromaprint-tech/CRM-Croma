@@ -8,13 +8,12 @@ import { showSuccess, showError } from '@/utils/toast';
 
 export interface ContatoInput {
   cliente_id: string;
-  unidade_id?: string | null;
   nome: string;
   cargo?: string | null;
   email?: string | null;
   telefone?: string | null;
-  celular?: string | null;
-  decisor?: boolean;
+  whatsapp?: string | null;
+  e_decisor?: boolean;
   ativo?: boolean;
 }
 
@@ -43,7 +42,7 @@ export function useContatos(clienteId: string | undefined) {
       if (!clienteId) throw new Error('ID do cliente nao informado');
 
       const { data, error } = await supabase
-        .from('contatos')
+        .from('cliente_contatos')
         .select('*, cliente_unidades(nome)')
         .eq('cliente_id', clienteId)
         .order('nome', { ascending: true });
@@ -64,7 +63,7 @@ export function useCreateContato() {
   return useMutation({
     mutationFn: async (input: ContatoInput) => {
       const { data, error } = await supabase
-        .from('contatos')
+        .from('cliente_contatos')
         .insert(input)
         .select()
         .single();
@@ -91,7 +90,7 @@ export function useUpdateContato() {
   return useMutation({
     mutationFn: async ({ id, ...updates }: ContatoUpdate) => {
       const { data, error } = await supabase
-        .from('contatos')
+        .from('cliente_contatos')
         .update(updates)
         .eq('id', id)
         .select()
