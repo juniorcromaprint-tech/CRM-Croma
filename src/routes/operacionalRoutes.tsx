@@ -12,6 +12,8 @@ const Produtos = lazy(() => import("@/pages/Produtos"));
 const ExpedicaoPage = lazy(() => import("@/domains/producao/pages/ExpedicaoPage"));
 const OrdemServicoPage = lazy(() => import("@/domains/producao/pages/OrdemServicoPage"));
 const OrdemServicoOPPage = lazy(() => import("@/domains/producao/pages/OrdemServicoOPPage"));
+const PCPDashboardPage = lazy(() => import('@/domains/producao/pages/PCPDashboardPage'));
+const SectorQueuePage = lazy(() => import('@/domains/producao/pages/SectorQueuePage'));
 
 export const operacionalRoutes = (
   <>
@@ -24,6 +26,8 @@ export const operacionalRoutes = (
     <Route path="instalacoes" element={<LazyPage><InstalacaoPage /></LazyPage>} />
     <Route path="almoxarife" element={<LazyPage><AlmoxarifePage /></LazyPage>} />
     <Route path="producao/diario-bordo" element={<LazyPage><DiarioBordoPage /></LazyPage>} />
+    <Route path="producao/pcp" element={<LazyPage><PCPDashboardPage /></LazyPage>} />
+    <Route path="producao/setor/:sectorId" element={<LazyPage><SectorQueuePage /></LazyPage>} />
     <Route path="produtos" element={<LazyPage><Produtos /></LazyPage>} />
   </>
 );

@@ -26,7 +26,7 @@ import {
   Users, Settings, Shield, Menu, Receipt, FileCheck, List,
   SlidersHorizontal, Key, BookOpen, LogOut, Calculator, Cog, Database,
   PanelLeftClose, PanelLeftOpen, Search, Truck,
-  Calendar, Megaphone, Package2, ArrowLeftRight, Building, Layers, BarChart2,
+  Calendar, Megaphone, Package2, ArrowLeftRight, Building, Layers, BarChart2, Gantt,
   type LucideIcon,
 } from "lucide-react";
 
@@ -36,7 +36,7 @@ const ICON_MAP: Record<string, LucideIcon> = {
   Package, Wallet, BarChart3, BadgeDollarSign, AlertTriangle,
   Users, Settings, Shield, Receipt, FileCheck, List,
   SlidersHorizontal, Key, BookOpen, Calculator, Cog, Database, Truck,
-  Calendar, Megaphone, Package2, ArrowLeftRight, Building, Layers, BarChart2,
+  Calendar, Megaphone, Package2, ArrowLeftRight, Building, Layers, BarChart2, Gantt,
 };
 
 // ---------------------------------------------------------------------------
