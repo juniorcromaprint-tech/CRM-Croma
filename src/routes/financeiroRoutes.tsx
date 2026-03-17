@@ -10,6 +10,8 @@ const PedidosAFaturarPage = lazy(() => import("@/domains/financeiro/pages/Pedido
 const ConciliacaoPage = lazy(() => import("@/domains/financeiro/pages/ConciliacaoPage"));
 const BoletosPage = lazy(() => import("@/domains/financeiro/pages/BoletosPage"));
 const ConfigBancariaPage = lazy(() => import("@/domains/financeiro/pages/ConfigBancariaPage"));
+const FluxoCaixaPage = lazy(() => import("@/domains/financeiro/pages/FluxoCaixaPage"));
+const RetornoUploadPage = lazy(() => import("@/domains/financeiro/pages/RetornoUploadPage"));
 
 export const financeiroRoutes = (
   <>
@@ -21,5 +23,7 @@ export const financeiroRoutes = (
     <Route path="financeiro/conciliacao" element={<LazyPage><ConciliacaoPage /></LazyPage>} />
     <Route path="financeiro/boletos" element={<LazyPage><BoletosPage /></LazyPage>} />
     <Route path="financeiro/config-bancaria" element={<LazyPage><ConfigBancariaPage /></LazyPage>} />
+    <Route path="financeiro/fluxo-caixa" element={<LazyPage><FluxoCaixaPage /></LazyPage>} />
+    <Route path="financeiro/retornos" element={<LazyPage><RetornoUploadPage /></LazyPage>} />
   </>
 );
