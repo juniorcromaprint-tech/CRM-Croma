@@ -17,6 +17,8 @@ import { useQueryClient } from '@tanstack/react-query';
 import type { AIResponse } from '@/domains/ai/types/ai.types';
 import { useUnidades, useCreateUnidade } from "@/domains/clientes/hooks/useUnidades";
 import { useContatos, useCreateContato } from "@/domains/clientes/hooks/useContatos";
+import { useCepLookup } from "@/domains/clientes/hooks/useCepLookup";
+import { useCnpjLookup } from "@/domains/clientes/hooks/useCnpjLookup";
 
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
@@ -61,6 +63,7 @@ import {
   CheckCircle,
   AlertCircle,
   Loader2,
+  Search,
 } from "lucide-react";
 
 // ---------------------------------------------------------------------------
@@ -223,6 +226,8 @@ export default function ClienteDetailPage() {
   const updateCliente = useUpdateCliente();
   const createUnidade = useCreateUnidade();
   const createContato = useCreateContato();
+  const { lookup: lookupCep, loading: cepLoading } = useCepLookup();
+  const { lookup: lookupCnpj, loading: cnpjLoading } = useCnpjLookup();
 
   // ---- AI ----
   const queryClient = useQueryClient();
@@ -343,6 +348,7 @@ export default function ClienteDetailPage() {
       endereco_cidade: cliente.endereco_cidade ?? "",
       endereco_estado: cliente.endereco_estado ?? "",
       endereco_cep: cliente.endereco_cep ?? "",
+      inscricao_estadual: cliente.inscricao_estadual ?? "",
       observacoes: cliente.observacoes ?? "",
     });
     setEditing(true);
@@ -380,6 +386,34 @@ export default function ClienteDetailPage() {
         },
       }
     );
+  }
+
+  async function handleCepBlur() {
+    if (!editForm.endereco_cep) return;
+    const result = await lookupCep(editForm.endereco_cep);
+    if (result) {
+      setEditForm((prev) => ({ ...prev, ...result }));
+    }
+  }
+
+  async function handleCnpjBuscar() {
+    if (!editForm.cnpj) return;
+    const result = await lookupCnpj(editForm.cnpj);
+    if (result) {
+      setEditForm((prev) => ({
+        ...prev,
+        razao_social: prev.razao_social || result.razao_social,
+        nome_fantasia: prev.nome_fantasia || result.nome_fantasia,
+        email: prev.email || result.email,
+        telefone: prev.telefone || result.telefone,
+        endereco_rua: prev.endereco_rua || result.endereco_rua,
+        endereco_numero: prev.endereco_numero || result.endereco_numero,
+        endereco_bairro: prev.endereco_bairro || result.endereco_bairro,
+        endereco_cidade: prev.endereco_cidade || result.endereco_cidade,
+        endereco_estado: prev.endereco_estado || result.endereco_estado,
+        endereco_cep: prev.endereco_cep || result.endereco_cep,
+      }));
+    }
   }
 
   function handleCreateContato() {
@@ -596,13 +630,45 @@ export default function ClienteDetailPage() {
                       }
                     />
                   </div>
+                  {/* CNPJ com botão Buscar */}
                   <div>
                     <Label>CNPJ</Label>
+                    <div className="flex gap-2">
+                      <Input
+                        value={editForm.cnpj ?? ""}
+                        onChange={(e) =>
+                          setEditForm({ ...editForm, cnpj: e.target.value })
+                        }
+                        placeholder="00.000.000/0000-00"
+                        className="flex-1"
+                      />
+                      <Button
+                        type="button"
+                        variant="outline"
+                        size="sm"
+                        onClick={handleCnpjBuscar}
+                        disabled={cnpjLoading || !editForm.cnpj}
+                        className="shrink-0"
+                      >
+                        {cnpjLoading ? (
+                          <Loader2 size={14} className="animate-spin" />
+                        ) : (
+                          <Search size={14} />
+                        )}
+                        <span className="ml-1">{cnpjLoading ? "Buscando..." : "Buscar"}</span>
+                      </Button>
+                    </div>
+                  </div>
+
+                  {/* Inscrição Estadual */}
+                  <div>
+                    <Label>Inscrição Estadual</Label>
                     <Input
-                      value={editForm.cnpj ?? ""}
+                      value={editForm.inscricao_estadual ?? ""}
                       onChange={(e) =>
-                        setEditForm({ ...editForm, cnpj: e.target.value })
+                        setEditForm({ ...editForm, inscricao_estadual: e.target.value })
                       }
+                      placeholder="Opcional"
                     />
                   </div>
                   <div>
@@ -743,15 +809,26 @@ export default function ClienteDetailPage() {
                     </div>
                     <div>
                       <Label>CEP</Label>
-                      <Input
-                        value={editForm.endereco_cep ?? ""}
-                        onChange={(e) =>
-                          setEditForm({
-                            ...editForm,
-                            endereco_cep: e.target.value,
-                          })
-                        }
-                      />
+                      <div className="relative">
+                        <Input
+                          value={editForm.endereco_cep ?? ""}
+                          onChange={(e) =>
+                            setEditForm({
+                              ...editForm,
+                              endereco_cep: e.target.value,
+                            })
+                          }
+                          onBlur={handleCepBlur}
+                          placeholder="00000-000"
+                          disabled={cepLoading}
+                        />
+                        {cepLoading && (
+                          <Loader2
+                            size={14}
+                            className="absolute right-3 top-1/2 -translate-y-1/2 animate-spin text-slate-400"
+                          />
+                        )}
+                      </div>
                     </div>
                   </div>
                 </div>
