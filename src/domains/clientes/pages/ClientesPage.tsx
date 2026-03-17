@@ -9,6 +9,7 @@ import {
   Building2, Search, Plus, Phone, Mail, MapPin,
   ChevronRight, Star, Filter, Globe, Loader2
 } from "lucide-react";
+import { useCnpjLookup } from "@/domains/clientes/hooks/useCnpjLookup";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Badge } from "@/components/ui/badge";
@@ -49,11 +50,29 @@ export default function ClientesPage() {
   const [showNew, setShowNew] = useState(false);
   const [page, setPage] = useState(1);
 
+  const { lookup: lookupCnpj, loading: cnpjLoading } = useCnpjLookup();
+
   const [form, setForm] = useState({
     razao_social: "", nome_fantasia: "", cnpj: "", segmento: "",
     classificacao: "C", email: "", telefone: "", website: "",
     endereco_cidade: "", endereco_estado: "", observacoes: "",
   });
+
+  async function handleCnpjBuscar() {
+    if (!form.cnpj) return;
+    const result = await lookupCnpj(form.cnpj);
+    if (result) {
+      setForm((prev) => ({
+        ...prev,
+        razao_social: prev.razao_social || result.razao_social,
+        nome_fantasia: prev.nome_fantasia || result.nome_fantasia,
+        email: prev.email || result.email,
+        telefone: prev.telefone || result.telefone,
+        endereco_cidade: prev.endereco_cidade || result.endereco_cidade,
+        endereco_estado: prev.endereco_estado || result.endereco_estado,
+      }));
+    }
+  }
 
   const { data: clientesResult, isLoading } = useQuery({
     queryKey: ["clientes", search, segFilter, classFilter, page],
@@ -95,9 +114,10 @@ export default function ClientesPage() {
 
   const createCliente = useMutation({
     mutationFn: async (newCliente: typeof form) => {
-      const { endereco_cidade, endereco_estado, ...rest } = newCliente;
+      const { endereco_cidade, endereco_estado, website, ...rest } = newCliente;
       const { error } = await supabase.from("clientes").insert({
         ...rest,
+        site: website || null,
         cidade: endereco_cidade,
         estado: endereco_estado,
       });
@@ -274,7 +294,13 @@ export default function ClientesPage() {
               </div>
               <div>
                 <Label>CNPJ</Label>
-                <Input value={form.cnpj} onChange={e => setForm({...form, cnpj: e.target.value})} placeholder="00.000.000/0001-00" />
+                <div className="flex gap-2">
+                  <Input value={form.cnpj} onChange={e => setForm({...form, cnpj: e.target.value})} placeholder="00.000.000/0001-00" className="flex-1" />
+                  <Button type="button" variant="outline" size="sm" onClick={handleCnpjBuscar} disabled={cnpjLoading || !form.cnpj} className="shrink-0">
+                    {cnpjLoading ? <Loader2 size={14} className="animate-spin" /> : <Search size={14} />}
+                    <span className="ml-1">{cnpjLoading ? "Buscando..." : "Buscar"}</span>
+                  </Button>
+                </div>
               </div>
             </div>
             <div className="grid grid-cols-2 gap-3">
