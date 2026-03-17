@@ -321,8 +321,8 @@ export default function ClienteDetailPage() {
     cargo: "",
     telefone: "",
     email: "",
-    celular: "",
-    decisor: false,
+    whatsapp: "",
+    e_decisor: false,
   });
 
   // ---- Handlers ----
@@ -394,8 +394,8 @@ export default function ClienteDetailPage() {
             cargo: "",
             telefone: "",
             email: "",
-            celular: "",
-            decisor: false,
+            whatsapp: "",
+            e_decisor: false,
           });
         },
       }
@@ -1112,7 +1112,7 @@ export default function ClienteDetailPage() {
                       )}
                     </div>
                     <div className="flex gap-1.5">
-                      {c.decisor && (
+                      {c.e_decisor && (
                         <Badge className="text-[10px] bg-amber-100 text-amber-700 border-amber-200 hover:bg-amber-100">
                           Decisor
                         </Badge>
@@ -1126,13 +1126,13 @@ export default function ClienteDetailPage() {
                         {formatPhone(c.telefone)}
                       </p>
                     )}
-                    {c.celular && (
+                    {c.whatsapp && (
                       <p className="flex items-center gap-1.5">
                         <MessageSquare
                           size={13}
                           className="text-green-500"
                         />
-                        {formatPhone(c.celular)}
+                        {formatPhone(c.whatsapp)}
                       </p>
                     )}
                     {c.email && (
@@ -1203,11 +1203,11 @@ export default function ClienteDetailPage() {
                   <div>
                     <Label>Celular / WhatsApp</Label>
                     <Input
-                      value={contatoForm.celular}
+                      value={contatoForm.whatsapp}
                       onChange={(e) =>
                         setContatoForm({
                           ...contatoForm,
-                          celular: e.target.value,
+                          whatsapp: e.target.value,
                         })
                       }
                       placeholder="(51) 99999-9999"
@@ -1231,11 +1231,11 @@ export default function ClienteDetailPage() {
                 <div className="flex items-center gap-2 pt-1">
                   <Checkbox
                     id="decisor"
-                    checked={contatoForm.decisor}
+                    checked={contatoForm.e_decisor}
                     onCheckedChange={(v) =>
                       setContatoForm({
                         ...contatoForm,
-                        decisor: v === true,
+                        e_decisor: v === true,
                       })
                     }
                   />
