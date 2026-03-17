@@ -2,10 +2,24 @@
   "version": "0.0.1",
   "configurations": [
     {
+      "name": "reverent-jennings (Vite dev)",
+      "runtimeExecutable": "cmd",
+      "runtimeArgs": ["/c", "C:\\Users\\Caldera\\Claude\\CRM-Croma\\.claude\\worktrees\\reverent-jennings\\start-dev.cmd"],
+      "port": 8082,
+      "autoPort": true
+    },
+    {
       "name": "CRM Croma (Vite dev)",
       "runtimeExecutable": "cmd",
-      "runtimeArgs": ["/c", "C:\\Users\\Caldera\\Claude\\CRM-Croma\\node_modules\\.bin\\vite.cmd", "--host"],
+      "runtimeArgs": ["/c", "C:\\Users\\Caldera\\Claude\\CRM-Croma\\start-dev.cmd"],
       "port": 8080,
+      "autoPort": true
+    },
+    {
+      "name": "great-clarke (Vite dev)",
+      "runtimeExecutable": "cmd",
+      "runtimeArgs": ["/c", "C:\\Users\\Caldera\\Claude\\CRM-Croma\\.claude\\worktrees\\great-clarke\\start-dev.cmd"],
+      "port": 8081,
       "autoPort": true
     }
   ]
