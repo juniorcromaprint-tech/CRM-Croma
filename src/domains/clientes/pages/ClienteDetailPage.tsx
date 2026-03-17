@@ -76,25 +76,25 @@ const CLASSIFICACAO_CONFIG: Record<
   string,
   { label: string; color: string; icon: string }
 > = {
-  bronze: {
-    label: "Bronze",
-    color: "bg-orange-100 text-orange-700 border-orange-200",
-    icon: "\u{1F949}",
+  A: {
+    label: "A",
+    color: "bg-blue-100 text-blue-700 border-blue-200",
+    icon: "\u{1F48E}",
   },
-  prata: {
-    label: "Prata",
-    color: "bg-slate-100 text-slate-600 border-slate-200",
-    icon: "\u{1F948}",
-  },
-  ouro: {
-    label: "Ouro",
+  B: {
+    label: "B",
     color: "bg-yellow-100 text-yellow-700 border-yellow-200",
     icon: "\u{1F947}",
   },
-  diamante: {
-    label: "Diamante",
-    color: "bg-blue-100 text-blue-700 border-blue-200",
-    icon: "\u{1F48E}",
+  C: {
+    label: "C",
+    color: "bg-slate-100 text-slate-600 border-slate-200",
+    icon: "\u{1F948}",
+  },
+  D: {
+    label: "D",
+    color: "bg-orange-100 text-orange-700 border-orange-200",
+    icon: "\u{1F949}",
   },
 };
 
@@ -348,7 +348,7 @@ export default function ClienteDetailPage() {
       nome_fantasia: cliente.nome_fantasia ?? "",
       cnpj: cliente.cnpj ?? "",
       segmento: cliente.segmento ?? "",
-      classificacao: cliente.classificacao ?? "bronze",
+      classificacao: cliente.classificacao ?? "C",
       email: cliente.email ?? "",
       telefone: cliente.telefone ?? "",
       website: cliente.site ?? "",
@@ -725,7 +725,7 @@ export default function ClienteDetailPage() {
                   <div>
                     <Label>Classificacao</Label>
                     <Select
-                      value={editForm.classificacao ?? "bronze"}
+                      value={editForm.classificacao ?? "C"}
                       onValueChange={(v) =>
                         setEditForm({ ...editForm, classificacao: v })
                       }
