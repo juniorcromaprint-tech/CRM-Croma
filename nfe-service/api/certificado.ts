@@ -2,7 +2,7 @@ import type { VercelRequest, VercelResponse } from '@vercel/node';
 import { getCertificateExpiryDays, validateInternalSecret } from './_cert';
 
 export default async function handler(req: VercelRequest, res: VercelResponse) {
-  if (req.method !== 'GET') {
+  if (req.method !== 'GET' && req.method !== 'POST') {
     return res.status(405).json({ sucesso: false, mensagem_erro: 'Metodo nao permitido' });
   }
   if (!validateInternalSecret(req as any)) {

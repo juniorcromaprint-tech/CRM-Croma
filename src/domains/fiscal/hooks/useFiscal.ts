@@ -191,6 +191,29 @@ export function useCancelarNFe() {
   });
 }
 
+export function useGerarDanfe() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: async (documentoId: string) => {
+      const { data, error } = await supabase.functions.invoke('fiscal-gerar-danfe', {
+        body: { documento_id: documentoId },
+      });
+      if (error) throw error;
+      const result = data as { ok: boolean; pdf_url?: string; mensagem?: string };
+      if (!result.ok) throw new Error(result.mensagem ?? 'Erro ao gerar DANFE');
+      return result;
+    },
+    onSuccess: (data) => {
+      qc.invalidateQueries({ queryKey: ['fiscal_documentos'] });
+      if (data.pdf_url) {
+        window.open(data.pdf_url, '_blank');
+        showSuccess('DANFE gerado com sucesso!');
+      }
+    },
+    onError: (err: any) => showError(err.message ?? 'Erro ao gerar DANFE'),
+  });
+}
+
 export function useValidarPedidoFiscal() {
   return useMutation({
     mutationFn: async (pedidoId: string) => {

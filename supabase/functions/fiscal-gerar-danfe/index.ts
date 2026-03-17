@@ -111,13 +111,13 @@ serve(async (req) => {
       }
     }
 
-    const nfeToken = Deno.env.get('NFE_PROVIDER_TOKEN');
-    const nfeBaseUrl = Deno.env.get('NFE_PROVIDER_URL') ?? 'https://homologacao.focusnfe.com.br';
+    const nfeServiceUrl = Deno.env.get('NFE_SERVICE_URL');
+    const nfeInternalSecret = Deno.env.get('NFE_INTERNAL_SECRET');
 
     let pdfUrl = '';
     let pdfPath = '';
 
-    if (!nfeToken || nfeToken === 'DEMO_MODE') {
+    if (!nfeServiceUrl || !nfeInternalSecret) {
       // Modo demo: cria um PDF placeholder simples
       const numero = doc.numero ?? 'DEMO';
       const chave = doc.chave_acesso ?? documento_id;
@@ -162,15 +162,18 @@ serve(async (req) => {
       pdfUrl = signedUrl?.signedUrl ?? '';
 
     } else if (doc.chave_acesso) {
-      // Modo real: busca PDF do provider
+      // Modo real: busca PDF via nfe-service (nfewizard-io)
       try {
         const response = await fetch(
-          `${nfeBaseUrl}/v2/nfe/${doc.chave_acesso}.pdf`,
+          `${nfeServiceUrl}/api/danfe`,
           {
+            method: 'POST',
             headers: {
-              'Authorization': `Token token=${nfeToken}`,
+              'Content-Type': 'application/json',
+              'x-internal-secret': nfeInternalSecret!,
               'Accept': 'application/pdf',
             },
+            body: JSON.stringify({ chave_acesso: doc.chave_acesso }),
           }
         );
 

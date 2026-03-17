@@ -30,7 +30,7 @@ export async function createNFeWizard(): Promise<InstanceType<typeof NFeWizard>>
         versaoDF: '4.00',
       },
       lib: {
-        connection: { timeout: 30000 }, // 30s — SEFAZ pode levar 15-45s
+        connection: { timeout: 60000 }, // 60s — SEFAZ pode levar 15-45s+
         useForSchemaValidation: 'validateSchemaJsBased', // Vercel nao tem Java
       },
     },

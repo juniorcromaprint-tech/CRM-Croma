@@ -184,6 +184,22 @@ serve(async (req) => {
       errosValidacao.push('Valor total deve ser maior que zero');
     }
 
+    // 6. Código IBGE do município do destinatário
+    const codigoIbgeDest = doc.codigo_ibge_municipio_dest;
+    if (!codigoIbgeDest || codigoIbgeDest === '9999999') {
+      errosValidacao.push('Código IBGE do município do destinatário não configurado. Atualize o cadastro do cliente.');
+    }
+
+    // 7. Valores numéricos dos itens
+    for (const item of itensVal) {
+      if (!item.valor_unitario || item.valor_unitario <= 0) {
+        errosValidacao.push(`Item "${item.descricao}" sem valor unitário válido`);
+      }
+      if (!item.quantidade || item.quantidade <= 0) {
+        errosValidacao.push(`Item "${item.descricao}" sem quantidade válida`);
+      }
+    }
+
     if (errosValidacao.length > 0) {
       await supabaseAdmin
         .from('fiscal_documentos')
@@ -463,23 +479,29 @@ serve(async (req) => {
 
       // Salva XML se disponível
       if (resultado.xml_autorizado) {
-        const xmlContent = typeof resultado.xml_autorizado === 'string'
-          ? new TextEncoder().encode(resultado.xml_autorizado)
-          : resultado.xml_autorizado;
+        try {
+          const xmlContent = typeof resultado.xml_autorizado === 'string'
+            ? new TextEncoder().encode(resultado.xml_autorizado)
+            : resultado.xml_autorizado;
 
-        const xmlPath = `documentos/${documento_id}/nfe_autorizada.xml`;
-        await supabaseAdmin.storage
-          .from('fiscal-xmls')
-          .upload(xmlPath, xmlContent, { contentType: 'application/xml', upsert: true });
+          const xmlPath = `documentos/${documento_id}/nfe_autorizada.xml`;
+          await supabaseAdmin.storage
+            .from('fiscal-xmls')
+            .upload(xmlPath, xmlContent, { contentType: 'application/xml', upsert: true });
 
-        await supabaseAdmin.from('fiscal_xmls').insert({
-          fiscal_documento_id: documento_id,
-          tipo_arquivo: 'xml_autorizado',
-          storage_path: xmlPath,
-          tamanho_bytes: typeof resultado.xml_autorizado === 'string'
-            ? resultado.xml_autorizado.length
-            : 0,
-        });
+          await supabaseAdmin.from('fiscal_xmls').insert({
+            fiscal_documento_id: documento_id,
+            tipo_arquivo: 'xml_autorizado',
+            storage_path: xmlPath,
+            tamanho_bytes: typeof resultado.xml_autorizado === 'string'
+              ? resultado.xml_autorizado.length
+              : 0,
+          });
+        } catch (storageErr) {
+          // NF-e já autorizada — não falhar a emissão por erro no storage
+          // Logar para recuperação manual posterior
+          console.error('[fiscal-emitir-nfe] Erro ao salvar XML no storage:', storageErr);
+        }
       }
 
       // Registra evento de emissão

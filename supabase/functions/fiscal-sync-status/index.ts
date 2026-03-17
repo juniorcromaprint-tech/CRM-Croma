@@ -68,22 +68,29 @@ serve(async (req) => {
       .order('updated_at', { ascending: true })
       .limit(50);
 
-    const nfeToken = Deno.env.get('NFE_PROVIDER_TOKEN');
-    const nfeBaseUrl = Deno.env.get('NFE_PROVIDER_URL') ?? 'https://homologacao.focusnfe.com.br';
+    const nfeServiceUrl = Deno.env.get('NFE_SERVICE_URL');
+    const nfeInternalSecret = Deno.env.get('NFE_INTERNAL_SECRET');
 
     let processados = 0;
     const resultados: Array<{ id: string; de: string; para: string }> = [];
 
     for (const doc of documentosPendentes ?? []) {
       try {
-        if (!nfeToken || nfeToken === 'DEMO_MODE') {
+        if (!nfeServiceUrl || !nfeInternalSecret) {
           // Demo: não altera status automaticamente
           continue;
         }
 
         const response = await fetch(
-          `${nfeBaseUrl}/v2/nfe/${doc.chave_acesso}`,
-          { headers: { 'Authorization': `Token token=${nfeToken}` } }
+          `${nfeServiceUrl}/api/consultar`,
+          {
+            method: 'POST',
+            headers: {
+              'Content-Type': 'application/json',
+              'x-internal-secret': nfeInternalSecret,
+            },
+            body: JSON.stringify({ chave_acesso: doc.chave_acesso }),
+          }
         );
 
         if (!response.ok) continue;
@@ -93,9 +100,9 @@ serve(async (req) => {
         let novoStatus = doc.status;
         let protocolo = null;
 
-        if (statusProvider === 'autorizado') {
+        if (statusProvider === 'autorizado' || retorno.sucesso) {
           novoStatus = 'autorizado';
-          protocolo = retorno.protocolo_autorizacao;
+          protocolo = retorno.protocolo ?? retorno.retorno?.protNFe?.infProt?.nProt;
         } else if (['rejeitado', 'cancelado', 'denegado'].includes(statusProvider)) {
           novoStatus = statusProvider;
         }

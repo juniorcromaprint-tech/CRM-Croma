@@ -15,7 +15,7 @@ import {
   FileBadge, Search, Filter, RefreshCw, XCircle, FileDown, FileText,
   Send, Loader2, AlertTriangle, CheckCircle2, Clock, Eye, RotateCcw
 } from 'lucide-react';
-import { useFiscalDocumentos, useEmitirNFe, useCancelarNFe } from '../hooks/useFiscal';
+import { useFiscalDocumentos, useEmitirNFe, useCancelarNFe, useGerarDanfe } from '../hooks/useFiscal';
 import { StatusFiscalBadge } from '../components/StatusFiscalBadge';
 
 export default function FiscalDocumentosPage() {
@@ -33,6 +33,7 @@ export default function FiscalDocumentosPage() {
   );
   const emitirMutation = useEmitirNFe();
   const cancelarMutation = useCancelarNFe();
+  const danfeMutation = useGerarDanfe();
 
   const filtered = (documentos as any[]).filter((d: any) => {
     const q = search.toLowerCase();
@@ -85,11 +86,8 @@ export default function FiscalDocumentosPage() {
   const handleBaixarPdf = async (doc: any) => {
     setBaixandoPdf(doc.id);
     try {
-      const { data, error } = await supabase.functions.invoke('fiscal-gerar-danfe', { body: { documento_id: doc.id } });
-      if (error || !(data as any)?.ok) return showError((data as any)?.mensagem ?? 'Erro ao gerar DANFE');
-      window.open((data as any).pdf_url, '_blank');
-      showSuccess('DANFE gerado!');
-    } catch { showError('Erro ao gerar DANFE'); } finally { setBaixandoPdf(null); }
+      await danfeMutation.mutateAsync(doc.id);
+    } catch { /* hook already shows error toast */ } finally { setBaixandoPdf(null); }
   };
 
   const handleReprocessar = async (doc: any) => {

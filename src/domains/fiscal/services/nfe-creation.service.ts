@@ -2,7 +2,7 @@ import { supabase } from '@/integrations/supabase/client';
 
 /**
  * Cria um documento fiscal (NF-e rascunho) a partir de um pedido.
- * Também cria os itens da NF-e e aplica CSOSN 400 (Simples Nacional).
+ * Também cria os itens da NF-e e aplica CSOSN 102 (Simples Nacional — tributada sem crédito).
  *
  * NCM é lido de produto_modelos.ncm (migration 028). Se não preenchido,
  * fica null e pode ser editado manualmente no documento fiscal.
@@ -61,8 +61,8 @@ export async function criarNFeFromPedido(pedidoId: string): Promise<string> {
       valor_unitario: Number(item.valor_unitario) || 0,
       valor_bruto: Number(item.valor_total) || 0,
       valor_total: Number(item.valor_total) || 0,
-      // Simples Nacional — CSOSN 400 (não tributado pelo ICMS)
-      cst_ou_csosn: '400',
+      // Simples Nacional — CSOSN 102 (tributada sem crédito de ICMS)
+      cst_ou_csosn: '102',
       origem_mercadoria: '0',
       aliquota_icms: 0,
       base_calculo_icms: 0,
