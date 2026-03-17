@@ -10,6 +10,9 @@ import {
   type PricingConfig,
   type PricingResult,
 } from "./pricing-engine";
+import { supabase } from '@/integrations/supabase/client';
+
+const _db = supabase as unknown as any;
 
 // ─── Tipos do Orçamento ──────────────────────────────────────────────────────
 
@@ -329,4 +332,105 @@ export function validarDesconto(
   }
 
   return { valido: true, desconto_maximo, requer_aprovacao: false, aviso: null };
+}
+
+// ─── Integração com Catálogo ─────────────────────────────────────────────────
+
+/**
+ * Busca BOM do modelo e calcula preço real automaticamente.
+ * Chamado quando usuário seleciona produto em novo item de orçamento.
+ * Retorna null se modelo não encontrado ou sem config.
+ */
+export async function calcPrecoFromModeloId(
+  modeloId: string,
+  quantidade: number,
+  larguraCm?: number,
+  alturaCm?: number,
+): Promise<{ precoUnitario: number; precoTotal: number; markup: number } | null> {
+  try {
+    // Buscar BOM + config em paralelo
+    const [materiaisResult, processosResult, modeloResult, configResult] = await Promise.all([
+      _db
+        .from('modelo_materiais')
+        .select(`
+          quantidade_por_unidade,
+          percentual_desperdicio,
+          custo_unitario,
+          unidade_medida,
+          materiais (
+            nome,
+            preco_medio,
+            unidade_medida
+          )
+        `)
+        .eq('modelo_id', modeloId),
+      _db
+        .from('modelo_processos')
+        .select('etapa, tempo_por_unidade_min, tempo_setup_min, custo_unitario')
+        .eq('modelo_id', modeloId),
+      _db
+        .from('produto_modelos')
+        .select('markup_padrao, produtos (categoria)')
+        .eq('id', modeloId)
+        .maybeSingle(),
+      _db
+        .from('config_precificacao')
+        .select('faturamento_medio, custo_operacional, custo_produtivo, qtd_funcionarios, horas_mes, percentual_comissao, percentual_impostos, percentual_juros, percentual_encargos')
+        .limit(1)
+        .maybeSingle(),
+    ]);
+
+    const modelo = modeloResult.data;
+    const configRow = configResult.data;
+
+    if (!modelo) return null;
+
+    const cfg: PricingConfig = configRow ? {
+      faturamentoMedio: configRow.faturamento_medio,
+      custoOperacional: configRow.custo_operacional,
+      custoProdutivo: configRow.custo_produtivo,
+      qtdFuncionarios: configRow.qtd_funcionarios,
+      horasMes: configRow.horas_mes,
+      percentualComissao: configRow.percentual_comissao,
+      percentualImpostos: configRow.percentual_impostos,
+      percentualJuros: configRow.percentual_juros,
+      percentualEncargos: configRow.percentual_encargos ?? 0,
+    } : DEFAULT_PRICING_CONFIG;
+
+    const materiais: OrcamentoMaterial[] = ((materiaisResult.data ?? []) as any[]).map((mm: any) => ({
+      descricao: mm.materiais?.nome ?? 'Material',
+      quantidade: mm.quantidade_por_unidade ?? 1,
+      unidade: mm.unidade_medida ?? mm.materiais?.unidade_medida ?? 'un',
+      custo_unitario: mm.custo_unitario ?? mm.materiais?.preco_medio ?? 0,
+      aproveitamento: mm.percentual_desperdicio != null ? 100 - mm.percentual_desperdicio : 85,
+    }));
+
+    const processos: OrcamentoProcesso[] = ((processosResult.data ?? []) as any[]).map((mp: any) => ({
+      etapa: mp.etapa ?? 'Processo',
+      tempo_minutos: mp.tempo_por_unidade_min ?? 0,
+      tempo_setup_min: mp.tempo_setup_min ?? 0,
+    }));
+
+    const result = calcOrcamentoItem(
+      {
+        descricao: 'Item orçamento',
+        quantidade,
+        largura_cm: larguraCm ?? null,
+        altura_cm: alturaCm ?? null,
+        materiais,
+        acabamentos: [],
+        processos,
+        markup_percentual: modelo.markup_padrao ?? 40,
+      },
+      cfg,
+    );
+
+    return {
+      precoUnitario: result.precoUnitario,
+      precoTotal: result.precoTotal,
+      markup: modelo.markup_padrao ?? 40,
+    };
+  } catch {
+    return null;
+  }
 }

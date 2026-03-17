@@ -17,6 +17,7 @@ const Settings = lazy(() => import("@/pages/Settings"));
 const AdminMaquinasPage = lazy(() => import("@/domains/admin/pages/AdminMaquinasPage"));
 const DadosHubPage = lazy(() => import("@/domains/dados/pages/DadosHubPage"));
 const ImportHistoricoPage = lazy(() => import("@/domains/dados/pages/ImportHistoricoPage"));
+const CatalogoProdutosPage = lazy(() => import("@/domains/admin/pages/CatalogoProdutosPage"));
 
 export const adminRoutes = (
   <>
@@ -78,6 +79,11 @@ export const adminRoutes = (
     <Route path="admin/dados/historico" element={
       <PermissionGuard module="admin" action="ver">
         <LazyPage><ImportHistoricoPage /></LazyPage>
+      </PermissionGuard>
+    } />
+    <Route path="admin/catalogo" element={
+      <PermissionGuard module="admin" action="ver">
+        <LazyPage><CatalogoProdutosPage /></LazyPage>
       </PermissionGuard>
     } />
     <Route path="relatorios" element={<LazyPage><RelatoriosPage /></LazyPage>} />
