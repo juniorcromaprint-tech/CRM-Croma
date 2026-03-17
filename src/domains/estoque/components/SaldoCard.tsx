@@ -3,7 +3,8 @@
 import { Card, CardContent } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Package } from "lucide-react";
-import type { EstoqueSaldo } from "../types/estoque.types";
+import { SemaforoBadge } from "@/shared/components/SemaforoBadge";
+import type { EstoqueSaldo, SemaforoStatus } from "../types/estoque.types";
 
 interface SaldoCardProps {
   saldo: EstoqueSaldo;
@@ -35,8 +36,8 @@ export function SaldoCard({ saldo }: SaldoCardProps) {
   const nome = saldo.material?.nome ?? "Material";
   const unidade = saldo.material?.unidade ?? "";
   const estoqueMinimo = saldo.material?.estoque_minimo ?? 0;
-  const quantidade = saldo.quantidade_disponivel ?? 0;
-  const reservado = saldo.quantidade_reservada ?? 0;
+  const quantidade = (saldo as any).saldo_disponivel ?? saldo.quantidade_disponivel ?? 0;
+  const reservado = (saldo as any).saldo_reservado ?? saldo.quantidade_reservada ?? 0;
 
   const badge = getBadgeStatus(quantidade, estoqueMinimo);
 
@@ -52,12 +53,27 @@ export function SaldoCard({ saldo }: SaldoCardProps) {
               {nome}
             </p>
           </div>
-          <Badge
-            variant="outline"
-            className={`text-xs flex-shrink-0 ${badge.className}`}
-          >
-            {badge.label}
-          </Badge>
+          <div className="flex items-center gap-1.5 flex-shrink-0">
+            {(saldo as any).semaforo && (
+              <SemaforoBadge
+                status={(saldo as any).semaforo as SemaforoStatus}
+                size="sm"
+                label={
+                  (saldo as any).semaforo === 'vermelho'
+                    ? 'Crítico'
+                    : (saldo as any).semaforo === 'amarelo'
+                    ? 'Atenção'
+                    : 'Normal'
+                }
+              />
+            )}
+            <Badge
+              variant="outline"
+              className={`text-xs ${badge.className}`}
+            >
+              {badge.label}
+            </Badge>
+          </div>
         </div>
 
         <div className="space-y-1.5">
