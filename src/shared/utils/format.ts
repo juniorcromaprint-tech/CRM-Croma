@@ -203,6 +203,39 @@ export function formatCEP(cep: string): string {
 }
 
 // ---------------------------------------------------------------------------
+// PHONE INPUT MASK
+// ---------------------------------------------------------------------------
+
+/**
+ * Aplica máscara de telefone enquanto digita: (11) 98154-8888 ou (11) 3333-3333
+ * Aceita entrada parcial e formata progressivamente.
+ */
+export function maskPhone(value: string): string {
+  const digits = value.replace(/\D/g, '').slice(0, 11);
+
+  if (digits.length === 0) return '';
+  if (digits.length <= 2) return `(${digits}`;
+  if (digits.length <= 6) return `(${digits.slice(0, 2)}) ${digits.slice(2)}`;
+  if (digits.length <= 10) {
+    return `(${digits.slice(0, 2)}) ${digits.slice(2, 6)}-${digits.slice(6)}`;
+  }
+  // 11 digits — celular
+  return `(${digits.slice(0, 2)}) ${digits.slice(2, 7)}-${digits.slice(7)}`;
+}
+
+// ---------------------------------------------------------------------------
+// EMAIL VALIDATION
+// ---------------------------------------------------------------------------
+
+/**
+ * Valida formato de email básico.
+ */
+export function isValidEmail(email: string): boolean {
+  if (!email) return true; // vazio é válido (campo opcional)
+  return /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email);
+}
+
+// ---------------------------------------------------------------------------
 // TEXTO
 // ---------------------------------------------------------------------------
 

@@ -218,6 +218,32 @@ export function useDeleteCliente() {
 }
 
 /**
+ * Hard-delete a cliente permanently. Admin/diretor only.
+ */
+export function useHardDeleteCliente() {
+  const queryClient = useQueryClient();
+
+  return useMutation({
+    mutationFn: async (id: string) => {
+      const { error } = await supabase
+        .from('clientes')
+        .delete()
+        .eq('id', id);
+
+      if (error) throw error;
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: [CLIENTES_KEY] });
+      queryClient.invalidateQueries({ queryKey: [CLIENTES_STATS_KEY] });
+      showSuccess('Cliente excluído permanentemente');
+    },
+    onError: (error: Error) => {
+      showError(`Erro ao excluir cliente: ${error.message}`);
+    },
+  });
+}
+
+/**
  * Aggregated stats: totals, counts by classificacao and segmento.
  */
 export function useClienteStats() {

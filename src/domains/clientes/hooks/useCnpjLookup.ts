@@ -37,7 +37,7 @@ function parseCnpjWs(data: Record<string, unknown>): CnpjResult {
   const estado = (e.estado ?? {}) as Record<string, string>;
   return {
     razao_social: (data.razao_social as string) ?? '',
-    nome_fantasia: (data.nome_fantasia as string) ?? '',
+    nome_fantasia: (e.nome_fantasia as string) ?? '',
     email: (e.email as string) ?? '',
     telefone: (e.telefone1 as string) ?? '',
     endereco_rua: [(e.logradouro as string), (e.numero as string)].filter(Boolean).join(', '),
@@ -82,8 +82,14 @@ export function useCnpjLookup() {
         source = 'cnpjws';
       }
 
-      // Verifica situação cadastral
-      const situacao = ((data as Record<string, string>).situacao ?? (data as Record<string, string>).descricao_situacao_cadastral ?? '').toUpperCase();
+      // Verifica situação cadastral (ReceitaWS: data.situacao, CNPJ.ws: estabelecimento.situacao_cadastral)
+      const estab = (data.estabelecimento ?? {}) as Record<string, string>;
+      const situacao = (
+        (data as Record<string, string>).situacao
+        ?? (data as Record<string, string>).descricao_situacao_cadastral
+        ?? estab.situacao_cadastral
+        ?? ''
+      ).toUpperCase();
       if (situacao && situacao !== 'ATIVA') {
         showError(`Empresa com situação: ${situacao}`);
         return null;

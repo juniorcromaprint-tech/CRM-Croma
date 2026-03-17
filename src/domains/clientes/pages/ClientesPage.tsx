@@ -2,7 +2,7 @@ import { useState } from "react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import { showSuccess, showError } from "@/utils/toast";
-import { formatCNPJ, formatPhone } from "@/shared/utils/format";
+import { formatCNPJ, formatPhone, maskPhone, isValidEmail } from "@/shared/utils/format";
 import { ilikeTerm } from "@/shared/utils/searchUtils";
 import { Link } from "react-router-dom";
 import {
@@ -330,11 +330,14 @@ export default function ClientesPage() {
             <div className="grid grid-cols-2 gap-3">
               <div>
                 <Label>Telefone</Label>
-                <Input value={form.telefone} onChange={e => setForm({...form, telefone: e.target.value})} placeholder="(51) 3333-3333" />
+                <Input value={form.telefone} onChange={e => setForm({...form, telefone: maskPhone(e.target.value)})} placeholder="(11) 98154-8888" />
               </div>
               <div>
                 <Label>Email</Label>
-                <Input type="email" value={form.email} onChange={e => setForm({...form, email: e.target.value})} placeholder="contato@empresa.com" />
+                <Input type="email" value={form.email} onChange={e => setForm({...form, email: e.target.value})} placeholder="contato@empresa.com" className={form.email && !isValidEmail(form.email) ? "border-red-300 focus-visible:ring-red-400" : ""} />
+                {form.email && !isValidEmail(form.email) && (
+                  <p className="text-xs text-red-500 mt-1">Email inválido</p>
+                )}
               </div>
             </div>
             <div className="grid grid-cols-2 gap-3">
@@ -356,7 +359,7 @@ export default function ClientesPage() {
             <Button variant="outline" onClick={() => setShowNew(false)}>Cancelar</Button>
             <Button
               onClick={() => createCliente.mutate(form)}
-              disabled={!form.razao_social || createCliente.isPending}
+              disabled={!form.razao_social || createCliente.isPending || (!!form.email && !isValidEmail(form.email))}
               className="bg-blue-600 hover:bg-blue-700"
             >
               {createCliente.isPending ? <><Loader2 size={16} className="animate-spin mr-2" />Salvando...</> : "Criar Cliente"}
