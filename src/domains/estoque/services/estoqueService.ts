@@ -116,4 +116,36 @@ export const estoqueService = {
       .eq("id", id);
     if (error) throw error;
   },
+
+  // === VIEW SALDOS COMPUTED ===
+  async listarSaldosView(filtros?: { busca?: string }) {
+    let q = db
+      .from("v_estoque_saldos")
+      .select("*")
+      .order("nome");
+    if (filtros?.busca) q = q.ilike("nome", `%${filtros.busca}%`);
+    const { data, error } = await q;
+    if (error) throw error;
+    return data ?? [];
+  },
+
+  // === SEMÁFORO ===
+  async listarSemaforo(filtros?: { busca?: string; semaforo?: string }) {
+    let q = db.from("v_estoque_semaforo").select("*").order("nome");
+    if (filtros?.busca) q = q.ilike("nome", `%${filtros.busca}%`);
+    if (filtros?.semaforo) q = q.eq("semaforo", filtros.semaforo);
+    const { data, error } = await q;
+    if (error) throw error;
+    return data ?? [];
+  },
+
+  async alertasSemaforo() {
+    const { data, error } = await db
+      .from("v_estoque_semaforo")
+      .select("*")
+      .in("semaforo", ["amarelo", "vermelho"])
+      .order("semaforo");
+    if (error) throw error;
+    return data ?? [];
+  },
 };
