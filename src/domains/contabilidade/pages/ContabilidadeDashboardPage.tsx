@@ -10,6 +10,10 @@ import {
   RefreshCw,
 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
+import AIButton from '@/domains/ai/components/AIButton';
+import AISidebar from '@/domains/ai/components/AISidebar';
+import { useAISidebar } from '@/domains/ai/hooks/useAISidebar';
+import { useDetectarProblemas } from '@/domains/ai/hooks/useDetectarProblemas';
 import { useDASHistorico, useCalcularDAS } from '../hooks/useDAS';
 import { useConfigTributaria } from '../hooks/useConfigTributaria';
 import { DASStatsCards } from '../components/DASStatsCards';
@@ -27,6 +31,11 @@ export default function ContabilidadeDashboardPage() {
   const { data: dasHistorico = [], isLoading: dasLoading } = useDASHistorico(new Date().getFullYear());
   const { data: configTrib } = useConfigTributaria();
   const calcularDAS = useCalcularDAS();
+  const detectarProblemas = useDetectarProblemas();
+  const aiSidebar = useAISidebar({
+    entityType: 'contabilidade',
+    entityId: 'dashboard',
+  });
 
   const ultimoDAS = dasHistorico[0] ?? null;
 
@@ -105,16 +114,27 @@ export default function ContabilidadeDashboardPage() {
             Módulo contábil autônomo — Simples Nacional
           </p>
         </div>
-        <Button
-          variant="outline"
-          size="sm"
-          className="gap-2"
-          onClick={() => calcularDAS.mutate(currentMonth)}
-          disabled={calcularDAS.isPending}
-        >
-          <RefreshCw size={14} className={calcularDAS.isPending ? 'animate-spin' : ''} />
-          Recalcular DAS
-        </Button>
+        <div className="flex items-center gap-2">
+          <AIButton
+            label="Análise IA"
+            onClick={(model) => {
+              detectarProblemas.mutate({ mode: 'manual', model }, {
+                onSuccess: (data) => aiSidebar.open(data),
+              });
+            }}
+            isLoading={detectarProblemas.isPending}
+          />
+          <Button
+            variant="outline"
+            size="sm"
+            className="gap-2"
+            onClick={() => calcularDAS.mutate(currentMonth)}
+            disabled={calcularDAS.isPending}
+          >
+            <RefreshCw size={14} className={calcularDAS.isPending ? 'animate-spin' : ''} />
+            Recalcular DAS
+          </Button>
+        </div>
       </div>
 
       {/* Cards DAS */}
@@ -220,6 +240,19 @@ export default function ContabilidadeDashboardPage() {
           </Button>
         </div>
       )}
+
+      <AISidebar
+        isOpen={aiSidebar.isOpen}
+        response={aiSidebar.response}
+        isLoading={detectarProblemas.isPending}
+        onClose={aiSidebar.close}
+        onApply={aiSidebar.applyActions}
+        onReanalyze={() => detectarProblemas.mutate({ mode: 'manual', model: undefined }, {
+          onSuccess: (data) => aiSidebar.setResponse(data),
+        })}
+        isReanalyzing={detectarProblemas.isPending}
+        title="Análise Contábil"
+      />
     </div>
   );
 }
