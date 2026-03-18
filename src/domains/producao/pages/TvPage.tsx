@@ -2,6 +2,7 @@ import React, { useState, useEffect } from "react";
 import { useSearchParams } from "react-router-dom";
 import { useQuery } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
+import { useEmpresaPrincipal } from "@/shared/hooks/useEmpresaPrincipal";
 
 // ===========================================================================
 // CONSTANTS
@@ -166,6 +167,8 @@ const TV_TOKEN = import.meta.env.VITE_TV_TOKEN || 'croma-tv-2026';
 
 // Componente interno com toda a lógica — só renderizado quando token é válido
 function TvDashboard() {
+  const { data: empresa } = useEmpresaPrincipal();
+  const nomeEmpresa = empresa?.nome_fantasia || empresa?.razao_social || 'CROMA PRINT';
   // ── Clock ──────────────────────────────────────────────────────────────────
   const [time, setTime] = useState(new Date());
   useEffect(() => {
@@ -257,7 +260,7 @@ function TvDashboard() {
           </div>
           <div>
             <h1 className="text-white font-bold text-lg leading-none tracking-wide">
-              CROMA PRINT
+              {nomeEmpresa.toUpperCase()}
             </h1>
             <p className="text-slate-400 text-xs tracking-widest uppercase leading-tight">
               Monitor de Produção

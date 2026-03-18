@@ -1,7 +1,11 @@
 // src/domains/portal/components/PortalFooter.tsx
 
+import { useEmpresaPrincipal } from "@/shared/hooks/useEmpresaPrincipal";
+
 export function PortalFooter() {
   const year = new Date().getFullYear();
+  const { data: empresa } = useEmpresaPrincipal();
+  const nomeEmpresa = empresa?.nome_fantasia || empresa?.razao_social || 'Croma Print';
 
   return (
     <footer className="mt-12 border-t border-slate-200 bg-white">
@@ -17,7 +21,7 @@ export function PortalFooter() {
 
           <div className="text-center sm:text-right">
             <p className="text-xs text-slate-400">
-              Croma Print Comunicacao Visual &copy; {year}
+              {nomeEmpresa} &copy; {year}
             </p>
             <p className="text-[11px] text-slate-300 mt-0.5">
               Comunicacao visual profissional para varejo e industria

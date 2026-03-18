@@ -23,6 +23,7 @@ interface OrcamentoPDFProps {
     })[];
     servicos: OrcamentoServico[];
   };
+  nomeEmpresa?: string;
 }
 
 // ─── Helpers ────────────────────────────────────────────────────────────────
@@ -45,7 +46,7 @@ function calcSubtotalServicos(servicos: OrcamentoServico[]): number {
 
 // ─── Component ──────────────────────────────────────────────────────────────
 
-export default function OrcamentoPDF({ orcamento }: OrcamentoPDFProps) {
+export default function OrcamentoPDF({ orcamento, nomeEmpresa = 'Croma Print Comunicação Visual' }: OrcamentoPDFProps) {
   const {
     numero,
     titulo,
@@ -842,7 +843,7 @@ export default function OrcamentoPDF({ orcamento }: OrcamentoPDFProps) {
         <div style={{ textAlign: "center" }}>
           <div style={{ borderBottom: "1px solid #94a3b8", marginBottom: "4px", height: "30px" }} />
           <div style={{ fontSize: "9px", color: "#64748b", fontWeight: 600 }}>
-            Croma Print Comunicação Visual
+            {nomeEmpresa}
           </div>
           <div style={{ fontSize: "8px", color: "#94a3b8" }}>
             Responsável Comercial
@@ -876,7 +877,7 @@ export default function OrcamentoPDF({ orcamento }: OrcamentoPDFProps) {
       >
         <div>
           <div style={{ fontWeight: 600, color: "#1e40af", fontSize: "10px" }}>
-            Croma Print Comunicação Visual
+            {nomeEmpresa}
           </div>
           <div style={{ marginTop: "2px" }}>
             Proposta {numero}

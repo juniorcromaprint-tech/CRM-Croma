@@ -21,6 +21,14 @@ export interface FiscalAmbiente {
   tipo: AmbienteFiscal;
   endpoint_base: string | null;
   ativo: boolean;
+  empresa_id: string | null;
+  empresas?: {
+    id: string;
+    razao_social: string;
+    cnpj: string;
+    ie: string | null;
+    crt: number | null;
+  } | null;
   created_at: string;
   updated_at: string;
 }

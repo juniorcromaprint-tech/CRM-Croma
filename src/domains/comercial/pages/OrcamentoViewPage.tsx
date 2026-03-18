@@ -38,6 +38,7 @@ import type { OrcamentoStatus } from "../services/orcamento.service";
 import { TrackingPanel } from '../components/TrackingPanel';
 import { SharePropostaModal } from '../components/SharePropostaModal';
 import { CondicoesPagamentoView } from '../components/CondicoesPagamentoView';
+import { useEmpresaPrincipal } from "@/shared/hooks/useEmpresaPrincipal";
 
 const STATUS_CONFIG: Record<OrcamentoStatus, { label: string; cls: string }> = {
   rascunho:   { label: "Rascunho",   cls: "bg-slate-100 text-slate-600" },
@@ -52,6 +53,8 @@ export default function OrcamentoViewPage() {
   const { id } = useParams<{ id: string }>();
   const navigate = useNavigate();
   const { data: orc, isLoading } = useOrcamento(id);
+  const { data: empresa } = useEmpresaPrincipal();
+  const nomeEmpresa = empresa?.nome_fantasia || empresa?.razao_social || 'Croma Print';
   const atualizar = useAtualizarOrcamento();
   const converter = useConverterParaPedido();
   const duplicar = useDuplicarOrcamento();
@@ -137,7 +140,7 @@ export default function OrcamentoViewPage() {
       // Renderiza OrcamentoPDF no container
       const orcamentoCompleto = orc as Parameters<typeof OrcamentoPDF>[0]["orcamento"];
       const root = createRoot(container);
-      root.render(<OrcamentoPDF orcamento={orcamentoCompleto} />);
+      root.render(<OrcamentoPDF orcamento={orcamentoCompleto} nomeEmpresa={nomeEmpresa} />);
 
       // Aguarda render completo
       await new Promise((r) => setTimeout(r, 300));
@@ -328,7 +331,7 @@ export default function OrcamentoViewPage() {
             <p className="text-sm text-slate-500 mt-1">{orc.numero}</p>
           </div>
           <div className="text-right">
-            <p className="font-bold text-slate-800">Croma Print</p>
+            <p className="font-bold text-slate-800">{nomeEmpresa}</p>
             <p className="text-sm text-slate-500">Comunicação Visual</p>
           </div>
         </div>
@@ -559,7 +562,7 @@ export default function OrcamentoViewPage() {
 
         {/* ──── Print footer ──── */}
         <div className="hidden print:block mt-12 pt-6 border-t border-slate-300 text-center text-xs text-slate-400">
-          <p>Croma Print Comunicação Visual</p>
+          <p>{nomeEmpresa}</p>
           <p>Proposta valida por {orc.validade_dias} dias a partir de {new Date(orc.created_at).toLocaleDateString("pt-BR")}</p>
         </div>
       </div>

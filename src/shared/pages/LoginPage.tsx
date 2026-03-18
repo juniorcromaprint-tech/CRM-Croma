@@ -6,9 +6,12 @@ import { useAuth } from "@/contexts/AuthContext";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
+import { useEmpresaPrincipal } from "@/shared/hooks/useEmpresaPrincipal";
 
 export default function LoginPage() {
   const { session, isLoading } = useAuth();
+  const { data: empresa } = useEmpresaPrincipal();
+  const nomeEmpresa = empresa?.nome_fantasia || empresa?.razao_social || 'Croma Print';
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [error, setError] = useState<string | null>(null);
@@ -60,7 +63,7 @@ export default function LoginPage() {
           <div className="mx-auto mb-4 flex h-14 w-14 items-center justify-center rounded-2xl bg-blue-600 text-white font-bold text-xl shadow-lg">
             C
           </div>
-          <h1 className="text-2xl font-bold text-slate-800">Croma Print</h1>
+          <h1 className="text-2xl font-bold text-slate-800">{nomeEmpresa}</h1>
           <p className="mt-1 text-sm text-slate-500">
             Sistema de Gestão Integrada
           </p>
@@ -125,7 +128,7 @@ export default function LoginPage() {
         </form>
 
         <p className="mt-4 text-center text-xs text-slate-400">
-          © {new Date().getFullYear()} Croma Print Comunicação Visual
+          © {new Date().getFullYear()} {nomeEmpresa}
         </p>
       </div>
     </div>
