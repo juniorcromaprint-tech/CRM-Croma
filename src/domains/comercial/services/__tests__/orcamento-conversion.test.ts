@@ -8,13 +8,15 @@ import { describe, it, expect, vi, beforeEach } from "vitest";
 // ─── Mock do Supabase client ─────────────────────────────────────────────────
 // vi.hoisted garante que a variável seja inicializada antes do hoisting do vi.mock.
 
-const { mockFrom } = vi.hoisted(() => ({
+const { mockFrom, mockRpc } = vi.hoisted(() => ({
   mockFrom: vi.fn(),
+  mockRpc: vi.fn(),
 }));
 
 vi.mock("@/integrations/supabase/client", () => ({
   supabase: {
     from: mockFrom,
+    rpc: mockRpc,
   },
 }));
 
@@ -98,6 +100,7 @@ function makeOrcamento(overrides: Partial<{
 // ─── Helper: configura mocks para um caminho feliz ───────────────────────────
 
 function setupHappyPath(orcamento: ReturnType<typeof makeOrcamento>) {
+  mockRpc.mockResolvedValue({ data: "PED-2026-0001", error: null });
   mockFrom.mockImplementation((table: string) => {
     // buscarPorId → propostas
     if (table === "propostas") {
