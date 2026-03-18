@@ -21,6 +21,13 @@
       "runtimeArgs": ["/c", "C:\\Users\\Caldera\\Claude\\CRM-Croma\\.claude\\worktrees\\great-clarke\\start-dev.cmd"],
       "port": 8081,
       "autoPort": true
+    },
+    {
+      "name": "fervent-wescoff (Vite dev)",
+      "runtimeExecutable": "cmd",
+      "runtimeArgs": ["/c", "C:\\Users\\Caldera\\Claude\\CRM-Croma\\.claude\\worktrees\\fervent-wescoff\\start-dev.cmd"],
+      "port": 8083,
+      "autoPort": true
     }
   ]
 }
