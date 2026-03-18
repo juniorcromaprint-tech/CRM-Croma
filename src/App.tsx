@@ -21,6 +21,7 @@ import { suprimentosRoutes } from "./routes/suprimentosRoutes";
 import { qualidadeRoutes } from "./routes/qualidadeRoutes";
 import { financeiroRoutes } from "./routes/financeiroRoutes";
 import { fiscalRoutes } from "./routes/fiscalRoutes";
+import { contabilidadeRoutes } from "./routes/contabilidadeRoutes";
 import { adminRoutes } from "./routes/adminRoutes";
 
 const queryClient = new QueryClient({
@@ -77,6 +78,7 @@ const App = () => (
               {qualidadeRoutes}
               {financeiroRoutes}
               {fiscalRoutes}
+              {contabilidadeRoutes}
               {adminRoutes}
             </Route>
 

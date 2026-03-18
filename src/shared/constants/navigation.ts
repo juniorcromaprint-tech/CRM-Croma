@@ -78,6 +78,18 @@ export const NAV_GROUPS: NavGroup[] = [
     ],
   },
   {
+    label: 'CONTABILIDADE',
+    items: [
+      { name: 'Dashboard Contábil', path: '/contabilidade', icon: 'Calculator', module: 'financeiro' },
+      { name: 'DAS / Simples', path: '/contabilidade/das', icon: 'Receipt', module: 'financeiro' },
+      { name: 'Extrato Bancário', path: '/contabilidade/extrato-bancario', icon: 'FileInput', module: 'financeiro' },
+      { name: 'Lançamentos', path: '/contabilidade/lancamentos', icon: 'BookOpen', module: 'financeiro' },
+      { name: 'Balancete', path: '/contabilidade/balancete', icon: 'BarChart2', module: 'financeiro' },
+      { name: 'Razão Contábil', path: '/contabilidade/razao', icon: 'FileText', module: 'financeiro' },
+      { name: 'DEFIS', path: '/contabilidade/defis', icon: 'FileCheck', module: 'financeiro' },
+    ],
+  },
+  {
     label: 'QUALIDADE',
     items: [
       { name: 'Dashboard', path: '/qualidade', icon: 'BarChart3', module: 'qualidade' },
