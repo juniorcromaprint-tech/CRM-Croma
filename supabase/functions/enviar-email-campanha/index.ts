@@ -41,6 +41,20 @@ serve(async (req) => {
       Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!,
     );
 
+    // Rate limiting: máx 5 disparos de campanha por hora por usuário
+    const { count: recentCount } = await supabase
+      .from('audit_logs')
+      .select('*', { count: 'exact', head: true })
+      .eq('user_id', user.id)
+      .eq('action', 'email_campanha')
+      .gte('created_at', new Date(Date.now() - 3600000).toISOString());
+    if ((recentCount ?? 0) >= 5) {
+      return new Response(JSON.stringify({ error: 'Rate limit excedido. Máximo 5 disparos por hora.' }), {
+        status: 429,
+        headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+      });
+    }
+
     const { campanha_id } = await req.json();
     if (!campanha_id) {
       return new Response(JSON.stringify({ error: 'campanha_id é obrigatório' }), {
