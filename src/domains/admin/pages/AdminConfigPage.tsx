@@ -21,6 +21,7 @@ import { Separator } from "@/components/ui/separator";
 
 import AIModelsTab from '../components/AIModelsTab';
 import { ProgressTracker } from '@/shared/components/ProgressTracker';
+import { TabTributario } from '@/domains/contabilidade/components/TabTributario';
 
 import {
   Settings,
@@ -33,6 +34,7 @@ import {
   Calculator,
   CheckCircle2,
   Brain,
+  Receipt,
 } from "lucide-react";
 
 // ----------------------------------------------------------------------------
@@ -802,6 +804,13 @@ export default function AdminConfigPage() {
             Progresso ERP
           </TabsTrigger>
           <TabsTrigger
+            value="tributario"
+            className="rounded-lg data-[state=active]:bg-white data-[state=active]:shadow-sm px-4 py-2 text-sm"
+          >
+            <Receipt className="h-4 w-4 mr-1.5" />
+            Tributário
+          </TabsTrigger>
+          <TabsTrigger
             value="sobre"
             className="rounded-lg data-[state=active]:bg-white data-[state=active]:shadow-sm px-4 py-2 text-sm"
           >
@@ -824,6 +833,10 @@ export default function AdminConfigPage() {
 
         <TabsContent value="progresso" className="mt-6">
           <ProgressTracker compact={false} />
+        </TabsContent>
+
+        <TabsContent value="tributario" className="mt-6">
+          <TabTributario />
         </TabsContent>
 
         <TabsContent value="sobre" className="mt-6">
