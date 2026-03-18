@@ -10,6 +10,23 @@
 
 ---
 
+## Já Resolvido na Sessão Anterior (NÃO refazer)
+
+Estes itens foram corrigidos na sessão de diagnóstico e NÃO precisam ser refeitos:
+
+| Item | Como foi resolvido |
+|------|-------------------|
+| Vercel deploy falhando (8x) | package.json corrigido + Install Command override → deploy OK |
+| Git user sramos-pix | Global + local config trocado para juniorcromaprint-tech |
+| Ambientes mostrando "—" nos cards | Query `useFiscalAmbientes` atualizada com colunas corretas |
+| Dois ambientes ativos simultaneamente | UPDATE no banco: produção → `ativo=false` |
+| Toggle buttons desabilitados | Resolvido automaticamente ao corrigir os ativos |
+| Migration 065 (empresas) | Já aplicada no Supabase |
+| Migrations 028, 029, 030, 033 | Aplicadas no Supabase nesta sessão |
+| Dados da Croma Print no ambiente produção | UPDATE no banco com dados reais |
+
+---
+
 ## Context: Current State (2026-03-18)
 
 ### Database
@@ -130,7 +147,32 @@ Trocar `'trocar_certificado'` por `'testar_certificado'`:
       p_acao: 'testar_certificado',
 ```
 
-**Step 4: Deploy da Edge Function atualizada no Supabase**
+**Step 4: Fix mismatch de status entre Edge Function e Frontend**
+
+A Edge Function grava `ultimo_teste_status: 'sucesso'` mas o frontend em `FiscalCertificadoPage.tsx` verifica `=== 'ok'`. O badge nunca fica verde.
+
+**Opção A (recomendada):** Alterar o frontend para aceitar ambos. Em `src/domains/fiscal/pages/FiscalCertificadoPage.tsx`, trocar TODAS as ocorrências (linhas ~304, ~309, ~585):
+
+De:
+```typescript
+certAtivo.ultimo_teste_status === 'ok'
+```
+Para:
+```typescript
+certAtivo.ultimo_teste_status === 'sucesso' || certAtivo.ultimo_teste_status === 'ok'
+```
+
+E na tabela de histórico (linha ~585):
+De:
+```typescript
+c.ultimo_teste_status === 'ok'
+```
+Para:
+```typescript
+c.ultimo_teste_status === 'sucesso' || c.ultimo_teste_status === 'ok'
+```
+
+**Step 5: Deploy da Edge Function atualizada no Supabase**
 
 Via Supabase CLI:
 ```bash
@@ -139,15 +181,15 @@ npx supabase functions deploy fiscal-testar-certificado --project-ref djwjmfgpln
 
 Ou via Dashboard: https://supabase.com/dashboard/project/djwjmfgplnqyffdcgdaw/functions → fiscal-testar-certificado → Update → colar o código atualizado.
 
-**Step 5: Testar**
+**Step 6: Testar**
 
 Navegar para https://crm-croma.vercel.app/fiscal/certificado → clicar "Testar Certificado".
-Expected: Toast verde "Certificado testado com sucesso!"
+Expected: Toast verde "Certificado testado com sucesso!" E badge verde "Sucesso" no card.
 
-**Step 6: Commit**
+**Step 7: Commit**
 ```bash
-git add supabase/functions/fiscal-testar-certificado/index.ts
-git commit -m "fix(fiscal): handle env: prefix in testar-certificado Edge Function"
+git add supabase/functions/fiscal-testar-certificado/index.ts src/domains/fiscal/pages/FiscalCertificadoPage.tsx
+git commit -m "fix(fiscal): handle env: prefix in testar-certificado + fix status badge mismatch"
 ```
 
 ---
@@ -670,12 +712,16 @@ Após completar TODAS as tasks:
 
 - [ ] `pnpm run build` passa sem erros
 - [ ] `pnpm run test` passa (102 testes)
-- [ ] "Testar Certificado" funciona em `/fiscal/certificado` → toast verde
+- [ ] "Testar Certificado" funciona em `/fiscal/certificado` → toast verde "sucesso"
+- [ ] Badge de último teste mostra verde "Sucesso" (não "Falhou") após testar
 - [ ] Upload de novo certificado grava corretamente no banco (coluna `arquivo_encriptado_url`)
 - [ ] `/admin/empresa` mostra e edita dados da Croma Print
+- [ ] `/admin/empresa` aparece no menu lateral (Sidebar)
 - [ ] `/fiscal/configuracao` → tab Ambientes mostra dados da empresa via relação (sem campos duplicados)
 - [ ] `/fiscal/configuracao` não tem mais tab "Empresas" (só link para /admin/empresa)
+- [ ] Ambientes têm Select de empresa (não campos manuais de CNPJ/razão social)
 - [ ] Orçamentos, OS, portal, login mostram nome dinâmico da empresa
 - [ ] **TODAS as 20 Edge Functions** aparecem como Active no Supabase Dashboard
 - [ ] Nenhuma Edge Function local ficou sem deploy
+- [ ] Secrets verificados: RESEND_API_KEY, ONEDRIVE_CLIENT_ID/SECRET/REFRESH_TOKEN, VERCEL_TOKEN
 - [ ] Commit final feito e push para `main`
