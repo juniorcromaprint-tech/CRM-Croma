@@ -199,7 +199,9 @@ git commit -m "fix(fiscal): handle env: prefix in testar-certificado + fix statu
 **Files:**
 - Modify: `src/domains/fiscal/pages/FiscalCertificadoPage.tsx`
 
-**O bug:** O `handleUpload` (linhas 158-164) grava em `arquivo_url` e `storage_path`, que NÃO existem na tabela. A coluna real é `arquivo_encriptado_url`.
+**O bug:** O `handleUpload` (linhas 158-164) grava em `arquivo_url` e `storage_path`, que NÃO existem na tabela. A coluna real é `arquivo_encriptado_url`. Além disso, falta o campo `cnpj_titular` que é NOT NULL no banco — o insert vai falhar com violação de constraint.
+
+**Referência correta:** `src/domains/fiscal/services/certificate.service.ts` linhas 60-69 faz o insert correto. Usar como modelo.
 
 **Step 1: Localizar o payload do insert (linhas 158-164)**
 
@@ -214,7 +216,7 @@ const payload: any = {
 };
 ```
 
-**Step 2: Corrigir para usar a coluna correta**
+**Step 2: Corrigir para usar as colunas corretas + adicionar cnpj_titular**
 
 Substituir por:
 ```typescript
@@ -222,9 +224,12 @@ const payload: any = {
   nome: formUpload.nome,
   tipo_certificado: 'a1',
   arquivo_encriptado_url: storagePath,
+  cnpj_titular: formUpload.cnpj_titular || '', // campo obrigatório NOT NULL
   ativo: false,
 };
 ```
+
+> **IMPORTANTE:** O form de upload precisa coletar o CNPJ titular do certificado. Adicionar um campo `<Input>` para CNPJ no formulário de upload, ou preencher automaticamente a partir da empresa ativa via `useEmpresaPrincipal()`.
 
 **Step 3: Remover a linha que pega URL pública (linhas 152-155)**
 
