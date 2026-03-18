@@ -30,6 +30,7 @@ import {
   PaginationNext, PaginationPrevious,
 } from "@/components/ui/pagination";
 import { TEMPERATURA_CONFIG } from "../constants/temperatura";
+import QueryErrorState from "@/shared/components/QueryErrorState";
 import { LEAD_STATUS_CONFIG, getStatusConfig } from "@/shared/constants/status";
 
 const PAGE_SIZE = 20;
@@ -84,7 +85,7 @@ export default function LeadsPage() {
 
   // ── Queries ──────────────────────────────────────────────────────────────
 
-  const { data: leadsResult, isLoading } = useQuery({
+  const { data: leadsResult, isLoading, isError, refetch } = useQuery({
     queryKey: ["leads", search, statusFilter, page],
     staleTime: 2 * 60 * 1000,
     queryFn: async () => {
@@ -217,6 +218,10 @@ export default function LeadsPage() {
   };
 
   // ── Render ───────────────────────────────────────────────────────────────
+
+  if (isError) {
+    return <QueryErrorState onRetry={refetch} />;
+  }
 
   return (
     <div className="space-y-6">
