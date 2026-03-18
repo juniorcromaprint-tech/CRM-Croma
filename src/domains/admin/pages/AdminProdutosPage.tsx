@@ -7,6 +7,7 @@ import { useState, useEffect } from "react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import { showSuccess, showError } from "@/utils/toast";
+import { brl } from "@/shared/utils/format";
 
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -130,13 +131,6 @@ interface Servico {
 // ----------------------------------------------------------------------------
 // HELPERS
 // ----------------------------------------------------------------------------
-
-function formatBRL(value: number): string {
-  return new Intl.NumberFormat("pt-BR", {
-    style: "currency",
-    currency: "BRL",
-  }).format(value);
-}
 
 function categoriaBadgeColor(categoria: string): string {
   const map: Record<string, string> = {
@@ -2005,7 +1999,7 @@ function TabAcabamentos() {
                     >
                       <td className="px-4 py-3 font-medium text-slate-800">{a.nome}</td>
                       <td className="px-4 py-3 font-mono text-slate-600">
-                        {formatBRL(a.custo_unitario)}
+                        {brl(a.custo_unitario)}
                       </td>
                       <td className="px-4 py-3 text-slate-500 font-mono text-xs">{a.unidade}</td>
                       <td className="px-4 py-3">
@@ -2405,10 +2399,10 @@ function TabServicos() {
                         </span>
                       </td>
                       <td className="px-4 py-3 font-mono text-slate-600">
-                        {formatBRL(s.custo_hora)}/h
+                        {brl(s.custo_hora)}/h
                       </td>
                       <td className="px-4 py-3 font-mono text-slate-500 text-xs">
-                        {s.preco_fixo != null ? formatBRL(s.preco_fixo) : "—"}
+                        {s.preco_fixo != null ? brl(s.preco_fixo) : "—"}
                       </td>
                       <td className="px-4 py-3">
                         <Badge

@@ -39,6 +39,7 @@ import {
   Loader2,
 } from 'lucide-react';
 import { useFiscalAuditLogs } from '../hooks/useFiscal';
+import { formatDate } from '@/shared/utils/format';
 
 // ---------------------------------------------------------------------------
 // Helpers
@@ -47,10 +48,6 @@ import { useFiscalAuditLogs } from '../hooks/useFiscal';
 function formatDateTime(d: string): string {
   const date = new Date(d);
   return date.toLocaleDateString('pt-BR') + ' ' + date.toLocaleTimeString('pt-BR');
-}
-
-function formatDate(d: string): string {
-  return new Date(d).toLocaleDateString('pt-BR');
 }
 
 const ACAO_CONFIG: Record<string, { label: string; className: string }> = {

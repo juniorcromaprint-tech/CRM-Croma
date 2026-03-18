@@ -22,14 +22,8 @@ import {
 } from 'lucide-react';
 import { useFiscalDocumentos } from '../hooks/useFiscal';
 import { StatusFiscalBadge } from '../components/StatusFiscalBadge';
-
-function brl(value: number): string {
-  return new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' }).format(value);
-}
-
-function formatDate(d: string): string {
-  return new Date(d).toLocaleDateString('pt-BR');
-}
+import { brl, formatDate } from '@/shared/utils/format';
+import QueryErrorState from '@/shared/components/QueryErrorState';
 
 export default function FiscalDashboardPage() {
   const navigate = useNavigate();
@@ -40,7 +34,7 @@ export default function FiscalDashboardPage() {
   inicioMes.setHours(0, 0, 0, 0);
   const inicioMesStr = inicioMes.toISOString();
 
-  const { data: docsMes = [], isLoading: loadingDocs } = useQuery({
+  const { data: docsMes = [], isLoading: loadingDocs, isError: isErrorDocs, refetch: refetchDocs } = useQuery({
     queryKey: ['fiscal_dashboard_docs_mes'],
     queryFn: async () => {
       const { data, error } = await supabase
@@ -131,6 +125,10 @@ export default function FiscalDashboardPage() {
   const recentesSlice = (documentosRecentes as any[]).slice(0, 10);
 
   const isLoading = loadingDocs || loadingCerts || loadingFila;
+
+  if (isErrorDocs) {
+    return <QueryErrorState onRetry={refetchDocs} />;
+  }
 
   return (
     <div className="space-y-6">

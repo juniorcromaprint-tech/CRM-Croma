@@ -13,7 +13,7 @@ import {
   ArrowRight, Plus, Calendar, BarChart3, Target,
   ShoppingCart, CheckCircle2, Clock, Activity, Zap,
 } from "lucide-react";
-import { brl as formatBRL } from "@/shared/utils/format";
+import { brl } from "@/shared/utils/format";
 import {
   useDashComercial, useDashPedidos, useDashProducao,
   useDashFinanceiro, useDashInstalacoes, useDashEstoque, useDashQualidade,
@@ -292,8 +292,8 @@ export default function DashboardDiretor() {
       <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
         <HeroKpi
           label="Faturamento Previsto"
-          value={fin?.totalReceber ? formatBRL(fin.totalReceber) : "R$ 0"}
-          subtitle={fin?.vencidos && fin.vencidos > 0 ? `${formatBRL(fin.vencidos)} em atraso` : "Tudo em dia"}
+          value={fin?.totalReceber ? brl(fin.totalReceber) : "R$ 0"}
+          subtitle={fin?.vencidos && fin.vencidos > 0 ? `${brl(fin.vencidos)} em atraso` : "Tudo em dia"}
           icon={<Wallet size={24} className="text-white" />}
           gradient="bg-gradient-to-br from-emerald-500 to-emerald-600"
           iconBg="bg-white/20"
@@ -303,7 +303,7 @@ export default function DashboardDiretor() {
         />
         <HeroKpi
           label="Pipeline Comercial"
-          value={comercial?.pipeline ? formatBRL(comercial.pipeline) : "R$ 0"}
+          value={comercial?.pipeline ? brl(comercial.pipeline) : "R$ 0"}
           subtitle={`${comercial?.leadsAtivos ?? 0} leads · ${comercial?.propostasPendentes ?? 0} propostas`}
           icon={<TrendingUp size={24} className="text-white" />}
           gradient="bg-gradient-to-br from-blue-500 to-blue-600"
@@ -410,7 +410,7 @@ export default function DashboardDiretor() {
                 <ActivityItem
                   key={`ped-${ped.id}`}
                   title={`${ped.numero || "Pedido"} — ${ped.clientes?.nome_fantasia || "Cliente"}`}
-                  subtitle={`${ped.status?.replace(/_/g, " ")} · ${formatBRL(Number(ped.valor_total) || 0)}`}
+                  subtitle={`${ped.status?.replace(/_/g, " ")} · ${brl(Number(ped.valor_total) || 0)}`}
                   time={timeAgo(ped.created_at)}
                   type="pedido"
                 />
@@ -444,10 +444,10 @@ export default function DashboardDiretor() {
             </div>
             <div className="space-y-3">
               {[
-                { label: "A Receber", value: formatBRL(fin?.totalReceber ?? 0), color: "text-emerald-600", dotColor: "bg-emerald-400" },
-                { label: "A Pagar", value: formatBRL(fin?.totalPagar ?? 0), color: "text-rose-600", dotColor: "bg-rose-400" },
-                { label: "Saldo Projetado", value: formatBRL(fin?.saldo ?? 0), color: (fin?.saldo ?? 0) >= 0 ? "text-blue-600" : "text-red-600", dotColor: (fin?.saldo ?? 0) >= 0 ? "bg-blue-400" : "bg-red-400" },
-                { label: "Inadimplência", value: formatBRL(fin?.vencidos ?? 0), color: (fin?.vencidos ?? 0) > 0 ? "text-red-600" : "text-slate-400", dotColor: (fin?.vencidos ?? 0) > 0 ? "bg-red-400" : "bg-slate-200" },
+                { label: "A Receber", value: brl(fin?.totalReceber ?? 0), color: "text-emerald-600", dotColor: "bg-emerald-400" },
+                { label: "A Pagar", value: brl(fin?.totalPagar ?? 0), color: "text-rose-600", dotColor: "bg-rose-400" },
+                { label: "Saldo Projetado", value: brl(fin?.saldo ?? 0), color: (fin?.saldo ?? 0) >= 0 ? "text-blue-600" : "text-red-600", dotColor: (fin?.saldo ?? 0) >= 0 ? "bg-blue-400" : "bg-red-400" },
+                { label: "Inadimplência", value: brl(fin?.vencidos ?? 0), color: (fin?.vencidos ?? 0) > 0 ? "text-red-600" : "text-slate-400", dotColor: (fin?.vencidos ?? 0) > 0 ? "bg-red-400" : "bg-slate-200" },
               ].map(({ label, value, color, dotColor }) => (
                 <div key={label} className="flex items-center justify-between py-2 border-b border-slate-50 last:border-0">
                   <div className="flex items-center gap-2.5">
