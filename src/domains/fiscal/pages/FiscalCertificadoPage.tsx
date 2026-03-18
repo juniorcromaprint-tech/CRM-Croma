@@ -87,6 +87,7 @@ export default function FiscalCertificadoPage() {
   const [formUpload, setFormUpload] = useState({
     nome: '',
     senha: '',
+    cnpj_titular: '',
     validade_fim: '',
     arquivo: null as File | null,
   });
@@ -149,17 +150,12 @@ export default function FiscalCertificadoPage() {
 
       if (uploadErr) throw uploadErr;
 
-      // 3. Obter URL pública para referência
-      const { data: urlData } = supabase.storage
-        .from('fiscal-certificados')
-        .getPublicUrl(storagePath);
-
-      // 4. Gravar metadados em fiscal_certificados
+      // 3. Gravar metadados em fiscal_certificados
       const payload: any = {
         nome: formUpload.nome,
         tipo_certificado: 'a1',
-        arquivo_url: urlData?.publicUrl ?? storagePath,
-        storage_path: storagePath,
+        arquivo_encriptado_url: storagePath,
+        cnpj_titular: formUpload.cnpj_titular || '',
         ativo: false, // será ativado pelo deploy
       };
 
@@ -202,7 +198,7 @@ export default function FiscalCertificadoPage() {
       qc.invalidateQueries({ queryKey: ['fiscal_certificados'] });
 
       // Limpar form
-      setFormUpload({ nome: '', senha: '', validade_fim: '', arquivo: null });
+      setFormUpload({ nome: '', senha: '', cnpj_titular: '', validade_fim: '', arquivo: null });
       if (fileRef.current) fileRef.current.value = '';
       setUploadAberto(false);
     } catch (e: any) {
@@ -301,12 +297,12 @@ export default function FiscalCertificadoPage() {
                     {certAtivo.ultimo_teste_status && (
                       <Badge
                         className={`text-xs ${
-                          certAtivo.ultimo_teste_status === 'ok'
+                          certAtivo.ultimo_teste_status === 'sucesso' || certAtivo.ultimo_teste_status === 'ok'
                             ? 'bg-green-100 text-green-700 border border-green-300'
                             : 'bg-red-100 text-red-700 border border-red-300'
                         }`}
                       >
-                        {certAtivo.ultimo_teste_status === 'ok' ? 'OK' : 'Falhou'}
+                        {certAtivo.ultimo_teste_status === 'sucesso' || certAtivo.ultimo_teste_status === 'ok' ? 'Sucesso' : 'Falhou'}
                       </Badge>
                     )}
                     <Button
@@ -386,6 +382,18 @@ export default function FiscalCertificadoPage() {
                 />
               </div>
               <div>
+                <Label htmlFor="cert_cnpj_titular">
+                  CNPJ Titular <span className="text-red-500">*</span>
+                </Label>
+                <Input
+                  id="cert_cnpj_titular"
+                  value={formUpload.cnpj_titular}
+                  onChange={(e) => setFormUpload((f) => ({ ...f, cnpj_titular: e.target.value }))}
+                  placeholder="00.000.000/0000-00"
+                  className="mt-1.5"
+                />
+              </div>
+              <div>
                 <Label htmlFor="cert_validade">Data de Validade</Label>
                 <Input
                   id="cert_validade"
@@ -460,7 +468,7 @@ export default function FiscalCertificadoPage() {
                 variant="outline"
                 onClick={() => {
                   setUploadAberto(false);
-                  setFormUpload({ nome: '', senha: '', validade_fim: '', arquivo: null });
+                  setFormUpload({ nome: '', senha: '', cnpj_titular: '', validade_fim: '', arquivo: null });
                   if (fileRef.current) fileRef.current.value = '';
                 }}
               >
@@ -582,9 +590,9 @@ export default function FiscalCertificadoPage() {
                         {c.ultimo_teste_em ? formatDateTime(c.ultimo_teste_em) : 'Nunca'}
                       </TableCell>
                       <TableCell>
-                        {c.ultimo_teste_status === 'ok' ? (
+                        {c.ultimo_teste_status === 'sucesso' || c.ultimo_teste_status === 'ok' ? (
                           <Badge className="bg-green-100 text-green-700 border border-green-300 text-xs">
-                            OK
+                            Sucesso
                           </Badge>
                         ) : c.ultimo_teste_status ? (
                           <Badge className="bg-red-100 text-red-700 border border-red-300 text-xs">

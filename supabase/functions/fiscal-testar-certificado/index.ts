@@ -103,27 +103,55 @@ serve(async (req) => {
       }
     }
 
-    // Verifica se arquivo existe no storage
+    // Verifica se arquivo/referência existe
     const storagePath = cert.arquivo_encriptado_url;
-    const folder = storagePath?.split('/').slice(0, -1).join('/') ?? 'certificados';
-    const fileName = storagePath?.split('/').pop();
 
-    let arquivoExiste = false;
-    if (fileName) {
-      const { data: files } = await supabaseAdmin.storage
-        .from('fiscal-certificados')
-        .list(folder);
-      arquivoExiste = (files ?? []).some((f: { name: string }) => f.name === fileName);
-    }
-
-    if (!arquivoExiste) {
-      const resultado = { ok: false, mensagem: 'Arquivo do certificado não encontrado no storage seguro' };
+    if (!storagePath) {
+      const resultado = { ok: false, mensagem: 'Nenhum arquivo ou referência de certificado configurada' };
       await supabaseAdmin.from('fiscal_certificados').update({
         ultimo_teste_em: new Date().toISOString(),
-        ultimo_teste_status: 'falha_arquivo',
+        ultimo_teste_status: 'falha_config',
         updated_at: new Date().toISOString(),
       }).eq('id', certificado_id);
       return new Response(JSON.stringify(resultado), { status: 200, headers: { ...corsHeaders, 'Content-Type': 'application/json' } });
+    }
+
+    if (storagePath.startsWith('env:')) {
+      // Certificate stored as env var reference (e.g., "env:NFE_CERT_BASE64")
+      // This is a valid configuration — the actual cert lives as a Vercel/Supabase secret
+      const envName = storagePath.replace('env:', '');
+      if (!envName) {
+        const resultado = { ok: false, mensagem: 'Referência de certificado inválida (env: sem nome)' };
+        await supabaseAdmin.from('fiscal_certificados').update({
+          ultimo_teste_em: new Date().toISOString(),
+          ultimo_teste_status: 'falha_config',
+          updated_at: new Date().toISOString(),
+        }).eq('id', certificado_id);
+        return new Response(JSON.stringify(resultado), { status: 200, headers: { ...corsHeaders, 'Content-Type': 'application/json' } });
+      }
+      // env-based certificate is valid — skip storage file check
+    } else {
+      // Storage-based certificate — verify file exists in bucket
+      const folder = storagePath.split('/').slice(0, -1).join('/') || 'certificados';
+      const fileName = storagePath.split('/').pop();
+
+      let arquivoExiste = false;
+      if (fileName) {
+        const { data: files } = await supabaseAdmin.storage
+          .from('fiscal-certificados')
+          .list(folder);
+        arquivoExiste = (files ?? []).some((f: { name: string }) => f.name === fileName);
+      }
+
+      if (!arquivoExiste) {
+        const resultado = { ok: false, mensagem: 'Arquivo do certificado não encontrado no storage seguro' };
+        await supabaseAdmin.from('fiscal_certificados').update({
+          ultimo_teste_em: new Date().toISOString(),
+          ultimo_teste_status: 'falha_arquivo',
+          updated_at: new Date().toISOString(),
+        }).eq('id', certificado_id);
+        return new Response(JSON.stringify(resultado), { status: 200, headers: { ...corsHeaders, 'Content-Type': 'application/json' } });
+      }
     }
 
     // Calcula dias restantes de validade
@@ -158,7 +186,7 @@ serve(async (req) => {
       p_user_id: null,
       p_entidade: 'fiscal_certificados',
       p_entidade_id: certificado_id,
-      p_acao: 'trocar_certificado',
+      p_acao: 'testar_certificado',
       p_resultado: 'sucesso',
       p_antes: null,
       p_depois: JSON.stringify({ teste: 'sucesso', dias_restantes: diasRestantes }),
