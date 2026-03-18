@@ -17,6 +17,7 @@ interface OSPrintLayoutProps {
   data: OSData | OSOPData;
   mode: 'pedido' | 'op';
   qrUrl: string;
+  nomeEmpresa?: string;
 }
 
 // ---------------------------------------------------------------------------
@@ -408,7 +409,7 @@ function ItemBlock({ item, index }: { item: OSItem; index: number }) {
 // Main component
 // ---------------------------------------------------------------------------
 
-export function OSPrintLayout({ data, mode, qrUrl }: OSPrintLayoutProps) {
+export function OSPrintLayout({ data, mode, qrUrl, nomeEmpresa = 'Croma Print Comunicação Visual' }: OSPrintLayoutProps) {
   const isPedido = isPedidoOS(data);
 
   // Derived values
@@ -617,7 +618,7 @@ export function OSPrintLayout({ data, mode, qrUrl }: OSPrintLayoutProps) {
       }}>
         <div>
           <div style={{ fontWeight: '600', color: '#1d4ed8', fontSize: '10px' }}>
-            Croma Print Comunicação Visual
+            {nomeEmpresa}
           </div>
           <div style={{ marginTop: '2px' }}>
             {vendedor && aprovadoEm

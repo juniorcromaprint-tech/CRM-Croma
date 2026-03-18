@@ -6,6 +6,7 @@ import { Input } from '@/components/ui/input';
 import { Link2, MessageCircle, Mail, Check, Loader2 } from 'lucide-react';
 import { supabase } from '@/integrations/supabase/client';
 import { showSuccess, showError } from '@/utils/toast';
+import { useEmpresaPrincipal } from "@/shared/hooks/useEmpresaPrincipal";
 
 interface Props {
   open: boolean;
@@ -18,6 +19,8 @@ interface Props {
 }
 
 export function SharePropostaModal({ open, onClose, propostaId, propostaNumero, shareToken, clienteTelefone, clienteEmail }: Props) {
+  const { data: empresa } = useEmpresaPrincipal();
+  const nomeEmpresa = empresa?.nome_fantasia || empresa?.razao_social || 'Croma Print';
   const [copied, setCopied] = useState(false);
   const [emailTo, setEmailTo] = useState(clienteEmail || '');
   const [sendingEmail, setSendingEmail] = useState(false);
@@ -44,7 +47,7 @@ export function SharePropostaModal({ open, onClose, propostaId, propostaNumero, 
   const openWhatsApp = async () => {
     await activateToken();
     const msg = encodeURIComponent(
-      `Olá! Segue o link da proposta ${propostaNumero} da Croma Print:\n\n${portalUrl}\n\nQualquer dúvida estou à disposição!`
+      `Olá! Segue o link da proposta ${propostaNumero} da ${nomeEmpresa}:\n\n${portalUrl}\n\nQualquer dúvida estou à disposição!`
     );
     const phone = (clienteTelefone || '').replace(/\D/g, '');
     window.open(`https://wa.me/${phone}?text=${msg}`, '_blank');

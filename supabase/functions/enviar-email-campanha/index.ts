@@ -72,6 +72,17 @@ serve(async (req) => {
       );
     }
 
+    // Buscar nome da empresa emitente para o sender
+    const { data: empresa } = await supabase
+      .from('empresas')
+      .select('razao_social, nome_fantasia')
+      .eq('ativa', true)
+      .order('created_at')
+      .limit(1)
+      .single();
+    const nomeEmpresa = empresa?.nome_fantasia || empresa?.razao_social || 'Croma Print';
+    const emailFrom = Deno.env.get('EMAIL_FROM') || `${nomeEmpresa} <noreply@cromaprint.com.br>`;
+
     const RESEND_API_KEY = Deno.env.get('RESEND_API_KEY');
     if (!RESEND_API_KEY) {
       // Modo demo: marca como enviado sem chamar Resend
@@ -99,7 +110,7 @@ serve(async (req) => {
             'Content-Type': 'application/json',
           },
           body: JSON.stringify({
-            from: 'Croma Print <noreply@cromaprint.com.br>',
+            from: emailFrom,
             to: [dest.email],
             subject: campanha.assunto_email,
             html: (campanha.corpo_email as string).replace(/\{\{nome\}\}/g, dest.nome),

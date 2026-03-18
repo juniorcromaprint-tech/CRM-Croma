@@ -17,11 +17,14 @@ import { OSLogistica } from '../components/os/OSLogistica';
 import { OSQRCode } from '../components/os/OSQRCode';
 import { OSActions } from '../components/os/OSActions';
 import { OSPrintLayout } from '../components/os/OSPrintLayout';
+import { useEmpresaPrincipal } from "@/shared/hooks/useEmpresaPrincipal";
 
 export default function OrdemServicoOPPage() {
   const { opId } = useParams<{ opId: string }>();
   const navigate = useNavigate();
   const { data: op, isLoading, isError } = useOrdemServicoOP(opId);
+  const { data: empresa } = useEmpresaPrincipal();
+  const nomeEmpresa = empresa?.nome_fantasia || empresa?.razao_social || 'Croma Print Comunicação Visual';
   const [pdfLoading, setPdfLoading] = useState(false);
 
   const handlePrint = () => {
@@ -39,7 +42,7 @@ export default function OrdemServicoOPPage() {
 
       const qrUrl = window.location.href;
       const root = createRoot(container);
-      root.render(<OSPrintLayout data={op} mode="op" qrUrl={qrUrl} />);
+      root.render(<OSPrintLayout data={op} mode="op" qrUrl={qrUrl} nomeEmpresa={nomeEmpresa} />);
 
       // Aguarda render completo
       await new Promise((r) => setTimeout(r, 400));
@@ -182,13 +185,13 @@ export default function OrdemServicoOPPage() {
             ? `Responsável: ${op.vendedor_nome}`
             : `Emitido em: ${new Date().toLocaleDateString('pt-BR')}`}
           <span className="mx-2">·</span>
-          Croma Print Comunicação Visual
+          {nomeEmpresa}
         </div>
       </div>
 
       {/* ══ Print version ══ */}
       <div className="hidden print:block">
-        <OSPrintLayout data={op} mode="op" qrUrl={qrUrl} />
+        <OSPrintLayout data={op} mode="op" qrUrl={qrUrl} nomeEmpresa={nomeEmpresa} />
       </div>
     </div>
   );

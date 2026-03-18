@@ -64,7 +64,7 @@ import {
   useFiscalRegras,
   useAlternarAmbienteFiscal,
 } from '../hooks/useFiscal';
-import TabEmpresas from '../components/TabEmpresas';
+import { useEmpresasAtivas } from '../hooks/useEmpresas';
 
 // ---------------------------------------------------------------------------
 // Tab Ambientes
@@ -73,6 +73,7 @@ import TabEmpresas from '../components/TabEmpresas';
 function TabAmbientes() {
   const qc = useQueryClient();
   const { data: ambientes = [], isLoading, error } = useFiscalAmbientes();
+  const { data: empresasAtivas = [] } = useEmpresasAtivas();
   const [editando, setEditando] = useState<any>(null);
   const [salvando, setSalvando] = useState(false);
   const alternarAmbiente = useAlternarAmbienteFiscal();
@@ -80,40 +81,14 @@ function TabAmbientes() {
   const [pendingAmbienteId, setPendingAmbienteId] = useState<string | null>(null);
 
   const [formAmb, setFormAmb] = useState({
-    cnpj_emitente: '',
-    razao_social_emitente: '',
-    ie_emitente: '',
-    im_emitente: '',
-    crt: 1 as number,
-    logradouro: '',
-    numero_endereco: '',
-    complemento: '',
-    bairro: '',
-    municipio: '',
-    uf: '',
-    cep: '',
-    codigo_municipio_ibge: '',
-    telefone_emitente: '',
+    empresa_id: '',
     ativo: true,
   });
 
   const abrirEdicao = (amb: any) => {
     setEditando(amb);
     setFormAmb({
-      cnpj_emitente: amb.cnpj_emitente ?? '',
-      razao_social_emitente: amb.razao_social_emitente ?? '',
-      ie_emitente: amb.ie_emitente ?? '',
-      im_emitente: amb.im_emitente ?? '',
-      crt: amb.crt ?? 1,
-      logradouro: amb.logradouro ?? '',
-      numero_endereco: amb.numero_endereco ?? '',
-      complemento: amb.complemento ?? '',
-      bairro: amb.bairro ?? '',
-      municipio: amb.municipio ?? '',
-      uf: amb.uf ?? '',
-      cep: amb.cep ?? '',
-      codigo_municipio_ibge: amb.codigo_municipio_ibge ?? '',
-      telefone_emitente: amb.telefone_emitente ?? '',
+      empresa_id: amb.empresa_id ?? '',
       ativo: amb.ativo ?? false,
     });
   };
@@ -125,20 +100,7 @@ function TabAmbientes() {
       const { error: err } = await supabase
         .from('fiscal_ambientes')
         .update({
-          cnpj_emitente: formAmb.cnpj_emitente || null,
-          razao_social_emitente: formAmb.razao_social_emitente || null,
-          ie_emitente: formAmb.ie_emitente || null,
-          im_emitente: formAmb.im_emitente || null,
-          crt: formAmb.crt,
-          logradouro: formAmb.logradouro || null,
-          numero_endereco: formAmb.numero_endereco || null,
-          complemento: formAmb.complemento || null,
-          bairro: formAmb.bairro || null,
-          municipio: formAmb.municipio || null,
-          uf: formAmb.uf || null,
-          cep: formAmb.cep || null,
-          codigo_municipio_ibge: formAmb.codigo_municipio_ibge || null,
-          telefone_emitente: formAmb.telefone_emitente || null,
+          empresa_id: formAmb.empresa_id || null,
           ativo: formAmb.ativo,
         })
         .eq('id', editando.id);
@@ -329,11 +291,11 @@ function TabAmbientes() {
               <CardContent className="space-y-2">
                 <div>
                   <p className="text-xs text-slate-500 uppercase tracking-wide mb-0.5">CNPJ Emitente</p>
-                  <p className="text-sm font-mono text-slate-800">{amb.cnpj_emitente ?? '—'}</p>
+                  <p className="text-sm font-mono text-slate-800">{(amb as any).empresas?.cnpj ?? amb.cnpj_emitente ?? '—'}</p>
                 </div>
                 <div>
                   <p className="text-xs text-slate-500 uppercase tracking-wide mb-0.5">Razão Social</p>
-                  <p className="text-sm text-slate-800">{amb.razao_social_emitente ?? '—'}</p>
+                  <p className="text-sm text-slate-800">{(amb as any).empresas?.razao_social ?? amb.razao_social_emitente ?? '—'}</p>
                 </div>
                 <div className="flex items-center gap-2 pt-2">
                   {amb.ativo ? (
@@ -370,188 +332,34 @@ function TabAmbientes() {
             </DialogTitle>
           </DialogHeader>
           <div className="space-y-6">
+            <Alert className="border-blue-200 bg-blue-50">
+              <Building2 className="w-4 h-4 text-blue-600" />
+              <AlertDescription className="text-blue-800 text-sm">
+                Os dados fiscais do emitente (CNPJ, endereço, IE) são gerenciados em{' '}
+                <a href="/admin/empresa" className="font-semibold underline hover:text-blue-900">
+                  Administração → Empresa
+                </a>
+              </AlertDescription>
+            </Alert>
 
-            {/* Seção: Identificação Fiscal */}
+            {/* Empresa Emitente */}
             <div>
-              <h3 className="text-xs font-semibold text-slate-500 uppercase tracking-wider mb-3 pb-1 border-b">
-                Identificação Fiscal
-              </h3>
-              <div className="space-y-3">
-                <div className="grid grid-cols-2 gap-3">
-                  <div>
-                    <Label htmlFor="cnpj_emitente">CNPJ Emitente</Label>
-                    <Input
-                      id="cnpj_emitente"
-                      value={formAmb.cnpj_emitente}
-                      onChange={(e) => setFormAmb((f) => ({ ...f, cnpj_emitente: e.target.value }))}
-                      placeholder="00.000.000/0001-00"
-                      className="mt-1.5 rounded-xl font-mono"
-                    />
-                  </div>
-                  <div>
-                    <Label htmlFor="ie_emitente">Inscrição Estadual (IE)</Label>
-                    <Input
-                      id="ie_emitente"
-                      value={formAmb.ie_emitente}
-                      onChange={(e) => setFormAmb((f) => ({ ...f, ie_emitente: e.target.value }))}
-                      placeholder="000.000.000.000"
-                      className="mt-1.5 rounded-xl font-mono"
-                    />
-                  </div>
-                </div>
-                <div>
-                  <Label htmlFor="razao_social_emitente">Razão Social</Label>
-                  <Input
-                    id="razao_social_emitente"
-                    value={formAmb.razao_social_emitente}
-                    onChange={(e) => setFormAmb((f) => ({ ...f, razao_social_emitente: e.target.value }))}
-                    placeholder="Razão social da empresa emissora"
-                    className="mt-1.5 rounded-xl"
-                  />
-                </div>
-                <div className="grid grid-cols-2 gap-3">
-                  <div>
-                    <Label htmlFor="im_emitente">Inscrição Municipal (IM)</Label>
-                    <Input
-                      id="im_emitente"
-                      value={formAmb.im_emitente}
-                      onChange={(e) => setFormAmb((f) => ({ ...f, im_emitente: e.target.value }))}
-                      placeholder="Opcional"
-                      className="mt-1.5 rounded-xl font-mono"
-                    />
-                  </div>
-                  <div>
-                    <Label htmlFor="crt_amb">Regime Tributário (CRT)</Label>
-                    <Select
-                      value={String(formAmb.crt)}
-                      onValueChange={(v) => setFormAmb((f) => ({ ...f, crt: Number(v) }))}
-                    >
-                      <SelectTrigger className="mt-1.5 rounded-xl">
-                        <SelectValue />
-                      </SelectTrigger>
-                      <SelectContent>
-                        <SelectItem value="1">1 — Simples Nacional</SelectItem>
-                        <SelectItem value="2">2 — Simples Nacional — Excesso Sublimite</SelectItem>
-                        <SelectItem value="3">3 — Regime Normal</SelectItem>
-                      </SelectContent>
-                    </Select>
-                  </div>
-                </div>
-              </div>
-            </div>
-
-            {/* Seção: Endereço */}
-            <div>
-              <h3 className="text-xs font-semibold text-slate-500 uppercase tracking-wider mb-3 pb-1 border-b">
-                Endereço
-              </h3>
-              <div className="space-y-3">
-                <div className="grid grid-cols-3 gap-3">
-                  <div className="col-span-2">
-                    <Label htmlFor="logradouro_amb">Logradouro</Label>
-                    <Input
-                      id="logradouro_amb"
-                      value={formAmb.logradouro}
-                      onChange={(e) => setFormAmb((f) => ({ ...f, logradouro: e.target.value }))}
-                      placeholder="Rua, Avenida..."
-                      className="mt-1.5 rounded-xl"
-                    />
-                  </div>
-                  <div>
-                    <Label htmlFor="numero_endereco_amb">Número</Label>
-                    <Input
-                      id="numero_endereco_amb"
-                      value={formAmb.numero_endereco}
-                      onChange={(e) => setFormAmb((f) => ({ ...f, numero_endereco: e.target.value }))}
-                      placeholder="123"
-                      className="mt-1.5 rounded-xl"
-                    />
-                  </div>
-                </div>
-                <div className="grid grid-cols-2 gap-3">
-                  <div>
-                    <Label htmlFor="complemento_amb">Complemento</Label>
-                    <Input
-                      id="complemento_amb"
-                      value={formAmb.complemento}
-                      onChange={(e) => setFormAmb((f) => ({ ...f, complemento: e.target.value }))}
-                      placeholder="Sala, Andar... (opcional)"
-                      className="mt-1.5 rounded-xl"
-                    />
-                  </div>
-                  <div>
-                    <Label htmlFor="bairro_amb">Bairro</Label>
-                    <Input
-                      id="bairro_amb"
-                      value={formAmb.bairro}
-                      onChange={(e) => setFormAmb((f) => ({ ...f, bairro: e.target.value }))}
-                      placeholder="Bairro"
-                      className="mt-1.5 rounded-xl"
-                    />
-                  </div>
-                </div>
-                <div className="grid grid-cols-3 gap-3">
-                  <div className="col-span-1">
-                    <Label htmlFor="municipio_amb">Município</Label>
-                    <Input
-                      id="municipio_amb"
-                      value={formAmb.municipio}
-                      onChange={(e) => setFormAmb((f) => ({ ...f, municipio: e.target.value }))}
-                      placeholder="São Paulo"
-                      className="mt-1.5 rounded-xl"
-                    />
-                  </div>
-                  <div>
-                    <Label htmlFor="uf_amb">UF</Label>
-                    <Input
-                      id="uf_amb"
-                      value={formAmb.uf}
-                      onChange={(e) => setFormAmb((f) => ({ ...f, uf: e.target.value.toUpperCase().slice(0, 2) }))}
-                      placeholder="SP"
-                      maxLength={2}
-                      className="mt-1.5 rounded-xl font-mono uppercase"
-                    />
-                  </div>
-                  <div>
-                    <Label htmlFor="cep_amb">CEP</Label>
-                    <Input
-                      id="cep_amb"
-                      value={formAmb.cep}
-                      onChange={(e) => setFormAmb((f) => ({ ...f, cep: e.target.value }))}
-                      placeholder="00000-000"
-                      className="mt-1.5 rounded-xl font-mono"
-                    />
-                  </div>
-                </div>
-                <div>
-                  <Label htmlFor="ibge_amb">Código IBGE do Município (7 dígitos)</Label>
-                  <Input
-                    id="ibge_amb"
-                    value={formAmb.codigo_municipio_ibge}
-                    onChange={(e) => setFormAmb((f) => ({ ...f, codigo_municipio_ibge: e.target.value }))}
-                    placeholder="3550308"
-                    maxLength={7}
-                    className="mt-1.5 rounded-xl font-mono"
-                  />
-                </div>
-              </div>
-            </div>
-
-            {/* Seção: Contato */}
-            <div>
-              <h3 className="text-xs font-semibold text-slate-500 uppercase tracking-wider mb-3 pb-1 border-b">
-                Contato
-              </h3>
-              <div>
-                <Label htmlFor="telefone_emitente_amb">Telefone</Label>
-                <Input
-                  id="telefone_emitente_amb"
-                  value={formAmb.telefone_emitente}
-                  onChange={(e) => setFormAmb((f) => ({ ...f, telefone_emitente: e.target.value }))}
-                  placeholder="(11) 99999-9999"
-                  className="mt-1.5 rounded-xl font-mono"
-                />
-              </div>
+              <Label htmlFor="empresa_id_amb">Empresa Emitente</Label>
+              <Select
+                value={formAmb.empresa_id}
+                onValueChange={(v) => setFormAmb((f) => ({ ...f, empresa_id: v }))}
+              >
+                <SelectTrigger className="mt-1.5 rounded-xl">
+                  <SelectValue placeholder="Selecione a empresa emitente..." />
+                </SelectTrigger>
+                <SelectContent>
+                  {(empresasAtivas as any[]).map((emp: any) => (
+                    <SelectItem key={emp.id} value={emp.id}>
+                      {emp.razao_social} ({emp.cnpj})
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
             </div>
 
             {/* Ativo */}
@@ -1169,23 +977,26 @@ export default function FiscalConfiguracaoPage() {
           Configurações Fiscais
         </h1>
         <p className="text-slate-500 text-sm mt-1">
-          Gerencie empresas emitentes, ambientes, séries e regras de operação da NF-e
+          Gerencie ambientes, séries e regras de operação da NF-e
         </p>
       </div>
 
+      <Alert className="border-blue-200 bg-blue-50">
+        <Building2 className="w-4 h-4 text-blue-600" />
+        <AlertDescription className="text-blue-800 text-sm">
+          Os dados da empresa emitente são gerenciados em{' '}
+          <a href="/admin/empresa" className="font-semibold underline hover:text-blue-900">
+            Administração → Empresa
+          </a>
+        </AlertDescription>
+      </Alert>
+
       {/* Tabs */}
-      <Tabs defaultValue="empresas">
+      <Tabs defaultValue="ambientes">
         <TabsList className="border-b bg-transparent h-auto p-0 mb-6">
           <TabsTrigger
-            value="empresas"
-            className="rounded-none border-b-2 border-transparent data-[state=active]:border-indigo-600 data-[state=active]:text-indigo-700 data-[state=active]:bg-transparent pb-2 text-sm font-medium"
-          >
-            <Building2 className="w-4 h-4 mr-1.5" />
-            Empresas
-          </TabsTrigger>
-          <TabsTrigger
             value="ambientes"
-            className="rounded-none border-b-2 border-transparent data-[state=active]:border-indigo-600 data-[state=active]:text-indigo-700 data-[state=active]:bg-transparent pb-2 text-sm font-medium"
+            className="rounded-none border-b-2 border-transparent data-[state=active]:border-indigo-600 data-[state=active]:text-indigo-700 data-[state=active]:bg-transparent pb-2 text-sm font-medium mr-2"
           >
             <Server className="w-4 h-4 mr-1.5" />
             Ambientes
@@ -1205,10 +1016,6 @@ export default function FiscalConfiguracaoPage() {
             Regras de Operação
           </TabsTrigger>
         </TabsList>
-
-        <TabsContent value="empresas">
-          <TabEmpresas />
-        </TabsContent>
 
         <TabsContent value="ambientes">
           <TabAmbientes />

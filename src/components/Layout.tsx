@@ -15,6 +15,7 @@ import CommandPalette from "@/shared/components/CommandPalette";
 import Breadcrumbs from "@/shared/components/Breadcrumbs";
 import { NotificationBadge } from "@/components/NotificationBadge";
 import AIAlertsBadge from '@/domains/ai/components/AIAlertsBadge';
+import { useEmpresaPrincipal } from "@/shared/hooks/useEmpresaPrincipal";
 
 // ---------------------------------------------------------------------------
 // Lucide Icons — mapped by string name from navigation.ts
@@ -58,14 +59,14 @@ export const CromaLogo = ({ className = "" }: { className?: string }) => (
   />
 );
 
-export const CromaLogoFallback = ({ className = "" }: { className?: string }) => (
+export const CromaLogoFallback = ({ className = "", name = "Cromaprint" }: { className?: string; name?: string }) => (
   <div className={`hidden flex items-center gap-1.5 ${className}`}>
     <div className="flex -space-x-1.5">
       <div className="w-4 h-4 rounded-full bg-cyan-500 mix-blend-multiply opacity-90" />
       <div className="w-4 h-4 rounded-full bg-fuchsia-500 mix-blend-multiply opacity-90" />
       <div className="w-4 h-4 rounded-full bg-yellow-400 mix-blend-multiply opacity-90" />
     </div>
-    <span className="font-black text-slate-800 tracking-tight text-xl">Cromaprint</span>
+    <span className="font-black text-slate-800 tracking-tight text-xl">{name}</span>
   </div>
 );
 
@@ -279,6 +280,8 @@ export default function Layout() {
   const { accessibleModules } = useAuth();
   const [collapsed, setCollapsed] = useState(false);
   const [cmdOpen, setCmdOpen] = useState(false);
+  const { data: empresa } = useEmpresaPrincipal();
+  const nomeEmpresa = empresa?.nome_fantasia || empresa?.razao_social || 'Cromaprint';
 
   const navGroups = useMemo(
     () => filterNavByModules(accessibleModules),
@@ -322,7 +325,7 @@ export default function Layout() {
           {!collapsed && (
             <div className="flex-1 min-w-0">
               <CromaLogo />
-              <CromaLogoFallback />
+              <CromaLogoFallback name={nomeEmpresa} />
             </div>
           )}
           <Tooltip>
@@ -386,7 +389,7 @@ export default function Layout() {
       <header className="md:hidden bg-white border-b border-slate-200 px-4 py-3 flex items-center justify-between sticky top-0 z-20 print:hidden">
         <div>
           <CromaLogo className="h-8" />
-          <CromaLogoFallback />
+          <CromaLogoFallback name={nomeEmpresa} />
         </div>
         <div className="flex items-center gap-2">
           <AIAlertsBadge onClick={() => window.location.href = '/dashboard'} />

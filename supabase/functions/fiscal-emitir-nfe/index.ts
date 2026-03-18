@@ -114,7 +114,7 @@ serve(async (req) => {
         fiscal_documentos_itens(*),
         clientes(*),
         pedidos(numero, valor_total),
-        fiscal_ambientes(tipo, endpoint_base),
+        fiscal_ambientes(tipo, endpoint_base, empresa_id, empresas(*)),
         fiscal_series(serie),
         fiscal_certificados(id, nome, arquivo_encriptado_url, senha_secret_ref, cnpj_titular)
       `)
@@ -237,10 +237,31 @@ serve(async (req) => {
     const numero = numeroData as number;
     const serie = doc.fiscal_series?.serie ?? 1;
     const ambiente = doc.fiscal_ambientes?.tipo ?? 'homologacao';
-    const cnpjEmitente = Deno.env.get('NFE_CNPJ_EMITENTE') ?? doc.fiscal_certificados?.cnpj_titular ?? '';
 
-    // Monta payload NF-e (estrutura nfewizard-io / SEFAZ)
-    const uf = Deno.env.get('NFE_UF') ?? 'SP';
+    // Dados da empresa emitente — lidos do banco (tabela empresas via fiscal_ambientes)
+    const empresa = (doc.fiscal_ambientes as any)?.empresas;
+    if (!empresa) {
+      return new Response(
+        JSON.stringify({ sucesso: false, mensagem_erro: 'Empresa emitente não configurada no ambiente fiscal. Acesse Administração → Empresa.' }),
+        { status: 422, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+      );
+    }
+
+    const cnpjEmitente = empresa.cnpj?.replace(/\D/g, '') ?? '';
+    const emitente = {
+      CNPJ: cnpjEmitente,
+      xNome: empresa.razao_social ?? '',
+      IE: empresa.ie?.replace(/\D/g, '') ?? '',
+      CRT: String(empresa.crt ?? 1),
+      xLgr: empresa.logradouro ?? '',
+      nro: empresa.numero_endereco ?? 'S/N',
+      xBairro: empresa.bairro ?? '',
+      cMun: empresa.codigo_municipio_ibge ?? '3550308',
+      xMun: empresa.municipio ?? '',
+      UF: empresa.uf ?? 'SP',
+      CEP: empresa.cep?.replace(/\D/g, '') ?? '',
+    };
+
     const cliente = doc.clientes;
     const itens = doc.fiscal_documentos_itens ?? [];
 
@@ -248,7 +269,7 @@ serve(async (req) => {
       NFe: {
         infNFe: {
           ide: {
-            cUF: '35', // SP — Croma Print fica em São Paulo
+            cUF: '35',
             natOp: doc.natureza_operacao ?? 'Venda de mercadoria',
             mod: '55',
             serie: serie.toString(),
@@ -256,7 +277,7 @@ serve(async (req) => {
             dhEmi: new Date().toISOString(),
             tpNF: '1',
             idDest: '1',
-            cMunFG: Deno.env.get('NFE_COD_IBGE') ?? '3550308',
+            cMunFG: emitente.cMun,
             tpImp: '1',
             tpEmis: '1',
             tpAmb: ambiente === 'producao' ? '1' : '2',
@@ -265,21 +286,21 @@ serve(async (req) => {
             indPres: '1',
           },
           emit: {
-            CNPJ: cnpjEmitente.replace(/\D/g, ''),
-            xNome: Deno.env.get('NFE_RAZAO_SOCIAL') ?? 'CROMA PRINT COMUNICACAO VISUAL LTDA',
+            CNPJ: emitente.CNPJ,
+            xNome: emitente.xNome,
             enderEmit: {
-              xLgr: Deno.env.get('NFE_ENDERECO') ?? 'RUA PAULO OROZIMBO',
-              nro: Deno.env.get('NFE_NUMERO') ?? '424',
-              xBairro: Deno.env.get('NFE_BAIRRO') ?? 'ACLIMACAO',
-              cMun: Deno.env.get('NFE_COD_IBGE') ?? '3550308',
-              xMun: Deno.env.get('NFE_MUNICIPIO') ?? 'SAO PAULO',
-              UF: uf,
-              CEP: Deno.env.get('NFE_CEP')?.replace(/\D/g, '') ?? '01535000',
+              xLgr: emitente.xLgr,
+              nro: emitente.nro,
+              xBairro: emitente.xBairro,
+              cMun: emitente.cMun,
+              xMun: emitente.xMun,
+              UF: emitente.UF,
+              CEP: emitente.CEP,
               cPais: '1058',
               xPais: 'Brasil',
             },
-            IE: Deno.env.get('NFE_IE') ?? '142826237111',
-            CRT: Deno.env.get('NFE_CRT') ?? '1', // 1 = Simples Nacional
+            IE: emitente.IE,
+            CRT: emitente.CRT,
           },
           dest: {
             ...(cliente?.cpf_cnpj?.replace(/\D/g, '').length === 11

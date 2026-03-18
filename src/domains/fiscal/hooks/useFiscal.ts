@@ -43,7 +43,7 @@ export function useFiscalAmbientes() {
     queryKey: ['fiscal_ambientes'],
     staleTime: 10 * 60 * 1000,
     queryFn: async () => {
-      const { data, error } = await supabase.from('fiscal_ambientes').select('id, codigo, nome, tipo, endpoint_base, ativo, cnpj_emitente, razao_social_emitente, ie_emitente, crt, created_at, updated_at').order('tipo');
+      const { data, error } = await supabase.from('fiscal_ambientes').select('id, codigo, nome, tipo, endpoint_base, ativo, empresa_id, empresas(id, razao_social, cnpj, ie, crt), created_at, updated_at').order('tipo');
       if (error) throw error;
       return data ?? [];
     },

@@ -10,6 +10,7 @@ import { brl } from "@/shared/utils/format";
 import { showError } from "@/utils/toast";
 import { useDREReal } from "../hooks/useMotorFinanceiro";
 import { Info } from "lucide-react";
+import { useEmpresaPrincipal } from "@/shared/hooks/useEmpresaPrincipal";
 
 import { Card, CardContent } from "@/components/ui/card";
 import { Skeleton } from "@/components/ui/skeleton";
@@ -450,6 +451,8 @@ function CustomTooltip({ active, payload, label }: any) {
 // ─── Componente principal ────────────────────────────────────────────────────
 
 export default function DrePage() {
+  const { data: empresa } = useEmpresaPrincipal();
+  const nomeEmpresa = empresa?.nome_fantasia || empresa?.razao_social || 'Croma Print';
   const [periodo, setPeriodo] = useState("mes");
 
   const { data: dre, isLoading, error } = useDRE(periodo);
@@ -584,7 +587,7 @@ export default function DrePage() {
 
       {/* ─── Print: título ─────────────────────────────────────── */}
       <div className="hidden print:block text-center mb-6">
-        <h1 className="text-2xl font-bold">Croma Print — DRE Gerencial</h1>
+        <h1 className="text-2xl font-bold">{nomeEmpresa} — DRE Gerencial</h1>
         <p className="text-slate-500">
           Período: {periodoLabel[periodo]} ({inicio} a {fim})
         </p>

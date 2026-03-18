@@ -17,6 +17,7 @@ import { OSLogistica } from '../components/os/OSLogistica';
 import { OSQRCode } from '../components/os/OSQRCode';
 import { OSActions } from '../components/os/OSActions';
 import { OSPrintLayout } from '../components/os/OSPrintLayout';
+import { useEmpresaPrincipal } from "@/shared/hooks/useEmpresaPrincipal";
 import AIButton from '@/domains/ai/components/AIButton';
 import ProducaoBriefing from '@/domains/ai/components/ProducaoBriefing';
 import { useBriefingProducao } from '@/domains/ai/hooks/useBriefingProducao';
@@ -26,6 +27,8 @@ export default function OrdemServicoPage() {
   const { pedidoId } = useParams<{ pedidoId: string }>();
   const navigate = useNavigate();
   const { data: os, isLoading, isError } = useOrdemServico(pedidoId);
+  const { data: empresa } = useEmpresaPrincipal();
+  const nomeEmpresa = empresa?.nome_fantasia || empresa?.razao_social || 'Croma Print Comunicação Visual';
   const [pdfLoading, setPdfLoading] = useState(false);
   const [briefingResult, setBriefingResult] = useState<AIResponse | null>(null);
   const briefingProducao = useBriefingProducao();
@@ -45,7 +48,7 @@ export default function OrdemServicoPage() {
 
       const qrUrl = window.location.href;
       const root = createRoot(container);
-      root.render(<OSPrintLayout data={os} mode="pedido" qrUrl={qrUrl} />);
+      root.render(<OSPrintLayout data={os} mode="pedido" qrUrl={qrUrl} nomeEmpresa={nomeEmpresa} />);
 
       // Aguarda render completo
       await new Promise((r) => setTimeout(r, 400));
@@ -201,7 +204,7 @@ export default function OrdemServicoPage() {
               ? `Responsável: ${os.vendedor_nome}`
               : `Emitido em: ${new Date().toLocaleDateString('pt-BR')}`}
           <span className="mx-2">·</span>
-          Croma Print Comunicação Visual
+          {nomeEmpresa}
         </div>
       </div>
 
@@ -217,7 +220,7 @@ export default function OrdemServicoPage() {
 
       {/* ══ Print version ══ */}
       <div className="hidden print:block">
-        <OSPrintLayout data={os} mode="pedido" qrUrl={qrUrl} />
+        <OSPrintLayout data={os} mode="pedido" qrUrl={qrUrl} nomeEmpresa={nomeEmpresa} />
       </div>
     </div>
   );
