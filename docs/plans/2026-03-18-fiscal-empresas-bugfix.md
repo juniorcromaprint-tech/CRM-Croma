@@ -928,3 +928,24 @@ Após completar TODAS as tasks:
 
 ### Final
 - [ ] Commit final feito e push para `main`
+
+---
+
+## Melhorias Futuras (NÃO bloqueia este plano)
+
+> Descobertas pela auditoria, mas não são bugs — são duplicações de dados que funcionam hoje.
+
+### 1. `contas_bancarias` — Dados do Cedente Duplicados
+
+A tabela `contas_bancarias` tem campos `cedente_nome`, `cedente_cnpj`, `cedente_endereco`, `cedente_cidade`, `cedente_estado`, `cedente_cep` que duplicam dados da `empresas`. O `BankAccountForm.tsx` (linhas 151-188) pede pro usuário digitar esses dados manualmente.
+
+**Melhoria:** Auto-preencher campos do cedente a partir da empresa selecionada. Não é urgente porque:
+- Funciona como está (dados manuais são válidos)
+- O cedente bancário PODE ser diferente da empresa fiscal (ex: filial)
+- Mudança requer migration para adicionar `empresa_id` em `contas_bancarias`
+
+**Arquivos afetados:**
+- `src/domains/financeiro/components/BankAccountForm.tsx` — form de cedente
+- `src/domains/financeiro/hooks/useBoletos.ts` — queries com campos cedente
+- `src/domains/financeiro/services/cnab400-itau.service.ts` — usa `account.cedente_nome/cnpj`
+- `src/domains/financeiro/types/boleto.types.ts` — tipos com campos cedente
