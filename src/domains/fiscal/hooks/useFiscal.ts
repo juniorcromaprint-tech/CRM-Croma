@@ -214,6 +214,31 @@ export function useGerarDanfe() {
   });
 }
 
+export function useAlternarAmbienteFiscal() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: async (ambienteId: string) => {
+      // Desativa todos os ambientes
+      const { error: e1 } = await supabase
+        .from('fiscal_ambientes')
+        .update({ ativo: false })
+        .neq('id', ambienteId);
+      if (e1) throw e1;
+      // Ativa o ambiente selecionado
+      const { error: e2 } = await supabase
+        .from('fiscal_ambientes')
+        .update({ ativo: true })
+        .eq('id', ambienteId);
+      if (e2) throw e2;
+    },
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: ['fiscal_ambientes'] });
+      showSuccess('Ambiente fiscal alterado com sucesso!');
+    },
+    onError: (err: any) => showError(err.message ?? 'Erro ao alternar ambiente'),
+  });
+}
+
 export function useValidarPedidoFiscal() {
   return useMutation({
     mutationFn: async (pedidoId: string) => {

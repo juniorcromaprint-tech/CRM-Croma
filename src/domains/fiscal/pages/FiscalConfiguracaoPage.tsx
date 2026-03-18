@@ -33,6 +33,16 @@ import {
 } from '@/components/ui/table';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from '@/components/ui/alert-dialog';
+import {
   Settings,
   Server,
   FileDigit,
@@ -43,11 +53,15 @@ import {
   AlertTriangle,
   CheckCircle,
   XCircle,
+  ShieldCheck,
+  FlaskConical,
+  ArrowRightLeft,
 } from 'lucide-react';
 import {
   useFiscalAmbientes,
   useFiscalSeries,
   useFiscalRegras,
+  useAlternarAmbienteFiscal,
 } from '../hooks/useFiscal';
 
 // ---------------------------------------------------------------------------
@@ -59,6 +73,9 @@ function TabAmbientes() {
   const { data: ambientes = [], isLoading, error } = useFiscalAmbientes();
   const [editando, setEditando] = useState<any>(null);
   const [salvando, setSalvando] = useState(false);
+  const alternarAmbiente = useAlternarAmbienteFiscal();
+  const [confirmProd, setConfirmProd] = useState(false);
+  const [pendingAmbienteId, setPendingAmbienteId] = useState<string | null>(null);
 
   const [formAmb, setFormAmb] = useState({
     cnpj_emitente: '',
@@ -160,8 +177,74 @@ function TabAmbientes() {
     ambienteAtivo.tipo !== 'producao' &&
     ambienteAtivo.tipo !== 'NFE_PRD';
 
+  const handleToggleAmbiente = (ambId: string, isProd: boolean) => {
+    if (isProd) {
+      setPendingAmbienteId(ambId);
+      setConfirmProd(true);
+    } else {
+      alternarAmbiente.mutate(ambId);
+    }
+  };
+
+  const confirmarMudancaProd = () => {
+    if (pendingAmbienteId) {
+      alternarAmbiente.mutate(pendingAmbienteId);
+    }
+    setConfirmProd(false);
+    setPendingAmbienteId(null);
+  };
+
   return (
     <>
+      {/* Seletor de Ambiente Ativo */}
+      <Card className="border-2 border-slate-200 mb-4">
+        <CardContent className="py-4">
+          <div className="flex items-center justify-between flex-wrap gap-3">
+            <div className="flex items-center gap-3">
+              <ArrowRightLeft className="w-5 h-5 text-indigo-600" />
+              <div>
+                <p className="text-sm font-semibold text-slate-800">Ambiente Ativo para Emissão</p>
+                <p className="text-xs text-slate-500">
+                  Selecione em qual ambiente as NF-e serão emitidas
+                </p>
+              </div>
+            </div>
+            <div className="flex items-center gap-2">
+              {(ambientes as any[]).map((amb: any) => {
+                const isProd = amb.tipo === 'producao' || amb.tipo === 'NFE_PRD';
+                const isActive = amb.ativo;
+                return (
+                  <Button
+                    key={amb.id}
+                    size="sm"
+                    disabled={isActive || alternarAmbiente.isPending}
+                    onClick={() => handleToggleAmbiente(amb.id, isProd)}
+                    className={`h-9 px-4 text-sm font-medium transition-all ${
+                      isActive
+                        ? isProd
+                          ? 'bg-green-600 hover:bg-green-600 text-white shadow-md cursor-default'
+                          : 'bg-amber-500 hover:bg-amber-500 text-white shadow-md cursor-default'
+                        : 'bg-white text-slate-600 border border-slate-300 hover:border-slate-400 hover:bg-slate-50'
+                    }`}
+                  >
+                    {isProd ? (
+                      <ShieldCheck className="w-4 h-4 mr-1.5" />
+                    ) : (
+                      <FlaskConical className="w-4 h-4 mr-1.5" />
+                    )}
+                    {isProd ? 'Produção' : 'Homologação'}
+                    {isActive && <CheckCircle className="w-3.5 h-3.5 ml-1.5" />}
+                  </Button>
+                );
+              })}
+              {alternarAmbiente.isPending && (
+                <Loader2 className="w-4 h-4 animate-spin text-slate-400" />
+              )}
+            </div>
+          </div>
+        </CardContent>
+      </Card>
+
       {/* Banner de aviso quando o ambiente ativo é homologação */}
       {ambienteAtivoIsHml && (
         <div className="flex items-center gap-3 px-4 py-3 rounded-xl border border-amber-400 bg-amber-50 text-amber-800 font-semibold text-sm mb-2">
@@ -174,6 +257,39 @@ function TabAmbientes() {
           </span>
         </div>
       )}
+
+      {/* Confirmação antes de mudar para Produção */}
+      <AlertDialog open={confirmProd} onOpenChange={setConfirmProd}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle className="flex items-center gap-2 text-red-700">
+              <ShieldCheck className="w-5 h-5" />
+              Ativar Ambiente de Produção?
+            </AlertDialogTitle>
+            <AlertDialogDescription className="text-sm text-slate-600 space-y-2">
+              <p>
+                Ao mudar para <strong>Produção</strong>, todas as NF-e emitidas terão{' '}
+                <strong>validade fiscal real</strong> e serão enviadas à SEFAZ oficial.
+              </p>
+              <p className="text-red-600 font-medium">
+                Documentos emitidos em produção NÃO podem ser desfeitos — apenas cancelados dentro
+                do prazo legal (24h).
+              </p>
+              <p>Certifique-se de que todos os dados do emitente e certificado digital estão corretos.</p>
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel>Cancelar</AlertDialogCancel>
+            <AlertDialogAction
+              onClick={confirmarMudancaProd}
+              className="bg-green-600 hover:bg-green-700 text-white"
+            >
+              <ShieldCheck className="w-4 h-4 mr-1.5" />
+              Sim, ativar Produção
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
 
       <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
         {(ambientes as any[]).map((amb: any) => {

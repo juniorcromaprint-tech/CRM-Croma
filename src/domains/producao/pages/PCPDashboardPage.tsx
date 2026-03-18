@@ -11,7 +11,7 @@ import { Button } from '@/components/ui/button';
 import KpiCard from '@/shared/components/KpiCard';
 import KanbanBoard, { type KanbanColumn } from '@/shared/components/KanbanBoard';
 import GanttTimeline from '@/shared/components/GanttTimeline';
-import SemaforoBadge from '@/shared/components/SemaforoBadge';
+import { SemaforoBadge } from '@/shared/components/SemaforoBadge';
 import { formatDate } from '@/shared/utils/format';
 import {
   useOpsAtivas,
