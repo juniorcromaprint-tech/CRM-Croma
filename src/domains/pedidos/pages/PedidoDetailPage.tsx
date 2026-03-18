@@ -26,7 +26,7 @@ import { useCriarPastaOneDrive } from '../hooks/useOneDrive'
 import { brl } from '@/shared/utils/format'
 import { criarOrdemProducao } from '@/domains/producao/services/producao.service'
 import { criarNFeFromPedido } from '@/domains/fiscal/services/nfe-creation.service'
-import { gerarContasReceber } from '@/domains/financeiro/services/financeiro-automation.service'
+import { gerarContasReceber, gerarParcelas } from '@/domains/financeiro/services/financeiro-automation.service'
 import { showError, showSuccess } from '@/utils/toast'
 import { supabase } from '@/integrations/supabase/client'
 import { updateWithLock, OptimisticLockError } from '@/shared/utils/optimistic-lock'
@@ -168,6 +168,7 @@ export default function PedidoDetailPage() {
     try {
       // 1. Gerar contas a receber ANTES de marcar como concluído
       await gerarContasReceber(id)
+      await gerarParcelas(id)
       // 2. Atualizar status com optimistic lock
       await updateWithLock('pedidos', id, { status: 'concluido' }, pedido.version)
       // 3. Invalidar cache para refletir no UI

@@ -2,7 +2,7 @@ import React, { useState, useMemo } from "react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import { showError, showSuccess } from "@/utils/toast";
-import { gerarContasReceber } from "@/domains/financeiro/services/financeiro-automation.service";
+import { gerarContasReceber, gerarParcelas } from "@/domains/financeiro/services/financeiro-automation.service";
 
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
@@ -748,6 +748,7 @@ export default function InstalacaoPage() {
       if (os.pedido_id && os.pedidos?.status === "em_instalacao") {
         await supabase.from("pedidos").update({ status: "concluido" }).eq("id", os.pedido_id);
         await gerarContasReceber(os.pedido_id);
+        await gerarParcelas(os.pedido_id);
       }
     },
     onSuccess: () => {
