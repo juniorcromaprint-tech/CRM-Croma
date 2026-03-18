@@ -65,6 +65,17 @@ serve(async (req) => {
 
     if (error || !proposta) throw new Error('Proposta não encontrada');
 
+    // Buscar nome da empresa emitente para o sender
+    const { data: empresa } = await supabase
+      .from('empresas')
+      .select('razao_social, nome_fantasia')
+      .eq('ativa', true)
+      .order('created_at')
+      .limit(1)
+      .single();
+    const nomeEmpresa = empresa?.nome_fantasia || empresa?.razao_social || 'Croma Print';
+    const emailFrom = Deno.env.get('EMAIL_FROM') || `${nomeEmpresa} <noreply@cromaprint.com.br>`;
+
     const portalUrl = `${Deno.env.get('APP_URL') || 'https://crm-croma.vercel.app'}/p/${proposta.share_token}`;
     const clienteName = destinatario_nome || proposta.cliente?.contato_nome || proposta.cliente?.nome_fantasia || 'Cliente';
 
@@ -76,12 +87,12 @@ serve(async (req) => {
         Authorization: `Bearer ${Deno.env.get('RESEND_API_KEY')}`,
       },
       body: JSON.stringify({
-        from: Deno.env.get('EMAIL_FROM') || 'Croma Print <noreply@cromaprint.com.br>',
+        from: emailFrom,
         to: destinatario_email,
-        subject: `Proposta Comercial ${proposta.numero} — Croma Print`,
+        subject: `Proposta Comercial ${proposta.numero} — ${nomeEmpresa}`,
         html: `
           <div style="font-family:sans-serif;max-width:600px;margin:0 auto;padding:20px;">
-            <h2 style="color:#1e40af;">Croma Print</h2>
+            <h2 style="color:#1e40af;">${nomeEmpresa}</h2>
             <p>Olá, ${clienteName}!</p>
             <p>Segue sua proposta comercial <strong>${proposta.numero}</strong>.</p>
             <p style="text-align:center;margin:32px 0;">
