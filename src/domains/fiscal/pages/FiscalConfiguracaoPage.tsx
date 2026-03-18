@@ -47,6 +47,7 @@ import {
   Server,
   FileDigit,
   ListChecks,
+  Building2,
   Edit2,
   Plus,
   Loader2,
@@ -63,6 +64,7 @@ import {
   useFiscalRegras,
   useAlternarAmbienteFiscal,
 } from '../hooks/useFiscal';
+import TabEmpresas from '../components/TabEmpresas';
 
 // ---------------------------------------------------------------------------
 // Tab Ambientes
@@ -1167,13 +1169,20 @@ export default function FiscalConfiguracaoPage() {
           Configurações Fiscais
         </h1>
         <p className="text-slate-500 text-sm mt-1">
-          Gerencie ambientes, séries e regras de operação da NF-e
+          Gerencie empresas emitentes, ambientes, séries e regras de operação da NF-e
         </p>
       </div>
 
       {/* Tabs */}
-      <Tabs defaultValue="ambientes">
+      <Tabs defaultValue="empresas">
         <TabsList className="border-b bg-transparent h-auto p-0 mb-6">
+          <TabsTrigger
+            value="empresas"
+            className="rounded-none border-b-2 border-transparent data-[state=active]:border-indigo-600 data-[state=active]:text-indigo-700 data-[state=active]:bg-transparent pb-2 text-sm font-medium"
+          >
+            <Building2 className="w-4 h-4 mr-1.5" />
+            Empresas
+          </TabsTrigger>
           <TabsTrigger
             value="ambientes"
             className="rounded-none border-b-2 border-transparent data-[state=active]:border-indigo-600 data-[state=active]:text-indigo-700 data-[state=active]:bg-transparent pb-2 text-sm font-medium"
@@ -1196,6 +1205,10 @@ export default function FiscalConfiguracaoPage() {
             Regras de Operação
           </TabsTrigger>
         </TabsList>
+
+        <TabsContent value="empresas">
+          <TabEmpresas />
+        </TabsContent>
 
         <TabsContent value="ambientes">
           <TabAmbientes />
