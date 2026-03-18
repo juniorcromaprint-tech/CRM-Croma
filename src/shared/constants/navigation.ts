@@ -98,6 +98,7 @@ export const NAV_GROUPS: NavGroup[] = [
   {
     label: 'ADMINISTRAÇÃO',
     items: [
+      { name: 'Empresa', path: '/admin/empresa', icon: 'Building2', module: 'admin' },
       { name: 'Usuários', path: '/admin/usuarios', icon: 'Users', module: 'admin' },
       { name: 'Configurações', path: '/admin/config', icon: 'Settings', module: 'admin' },
       { name: 'Precificação', path: '/admin/precificacao', icon: 'Calculator', module: 'admin' },

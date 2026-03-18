@@ -3,6 +3,7 @@ import { Route } from "react-router-dom";
 import LazyPage from "@/shared/components/LazyPage";
 import PermissionGuard from "@/shared/components/PermissionGuard";
 
+const EmpresaPage = lazy(() => import("@/domains/admin/pages/EmpresaPage"));
 const AdminUsuariosPage = lazy(() => import("@/domains/admin/pages/AdminUsuariosPage"));
 const AdminAuditoriaPage = lazy(() => import("@/domains/admin/pages/AdminAuditoriaPage"));
 const AdminConfigPage = lazy(() => import("@/domains/admin/pages/AdminConfigPage"));
@@ -21,6 +22,11 @@ const CatalogoProdutosPage = lazy(() => import("@/domains/admin/pages/CatalogoPr
 
 export const adminRoutes = (
   <>
+    <Route path="admin/empresa" element={
+      <PermissionGuard module="admin" action="ver">
+        <LazyPage><EmpresaPage /></LazyPage>
+      </PermissionGuard>
+    } />
     <Route path="admin/usuarios" element={
       <PermissionGuard module="admin" action="ver">
         <LazyPage><AdminUsuariosPage /></LazyPage>
