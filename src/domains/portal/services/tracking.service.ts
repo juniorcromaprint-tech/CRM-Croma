@@ -42,7 +42,6 @@ export async function sendHeartbeat(params: {
     p_downloaded_pdf: params.downloadedPdf,
   });
   // Heartbeat failures are non-critical — don't throw
-  if (error) console.warn('Heartbeat failed:', error.message);
 }
 
 export async function resolveGeo(): Promise<{ city: string; region: string; country: string } | null> {

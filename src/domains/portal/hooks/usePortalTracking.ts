@@ -60,7 +60,6 @@ export function usePortalTracking(token: string) {
         });
         viewIdRef.current = viewId;
       } catch (err) {
-        console.warn('Failed to register view:', err);
       }
     };
 
