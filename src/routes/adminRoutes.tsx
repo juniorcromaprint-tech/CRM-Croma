@@ -92,7 +92,7 @@ export const adminRoutes = (
         <LazyPage><CatalogoProdutosPage /></LazyPage>
       </PermissionGuard>
     } />
-    <Route path="relatorios" element={<LazyPage><RelatoriosPage /></LazyPage>} />
-    <Route path="settings" element={<LazyPage><Settings /></LazyPage>} />
+    <Route path="relatorios" element={<PermissionGuard module="admin" action="ver"><LazyPage><RelatoriosPage /></LazyPage></PermissionGuard>} />
+    <Route path="settings" element={<PermissionGuard module="admin" action="ver"><LazyPage><Settings /></LazyPage></PermissionGuard>} />
   </>
 );
