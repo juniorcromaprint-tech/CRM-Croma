@@ -34,7 +34,7 @@ async function buildConfigSnapshot(): Promise<Record<string, unknown>> {
       };
     }
   } catch {
-    console.warn("[orcamento.service] config_precificacao não disponível — usando defaults");
+    // Fallback intencional: config não disponível, usar defaults sem bloquear
   }
   // Fallback: salva DEFAULT_PRICING_CONFIG como snapshot
   return {
@@ -426,9 +426,8 @@ export const orcamentoService = {
             custo_total: m.custo_total,
           })),
         );
-      } catch {
-        // Tabela pode não existir ainda (migration 006 pendente)
-        console.warn("[orcamento.service] proposta_item_materiais não disponível");
+      } catch (err) {
+        throw new Error(`Falha ao salvar materiais do item: ${err instanceof Error ? err.message : 'erro desconhecido'}`);
       }
     }
 
@@ -445,8 +444,8 @@ export const orcamentoService = {
             custo_total: a.custo_total,
           })),
         );
-      } catch {
-        console.warn("[orcamento.service] proposta_item_acabamentos não disponível");
+      } catch (err) {
+        throw new Error(`Falha ao salvar acabamentos do item: ${err instanceof Error ? err.message : 'erro desconhecido'}`);
       }
     }
 
@@ -461,8 +460,8 @@ export const orcamentoService = {
             ordem: p.ordem ?? idx,
           })),
         );
-      } catch {
-        console.warn("[orcamento.service] proposta_item_processos não disponível (migration 018 pendente?)");
+      } catch (err) {
+        throw new Error(`Falha ao salvar processos do item: ${err instanceof Error ? err.message : 'erro desconhecido'}`);
       }
     }
 
@@ -474,36 +473,22 @@ export const orcamentoService = {
     propostaId: string,
     servico: OrcamentoServicoCreateInput,
   ): Promise<OrcamentoServico> {
-    try {
-      const { data, error } = await supabase
-        .from("proposta_servicos")
-        .insert({ ...servico, proposta_id: propostaId })
-        .select()
-        .single();
-      if (error) throw error;
-      return data as OrcamentoServico;
-    } catch {
-      // Tabela pode não existir ainda (migration 006 pendente)
-      console.warn("[orcamento.service] proposta_servicos não disponível");
-      return {
-        id: crypto.randomUUID(),
-        proposta_id: propostaId,
-        ...servico,
-      } as OrcamentoServico;
-    }
+    const { data, error } = await supabase
+      .from("proposta_servicos")
+      .insert({ ...servico, proposta_id: propostaId })
+      .select()
+      .single();
+    if (error) throw new Error(`Falha ao adicionar serviço: ${error.message}`);
+    return data as OrcamentoServico;
   },
 
   // ─── Remover serviço ──────────────────────────────────────────────────
   async removerServico(id: string): Promise<void> {
-    try {
-      const { error } = await supabase
-        .from("proposta_servicos")
-        .delete()
-        .eq("id", id);
-      if (error) throw error;
-    } catch {
-      console.warn("[orcamento.service] proposta_servicos não disponível");
-    }
+    const { error } = await supabase
+      .from("proposta_servicos")
+      .delete()
+      .eq("id", id);
+    if (error) throw new Error(`Falha ao remover serviço: ${error.message}`);
   },
 
   // ─── Salvar todos os serviços (replace all) ──────────────────────────
@@ -511,20 +496,17 @@ export const orcamentoService = {
     propostaId: string,
     servicos: OrcamentoServicoCreateInput[],
   ): Promise<void> {
-    try {
-      // Remove existentes
-      await supabase
-        .from("proposta_servicos")
-        .delete()
-        .eq("proposta_id", propostaId);
-      // Insere novos
-      if (servicos.length > 0) {
-        await supabase.from("proposta_servicos").insert(
-          servicos.map((s) => ({ ...s, proposta_id: propostaId })),
-        );
-      }
-    } catch {
-      console.warn("[orcamento.service] proposta_servicos não disponível");
+    const { error: deleteError } = await supabase
+      .from("proposta_servicos")
+      .delete()
+      .eq("proposta_id", propostaId);
+    if (deleteError) throw new Error(`Falha ao remover serviços existentes: ${deleteError.message}`);
+
+    if (servicos.length > 0) {
+      const { error: insertError } = await supabase.from("proposta_servicos").insert(
+        servicos.map((s) => ({ ...s, proposta_id: propostaId })),
+      );
+      if (insertError) throw new Error(`Falha ao salvar serviços: ${insertError.message}`);
     }
   },
 
@@ -580,9 +562,8 @@ export const orcamentoService = {
           })),
         );
       }
-    } catch {
-      // Tabela pode não existir ainda (migration 006 pendente)
-      console.warn("[orcamento.service] proposta_item_materiais não disponível");
+    } catch (err) {
+      throw new Error(`Falha ao atualizar materiais do item: ${err instanceof Error ? err.message : 'erro desconhecido'}`);
     }
 
     // 3. Substituir acabamentos (DELETE + INSERT)
@@ -604,8 +585,8 @@ export const orcamentoService = {
           })),
         );
       }
-    } catch {
-      console.warn("[orcamento.service] proposta_item_acabamentos não disponível");
+    } catch (err) {
+      throw new Error(`Falha ao atualizar acabamentos do item: ${err instanceof Error ? err.message : 'erro desconhecido'}`);
     }
 
     // 4. Substituir processos (DELETE + INSERT — migration 018)
@@ -625,8 +606,8 @@ export const orcamentoService = {
           })),
         );
       }
-    } catch {
-      console.warn("[orcamento.service] proposta_item_processos não disponível (migration 018 pendente?)");
+    } catch (err) {
+      throw new Error(`Falha ao atualizar processos do item: ${err instanceof Error ? err.message : 'erro desconhecido'}`);
     }
 
     return itemResult;
@@ -762,21 +743,10 @@ export const orcamentoService = {
       })
       .eq("id", orcamentoId);
 
-    // A-01: Numeração atômica via MAX + 1 com lock implícito do INSERT
-    const ano = new Date().getFullYear();
-    const { data: ultimoPedido } = await supabase
-      .from("pedidos")
-      .select("numero")
-      .like("numero", `PED-${ano}-%`)
-      .order("numero", { ascending: false })
-      .limit(1);
-
-    let seq = 1;
-    if (ultimoPedido && ultimoPedido.length > 0) {
-      const match = ultimoPedido[0].numero.match(/PED-\d{4}-(\d+)/);
-      if (match) seq = parseInt(match[1], 10) + 1;
-    }
-    const numeroPedido = `PED-${ano}-${String(seq).padStart(4, "0")}`;
+    // A-01: Numeração atômica via sequence do Postgres (elimina race condition)
+    const { data: numData, error: numError } = await supabase.rpc('gerar_numero_pedido');
+    if (numError) throw new Error(`Erro ao gerar número do pedido: ${numError.message}`);
+    const numeroPedido = numData as string;
 
     const { data: pedido, error } = await supabase
       .from("pedidos")

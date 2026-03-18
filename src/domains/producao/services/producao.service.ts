@@ -3,20 +3,9 @@ import { supabase } from '@/integrations/supabase/client';
 const ETAPA_NOMES = ['criacao', 'impressao', 'acabamento', 'conferencia', 'expedicao'] as const;
 
 async function generateOpNumero(): Promise<string> {
-  const year = new Date().getFullYear();
-  const { data: ultimo } = await supabase
-    .from('ordens_producao')
-    .select('numero')
-    .like('numero', `OP-${year}-%`)
-    .order('numero', { ascending: false })
-    .limit(1);
-
-  let seq = 1;
-  if (ultimo && ultimo.length > 0) {
-    const match = ultimo[0].numero.match(/OP-\d{4}-(\d+)/);
-    if (match) seq = parseInt(match[1], 10) + 1;
-  }
-  return `OP-${year}-${String(seq).padStart(4, '0')}`;
+  const { data, error } = await supabase.rpc('gerar_numero_op');
+  if (error) throw new Error(`Erro ao gerar número da OP: ${error.message}`);
+  return data as string;
 }
 
 export async function criarOrdemProducao(pedidoId: string): Promise<void> {
