@@ -83,6 +83,7 @@ export default function FiscalCertificadoPage() {
   const [enviando, setEnviando] = useState(false);
   const fileRef = useRef<HTMLInputElement>(null);
 
+  const [deployStatus, setDeployStatus] = useState<'deploying' | 'success' | 'failed' | 'partial' | null>(null);
   const [formUpload, setFormUpload] = useState({
     nome: '',
     senha: '',
@@ -128,7 +129,13 @@ export default function FiscalCertificadoPage() {
 
     setEnviando(true);
     try {
-      // 1. Upload do arquivo para Supabase Storage
+      // 1. Converter arquivo para base64 no browser
+      const fileBuffer = await formUpload.arquivo.arrayBuffer();
+      const certBase64 = btoa(
+        new Uint8Array(fileBuffer).reduce((data, byte) => data + String.fromCharCode(byte), '')
+      );
+
+      // 2. Upload do arquivo para Supabase Storage (backup seguro)
       const ext = formUpload.arquivo.name.split('.').pop() ?? 'pfx';
       const storagePath = `certificados/${Date.now()}_${formUpload.nome.replace(/\s+/g, '_')}.${ext}`;
 
@@ -142,27 +149,56 @@ export default function FiscalCertificadoPage() {
 
       if (uploadErr) throw uploadErr;
 
-      // 2. Obter URL pública (ou signed URL) para referência
+      // 3. Obter URL pública para referência
       const { data: urlData } = supabase.storage
         .from('fiscal-certificados')
         .getPublicUrl(storagePath);
 
-      // 3. Gravar metadados em fiscal_certificados
+      // 4. Gravar metadados em fiscal_certificados
       const payload: any = {
         nome: formUpload.nome,
+        tipo_certificado: 'a1',
         arquivo_url: urlData?.publicUrl ?? storagePath,
         storage_path: storagePath,
-        ativo: false, // precisa ser ativado manualmente após validação
+        ativo: false, // será ativado pelo deploy
       };
 
       if (formUpload.validade_fim) {
         payload.validade_fim = formUpload.validade_fim;
       }
 
-      const { error: insertErr } = await supabase.from('fiscal_certificados').insert(payload);
+      const { data: inserted, error: insertErr } = await supabase
+        .from('fiscal_certificados')
+        .insert(payload)
+        .select('id')
+        .single();
       if (insertErr) throw insertErr;
 
-      showSuccess('Certificado enviado com sucesso. Clique em "Testar" para validar.');
+      // 5. Deploy automático no nfe-service via Edge Function
+      setDeployStatus('deploying');
+      const { data: deployResult, error: deployErr } = await supabase.functions.invoke(
+        'fiscal-deploy-certificado',
+        {
+          body: {
+            cert_base64: certBase64,
+            cert_password: formUpload.senha,
+            certificado_id: inserted?.id,
+          },
+        }
+      );
+
+      if (deployErr) {
+        console.warn('Deploy automático falhou (certificado salvo):', deployErr);
+        showSuccess('Certificado salvo com sucesso! Deploy automático falhou — configure manualmente no Vercel.');
+        setDeployStatus('failed');
+      } else if ((deployResult as any)?.ok) {
+        showSuccess((deployResult as any).mensagem ?? 'Certificado deployado com sucesso!');
+        setDeployStatus('success');
+      } else {
+        showSuccess('Certificado salvo. ' + ((deployResult as any)?.mensagem ?? 'Deploy requer configuração.'));
+        setDeployStatus('partial');
+      }
+
       qc.invalidateQueries({ queryKey: ['fiscal_certificados'] });
 
       // Limpar form
@@ -171,6 +207,7 @@ export default function FiscalCertificadoPage() {
       setUploadAberto(false);
     } catch (e: any) {
       showError(e.message ?? 'Erro ao enviar certificado');
+      setDeployStatus(null);
     } finally {
       setEnviando(false);
     }
@@ -450,6 +487,55 @@ export default function FiscalCertificadoPage() {
           </CardContent>
         )}
       </Card>
+
+      {/* Status do Deploy Automático */}
+      {deployStatus && (
+        <Alert
+          className={`border ${
+            deployStatus === 'deploying'
+              ? 'border-blue-300 bg-blue-50'
+              : deployStatus === 'success'
+                ? 'border-green-300 bg-green-50'
+                : deployStatus === 'failed'
+                  ? 'border-red-300 bg-red-50'
+                  : 'border-amber-300 bg-amber-50'
+          }`}
+        >
+          {deployStatus === 'deploying' ? (
+            <Loader2 className="w-4 h-4 text-blue-600 animate-spin" />
+          ) : deployStatus === 'success' ? (
+            <CheckCircle className="w-4 h-4 text-green-600" />
+          ) : deployStatus === 'failed' ? (
+            <XCircle className="w-4 h-4 text-red-600" />
+          ) : (
+            <AlertTriangle className="w-4 h-4 text-amber-600" />
+          )}
+          <AlertDescription
+            className={`text-sm ${
+              deployStatus === 'deploying'
+                ? 'text-blue-800'
+                : deployStatus === 'success'
+                  ? 'text-green-800'
+                  : deployStatus === 'failed'
+                    ? 'text-red-800'
+                    : 'text-amber-800'
+            }`}
+          >
+            {deployStatus === 'deploying' && (
+              <span><strong>Deploying...</strong> Atualizando certificado no servidor de emissão NF-e. Aguarde...</span>
+            )}
+            {deployStatus === 'success' && (
+              <span><strong>Deploy concluído!</strong> Certificado atualizado no nfe-service e redeploy disparado. As próximas emissões usarão o novo certificado.</span>
+            )}
+            {deployStatus === 'failed' && (
+              <span><strong>Deploy falhou.</strong> O certificado foi salvo no storage, mas não foi possível atualizar automaticamente o nfe-service. Configure VERCEL_TOKEN e NFE_SERVICE_PROJECT_ID nas secrets do Supabase.</span>
+            )}
+            {deployStatus === 'partial' && (
+              <span><strong>Parcialmente concluído.</strong> O certificado foi salvo, mas o redeploy automático não foi possível. Faça um redeploy manual no Vercel.</span>
+            )}
+          </AlertDescription>
+        </Alert>
+      )}
 
       {/* Histórico de Certificados */}
       {!isLoading && certHistorico.length > 0 && (
