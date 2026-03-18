@@ -2,7 +2,7 @@ import React, { useState } from 'react'
 import { useParams, useNavigate } from 'react-router-dom'
 import {
   ArrowLeft, FolderOpen, ExternalLink, Loader2,
-  Play, CheckCircle, Truck, Wrench, Award, FileText, XCircle,
+  Play, CheckCircle, Truck, Wrench, Award, FileText, XCircle, RefreshCw,
 } from 'lucide-react'
 import { useMutation, useQueryClient } from '@tanstack/react-query'
 import { Button } from '@/components/ui/button'
@@ -36,21 +36,23 @@ const VALID_TRANSITIONS: Record<string, string[]> = {
   rascunho:              ['aguardando_aprovacao'],
   aguardando_aprovacao:  ['aprovado', 'cancelado'],
   aprovado:              ['em_producao', 'cancelado'],
-  em_producao:           ['produzido', 'cancelado'],
-  produzido:             ['aguardando_instalacao', 'cancelado'],
+  em_producao:           ['produzido', 'parcialmente_concluido', 'cancelado'],
+  parcialmente_concluido: ['em_producao', 'produzido', 'cancelado'],
+  produzido:             ['aguardando_instalacao', 'concluido', 'cancelado'],
   aguardando_instalacao: ['em_instalacao', 'cancelado'],
   em_instalacao:         ['concluido', 'cancelado'],
 }
 
 // Map of current status → next status action
 const FLOW_ACTIONS: Record<string, { label: string; next: string; icon: React.ReactNode; cls: string }> = {
-  rascunho:              { label: 'Enviar p/ Aprovação',  next: 'aguardando_aprovacao',   icon: <FileText size={14} />,     cls: 'bg-slate-600 hover:bg-slate-700' },
-  aguardando_aprovacao:  { label: 'Aprovar Pedido',       next: 'aprovado',               icon: <Award size={14} />,       cls: 'bg-blue-600 hover:bg-blue-700' },
-  aprovado:              { label: 'Iniciar Produção',     next: 'em_producao',            icon: <Play size={14} />,        cls: 'bg-orange-600 hover:bg-orange-700' },
-  em_producao:           { label: 'Marcar Produzido',     next: 'produzido',              icon: <CheckCircle size={14} />, cls: 'bg-teal-600 hover:bg-teal-700' },
-  produzido:             { label: 'Aguardar Instalação',  next: 'aguardando_instalacao',  icon: <Truck size={14} />,       cls: 'bg-purple-600 hover:bg-purple-700' },
-  aguardando_instalacao: { label: 'Iniciar Instalação',   next: 'em_instalacao',          icon: <Wrench size={14} />,      cls: 'bg-indigo-600 hover:bg-indigo-700' },
-  em_instalacao:         { label: 'Concluir Pedido',      next: 'concluido',              icon: <Award size={14} />,       cls: 'bg-emerald-600 hover:bg-emerald-700' },
+  rascunho:               { label: 'Enviar p/ Aprovação',  next: 'aguardando_aprovacao',   icon: <FileText size={14} />,     cls: 'bg-slate-600 hover:bg-slate-700' },
+  aguardando_aprovacao:   { label: 'Aprovar Pedido',       next: 'aprovado',               icon: <Award size={14} />,       cls: 'bg-blue-600 hover:bg-blue-700' },
+  aprovado:               { label: 'Iniciar Produção',     next: 'em_producao',            icon: <Play size={14} />,        cls: 'bg-orange-600 hover:bg-orange-700' },
+  em_producao:            { label: 'Marcar Produzido',     next: 'produzido',              icon: <CheckCircle size={14} />, cls: 'bg-teal-600 hover:bg-teal-700' },
+  parcialmente_concluido: { label: 'Retomar Produção',     next: 'em_producao',            icon: <RefreshCw size={14} />,   cls: 'bg-yellow-600 hover:bg-yellow-700' },
+  produzido:              { label: 'Aguardar Instalação',  next: 'aguardando_instalacao',  icon: <Truck size={14} />,       cls: 'bg-purple-600 hover:bg-purple-700' },
+  aguardando_instalacao:  { label: 'Iniciar Instalação',   next: 'em_instalacao',          icon: <Wrench size={14} />,      cls: 'bg-indigo-600 hover:bg-indigo-700' },
+  em_instalacao:          { label: 'Concluir Pedido',      next: 'concluido',              icon: <Award size={14} />,       cls: 'bg-emerald-600 hover:bg-emerald-700' },
 }
 
 const STATUS_CONFIG: Record<string, { label: string; cls: string }> = {

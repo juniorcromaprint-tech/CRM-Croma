@@ -94,6 +94,7 @@ export default function LeadsPage() {
       let query = supabase
         .from("leads")
         .select("*", { count: "exact" })
+        .is("excluido_em", null)
         .order("created_at", { ascending: false })
         .range(from, to);
 
@@ -173,13 +174,19 @@ export default function LeadsPage() {
 
   const deleteLead = useMutation({
     mutationFn: async (leadId: string) => {
-      const { error } = await supabase.from("leads").delete().eq("id", leadId);
+      const { error } = await supabase
+        .from("leads")
+        .update({
+          excluido_em: new Date().toISOString(),
+          excluido_por: profile?.id ?? null,
+        })
+        .eq("id", leadId);
       if (error) throw error;
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["leads"] });
       queryClient.invalidateQueries({ queryKey: ["dashboard"] });
-      showSuccess("Lead excluído permanentemente");
+      showSuccess("Lead excluído com sucesso");
       setConfirmDeleteLeadId(null);
     },
     onError: (err: any) => showError(err.message || "Erro ao excluir lead"),
