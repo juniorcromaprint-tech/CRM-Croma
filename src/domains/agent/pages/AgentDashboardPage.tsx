@@ -14,17 +14,11 @@ import {
   Smartphone,
 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
-import { Badge } from '@/components/ui/badge';
-import {
-  Dialog,
-  DialogContent,
-  DialogHeader,
-  DialogTitle,
-} from '@/components/ui/dialog';
 import KpiCard from '@/shared/components/KpiCard';
 import { formatDate } from '@/shared/utils/format';
 import { useAgentConversations, useAgentStats } from '../hooks/useAgentConversations';
 import { useRunOrchestrator } from '../hooks/useAgentActions';
+import LeadDiscoveryDialog from '../components/LeadDiscoveryDialog';
 import type { AgentConversation, AgentCanal, AgentConversationStatus, AgentEtapa } from '../types/agent.types';
 
 // ─── Badge helpers ───────────────────────────────────────────────────────────
@@ -273,20 +267,11 @@ export default function AgentDashboardPage() {
         )}
       </div>
 
-      {/* ── Nova Prospecção Dialog (placeholder) ────────────────────────── */}
-      <Dialog open={showNovaProspeccao} onOpenChange={setShowNovaProspeccao}>
-        <DialogContent className="sm:max-w-md">
-          <DialogHeader>
-            <DialogTitle>Nova Prospecção</DialogTitle>
-          </DialogHeader>
-          {/* TODO: selecionar leads para prospecção — integrar com LeadsPage e iniciar sequência */}
-          <div className="py-8 text-center text-slate-400 text-sm">
-            <Bot size={32} className="mx-auto text-slate-300 mb-3" />
-            <p>Seleção de leads para prospecção</p>
-            <p className="text-xs mt-1 text-slate-300">Em breve disponível</p>
-          </div>
-        </DialogContent>
-      </Dialog>
+      {/* ── Nova Prospecção Dialog ───────────────────────────────────────── */}
+      <LeadDiscoveryDialog
+        open={showNovaProspeccao}
+        onOpenChange={setShowNovaProspeccao}
+      />
     </div>
   );
 }
