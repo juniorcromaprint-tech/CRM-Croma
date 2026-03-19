@@ -180,7 +180,13 @@ export default function Jobs() {
         await supabase.storage.from('job_videos').remove(videos.map(v => extractFileName(v.video_url)));
       }
 
-      // 2. Deletar a OS (cascade deleta job_photos e job_videos)
+      // 2. Deletar registros filhos explicitamente (defesa extra além do CASCADE)
+      await Promise.all([
+        supabase.from('job_photos').delete().eq('job_id', jobId),
+        supabase.from('job_videos').delete().eq('job_id', jobId),
+      ]);
+
+      // 3. Deletar a OS
       const { error } = await supabase.from('jobs').delete().eq('id', jobId);
       if (error) throw error;
     },
