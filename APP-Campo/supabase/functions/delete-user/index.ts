@@ -48,7 +48,7 @@ serve(async (req) => {
       .from('jobs')
       .select('id, os_number, status')
       .eq('assigned_to', userId)
-      .in('status', ['em_andamento', 'agendado', 'pendente'])
+      .in('status', ['Em andamento', 'Agendado', 'Pendente'])
 
     if (jobsError) {
       console.error("[delete-user] Error checking jobs:", jobsError)
