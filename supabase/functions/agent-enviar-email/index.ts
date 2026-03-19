@@ -5,9 +5,9 @@ import {
   handleCorsOptions,
   getCorsHeaders,
   jsonResponse,
-  authenticateAndAuthorize,
   getServiceClient,
 } from '../ai-shared/ai-helpers.ts';
+import { createClient } from 'https://esm.sh/@supabase/supabase-js@2';
 
 const DEFAULT_EMAIL_FROM = 'Croma Print <comercial@cromaprint.com.br>';
 const DEFAULT_EMAIL_REPLY_TO = 'comercial@cromaprint.com.br';
@@ -45,9 +45,32 @@ serve(async (req: Request) => {
   const corsHeaders = getCorsHeaders(req);
 
   try {
-    // Auth + role check
-    const { auth, error: authError } = await authenticateAndAuthorize(req, 'agent-enviar-email' as any);
-    if (authError) return authError;
+    // Auth: validate JWT and check role
+    const authHeader = req.headers.get('Authorization');
+    if (!authHeader?.startsWith('Bearer ')) {
+      return new Response(JSON.stringify({ error: 'Token não fornecido' }), {
+        status: 401, headers: { ...corsHeaders, 'Content-Type': 'application/json' }
+      });
+    }
+    const token = authHeader.replace('Bearer ', '');
+    const supabaseAuth = createClient(
+      Deno.env.get('SUPABASE_URL')!,
+      Deno.env.get('SUPABASE_ANON_KEY')!
+    );
+    const { data: { user }, error: userAuthError } = await supabaseAuth.auth.getUser(token);
+    if (userAuthError || !user) {
+      return new Response(JSON.stringify({ error: 'Token inválido' }), {
+        status: 401, headers: { ...corsHeaders, 'Content-Type': 'application/json' }
+      });
+    }
+    const supabaseService = getServiceClient();
+    const { data: profile } = await supabaseService.from('profiles').select('role').eq('id', user.id).single();
+    const allowedRoles = ['comercial', 'gerente', 'admin'];
+    if (!profile || !allowedRoles.includes(profile.role)) {
+      return new Response(JSON.stringify({ error: 'Sem permissão' }), {
+        status: 403, headers: { ...corsHeaders, 'Content-Type': 'application/json' }
+      });
+    }
 
     const body = await req.json();
     const { message_id } = body;
@@ -62,8 +85,8 @@ serve(async (req: Request) => {
     const { data: msg, error: msgErr } = await supabase
       .from('agent_messages')
       .select(`
-        id, assunto, corpo, status, metadata,
-        conversa_id,
+        id, assunto, conteudo, status, metadata,
+        conversation_id,
         agent_conversations (
           id, lead_id, mensagens_enviadas,
           leads (
@@ -96,19 +119,25 @@ serve(async (req: Request) => {
       return jsonResponse({ error: 'Lead sem email cadastrado' }, 400, corsHeaders);
     }
 
-    // 3. Fetch agent_config for sender info
-    const { data: agentConfig } = await supabase
-      .from('agent_config')
-      .select('email_remetente, nome_remetente')
-      .limit(1)
+    // 3. Fetch agent_config from admin_config table
+    const { data: configRow } = await supabase
+      .from('admin_config')
+      .select('valor')
+      .eq('chave', 'agent_config')
       .single();
+
+    const agentConfig = (configRow?.valor && typeof configRow.valor === 'object'
+      ? configRow.valor
+      : typeof configRow?.valor === 'string'
+        ? JSON.parse(configRow.valor)
+        : {}) as Record<string, string>;
 
     const emailRemetente = agentConfig?.email_remetente || DEFAULT_EMAIL_REPLY_TO;
     const nomeRemetente = agentConfig?.nome_remetente || 'Croma Print';
     const fromAddress = `${nomeRemetente} <${emailRemetente}>`;
 
     // 4. Build HTML body
-    const htmlBody = textToHtml(msg.corpo || '');
+    const htmlBody = textToHtml(msg.conteudo || '');
 
     // 5. Build email subject
     const subject =
@@ -133,7 +162,7 @@ serve(async (req: Request) => {
       await supabase
         .from('agent_conversations')
         .update({ ultima_mensagem_em: now })
-        .eq('id', msg.conversa_id);
+        .eq('id', msg.conversation_id);
 
       // Insert atividade comercial
       await supabase.from('atividades_comerciais').insert({
@@ -210,7 +239,7 @@ serve(async (req: Request) => {
     await supabase
       .from('agent_conversations')
       .update({ ultima_mensagem_em: now })
-      .eq('id', msg.conversa_id);
+      .eq('id', msg.conversation_id);
 
     // 10. Insert atividade comercial
     await supabase.from('atividades_comerciais').insert({

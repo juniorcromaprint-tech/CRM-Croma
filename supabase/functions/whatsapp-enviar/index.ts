@@ -7,9 +7,9 @@ import {
   handleCorsOptions,
   getCorsHeaders,
   jsonResponse,
-  authenticateAndAuthorize,
   getServiceClient,
 } from '../ai-shared/ai-helpers.ts';
+import { createClient } from 'https://esm.sh/@supabase/supabase-js@2';
 
 const META_API_VERSION = 'v19.0';
 
@@ -64,12 +64,32 @@ serve(async (req: Request) => {
   const corsHeaders = getCorsHeaders(req);
 
   try {
-    // Auth + role check (same pattern as agent-enviar-email)
-    const { auth: _auth, error: authError } = await authenticateAndAuthorize(
-      req,
-      'agent-enviar-email' as any
+    // Auth: validate JWT and check role
+    const authHeader = req.headers.get('Authorization');
+    if (!authHeader?.startsWith('Bearer ')) {
+      return new Response(JSON.stringify({ error: 'Token não fornecido' }), {
+        status: 401, headers: { ...corsHeaders, 'Content-Type': 'application/json' }
+      });
+    }
+    const token = authHeader.replace('Bearer ', '');
+    const supabaseAuth = createClient(
+      Deno.env.get('SUPABASE_URL')!,
+      Deno.env.get('SUPABASE_ANON_KEY')!
     );
-    if (authError) return authError;
+    const { data: { user }, error: userAuthError } = await supabaseAuth.auth.getUser(token);
+    if (userAuthError || !user) {
+      return new Response(JSON.stringify({ error: 'Token inválido' }), {
+        status: 401, headers: { ...corsHeaders, 'Content-Type': 'application/json' }
+      });
+    }
+    const supabaseService = getServiceClient();
+    const { data: profile } = await supabaseService.from('profiles').select('role').eq('id', user.id).single();
+    const allowedRoles = ['comercial', 'gerente', 'admin'];
+    if (!profile || !allowedRoles.includes(profile.role)) {
+      return new Response(JSON.stringify({ error: 'Sem permissão' }), {
+        status: 403, headers: { ...corsHeaders, 'Content-Type': 'application/json' }
+      });
+    }
 
     const body = await req.json();
     const { message_id } = body as { message_id: string };
