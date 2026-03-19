@@ -435,7 +435,7 @@ function TabImportarLista({ onClose }: { onClose: () => void }) {
 
 function TabDoCRM({ onClose }: { onClose: () => void }) {
   const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
-  const [statusFilter, setStatusFilter] = useState<'novo' | 'contatado' | ''>('');
+  const [statusFilter, setStatusFilter] = useState<'novo' | 'em_contato' | ''>('');
   const [temperaturaFilter, setTemperaturaFilter] = useState<'frio' | 'morno' | ''>('');
   const [isStarting, setIsStarting] = useState(false);
 
@@ -447,7 +447,7 @@ function TabDoCRM({ onClose }: { onClose: () => void }) {
   // Filter out leads that already have agent conversations (no easy client-side check,
   // so we show all with note that already-running ones will be handled server-side)
   const leads = allLeads.filter(
-    (l) => l.status === 'novo' || l.status === 'contatado'
+    (l) => l.status === 'novo' || l.status === 'em_contato'
   );
 
   const toggle = (id: string) => {
@@ -504,12 +504,12 @@ function TabDoCRM({ onClose }: { onClose: () => void }) {
       <div className="flex gap-2">
         <select
           value={statusFilter}
-          onChange={(e) => setStatusFilter(e.target.value as 'novo' | 'contatado' | '')}
+          onChange={(e) => setStatusFilter(e.target.value as 'novo' | 'em_contato' | '')}
           className="flex-1 rounded-xl border border-slate-200 px-3 py-2 text-sm text-slate-700 bg-white focus:outline-none focus:ring-2 focus:ring-blue-500"
         >
           <option value="">Todos os status</option>
           <option value="novo">Novo</option>
-          <option value="contatado">Contatado</option>
+          <option value="em_contato">Em Contato</option>
         </select>
         <select
           value={temperaturaFilter}

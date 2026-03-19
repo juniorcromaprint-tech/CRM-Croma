@@ -93,7 +93,7 @@ export async function iniciarSequenciaEmail(leadIds: string[]): Promise<Sequence
 export async function enviarMensagensAprovadas(): Promise<SendApprovedResult> {
   const { data: messages, error: fetchError } = await supabase
     .from('agent_messages')
-    .select('id')
+    .select('id, conversation_id')
     .eq('status', 'aprovada')
     .eq('canal', 'email')
     .limit(20);
@@ -107,7 +107,7 @@ export async function enviarMensagensAprovadas(): Promise<SendApprovedResult> {
 
   for (const message of messages) {
     const res = await supabase.functions.invoke('agent-enviar-email', {
-      body: { message_id: message.id },
+      body: { message_id: message.id, conversation_id: message.conversation_id },
     });
 
     if (res.error) {
