@@ -121,7 +121,7 @@ export default function BillingReport() {
   const { data: companySettings } = useQuery({
     queryKey: ["company-settings"],
     queryFn: async () => {
-      const { data } = await supabase.from("company_settings").select("*").single();
+      const { data } = await supabase.from("company_settings").select("*").maybeSingle();
       return data;
     },
   });
@@ -572,9 +572,9 @@ export default function BillingReport() {
                   className="h-12 object-contain mb-2"
                 />
                 <p className="text-slate-500 text-sm">
-                  {(companySettings as any)?.company_phone || ""}
-                  {(companySettings as any)?.company_email
-                    ? ` • ${(companySettings as any).company_email}`
+                  {companySettings?.phone || ""}
+                  {companySettings?.address
+                    ? ` • ${companySettings.address}`
                     : ""}
                 </p>
               </div>

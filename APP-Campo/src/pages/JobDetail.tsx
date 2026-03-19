@@ -229,7 +229,7 @@ export default function JobDetail() {
 
   const handleWhatsAppShare = () => {
     if (!job) return;
-    const formattedDate = new Date(job.scheduled_date).toLocaleDateString("pt-BR");
+    const formattedDate = job.scheduled_date ? new Date(job.scheduled_date).toLocaleDateString("pt-BR") : "Sem data";
     const clientName = job.stores?.name || "Não informado";
     const text = `Olá! Segue o status da *Ordem de Serviço* da Cromaprint:%0A%0A*OS:* ${job.os_number}%0A*Cliente:* ${clientName}%0A*Data:* ${formattedDate}%0A*Serviço:* ${job.type}%0A*Status:* ${job.status}`;
     window.open(`https://wa.me/?text=${text}`, "_blank");
@@ -240,7 +240,7 @@ export default function JobDetail() {
     const originalTitle = document.title;
     const clientName = job.stores?.brand || "Cliente";
     const storeCode = job.stores?.code ? `Cod ${job.stores.code}` : "SemCod";
-    const dateStr = new Date(job.scheduled_date).toLocaleDateString("pt-BR").replace(/\//g, "-");
+    const dateStr = job.scheduled_date ? new Date(job.scheduled_date).toLocaleDateString("pt-BR").replace(/\//g, "-") : "sem-data";
     const osNumber = `OS ${job.os_number || "SemNumero"}`;
 
     document.title = `${clientName} - ${storeCode} - ${dateStr} - ${osNumber}`;
@@ -255,7 +255,7 @@ export default function JobDetail() {
 
     const clientName = job.stores?.brand || "Cliente";
     const storeCode = job.stores?.code ? `Cod${job.stores.code}` : "";
-    const dateStr = new Date(job.scheduled_date).toLocaleDateString("pt-BR").replace(/\//g, "-");
+    const dateStr = job.scheduled_date ? new Date(job.scheduled_date).toLocaleDateString("pt-BR").replace(/\//g, "-") : "sem-data";
     const fileName = `Relatorio_${clientName}${storeCode ? "_" + storeCode : ""}_${dateStr}_OS${job.os_number || ""}.pdf`.replace(/\s+/g, "_");
 
     setIsGeneratingPDF(true);

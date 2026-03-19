@@ -45,7 +45,7 @@ export default function JobPhotos({ jobId, jobLat, jobLng, isOffline }: JobPhoto
   const { data: companySettings } = useQuery({
     queryKey: ["company-settings"],
     queryFn: async () => {
-      const { data, error } = await supabase.from("company_settings").select("*").single();
+      const { data, error } = await supabase.from("company_settings").select("*").maybeSingle();
       if (error) throw error;
       return data;
     },

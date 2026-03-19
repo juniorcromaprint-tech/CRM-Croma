@@ -95,7 +95,8 @@ export default function Jobs() {
     }
 
     if (debouncedSearch) {
-      query = query.or(`os_number.ilike.%${debouncedSearch}%,type.ilike.%${debouncedSearch}%`);
+      const escaped = debouncedSearch.replace(/[%_\\,().]/g, c => '\\' + c);
+      query = query.or(`os_number.ilike.%${escaped}%,type.ilike.%${escaped}%`);
     }
 
     if (todayFilter) {
@@ -139,11 +140,6 @@ export default function Jobs() {
   const { isRefreshing, pullDistance, onTouchStart, onTouchMove, onTouchEnd, threshold } = usePullRefresh(
     async () => { await refetch(); }
   );
-
-  useEffect(() => {
-    const timer = setTimeout(() => setDebouncedSearch(searchTerm), 300);
-    return () => clearTimeout(timer);
-  }, [searchTerm]);
 
   useEffect(() => {
     const timer = setTimeout(() => setDebouncedSearch(searchTerm), 300);
