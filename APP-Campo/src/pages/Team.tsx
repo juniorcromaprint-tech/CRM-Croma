@@ -2,7 +2,7 @@ import React, { useState } from "react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/contexts/AuthContext";
-import { Shield, User, ShieldCheck, Loader2, Plus, Trash2, AlertTriangle } from "lucide-react";
+import { Shield, User, ShieldCheck, Loader2, Plus, Trash2, AlertTriangle, Pencil } from "lucide-react";
 import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { showSuccess, showError } from "@/utils/toast";
@@ -32,6 +32,7 @@ export default function Team() {
   const queryClient = useQueryClient();
   const [isSheetOpen, setIsSheetOpen] = useState(false);
   const [memberToDelete, setMemberToDelete] = useState<TeamMember | null>(null);
+  const [memberToEdit, setMemberToEdit] = useState<TeamMember | null>(null);
 
   // Busca todos os perfis cadastrados
   const { data: team, isLoading } = useQuery({
@@ -171,16 +172,27 @@ export default function Team() {
                     </div>
                   </div>
 
-                  <div className="flex items-center gap-3 sm:w-auto w-full">
+                  <div className="flex items-center gap-2 sm:w-auto w-full">
                     <select
                       disabled={member.id === profile.id || updateRoleMutation.isPending}
                       value={member.role || 'instalador'}
                       onChange={(e) => updateRoleMutation.mutate({ userId: member.id, newRole: e.target.value })}
-                      className="h-11 px-3 rounded-xl border border-slate-200 bg-white text-sm font-medium text-slate-700 outline-none focus:ring-2 focus:ring-blue-600 disabled:opacity-50 disabled:cursor-not-allowed flex-1 sm:w-40"
+                      className="h-11 px-3 rounded-xl border border-slate-200 bg-white text-sm font-medium text-slate-700 outline-none focus:ring-2 focus:ring-blue-600 disabled:opacity-50 disabled:cursor-not-allowed flex-1 sm:w-36"
                     >
                       <option value="instalador">Instalador</option>
                       <option value="admin">Administrador</option>
                     </select>
+
+                    {/* Botão Editar */}
+                    <Button
+                      variant="ghost"
+                      size="icon"
+                      onClick={() => setMemberToEdit(member)}
+                      className="h-11 w-11 rounded-xl text-slate-400 hover:text-blue-600 hover:bg-blue-50 shrink-0 transition-colors"
+                      title="Editar membro"
+                    >
+                      <Pencil size={16} />
+                    </Button>
 
                     {/* Botão Excluir - só aparece se NÃO for o próprio admin */}
                     {member.id !== profile.id && (
@@ -216,6 +228,12 @@ export default function Team() {
       <TeamMemberFormSheet
         isOpen={isSheetOpen}
         onClose={() => setIsSheetOpen(false)}
+      />
+
+      <TeamMemberFormSheet
+        isOpen={!!memberToEdit}
+        onClose={() => setMemberToEdit(null)}
+        memberToEdit={memberToEdit}
       />
 
       {/* Diálogo de Confirmação de Exclusão */}

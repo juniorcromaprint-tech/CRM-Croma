@@ -17,59 +17,60 @@ serve(async (req) => {
       return new Response('Unauthorized', { status: 401, headers: corsHeaders })
     }
 
+    // Verifica se quem está fazendo a requisição é um admin
     const supabaseClient = createClient(
       Deno.env.get('SUPABASE_URL') ?? '',
       Deno.env.get('SUPABASE_ANON_KEY') ?? '',
       { global: { headers: { Authorization: authHeader } } }
     )
 
-    // Verifica se quem está fazendo a requisição é um admin
     const { data: { user }, error: userError } = await supabaseClient.auth.getUser()
     if (userError || !user) throw new Error('Unauthorized')
 
     const { data: profile } = await supabaseClient.from('profiles').select('role').eq('id', user.id).single()
-    if (profile?.role !== 'admin') throw new Error('Apenas administradores podem criar usuários.')
+    if (profile?.role !== 'admin') throw new Error('Apenas administradores podem excluir OSs.')
 
-    // Pega os dados do novo usuário
-    const { email, password, firstName, lastName, role } = await req.json()
+    const { jobId } = await req.json()
+    if (!jobId) throw new Error('jobId é obrigatório')
 
-    // Cria um cliente admin para ignorar as regras de segurança (RLS) e criar o usuário na Auth
+    // Admin client para contornar RLS
     const supabaseAdmin = createClient(
       Deno.env.get('SUPABASE_URL') ?? '',
       Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') ?? ''
     )
 
-    // Cria o usuário
-    const { data: newUser, error: createError } = await supabaseAdmin.auth.admin.createUser({
-      email,
-      password,
-      email_confirm: true,
-      user_metadata: {
-        first_name: firstName,
-        last_name: lastName
-      }
-    })
+    const extractFileName = (url: string) => url.split('/').pop() || ''
 
-    if (createError) throw createError
+    // Busca arquivos vinculados para limpar o storage
+    const [photosResult, videosResult] = await Promise.all([
+      supabaseAdmin.from('job_photos').select('photo_url').eq('job_id', jobId),
+      supabaseAdmin.from('job_videos').select('video_url').eq('job_id', jobId),
+    ])
 
-    // Upsert do perfil com nome + cargo (trigger pode não copiar user_metadata corretamente)
-    const fullName = `${firstName} ${lastName || ''}`.trim()
-    await supabaseAdmin.from('profiles').upsert({
-      id: newUser.user.id,
-      first_name: firstName,
-      last_name: lastName || null,
-      full_name: fullName,
-      role: role === 'admin' ? 'admin' : 'instalador',
-    })
+    if (photosResult.data && photosResult.data.length > 0) {
+      await supabaseAdmin.storage.from('job_photos').remove(
+        photosResult.data.map(p => extractFileName(p.photo_url))
+      )
+    }
 
-    console.log("[create-user] User created successfully", { userId: newUser.user.id })
+    if (videosResult.data && videosResult.data.length > 0) {
+      await supabaseAdmin.storage.from('job_videos').remove(
+        videosResult.data.map(v => extractFileName(v.video_url))
+      )
+    }
 
-    return new Response(JSON.stringify({ user: newUser.user }), {
+    // Deleta a OS (cascade remove job_photos, job_videos, etc.)
+    const { error } = await supabaseAdmin.from('jobs').delete().eq('id', jobId)
+    if (error) throw error
+
+    console.log("[delete-job] Job deleted successfully", { jobId, deletedBy: user.id })
+
+    return new Response(JSON.stringify({ success: true }), {
       headers: { ...corsHeaders, 'Content-Type': 'application/json' },
       status: 200,
     })
   } catch (error: any) {
-    console.error("[create-user] Error:", error)
+    console.error("[delete-job] Error:", error)
     return new Response(JSON.stringify({ error: error.message }), {
       headers: { ...corsHeaders, 'Content-Type': 'application/json' },
       status: 400,
