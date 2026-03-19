@@ -48,7 +48,7 @@ export default function JobChecklist({ jobId, initialData, onSave, disabled }: J
       </div>
       <div className="space-y-3">
         {Object.entries(checks).map(([item, checked]) => (
-          <label
+          <div
             key={item}
             className={`flex items-center gap-3 p-3 rounded-xl cursor-pointer transition-colors ${
               checked ? 'bg-green-50 border border-green-200' : 'bg-slate-50 border border-slate-100 hover:bg-slate-100'
@@ -59,7 +59,7 @@ export default function JobChecklist({ jobId, initialData, onSave, disabled }: J
             <span className={`text-sm font-medium ${checked ? 'text-green-700 line-through' : 'text-slate-700'}`}>
               {item}
             </span>
-          </label>
+          </div>
         ))}
       </div>
     </div>
