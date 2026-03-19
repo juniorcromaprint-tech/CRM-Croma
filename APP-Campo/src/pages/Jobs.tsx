@@ -1,6 +1,7 @@
 import React, { useState, useMemo, useEffect } from "react";
 import { useSearchParams, useNavigate } from "react-router-dom";
 import { useInfiniteQuery, useMutation, useQueryClient } from "@tanstack/react-query";
+import { usePullRefresh } from "@/hooks/use-pull-refresh";
 import { supabase } from "@/integrations/supabase/client";
 import { Search, Plus, MapPin, ClipboardList, Filter, ChevronLeft, ChevronRight, Calendar, AlertTriangle, User, Loader2, Download, Trash2, CalendarCheck } from "lucide-react";
 import { JobCardSkeleton } from "@/components/Skeletons";
@@ -125,13 +126,18 @@ export default function Jobs() {
     isLoading,
     fetchNextPage,
     hasNextPage,
-    isFetchingNextPage
+    isFetchingNextPage,
+    refetch
   } = useInfiniteQuery({
     queryKey: ['infinite-jobs', statusFilter, debouncedSearch, myJobsFilter, profile?.id, startDate, endDate, todayFilter],
     queryFn: fetchJobs,
     initialPageParam: 0,
     getNextPageParam: (lastPage) => lastPage.nextPage,
   });
+
+  const { isRefreshing, pullDistance, onTouchStart, onTouchMove, onTouchEnd, threshold } = usePullRefresh(
+    async () => { await refetch(); }
+  );
 
   useEffect(() => {
     const timer = setTimeout(() => setDebouncedSearch(searchTerm), 300);
@@ -398,7 +404,24 @@ export default function Jobs() {
           <p className="text-slate-500 mt-1">Tente ajustar sua busca ou filtro.</p>
         </div>
       ) : (
-        <div className="space-y-4">
+        <div
+          className="space-y-4"
+          onTouchStart={onTouchStart}
+          onTouchMove={onTouchMove}
+          onTouchEnd={onTouchEnd}
+        >
+          {(pullDistance > 0 || isRefreshing) && (
+            <div
+              className="flex justify-center py-2 overflow-hidden transition-all"
+              style={{ height: isRefreshing ? 40 : pullDistance }}
+            >
+              <Loader2
+                className={`text-blue-600 ${pullDistance >= threshold || isRefreshing ? "animate-spin" : ""}`}
+                size={24}
+              />
+            </div>
+          )}
+
           <div className="flex items-center justify-between text-sm text-slate-500 px-1">
             <span>Mostrando {allJobs.length} de {totalCount} OSs</span>
           </div>

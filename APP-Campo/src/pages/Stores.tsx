@@ -1,9 +1,10 @@
 import React, { useState, useMemo, useEffect, useRef } from "react";
-import { Search, Store, MapPin, ChevronRight, Filter, Building2, ChevronLeft, Plus, Edit, Map, Check, Navigation } from "lucide-react";
+import { Search, Store, MapPin, ChevronRight, Filter, Building2, ChevronLeft, Plus, Edit, Map, Check, Navigation, Loader2 } from "lucide-react";
 import { Input } from "@/components/ui/input";
 import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { useQuery } from "@tanstack/react-query";
+import { usePullRefresh } from "@/hooks/use-pull-refresh";
 import { supabase } from "@/integrations/supabase/client";
 import { useNavigate } from "react-router-dom";
 import StoreFormSheet from "@/components/StoreFormSheet";
@@ -111,31 +112,35 @@ export default function Stores() {
   const [isSheetOpen, setIsSheetOpen] = useState(false);
   const [storeToEdit, setStoreToEdit] = useState<any>(null);
 
-  const { data: stores, isLoading } = useQuery({
+  const { data: stores, isLoading, refetch } = useQuery({
     queryKey: ['all-stores'],
     queryFn: async () => {
       let allData: any[] = [];
       let page = 0;
       const pageSize = 1000;
-      
+
       while (true) {
         const { data, error } = await supabase
           .from('stores')
           .select('*')
           .order('name')
           .range(page * pageSize, (page + 1) * pageSize - 1);
-        
+
         if (error) throw error;
         if (!data || data.length === 0) break;
-        
+
         allData = [...allData, ...data];
         if (data.length < pageSize) break;
         page++;
       }
-      
+
       return allData;
     }
   });
+
+  const { isRefreshing, pullDistance, onTouchStart, onTouchMove, onTouchEnd, threshold } = usePullRefresh(
+    async () => { await refetch(); }
+  );
 
   const brands = useMemo(() => {
     if (!stores) return [];
@@ -285,7 +290,24 @@ export default function Stores() {
           <p className="text-slate-500 mt-1">Tente ajustar sua busca ou filtro.</p>
         </div>
       ) : (
-        <div className="space-y-4">
+        <div
+          className="space-y-4"
+          onTouchStart={onTouchStart}
+          onTouchMove={onTouchMove}
+          onTouchEnd={onTouchEnd}
+        >
+          {(pullDistance > 0 || isRefreshing) && (
+            <div
+              className="flex justify-center py-2 overflow-hidden transition-all"
+              style={{ height: isRefreshing ? 40 : pullDistance }}
+            >
+              <Loader2
+                className={`text-blue-600 ${pullDistance >= threshold || isRefreshing ? "animate-spin" : ""}`}
+                size={24}
+              />
+            </div>
+          )}
+
           <div className="flex items-center justify-between text-sm text-slate-500 px-1">
             <span>Mostrando {paginatedStores.length} de {filteredStores.length} lojas</span>
           </div>
