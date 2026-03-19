@@ -25,13 +25,6 @@ export interface ImportResult {
 
 // ─── Helpers ──────────────────────────────────────────────────────────────────
 
-async function getAuthHeader(): Promise<Record<string, string>> {
-  const {
-    data: { session },
-  } = await supabase.auth.getSession();
-  return { Authorization: `Bearer ${session?.access_token}` };
-}
-
 /** Normalize phone: strip non-digits, return last 10 digits */
 function normalizePhone(phone: string): string {
   const digits = phone.replace(/\D/g, '');
@@ -105,7 +98,7 @@ export async function verificarDuplicatas(leads: DiscoveredLead[]): Promise<Disc
 // ─── Google Places Discovery ──────────────────────────────────────────────────
 
 /**
- * Searches for leads via the `agent-buscar-leads` Edge Function (Google Places).
+ * Searches for leads via the `buscar-leads-google` Edge Function (Google Places).
  * Falls back gracefully if the function is unavailable.
  */
 export async function buscarLeadsGoogle(params: {
@@ -113,18 +106,15 @@ export async function buscarLeadsGoogle(params: {
   regiao?: string;
   max_resultados?: number;
 }): Promise<DiscoveredLead[]> {
-  const headers = await getAuthHeader();
-
   const searchQuery = params.regiao
     ? `${params.query} em ${params.regiao}`
     : params.query;
 
-  const res = await supabase.functions.invoke('agent-buscar-leads', {
+  const res = await supabase.functions.invoke('buscar-leads-google', {
     body: {
       query: searchQuery,
       max_resultados: params.max_resultados ?? 20,
     },
-    headers,
   });
 
   if (res.error) {

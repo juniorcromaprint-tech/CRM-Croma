@@ -3,16 +3,9 @@ import { supabase } from '@/integrations/supabase/client';
 import { showSuccess, showError } from '@/utils/toast';
 import type { AgentQualification, AgentAction, AgentCanal, AgentEtapa } from '../types/agent.types';
 
-// ─── Helpers ─────────────────────────────────────────────────────────────────
-
-async function getAuthHeader() {
-  const {
-    data: { session },
-  } = await supabase.auth.getSession();
-  return { Authorization: `Bearer ${session?.access_token}` };
-}
-
 // ─── Hooks ───────────────────────────────────────────────────────────────────
+// Note: supabase.functions.invoke automatically attaches the current session's
+// Authorization header and handles token auto-refresh. No manual headers needed.
 
 /**
  * Qualifica um lead via IA (Edge Function `ai-qualificar-lead`).
@@ -23,11 +16,8 @@ export function useQualifyLead() {
 
   return useMutation({
     mutationFn: async (leadId: string): Promise<AgentQualification> => {
-      const headers = await getAuthHeader();
-
       const res = await supabase.functions.invoke('ai-qualificar-lead', {
         body: { lead_id: leadId },
-        headers,
       });
 
       if (res.error) throw new Error(res.error.message);
@@ -58,11 +48,8 @@ export function useComposeMessage() {
       etapa?: AgentEtapa;
       contexto_extra?: string;
     }) => {
-      const headers = await getAuthHeader();
-
       const res = await supabase.functions.invoke('ai-compor-mensagem', {
         body: params,
-        headers,
       });
 
       if (res.error) throw new Error(res.error.message);
@@ -88,11 +75,8 @@ export function useRunOrchestrator() {
 
   return useMutation({
     mutationFn: async (): Promise<{ actions: AgentAction[]; processed: number }> => {
-      const headers = await getAuthHeader();
-
       const res = await supabase.functions.invoke('ai-decidir-acao', {
         body: { modo: 'batch' },
-        headers,
       });
 
       if (res.error) throw new Error(res.error.message);
