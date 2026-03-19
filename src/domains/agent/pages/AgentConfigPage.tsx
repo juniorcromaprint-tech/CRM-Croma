@@ -37,6 +37,10 @@ import {
   Edit2,
   Check,
   X,
+  MessageCircle,
+  Copy,
+  CheckCircle2,
+  XCircle,
 } from 'lucide-react';
 
 import type { AgentConfig, AgentTemplate, AgentCanal } from '../types/agent.types';
@@ -83,6 +87,7 @@ const TONS = [
 function TabGeralConfig() {
   const queryClient = useQueryClient();
   const [config, setConfig] = useState<AgentConfig>(DEFAULT_CONFIG);
+  const [whatsappConfigured, setWhatsappConfigured] = useState(false);
 
   const { isLoading } = useQuery({
     queryKey: ['agent_config'],
@@ -100,6 +105,26 @@ function TabGeralConfig() {
           return parsed;
         } catch {
           return null;
+        }
+      }
+      return null;
+    },
+  });
+
+  useQuery({
+    queryKey: ['whatsapp_config_check'],
+    queryFn: async () => {
+      const { data } = await supabase
+        .from('admin_config')
+        .select('valor')
+        .eq('chave', 'whatsapp_config')
+        .maybeSingle();
+      if (data?.valor) {
+        try {
+          const parsed = JSON.parse(data.valor) as Record<string, string>;
+          setWhatsappConfigured(!!parsed.phone_number_id);
+        } catch {
+          setWhatsappConfigured(false);
         }
       }
       return null;
@@ -278,18 +303,33 @@ function TabGeralConfig() {
           </CardHeader>
           <CardContent>
             <div className="space-y-3">
-              {CANAIS.map((canal) => (
-                <div key={canal.value} className="flex items-center justify-between">
-                  <Label className="text-slate-700 font-medium cursor-pointer" htmlFor={`canal-${canal.value}`}>
-                    {canal.label}
-                  </Label>
-                  <Switch
-                    id={`canal-${canal.value}`}
-                    checked={config.canais_ativos.includes(canal.value)}
-                    onCheckedChange={() => toggleCanal(canal.value)}
-                  />
-                </div>
-              ))}
+              {CANAIS.map((canal) => {
+                const isWhatsApp = canal.value === 'whatsapp';
+                const isDisabled = isWhatsApp && !whatsappConfigured;
+                return (
+                  <div key={canal.value} className="flex items-center justify-between">
+                    <div className="flex items-center gap-2">
+                      <Label
+                        className={`font-medium ${isDisabled ? 'text-slate-400 cursor-not-allowed' : 'text-slate-700 cursor-pointer'}`}
+                        htmlFor={`canal-${canal.value}`}
+                      >
+                        {canal.label}
+                      </Label>
+                      {isDisabled && (
+                        <span className="text-[10px] text-amber-600 bg-amber-50 border border-amber-200 rounded px-1.5 py-0.5 leading-none">
+                          Configure na aba WhatsApp primeiro
+                        </span>
+                      )}
+                    </div>
+                    <Switch
+                      id={`canal-${canal.value}`}
+                      checked={config.canais_ativos.includes(canal.value)}
+                      onCheckedChange={() => !isDisabled && toggleCanal(canal.value)}
+                      disabled={isDisabled}
+                    />
+                  </div>
+                );
+              })}
             </div>
           </CardContent>
         </Card>
@@ -751,6 +791,299 @@ function TabTemplates() {
   );
 }
 
+// ─── Tab 4: WhatsApp ──────────────────────────────────────────────────────────
+
+const WEBHOOK_URL = 'https://djwjmfgplnqyffdcgdaw.supabase.co/functions/v1/whatsapp-webhook';
+
+interface WhatsAppConfig {
+  phone_number_id: string;
+  access_token: string;
+  verify_token: string;
+  app_secret: string;
+  template_abertura: string;
+  max_whatsapp_dia: number;
+  horario_whatsapp_inicio: string;
+  horario_whatsapp_fim: string;
+}
+
+const DEFAULT_WA_CONFIG: WhatsAppConfig = {
+  phone_number_id: '',
+  access_token: '',
+  verify_token: '',
+  app_secret: '',
+  template_abertura: 'croma_abertura',
+  max_whatsapp_dia: 50,
+  horario_whatsapp_inicio: '08:00',
+  horario_whatsapp_fim: '18:00',
+};
+
+function TabWhatsApp() {
+  const queryClient = useQueryClient();
+  const [waConfig, setWaConfig] = useState<WhatsAppConfig>(DEFAULT_WA_CONFIG);
+  const [copied, setCopied] = useState(false);
+
+  const { isLoading } = useQuery({
+    queryKey: ['whatsapp_config'],
+    queryFn: async () => {
+      const { data, error } = await supabase
+        .from('admin_config')
+        .select('valor')
+        .eq('chave', 'whatsapp_config')
+        .maybeSingle();
+      if (error) throw error;
+      if (data?.valor) {
+        try {
+          const parsed = JSON.parse(data.valor) as Partial<WhatsAppConfig>;
+          setWaConfig((prev) => ({ ...prev, ...parsed }));
+          return parsed;
+        } catch {
+          return null;
+        }
+      }
+      return null;
+    },
+  });
+
+  const saveConfig = useMutation({
+    mutationFn: async () => {
+      const { error } = await supabase
+        .from('admin_config')
+        .upsert({ chave: 'whatsapp_config', valor: JSON.stringify(waConfig) }, { onConflict: 'chave' });
+      if (error) throw new Error(error.message);
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['whatsapp_config'] });
+      queryClient.invalidateQueries({ queryKey: ['whatsapp_config_check'] });
+      showSuccess('Configurações do WhatsApp salvas!');
+    },
+    onError: () => showError('Erro ao salvar configurações do WhatsApp.'),
+  });
+
+  function handleCopy() {
+    navigator.clipboard.writeText(WEBHOOK_URL).then(() => {
+      setCopied(true);
+      setTimeout(() => setCopied(false), 2000);
+    });
+  }
+
+  const isConnected = !!waConfig.phone_number_id;
+
+  if (isLoading) {
+    return (
+      <div className="flex items-center justify-center py-16 gap-2 text-slate-400">
+        <Loader2 className="h-5 w-5 animate-spin" />
+        <span>Carregando configurações...</span>
+      </div>
+    );
+  }
+
+  return (
+    <div className="space-y-6 max-w-2xl">
+
+      {/* Section 1: Conexão */}
+      <Card className="rounded-2xl border-none shadow-sm">
+        <CardHeader className="pb-3">
+          <div className="flex items-center justify-between">
+            <div className="flex items-center gap-2">
+              <MessageCircle className="h-5 w-5 text-blue-600" />
+              <CardTitle className="text-slate-800 text-base">Conexão</CardTitle>
+            </div>
+            <div className="flex items-center gap-2">
+              {isConnected ? (
+                <>
+                  <CheckCircle2 className="h-4 w-4 text-green-500" />
+                  <span className="text-sm font-medium text-green-600">Conectado</span>
+                </>
+              ) : (
+                <>
+                  <XCircle className="h-4 w-4 text-red-400" />
+                  <span className="text-sm font-medium text-red-500">Não conectado</span>
+                </>
+              )}
+            </div>
+          </div>
+          <CardDescription>Credenciais da API do WhatsApp Business (Meta)</CardDescription>
+        </CardHeader>
+        <CardContent className="space-y-4">
+          <div className="space-y-1.5">
+            <Label className="text-slate-700 font-medium">Phone Number ID (Meta Business)</Label>
+            <Input
+              value={waConfig.phone_number_id}
+              onChange={(e) => setWaConfig((p) => ({ ...p, phone_number_id: e.target.value }))}
+              className="h-11 rounded-xl font-mono text-sm"
+              placeholder="Ex: 123456789012345"
+            />
+          </div>
+
+          <div className="space-y-1.5">
+            <Label className="text-slate-700 font-medium">Access Token (Meta)</Label>
+            <Input
+              type="password"
+              value={waConfig.access_token}
+              onChange={(e) => setWaConfig((p) => ({ ...p, access_token: e.target.value }))}
+              className="h-11 rounded-xl font-mono text-sm"
+              placeholder="EAAxxxxxxxxxxxxxxx"
+            />
+          </div>
+
+          <div className="space-y-1.5">
+            <Label className="text-slate-700 font-medium">Verify Token (para webhook)</Label>
+            <Input
+              value={waConfig.verify_token}
+              onChange={(e) => setWaConfig((p) => ({ ...p, verify_token: e.target.value }))}
+              className="h-11 rounded-xl font-mono text-sm"
+              placeholder="Token secreto que você define"
+            />
+            <p className="text-xs text-slate-400">Token definido por você para verificação do webhook no Meta.</p>
+          </div>
+
+          <div className="space-y-1.5">
+            <Label className="text-slate-700 font-medium">App Secret (validação webhook)</Label>
+            <Input
+              type="password"
+              value={waConfig.app_secret}
+              onChange={(e) => setWaConfig((p) => ({ ...p, app_secret: e.target.value }))}
+              className="h-11 rounded-xl font-mono text-sm"
+              placeholder="App Secret do seu app no Meta"
+            />
+          </div>
+        </CardContent>
+      </Card>
+
+      {/* Section 2: Webhook URL */}
+      <Card className="rounded-2xl border-none shadow-sm">
+        <CardHeader className="pb-3">
+          <CardTitle className="text-slate-800 text-base">URL do Webhook</CardTitle>
+          <CardDescription>Configure esta URL como webhook no Meta Business Suite. Eventos: <code className="text-xs bg-slate-100 px-1 py-0.5 rounded">messages</code></CardDescription>
+        </CardHeader>
+        <CardContent className="space-y-3">
+          <div className="flex items-center gap-2">
+            <Input
+              readOnly
+              value={WEBHOOK_URL}
+              className="h-11 rounded-xl font-mono text-xs bg-slate-50 text-slate-600"
+            />
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={handleCopy}
+              className="h-11 px-3 rounded-xl shrink-0 gap-1.5"
+            >
+              {copied ? (
+                <>
+                  <Check className="h-4 w-4 text-green-500" />
+                  <span className="text-xs text-green-600">Copiado</span>
+                </>
+              ) : (
+                <>
+                  <Copy className="h-4 w-4" />
+                  <span className="text-xs">Copiar</span>
+                </>
+              )}
+            </Button>
+          </div>
+          <div className="bg-blue-50 border border-blue-100 rounded-xl p-3 text-xs text-blue-700 space-y-1">
+            <p className="font-semibold">Como configurar no Meta Business Suite:</p>
+            <ol className="list-decimal list-inside space-y-1 text-blue-600">
+              <li>Acesse o painel do seu app em <strong>developers.facebook.com</strong></li>
+              <li>Vá em <strong>WhatsApp → Configuração</strong></li>
+              <li>Cole a URL acima no campo <strong>URL de Callback</strong></li>
+              <li>Informe o mesmo <strong>Verify Token</strong> configurado acima</li>
+              <li>Inscreva-se no evento <strong>messages</strong></li>
+            </ol>
+          </div>
+        </CardContent>
+      </Card>
+
+      {/* Section 3: Templates Meta */}
+      <Card className="rounded-2xl border-none shadow-sm">
+        <CardHeader className="pb-3">
+          <CardTitle className="text-slate-800 text-base">Templates Meta</CardTitle>
+          <CardDescription>
+            Templates devem ser aprovados no Meta Business Suite antes de usar.
+          </CardDescription>
+        </CardHeader>
+        <CardContent className="space-y-4">
+          <div className="bg-amber-50 border border-amber-200 rounded-xl p-3 text-xs text-amber-700">
+            Crie e submeta templates para aprovação em <strong>business.facebook.com → Conta WhatsApp Business → Modelos de mensagem</strong>. O processo de aprovação pode levar até 24h.
+          </div>
+          <div className="space-y-1.5">
+            <Label className="text-slate-700 font-medium">Template de Abertura</Label>
+            <Input
+              value={waConfig.template_abertura}
+              onChange={(e) => setWaConfig((p) => ({ ...p, template_abertura: e.target.value }))}
+              className="h-11 rounded-xl font-mono text-sm"
+              placeholder="croma_abertura"
+            />
+            <p className="text-xs text-slate-400">Nome exato do template aprovado no Meta para a primeira mensagem de contato.</p>
+          </div>
+        </CardContent>
+      </Card>
+
+      {/* Section 4: Configurações de Envio */}
+      <Card className="rounded-2xl border-none shadow-sm">
+        <CardHeader className="pb-3">
+          <CardTitle className="text-slate-800 text-base">Configurações de Envio</CardTitle>
+          <CardDescription>Limites e horários para envios via WhatsApp</CardDescription>
+        </CardHeader>
+        <CardContent className="space-y-4">
+          <div className="space-y-1.5">
+            <Label className="text-slate-700 font-medium">Máximo de Mensagens por Dia</Label>
+            <Input
+              type="number"
+              min={1}
+              max={1000}
+              value={waConfig.max_whatsapp_dia}
+              onChange={(e) => setWaConfig((p) => ({ ...p, max_whatsapp_dia: parseInt(e.target.value, 10) || 50 }))}
+              className="h-11 rounded-xl"
+            />
+            <p className="text-xs text-slate-400">Contas novas do WhatsApp Business têm limite de 250 conversas/dia. Contas verificadas podem ter até 100k.</p>
+          </div>
+
+          <div className="grid grid-cols-2 gap-4">
+            <div className="space-y-1.5">
+              <Label className="text-slate-700 font-medium">Horário Início</Label>
+              <Input
+                type="time"
+                value={waConfig.horario_whatsapp_inicio}
+                onChange={(e) => setWaConfig((p) => ({ ...p, horario_whatsapp_inicio: e.target.value }))}
+                className="h-11 rounded-xl"
+              />
+            </div>
+            <div className="space-y-1.5">
+              <Label className="text-slate-700 font-medium">Horário Fim</Label>
+              <Input
+                type="time"
+                value={waConfig.horario_whatsapp_fim}
+                onChange={(e) => setWaConfig((p) => ({ ...p, horario_whatsapp_fim: e.target.value }))}
+                className="h-11 rounded-xl"
+              />
+            </div>
+          </div>
+        </CardContent>
+      </Card>
+
+      <Button
+        onClick={() => saveConfig.mutate()}
+        disabled={saveConfig.isPending}
+        className="h-11 bg-blue-600 hover:bg-blue-700 text-white rounded-xl px-8"
+      >
+        {saveConfig.isPending ? (
+          <>
+            <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+            Salvando...
+          </>
+        ) : (
+          <>
+            <Save className="h-4 w-4 mr-2" />
+            Salvar Configurações WhatsApp
+          </>
+        )}
+      </Button>
+    </div>
+  );
+}
+
 // ─── Main Page ────────────────────────────────────────────────────────────────
 
 export default function AgentConfigPage() {
@@ -795,6 +1128,13 @@ export default function AgentConfigPage() {
             <FileText className="h-4 w-4 mr-1.5" />
             Templates
           </TabsTrigger>
+          <TabsTrigger
+            value="whatsapp"
+            className="rounded-lg data-[state=active]:bg-white data-[state=active]:shadow-sm px-4 py-2 text-sm"
+          >
+            <MessageCircle className="h-4 w-4 mr-1.5" />
+            WhatsApp
+          </TabsTrigger>
         </TabsList>
 
         <TabsContent value="geral" className="mt-6">
@@ -807,6 +1147,10 @@ export default function AgentConfigPage() {
 
         <TabsContent value="templates" className="mt-6">
           <TabTemplates />
+        </TabsContent>
+
+        <TabsContent value="whatsapp" className="mt-6">
+          <TabWhatsApp />
         </TabsContent>
       </Tabs>
     </div>
