@@ -28,7 +28,8 @@ export type AIFunctionName =
   | 'resumo-cliente'
   | 'briefing-producao'
   | 'detectar-problemas'
-  | 'composicao-produto';
+  | 'composicao-produto'
+  | 'qualificar-lead';
 
 export type AIEntityType = 'proposta' | 'cliente' | 'pedido' | 'geral';
 
@@ -62,6 +63,7 @@ export const AI_ROLE_ACCESS: Record<AIFunctionName, string[]> = {
   'briefing-producao': ['producao', 'gerente', 'admin'],
   'detectar-problemas': ['gerente', 'admin'],
   'composicao-produto': ['comercial', 'producao', 'gerente', 'admin'],
+  'qualificar-lead': ['comercial', 'gerente', 'admin'],
 };
 
 // Cost per 1M tokens (USD) for estimation
