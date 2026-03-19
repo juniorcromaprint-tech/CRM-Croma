@@ -5,7 +5,8 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import {
   Download, Share2, Loader2, FileText, Camera,
-  Calendar, Store, User, CheckCircle2, AlertTriangle, Image as ImageIcon
+  Calendar, Store, User, CheckCircle2, AlertTriangle, Image as ImageIcon,
+  Clock, Timer, Tag,
 } from "lucide-react";
 import { showError } from "@/utils/toast";
 
@@ -72,6 +73,25 @@ function lastDayOfMonth(offset = 0) {
   return d.toISOString().split("T")[0];
 }
 
+/** Returns total minutes between started_at and finished_at, or 0 if missing/invalid */
+function jobDurationMinutes(job: any): number {
+  if (!job.started_at || !job.finished_at) return 0;
+  const start = new Date(job.started_at).getTime();
+  const end = new Date(job.finished_at).getTime();
+  if (isNaN(start) || isNaN(end) || end <= start) return 0;
+  return Math.round((end - start) / 60000);
+}
+
+/** Formats total minutes as "Xh Ym" */
+function formatMinutes(totalMinutes: number): string {
+  if (totalMinutes === 0) return "—";
+  const h = Math.floor(totalMinutes / 60);
+  const m = totalMinutes % 60;
+  if (h === 0) return `${m}min`;
+  if (m === 0) return `${h}h`;
+  return `${h}h ${m}min`;
+}
+
 export default function BillingReport() {
   const [startDate, setStartDate] = useState(firstDayOfMonth());
   const [endDate, setEndDate] = useState(lastDayOfMonth());
@@ -113,23 +133,46 @@ export default function BillingReport() {
   });
 
   const brands = Array.from(
-    new Set(dateFiltered.map((j: any) => j.stores?.brand).filter(Boolean))
-  );
+    new Set((jobs || []).map((j: any) => j.stores?.brand).filter(Boolean))
+  ).sort() as string[];
+
   const filtered = dateFiltered.filter((j: any) =>
     !brandFilter || j.stores?.brand === brandFilter
   );
 
+  // Totalizadores
+  const completedJobs = filtered.filter((j: any) => j.status === "Concluído");
+  const totalHoursMinutes = completedJobs.reduce(
+    (acc: number, j: any) => acc + jobDurationMinutes(j),
+    0
+  );
+  const avgMinutesPerJob =
+    completedJobs.length > 0 ? Math.round(totalHoursMinutes / completedJobs.length) : 0;
+
   const stats = {
     total: filtered.length,
-    completed: filtered.filter((j: any) => j.status === "Concluído").length,
+    completed: completedJobs.length,
     pending: filtered.filter((j: any) => j.status === "Pendente").length,
     issues: filtered.filter((j: any) => j.issues && j.issues.trim()).length,
     photos: filtered.reduce((acc: number, j: any) => acc + (j.job_photos?.length || 0), 0),
+    totalHoursMinutes,
+    avgMinutesPerJob,
   };
 
   const formatDate = (d: string | null) => {
     if (!d) return "—";
     return new Date(d + "T12:00:00").toLocaleDateString("pt-BR");
+  };
+
+  const formatDateTime = (d: string | null) => {
+    if (!d) return "—";
+    return new Date(d).toLocaleString("pt-BR", {
+      day: "2-digit",
+      month: "2-digit",
+      year: "numeric",
+      hour: "2-digit",
+      minute: "2-digit",
+    });
   };
 
   const periodLabel = () => {
@@ -182,6 +225,8 @@ export default function BillingReport() {
         `Pendentes: ${stats.pending}`,
         `Com ocorrências: ${stats.issues}`,
         `Fotos registradas: ${stats.photos}`,
+        `Horas trabalhadas: ${formatMinutes(stats.totalHoursMinutes)}`,
+        `Média por OS: ${formatMinutes(stats.avgMinutesPerJob)}`,
         ``,
         `Segue em anexo o relatório completo com todas as instalações do período.`,
       ].join("\n");
@@ -239,7 +284,7 @@ export default function BillingReport() {
 
       {/* Date range + filters */}
       <div className="bg-white rounded-2xl border border-slate-200 p-4 space-y-4">
-        {/* Date inputs */}
+        {/* Date inputs + brand filter */}
         <div className="flex flex-col sm:flex-row items-start sm:items-end gap-3">
           <div className="flex-1">
             <label className="text-xs font-bold text-slate-500 mb-1 block">Data início</label>
@@ -260,26 +305,31 @@ export default function BillingReport() {
               className="h-10 rounded-xl bg-slate-50 border-slate-200 text-slate-700"
             />
           </div>
-          {brands.length > 1 && (
-            <div className="flex-1 relative">
-              <label className="text-xs font-bold text-slate-500 mb-1 block">Filtrar por marca</label>
-              <select
-                value={brandFilter}
-                onChange={(e) => setBrandFilter(e.target.value)}
-                className="w-full h-10 pl-3 pr-8 rounded-xl border border-slate-200 bg-slate-50 text-sm text-slate-700 appearance-none outline-none focus:ring-2 focus:ring-blue-600"
-              >
-                <option value="">Todas as marcas</option>
-                {brands.map((b) => (
-                  <option key={b as string} value={b as string}>{b as string}</option>
-                ))}
-              </select>
-              <div className="absolute right-2 bottom-2.5 pointer-events-none text-slate-400">
-                <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-                  <path d="m6 9 6 6 6-6"/>
-                </svg>
-              </div>
+          {/* Brand filter — always visible */}
+          <div className="flex-1 relative">
+            <label className="text-xs font-bold text-slate-500 mb-1 block flex items-center gap-1">
+              <Tag size={11} />
+              Filtrar por marca
+            </label>
+            <select
+              value={brandFilter}
+              onChange={(e) => setBrandFilter(e.target.value)}
+              className="w-full h-10 pl-3 pr-8 rounded-xl border border-slate-200 bg-slate-50 text-sm text-slate-700 appearance-none outline-none focus:ring-2 focus:ring-blue-600"
+              disabled={brands.length === 0}
+            >
+              <option value="">
+                {brands.length === 0 ? "Nenhuma marca disponível" : "Todas as marcas"}
+              </option>
+              {brands.map((b) => (
+                <option key={b} value={b}>{b}</option>
+              ))}
+            </select>
+            <div className="absolute right-2 bottom-2.5 pointer-events-none text-slate-400">
+              <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                <path d="m6 9 6 6 6-6"/>
+              </svg>
             </div>
-          )}
+          </div>
         </div>
 
         {/* Date field selector */}
@@ -328,21 +378,54 @@ export default function BillingReport() {
         </div>
       </div>
 
-      {/* Stats cards */}
+      {/* Totalizadores — 4 cards */}
       <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
         {[
-          { label: "Total de OS", value: stats.total, icon: FileText, color: "text-blue-600", bg: "bg-blue-50" },
-          { label: "Concluídas", value: stats.completed, icon: CheckCircle2, color: "text-green-600", bg: "bg-green-50" },
-          { label: "Pendentes", value: stats.pending, icon: AlertTriangle, color: "text-orange-600", bg: "bg-orange-50" },
-          { label: "Fotos", value: stats.photos, icon: Camera, color: "text-purple-600", bg: "bg-purple-50" },
-        ].map(({ label, value, icon: Icon, color, bg }) => (
+          {
+            label: "OS Concluídas",
+            value: `${stats.completed}/${stats.total}`,
+            sub: `${stats.pending} pendente${stats.pending !== 1 ? "s" : ""}`,
+            icon: CheckCircle2,
+            color: "text-green-600",
+            bg: "bg-green-50",
+          },
+          {
+            label: "Fotos Registradas",
+            value: stats.photos,
+            sub: stats.completed > 0
+              ? `~${Math.round(stats.photos / Math.max(stats.total, 1))} por OS`
+              : "nenhuma OS concluída",
+            icon: Camera,
+            color: "text-purple-600",
+            bg: "bg-purple-50",
+          },
+          {
+            label: "Horas Trabalhadas",
+            value: formatMinutes(stats.totalHoursMinutes),
+            sub: stats.totalHoursMinutes > 0 ? "OS com tempo registrado" : "sem dados de tempo",
+            icon: Clock,
+            color: "text-blue-600",
+            bg: "bg-blue-50",
+          },
+          {
+            label: "Média por OS",
+            value: formatMinutes(stats.avgMinutesPerJob),
+            sub: stats.completed > 0
+              ? `${stats.completed} OS concluída${stats.completed !== 1 ? "s" : ""}`
+              : "nenhuma OS concluída",
+            icon: Timer,
+            color: "text-orange-600",
+            bg: "bg-orange-50",
+          },
+        ].map(({ label, value, sub, icon: Icon, color, bg }) => (
           <div key={label} className="bg-white rounded-2xl border border-slate-200 p-4 flex items-center gap-3">
-            <div className={`w-10 h-10 rounded-xl ${bg} flex items-center justify-center`}>
+            <div className={`w-10 h-10 rounded-xl ${bg} flex items-center justify-center shrink-0`}>
               <Icon size={20} className={color} />
             </div>
-            <div>
-              <p className="text-2xl font-bold text-slate-800">{value}</p>
-              <p className="text-xs text-slate-500">{label}</p>
+            <div className="min-w-0">
+              <p className="text-xl font-bold text-slate-800 leading-tight">{value}</p>
+              <p className="text-xs font-semibold text-slate-500 leading-tight">{label}</p>
+              <p className="text-xs text-slate-400 truncate mt-0.5">{sub}</p>
             </div>
           </div>
         ))}
@@ -372,6 +455,102 @@ export default function BillingReport() {
           <FileText size={48} className="mx-auto mb-3 opacity-30" />
           <p className="font-medium">Nenhuma OS encontrada no período selecionado.</p>
           <p className="text-sm mt-1">Total no banco: {jobs?.length ?? 0} OS. Tente ampliar o intervalo de datas.</p>
+        </div>
+      )}
+
+      {/* Summary table */}
+      {!isLoading && filtered.length > 0 && (
+        <div className="bg-white rounded-2xl border border-slate-200 overflow-hidden">
+          <div className="px-4 py-3 border-b border-slate-200 flex items-center justify-between">
+            <h2 className="font-bold text-slate-800 text-sm flex items-center gap-2">
+              <FileText size={15} className="text-blue-600" />
+              Resumo das OS — {periodLabel()}
+              {brandFilter && (
+                <span className="ml-2 inline-flex items-center gap-1 bg-blue-100 text-blue-700 text-xs font-semibold px-2 py-0.5 rounded-full">
+                  <Tag size={10} />
+                  {brandFilter}
+                </span>
+              )}
+            </h2>
+            <span className="text-xs text-slate-400">{filtered.length} registro{filtered.length !== 1 ? "s" : ""}</span>
+          </div>
+          <div className="overflow-x-auto">
+            <table className="w-full text-sm">
+              <thead>
+                <tr className="bg-slate-50 border-b border-slate-200">
+                  <th className="text-left px-4 py-3 font-bold text-slate-600 text-xs uppercase tracking-wide">#</th>
+                  <th className="text-left px-4 py-3 font-bold text-slate-600 text-xs uppercase tracking-wide">OS</th>
+                  <th className="text-left px-4 py-3 font-bold text-slate-600 text-xs uppercase tracking-wide">Loja / Marca</th>
+                  <th className="text-left px-4 py-3 font-bold text-slate-600 text-xs uppercase tracking-wide">Tipo</th>
+                  <th className="text-left px-4 py-3 font-bold text-slate-600 text-xs uppercase tracking-wide">Instalador</th>
+                  <th className="text-left px-4 py-3 font-bold text-slate-600 text-xs uppercase tracking-wide">Agendamento</th>
+                  <th className="text-left px-4 py-3 font-bold text-slate-600 text-xs uppercase tracking-wide">Finalização</th>
+                  <th className="text-left px-4 py-3 font-bold text-slate-600 text-xs uppercase tracking-wide">Duração</th>
+                  <th className="text-left px-4 py-3 font-bold text-slate-600 text-xs uppercase tracking-wide">Fotos</th>
+                  <th className="text-left px-4 py-3 font-bold text-slate-600 text-xs uppercase tracking-wide">Status</th>
+                </tr>
+              </thead>
+              <tbody className="divide-y divide-slate-100">
+                {filtered.map((job: any, idx: number) => {
+                  const duration = jobDurationMinutes(job);
+                  const photoCount = job.job_photos?.length || 0;
+                  return (
+                    <tr
+                      key={job.id}
+                      className={idx % 2 === 0 ? "bg-white hover:bg-slate-50" : "bg-slate-50 hover:bg-slate-100"}
+                      style={{ transition: "background 0.15s" }}
+                    >
+                      <td className="px-4 py-3 text-slate-400 font-medium text-xs">{idx + 1}</td>
+                      <td className="px-4 py-3 font-bold text-slate-800">{job.os_number}</td>
+                      <td className="px-4 py-3">
+                        <p className="font-semibold text-slate-700 text-xs leading-tight">{job.stores?.name || "—"}</p>
+                        {job.stores?.brand && (
+                          <p className="text-xs text-slate-400 mt-0.5">{job.stores.brand}</p>
+                        )}
+                      </td>
+                      <td className="px-4 py-3 text-slate-600 text-xs">{job.type || "—"}</td>
+                      <td className="px-4 py-3 text-xs text-slate-600">
+                        {job.profiles
+                          ? `${job.profiles.first_name} ${job.profiles.last_name}`
+                          : <span className="text-slate-400">—</span>}
+                      </td>
+                      <td className="px-4 py-3 text-xs text-slate-600 whitespace-nowrap">
+                        {formatDate(job.scheduled_date)}
+                      </td>
+                      <td className="px-4 py-3 text-xs text-slate-600 whitespace-nowrap">
+                        {formatDateTime(job.finished_at)}
+                      </td>
+                      <td className="px-4 py-3 text-xs text-slate-600 whitespace-nowrap">
+                        {duration > 0 ? (
+                          <span className="flex items-center gap-1">
+                            <Clock size={11} className="text-slate-400" />
+                            {formatMinutes(duration)}
+                          </span>
+                        ) : (
+                          <span className="text-slate-300">—</span>
+                        )}
+                      </td>
+                      <td className="px-4 py-3 text-xs">
+                        {photoCount > 0 ? (
+                          <span className="flex items-center gap-1 text-purple-600 font-semibold">
+                            <Camera size={11} />
+                            {photoCount}
+                          </span>
+                        ) : (
+                          <span className="text-slate-300">—</span>
+                        )}
+                      </td>
+                      <td className="px-4 py-3">
+                        <span className={`text-xs font-semibold px-2 py-0.5 rounded-full ${STATUS_COLORS[job.status] || "bg-slate-100 text-slate-600"}`}>
+                          {job.status}
+                        </span>
+                      </td>
+                    </tr>
+                  );
+                })}
+              </tbody>
+            </table>
+          </div>
         </div>
       )}
 
@@ -418,10 +597,10 @@ export default function BillingReport() {
 
             <div className="mt-4 grid grid-cols-4 gap-3 text-center">
               {[
-                { label: "Total", value: stats.total },
-                { label: "Concluídas", value: stats.completed },
-                { label: "Pendentes", value: stats.pending },
+                { label: "OS Concluídas", value: `${stats.completed}/${stats.total}` },
                 { label: "Fotos", value: stats.photos },
+                { label: "Horas trabalhadas", value: formatMinutes(stats.totalHoursMinutes) },
+                { label: "Média por OS", value: formatMinutes(stats.avgMinutesPerJob) },
               ].map(({ label, value }) => (
                 <div key={label} className="bg-slate-50 rounded-xl p-3">
                   <p className="text-xl font-bold text-slate-800">{value}</p>
@@ -439,6 +618,7 @@ export default function BillingReport() {
               (p: any) => p.photo_type !== "before" && p.photo_type !== "after"
             );
             const allPhotos = job.job_photos || [];
+            const duration = jobDurationMinutes(job);
 
             return (
               <div key={job.id}>
@@ -456,6 +636,12 @@ export default function BillingReport() {
                     {job.status}
                   </span>
                   <span className="text-sm text-slate-600">{job.type}</span>
+                  {duration > 0 && (
+                    <span className="text-xs text-slate-500 flex items-center gap-1">
+                      <Clock size={12} />
+                      {formatMinutes(duration)}
+                    </span>
+                  )}
                   <span className="ml-auto text-sm text-slate-500 flex items-center gap-1">
                     <Calendar size={13} />
                     {formatDate(job.scheduled_date)}
@@ -488,6 +674,27 @@ export default function BillingReport() {
                       </div>
                     )}
                   </div>
+
+                  {job.finished_at && (
+                    <div className="flex flex-wrap gap-4 text-xs text-slate-500">
+                      {job.started_at && (
+                        <span className="flex items-center gap-1">
+                          <Calendar size={11} />
+                          Início: {formatDateTime(job.started_at)}
+                        </span>
+                      )}
+                      <span className="flex items-center gap-1">
+                        <Calendar size={11} />
+                        Fim: {formatDateTime(job.finished_at)}
+                      </span>
+                      {duration > 0 && (
+                        <span className="flex items-center gap-1 font-semibold text-slate-600">
+                          <Clock size={11} />
+                          Duração: {formatMinutes(duration)}
+                        </span>
+                      )}
+                    </div>
+                  )}
 
                   {job.notes && (
                     <div className="bg-slate-50 rounded-lg p-3">
