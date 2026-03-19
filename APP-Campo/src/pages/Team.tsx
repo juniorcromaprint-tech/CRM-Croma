@@ -25,14 +25,15 @@ type TeamMember = {
   full_name: string | null;
   role: string | null;
   email?: string | null;
+  telefone?: string | null;
 };
 
 export default function Team() {
   const { profile } = useAuth();
   const queryClient = useQueryClient();
   const [isSheetOpen, setIsSheetOpen] = useState(false);
+  const [editingMember, setEditingMember] = useState<TeamMember | null>(null);
   const [memberToDelete, setMemberToDelete] = useState<TeamMember | null>(null);
-  const [memberToEdit, setMemberToEdit] = useState<TeamMember | null>(null);
 
   // Busca todos os perfis cadastrados
   const { data: team, isLoading } = useQuery({
@@ -135,7 +136,7 @@ export default function Team() {
           <p className="text-slate-500 mt-1">Gerencie os acessos e cargos dos seus colaboradores.</p>
         </div>
         <Button
-          onClick={() => setIsSheetOpen(true)}
+          onClick={() => { setEditingMember(null); setIsSheetOpen(true); }}
           className="bg-blue-600 hover:bg-blue-700 text-white rounded-xl h-11 px-5 shadow-sm w-full md:w-auto"
         >
           <Plus size={20} className="mr-2" /> Novo Membro
@@ -177,24 +178,22 @@ export default function Team() {
                       disabled={member.id === profile.id || updateRoleMutation.isPending}
                       value={member.role || 'instalador'}
                       onChange={(e) => updateRoleMutation.mutate({ userId: member.id, newRole: e.target.value })}
-                      className="h-11 px-3 rounded-xl border border-slate-200 bg-white text-sm font-medium text-slate-700 outline-none focus:ring-2 focus:ring-blue-600 disabled:opacity-50 disabled:cursor-not-allowed flex-1 sm:w-36"
+                      className="h-11 px-3 rounded-xl border border-slate-200 bg-white text-sm font-medium text-slate-700 outline-none focus:ring-2 focus:ring-blue-600 disabled:opacity-50 disabled:cursor-not-allowed flex-1 sm:w-40"
                     >
                       <option value="instalador">Instalador</option>
                       <option value="admin">Administrador</option>
                     </select>
 
-                    {/* Botão Editar */}
                     <Button
                       variant="ghost"
                       size="icon"
-                      onClick={() => setMemberToEdit(member)}
+                      onClick={() => { setEditingMember(member); setIsSheetOpen(true); }}
                       className="h-11 w-11 rounded-xl text-slate-400 hover:text-blue-600 hover:bg-blue-50 shrink-0 transition-colors"
                       title="Editar membro"
                     >
-                      <Pencil size={16} />
+                      <Pencil size={18} />
                     </Button>
 
-                    {/* Botão Excluir - só aparece se NÃO for o próprio admin */}
                     {member.id !== profile.id && (
                       <Button
                         variant="ghost"
@@ -227,13 +226,8 @@ export default function Team() {
 
       <TeamMemberFormSheet
         isOpen={isSheetOpen}
-        onClose={() => setIsSheetOpen(false)}
-      />
-
-      <TeamMemberFormSheet
-        isOpen={!!memberToEdit}
-        onClose={() => setMemberToEdit(null)}
-        memberToEdit={memberToEdit}
+        onClose={() => { setIsSheetOpen(false); setEditingMember(null); }}
+        editMember={editingMember}
       />
 
       {/* Diálogo de Confirmação de Exclusão */}

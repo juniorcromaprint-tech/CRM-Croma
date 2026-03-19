@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from "react";
-import { Save, Loader2, UserPlus, Pencil, Mail, Lock, Shield, User } from "lucide-react";
+import { Save, Loader2, UserPlus, Mail, Lock, Shield, Pencil, Phone } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Sheet, SheetContent, SheetHeader, SheetTitle, SheetDescription } from "@/components/ui/sheet";
@@ -7,55 +7,73 @@ import { supabase } from "@/integrations/supabase/client";
 import { showSuccess, showError } from "@/utils/toast";
 import { useQueryClient } from "@tanstack/react-query";
 
-type MemberToEdit = {
+interface EditMember {
   id: string;
   first_name: string | null;
   last_name: string | null;
-  email?: string | null;
+  full_name: string | null;
   role: string | null;
-};
+  email?: string | null;
+  telefone?: string | null;
+}
 
 interface TeamMemberFormSheetProps {
   isOpen: boolean;
   onClose: () => void;
-  memberToEdit?: MemberToEdit | null;
+  editMember?: EditMember | null;
 }
 
-export default function TeamMemberFormSheet({ isOpen, onClose, memberToEdit }: TeamMemberFormSheetProps) {
+export default function TeamMemberFormSheet({ isOpen, onClose, editMember }: TeamMemberFormSheetProps) {
   const queryClient = useQueryClient();
   const [isSubmitting, setIsSubmitting] = useState(false);
-  const isEditing = !!memberToEdit;
+  const isEditMode = !!editMember;
 
   const [formData, setFormData] = useState({
     firstName: "",
     lastName: "",
     email: "",
     password: "",
+    telefone: "",
     role: "instalador"
   });
 
-  // Preenche formulário ao editar
   useEffect(() => {
-    if (memberToEdit) {
+    if (editMember) {
       setFormData({
-        firstName: memberToEdit.first_name || "",
-        lastName: memberToEdit.last_name || "",
-        email: memberToEdit.email || "",
+        firstName: editMember.first_name || "",
+        lastName: editMember.last_name || "",
+        email: editMember.email || "",
         password: "",
-        role: memberToEdit.role || "instalador"
+        telefone: editMember.telefone || "",
+        role: editMember.role || "instalador"
       });
     } else {
-      setFormData({ firstName: "", lastName: "", email: "", password: "", role: "instalador" });
+      setFormData({ firstName: "", lastName: "", email: "", password: "", telefone: "", role: "instalador" });
     }
-  }, [memberToEdit, isOpen]);
+  }, [editMember, isOpen]);
 
   const handleChange = (e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement>) => {
     setFormData(prev => ({ ...prev, [e.target.name]: e.target.value }));
   };
 
+  const handleSubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
+
+    if (!formData.firstName) {
+      showError("Preencha o nome.");
+      return;
+    }
+
+    if (isEditMode) {
+      await handleUpdate();
+    } else {
+      await handleCreate();
+    }
+  };
+
   const handleCreate = async () => {
-    if (!formData.firstName || !formData.email || !formData.password) {
-      showError("Preencha todos os campos obrigatórios.");
+    if (!formData.email || !formData.password) {
+      showError("Preencha e-mail e senha para criar o usuário.");
       return;
     }
     if (formData.password.length < 6) {
@@ -63,53 +81,51 @@ export default function TeamMemberFormSheet({ isOpen, onClose, memberToEdit }: T
       return;
     }
 
-    const { data, error } = await supabase.functions.invoke('create-user', {
-      body: formData
-    });
-
-    if (error) throw error;
-    if (data?.error) throw new Error(data.error);
-
-    showSuccess("Membro adicionado com sucesso!");
-  };
-
-  const handleEdit = async () => {
-    if (!formData.firstName) {
-      showError("O nome é obrigatório.");
-      return;
-    }
-
-    const fullName = `${formData.firstName} ${formData.lastName || ''}`.trim();
-    const { error } = await supabase
-      .from('profiles')
-      .update({
-        first_name: formData.firstName,
-        last_name: formData.lastName || null,
-        full_name: fullName,
-        role: formData.role,
-      })
-      .eq('id', memberToEdit!.id);
-
-    if (error) throw error;
-
-    showSuccess("Membro atualizado com sucesso!");
-  };
-
-  const handleSubmit = async (e: React.FormEvent) => {
-    e.preventDefault();
     setIsSubmitting(true);
     try {
-      if (isEditing) {
-        await handleEdit();
-      } else {
-        await handleCreate();
-      }
+      const { data, error } = await supabase.functions.invoke('create-user', {
+        body: formData
+      });
 
+      if (error) throw error;
+      if (data?.error) throw new Error(data.error);
+
+      showSuccess("Membro adicionado com sucesso!");
       queryClient.invalidateQueries({ queryKey: ['team-profiles'] });
       onClose();
     } catch (error: any) {
       console.error(error);
-      showError(error.message || "Erro ao salvar. Tente novamente.");
+      showError(error.message || "Erro ao criar usuário. Verifique se o e-mail já existe.");
+    } finally {
+      setIsSubmitting(false);
+    }
+  };
+
+  const handleUpdate = async () => {
+    if (!editMember) return;
+
+    setIsSubmitting(true);
+    try {
+      const fullName = [formData.firstName, formData.lastName].filter(Boolean).join(' ');
+      const { error } = await supabase
+        .from('profiles')
+        .update({
+          first_name: formData.firstName || null,
+          last_name: formData.lastName || null,
+          full_name: fullName || null,
+          role: formData.role,
+          telefone: formData.telefone || null,
+        })
+        .eq('id', editMember.id);
+
+      if (error) throw error;
+
+      showSuccess("Membro atualizado com sucesso!");
+      queryClient.invalidateQueries({ queryKey: ['team-profiles'] });
+      onClose();
+    } catch (error: any) {
+      console.error(error);
+      showError(error.message || "Erro ao atualizar membro.");
     } finally {
       setIsSubmitting(false);
     }
@@ -121,16 +137,16 @@ export default function TeamMemberFormSheet({ isOpen, onClose, memberToEdit }: T
         <div className="p-6 bg-slate-50 border-b border-slate-100 sticky top-0 z-10">
           <SheetHeader>
             <SheetTitle className="text-2xl font-bold text-slate-800 flex items-center gap-2">
-              {isEditing
-                ? <><Pencil className="text-blue-600" size={24} /> Editar Membro</>
-                : <><UserPlus className="text-blue-600" size={24} /> Novo Membro</>
-              }
+              {isEditMode ? (
+                <><Pencil className="text-blue-600" size={24} /> Editar Membro</>
+              ) : (
+                <><UserPlus className="text-blue-600" size={24} /> Novo Membro</>
+              )}
             </SheetTitle>
             <SheetDescription className="text-slate-500">
-              {isEditing
-                ? "Atualize as informações do colaborador."
-                : "Crie uma conta de acesso para um novo instalador ou administrador."
-              }
+              {isEditMode
+                ? "Atualize os dados do membro da equipe."
+                : "Crie uma conta de acesso para um novo instalador ou administrador."}
             </SheetDescription>
           </SheetHeader>
         </div>
@@ -163,39 +179,64 @@ export default function TeamMemberFormSheet({ isOpen, onClose, memberToEdit }: T
 
             <div>
               <label className="text-xs font-bold text-slate-500 mb-1 flex items-center gap-1">
-                <Mail size={12} /> E-mail de Acesso {!isEditing && '*'}
+                <Phone size={12} /> Telefone
               </label>
               <Input
-                type="email"
-                name="email"
-                value={formData.email}
+                name="telefone"
+                value={formData.telefone}
                 onChange={handleChange}
-                placeholder="joao@empresa.com"
+                placeholder="(11) 99999-9999"
                 className="h-11 rounded-xl bg-slate-50 border-slate-200"
-                required={!isEditing}
-                disabled={isEditing}
               />
-              {isEditing && (
-                <p className="text-[10px] text-slate-400 mt-1">O e-mail não pode ser alterado.</p>
-              )}
             </div>
 
-            {!isEditing && (
+            {!isEditMode && (
+              <>
+                <div>
+                  <label className="text-xs font-bold text-slate-500 mb-1 flex items-center gap-1">
+                    <Mail size={12} /> E-mail de Acesso *
+                  </label>
+                  <Input
+                    type="email"
+                    name="email"
+                    value={formData.email}
+                    onChange={handleChange}
+                    placeholder="joao@empresa.com"
+                    className="h-11 rounded-xl bg-slate-50 border-slate-200"
+                    required
+                  />
+                </div>
+
+                <div>
+                  <label className="text-xs font-bold text-slate-500 mb-1 flex items-center gap-1">
+                    <Lock size={12} /> Senha Inicial *
+                  </label>
+                  <Input
+                    type="text"
+                    name="password"
+                    value={formData.password}
+                    onChange={handleChange}
+                    placeholder="Mínimo 6 caracteres"
+                    className="h-11 rounded-xl bg-slate-50 border-slate-200"
+                    required
+                    minLength={6}
+                  />
+                  <p className="text-[10px] text-slate-400 mt-1">O usuário poderá alterar a senha depois.</p>
+                </div>
+              </>
+            )}
+
+            {isEditMode && formData.email && (
               <div>
                 <label className="text-xs font-bold text-slate-500 mb-1 flex items-center gap-1">
-                  <Lock size={12} /> Senha Inicial *
+                  <Mail size={12} /> E-mail
                 </label>
                 <Input
-                  type="text"
-                  name="password"
-                  value={formData.password}
-                  onChange={handleChange}
-                  placeholder="Mínimo 6 caracteres"
-                  className="h-11 rounded-xl bg-slate-50 border-slate-200"
-                  required
-                  minLength={6}
+                  value={formData.email}
+                  disabled
+                  className="h-11 rounded-xl bg-slate-100 border-slate-200 text-slate-500"
                 />
-                <p className="text-[10px] text-slate-400 mt-1">O usuário poderá alterar a senha depois.</p>
+                <p className="text-[10px] text-slate-400 mt-1">O e-mail de acesso não pode ser alterado.</p>
               </div>
             )}
 
@@ -235,9 +276,9 @@ export default function TeamMemberFormSheet({ isOpen, onClose, memberToEdit }: T
               className="flex-1 h-12 rounded-xl bg-blue-600 hover:bg-blue-700 text-white font-bold shadow-sm"
             >
               {isSubmitting ? (
-                <><Loader2 className="animate-spin mr-2" size={20} /> {isEditing ? 'Salvando...' : 'Criando...'}</>
+                <><Loader2 className="animate-spin mr-2" size={20} /> {isEditMode ? 'Salvando...' : 'Criando...'}</>
               ) : (
-                <><Save className="mr-2" size={20} /> {isEditing ? 'Salvar Alterações' : 'Criar Conta'}</>
+                <><Save className="mr-2" size={20} /> {isEditMode ? 'Salvar' : 'Criar Conta'}</>
               )}
             </Button>
           </div>
