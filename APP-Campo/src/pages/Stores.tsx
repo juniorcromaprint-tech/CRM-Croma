@@ -97,7 +97,8 @@ const MultiSelect = ({ options, selected, onChange, placeholder, icon: Icon }: M
 
 export default function Stores() {
   const [searchTerm, setSearchTerm] = useState("");
-  
+  const [debouncedSearch, setDebouncedSearch] = useState("");
+
   const [selectedBrands, setSelectedBrands] = useState<string[]>([]);
   const [selectedStates, setSelectedStates] = useState<string[]>([]);
   const [selectedNeighborhoods, setSelectedNeighborhoods] = useState<string[]>([]);
@@ -157,10 +158,15 @@ export default function Stores() {
     return Array.from(uniqueNeigh).sort();
   }, [stores, selectedStates]);
 
+  useEffect(() => {
+    const timer = setTimeout(() => setDebouncedSearch(searchTerm), 300);
+    return () => clearTimeout(timer);
+  }, [searchTerm]);
+
   // Reseta a página quando os filtros mudam
   useEffect(() => {
     setCurrentPage(1);
-  }, [searchTerm, selectedBrands, selectedStates, selectedNeighborhoods]);
+  }, [debouncedSearch, selectedBrands, selectedStates, selectedNeighborhoods]);
 
   // Limpa os bairros apenas se o estado mudar e já houver bairros selecionados
   // Isso evita o loop infinito no carregamento inicial
@@ -172,11 +178,11 @@ export default function Stores() {
 
   const filteredStores = useMemo(() => {
     if (!stores) return [];
-    
+
     return stores.filter(store => {
-      const searchLower = searchTerm.toLowerCase().trim();
-      
-      const matchesSearch = 
+      const searchLower = debouncedSearch.toLowerCase().trim();
+
+      const matchesSearch =
         (String(store.name || "").toLowerCase()).includes(searchLower) ||
         (String(store.corporate_name || "").toLowerCase()).includes(searchLower) ||
         (String(store.code || "").toLowerCase()).includes(searchLower) ||
@@ -190,7 +196,7 @@ export default function Stores() {
 
       return matchesSearch && matchesBrand && matchesState && matchesNeighborhood;
     });
-  }, [stores, searchTerm, selectedBrands, selectedStates, selectedNeighborhoods]);
+  }, [stores, debouncedSearch, selectedBrands, selectedStates, selectedNeighborhoods]);
 
   const totalPages = Math.ceil(filteredStores.length / itemsPerPage);
   const paginatedStores = filteredStores.slice(
