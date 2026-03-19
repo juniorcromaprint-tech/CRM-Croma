@@ -3,6 +3,7 @@ import { useNavigate } from 'react-router-dom';
 import {
   Search,
   Upload,
+  Download,
   Users,
   Star,
   Globe,
@@ -337,8 +338,20 @@ function TabImportarLista({ onClose }: { onClose: () => void }) {
   return (
     <div className="space-y-4">
       <div className="space-y-1">
-        <p className="text-sm text-slate-600 font-medium">Formato: nome, email, telefone (um por linha)</p>
-        <p className="text-xs text-slate-400">A linha de cabeçalho é detectada e ignorada automaticamente.</p>
+        <div className="flex items-center justify-between">
+          <div>
+            <p className="text-sm text-slate-600 font-medium">Formato: nome, email, telefone (um por linha)</p>
+            <p className="text-xs text-slate-400">A linha de cabeçalho é detectada e ignorada automaticamente.</p>
+          </div>
+          <a
+            href="/modelo-importacao-leads.csv"
+            download="modelo-importacao-leads.csv"
+            className="flex items-center gap-1.5 text-xs text-blue-600 hover:text-blue-700 font-medium shrink-0"
+          >
+            <Download size={14} />
+            Baixar modelo
+          </a>
+        </div>
       </div>
 
       <Textarea
