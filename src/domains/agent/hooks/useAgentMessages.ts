@@ -173,13 +173,8 @@ export function useSendApprovedMessage() {
       messageId: string;
       conversationId: string;
     }) => {
-      const {
-        data: { session },
-      } = await supabase.auth.getSession();
-
       const res = await supabase.functions.invoke('agent-enviar-email', {
         body: { message_id: messageId, conversation_id: conversationId },
-        headers: { Authorization: `Bearer ${session?.access_token}` },
       });
 
       if (res.error) throw new Error(res.error.message);
@@ -214,13 +209,8 @@ export function useSendApprovedWhatsApp() {
       messageId: string;
       conversationId: string;
     }) => {
-      const {
-        data: { session },
-      } = await supabase.auth.getSession();
-
       const res = await supabase.functions.invoke('whatsapp-enviar', {
         body: { message_id: messageId, conversation_id: conversationId },
-        headers: { Authorization: `Bearer ${session?.access_token}` },
       });
 
       if (res.error) throw new Error(res.error.message);

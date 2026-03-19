@@ -22,16 +22,9 @@ export interface SendApprovedResult {
   total: number;
 }
 
-// ─── Helper ───────────────────────────────────────────────────────────────────
-
-async function getAuthHeader(): Promise<Record<string, string>> {
-  const {
-    data: { session },
-  } = await supabase.auth.getSession();
-  return { Authorization: `Bearer ${session?.access_token}` };
-}
-
 // ─── Service Functions ────────────────────────────────────────────────────────
+// Note: supabase.functions.invoke automatically attaches the current session's
+// Authorization header and handles token auto-refresh. No manual headers needed.
 
 /**
  * Orquestra qualificação + composição de email para uma lista de leads.
@@ -41,12 +34,9 @@ export async function iniciarSequenciaEmail(leadIds: string[]): Promise<Sequence
   const results: SequenceResult[] = [];
 
   for (const lead_id of leadIds) {
-    const headers = await getAuthHeader();
-
     // Step 1: Qualify lead
     const qualRes = await supabase.functions.invoke('ai-qualificar-lead', {
       body: { lead_id },
-      headers,
     });
 
     if (qualRes.error) {
@@ -73,7 +63,6 @@ export async function iniciarSequenciaEmail(leadIds: string[]): Promise<Sequence
     // Step 3: Compose opening email
     const composeRes = await supabase.functions.invoke('ai-compor-mensagem', {
       body: { lead_id, canal: 'email', etapa: 'abertura' },
-      headers,
     });
 
     if (composeRes.error) {
@@ -117,11 +106,8 @@ export async function enviarMensagensAprovadas(): Promise<SendApprovedResult> {
   let erros = 0;
 
   for (const message of messages) {
-    const headers = await getAuthHeader();
-
     const res = await supabase.functions.invoke('agent-enviar-email', {
       body: { message_id: message.id },
-      headers,
     });
 
     if (res.error) {
