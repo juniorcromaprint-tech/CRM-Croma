@@ -7,6 +7,7 @@ import { useQuery } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import { useNavigate } from "react-router-dom";
 import StoreFormSheet from "@/components/StoreFormSheet";
+import { StoreCardSkeleton } from "@/components/Skeletons";
 
 // Componente customizado para Múltipla Seleção
 interface MultiSelectProps {
@@ -274,9 +275,8 @@ export default function Stores() {
       </div>
 
       {isLoading ? (
-        <div className="flex flex-col items-center justify-center py-12 text-slate-500">
-          <div className="w-8 h-8 border-4 border-blue-200 border-t-blue-600 rounded-full animate-spin mb-4"></div>
-          <p>Carregando lojas...</p>
+        <div className="space-y-4">
+          {Array.from({ length: 6 }).map((_, i) => <StoreCardSkeleton key={i} />)}
         </div>
       ) : filteredStores.length === 0 ? (
         <div className="text-center py-12 bg-white rounded-2xl border border-slate-100 shadow-sm">

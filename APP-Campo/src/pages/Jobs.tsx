@@ -3,6 +3,7 @@ import { useSearchParams, useNavigate } from "react-router-dom";
 import { useInfiniteQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import { Search, Plus, MapPin, ClipboardList, Filter, ChevronLeft, ChevronRight, Calendar, AlertTriangle, User, Loader2, Download, Trash2, CalendarCheck } from "lucide-react";
+import { JobCardSkeleton } from "@/components/Skeletons";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
@@ -387,9 +388,8 @@ export default function Jobs() {
       </div>
 
       {isLoading ? (
-        <div className="flex flex-col items-center justify-center py-12 text-slate-500">
-          <div className="w-8 h-8 border-4 border-blue-200 border-t-blue-600 rounded-full animate-spin mb-4"></div>
-          <p>Carregando OSs...</p>
+        <div className="space-y-4">
+          {Array.from({ length: 5 }).map((_, i) => <JobCardSkeleton key={i} />)}
         </div>
       ) : allJobs.length === 0 ? (
         <div className="text-center py-12 bg-white rounded-2xl border border-slate-100 shadow-sm">

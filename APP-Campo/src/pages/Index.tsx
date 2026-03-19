@@ -6,6 +6,7 @@ import { Button } from "@/components/ui/button";
 import { useQuery } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import JobFormSheet from "@/components/JobFormSheet";
+import { StatCardSkeleton, JobCardSkeleton } from "@/components/Skeletons";
 
 export default function Index() {
   const navigate = useNavigate();
@@ -64,65 +65,73 @@ export default function Index() {
 
       {/* Cards de Estatísticas */}
       <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
-        <Card
-          onClick={() => navigate('/jobs?status=Pendente')}
-          className="border-none shadow-sm rounded-2xl overflow-hidden bg-gradient-to-br from-amber-50 to-amber-100/50 cursor-pointer hover:shadow-md hover:-translate-y-1 transition-all group"
-        >
-          <CardContent className="p-5 flex items-center gap-4">
-            <div className="w-12 h-12 rounded-xl flex items-center justify-center bg-amber-500 text-white shadow-sm shadow-amber-200 group-hover:scale-110 transition-transform">
-              <Clock size={24} />
-            </div>
-            <div>
-              <p className="text-xs font-bold text-amber-700/70 uppercase tracking-wider">Pendentes</p>
-              <h3 className="text-2xl font-black text-amber-900">{stats?.pendentes ?? '-'}</h3>
-            </div>
-          </CardContent>
-        </Card>
+        {!stats ? (
+          <>
+            {Array.from({ length: 4 }).map((_, i) => <StatCardSkeleton key={i} />)}
+          </>
+        ) : (
+          <>
+            <Card
+              onClick={() => navigate('/jobs?status=Pendente')}
+              className="border-none shadow-sm rounded-2xl overflow-hidden bg-gradient-to-br from-amber-50 to-amber-100/50 cursor-pointer hover:shadow-md hover:-translate-y-1 transition-all group"
+            >
+              <CardContent className="p-5 flex items-center gap-4">
+                <div className="w-12 h-12 rounded-xl flex items-center justify-center bg-amber-500 text-white shadow-sm shadow-amber-200 group-hover:scale-110 transition-transform">
+                  <Clock size={24} />
+                </div>
+                <div>
+                  <p className="text-xs font-bold text-amber-700/70 uppercase tracking-wider">Pendentes</p>
+                  <h3 className="text-2xl font-black text-amber-900">{stats.pendentes}</h3>
+                </div>
+              </CardContent>
+            </Card>
 
-        <Card
-          onClick={() => navigate('/jobs?status=Em andamento')}
-          className="border-none shadow-sm rounded-2xl overflow-hidden bg-gradient-to-br from-blue-50 to-blue-100/50 cursor-pointer hover:shadow-md hover:-translate-y-1 transition-all group"
-        >
-          <CardContent className="p-5 flex items-center gap-4">
-            <div className="w-12 h-12 rounded-xl flex items-center justify-center bg-blue-500 text-white shadow-sm shadow-blue-200 group-hover:scale-110 transition-transform">
-              <Clock size={24} />
-            </div>
-            <div>
-              <p className="text-xs font-bold text-blue-700/70 uppercase tracking-wider">Em andamento</p>
-              <h3 className="text-2xl font-black text-blue-900">{stats?.emAndamento ?? '-'}</h3>
-            </div>
-          </CardContent>
-        </Card>
+            <Card
+              onClick={() => navigate('/jobs?status=Em andamento')}
+              className="border-none shadow-sm rounded-2xl overflow-hidden bg-gradient-to-br from-blue-50 to-blue-100/50 cursor-pointer hover:shadow-md hover:-translate-y-1 transition-all group"
+            >
+              <CardContent className="p-5 flex items-center gap-4">
+                <div className="w-12 h-12 rounded-xl flex items-center justify-center bg-blue-500 text-white shadow-sm shadow-blue-200 group-hover:scale-110 transition-transform">
+                  <Clock size={24} />
+                </div>
+                <div>
+                  <p className="text-xs font-bold text-blue-700/70 uppercase tracking-wider">Em andamento</p>
+                  <h3 className="text-2xl font-black text-blue-900">{stats.emAndamento}</h3>
+                </div>
+              </CardContent>
+            </Card>
 
-        <Card
-          onClick={() => navigate('/jobs?status=Concluído')}
-          className="border-none shadow-sm rounded-2xl overflow-hidden bg-gradient-to-br from-emerald-50 to-emerald-100/50 cursor-pointer hover:shadow-md hover:-translate-y-1 transition-all group"
-        >
-          <CardContent className="p-5 flex items-center gap-4">
-            <div className="w-12 h-12 rounded-xl flex items-center justify-center bg-emerald-500 text-white shadow-sm shadow-emerald-200 group-hover:scale-110 transition-transform">
-              <CheckCircle2 size={24} />
-            </div>
-            <div>
-              <p className="text-xs font-bold text-emerald-700/70 uppercase tracking-wider">Concluídas</p>
-              <h3 className="text-2xl font-black text-emerald-900">{stats?.concluidas ?? '-'}</h3>
-            </div>
-          </CardContent>
-        </Card>
+            <Card
+              onClick={() => navigate('/jobs?status=Concluído')}
+              className="border-none shadow-sm rounded-2xl overflow-hidden bg-gradient-to-br from-emerald-50 to-emerald-100/50 cursor-pointer hover:shadow-md hover:-translate-y-1 transition-all group"
+            >
+              <CardContent className="p-5 flex items-center gap-4">
+                <div className="w-12 h-12 rounded-xl flex items-center justify-center bg-emerald-500 text-white shadow-sm shadow-emerald-200 group-hover:scale-110 transition-transform">
+                  <CheckCircle2 size={24} />
+                </div>
+                <div>
+                  <p className="text-xs font-bold text-emerald-700/70 uppercase tracking-wider">Concluídas</p>
+                  <h3 className="text-2xl font-black text-emerald-900">{stats.concluidas}</h3>
+                </div>
+              </CardContent>
+            </Card>
 
-        <Card
-          onClick={() => navigate('/jobs?status=Divergência')}
-          className="border-none shadow-sm rounded-2xl overflow-hidden bg-gradient-to-br from-rose-50 to-rose-100/50 cursor-pointer hover:shadow-md hover:-translate-y-1 transition-all group"
-        >
-          <CardContent className="p-5 flex items-center gap-4">
-            <div className="w-12 h-12 rounded-xl flex items-center justify-center bg-rose-500 text-white shadow-sm shadow-rose-200 group-hover:scale-110 transition-transform">
-              <AlertCircle size={24} />
-            </div>
-            <div>
-              <p className="text-xs font-bold text-rose-700/70 uppercase tracking-wider">Divergências</p>
-              <h3 className="text-2xl font-black text-rose-900">{stats?.divergencias ?? '-'}</h3>
-            </div>
-          </CardContent>
-        </Card>
+            <Card
+              onClick={() => navigate('/jobs?status=Divergência')}
+              className="border-none shadow-sm rounded-2xl overflow-hidden bg-gradient-to-br from-rose-50 to-rose-100/50 cursor-pointer hover:shadow-md hover:-translate-y-1 transition-all group"
+            >
+              <CardContent className="p-5 flex items-center gap-4">
+                <div className="w-12 h-12 rounded-xl flex items-center justify-center bg-rose-500 text-white shadow-sm shadow-rose-200 group-hover:scale-110 transition-transform">
+                  <AlertCircle size={24} />
+                </div>
+                <div>
+                  <p className="text-xs font-bold text-rose-700/70 uppercase tracking-wider">Divergências</p>
+                  <h3 className="text-2xl font-black text-rose-900">{stats.divergencias}</h3>
+                </div>
+              </CardContent>
+            </Card>
+          </>
+        )}
       </div>
 
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
@@ -136,9 +145,8 @@ export default function Index() {
           </CardHeader>
           <CardContent className="p-5">
             {isLoading ? (
-              <div className="flex flex-col items-center justify-center py-8 text-slate-400">
-                <div className="w-6 h-6 border-4 border-blue-200 border-t-blue-600 rounded-full animate-spin mb-3"></div>
-                <p className="text-sm font-medium">Carregando instalações...</p>
+              <div className="space-y-3">
+                {Array.from({ length: 5 }).map((_, i) => <JobCardSkeleton key={i} />)}
               </div>
             ) : error ? (
               <div className="text-center py-8 bg-rose-50 rounded-xl">
