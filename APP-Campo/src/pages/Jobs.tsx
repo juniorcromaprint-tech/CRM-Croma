@@ -146,6 +146,11 @@ export default function Jobs() {
   }, [searchTerm]);
 
   useEffect(() => {
+    const timer = setTimeout(() => setDebouncedSearch(searchTerm), 300);
+    return () => clearTimeout(timer);
+  }, [searchTerm]);
+
+  useEffect(() => {
     if (inView && hasNextPage) {
       fetchNextPage();
     }

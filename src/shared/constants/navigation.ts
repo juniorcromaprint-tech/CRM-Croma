@@ -90,6 +90,14 @@ export const NAV_GROUPS: NavGroup[] = [
     ],
   },
   {
+    label: 'AGENTE DE VENDAS',
+    items: [
+      { name: 'Dashboard', path: '/agente', icon: 'Bot', module: 'comercial' },
+      { name: 'Aprovação', path: '/agente/aprovacao', icon: 'Clock', module: 'comercial' },
+      { name: 'Configurações', path: '/agente/config', icon: 'Settings', module: 'comercial' },
+    ],
+  },
+  {
     label: 'QUALIDADE',
     items: [
       { name: 'Dashboard', path: '/qualidade', icon: 'BarChart3', module: 'qualidade' },
