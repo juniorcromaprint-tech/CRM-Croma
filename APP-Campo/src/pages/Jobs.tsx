@@ -75,7 +75,7 @@ export default function Jobs() {
     const limit = 20;
     let query = supabase
       .from('jobs')
-      .select('*, stores!inner(name, brand), profiles!jobs_assigned_to_fkey(first_name, last_name)', { count: 'exact' })
+      .select('id, os_number, type, status, scheduled_date, created_at, notes, issues, assigned_to, store_id, stores!inner(name, brand), profiles!jobs_assigned_to_fkey(first_name, last_name)', { count: 'exact' })
       .order('created_at', { ascending: false })
       .range(pageParam * limit, (pageParam + 1) * limit - 1);
 

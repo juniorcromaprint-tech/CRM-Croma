@@ -16,7 +16,7 @@ export default function Index() {
     queryFn: async () => {
       const { data, error } = await supabase
         .from('jobs')
-        .select('*, stores(name, brand)')
+        .select('id, os_number, type, status, created_at, stores(name, brand)')
         .order('created_at', { ascending: false })
         .limit(5);
 
@@ -32,10 +32,10 @@ export default function Index() {
     queryKey: ['dashboard-stats'],
     queryFn: async () => {
       const [pendRes, andRes, concRes, divRes] = await Promise.all([
-        supabase.from('jobs').select('*', { count: 'exact', head: true }).eq('status', 'Pendente'),
-        supabase.from('jobs').select('*', { count: 'exact', head: true }).eq('status', 'Em andamento'),
-        supabase.from('jobs').select('*', { count: 'exact', head: true }).eq('status', 'Concluído'),
-        supabase.from('jobs').select('*', { count: 'exact', head: true }).not('issues', 'is', null).neq('issues', ''),
+        supabase.from('jobs').select('id', { count: 'exact', head: true }).eq('status', 'Pendente'),
+        supabase.from('jobs').select('id', { count: 'exact', head: true }).eq('status', 'Em andamento'),
+        supabase.from('jobs').select('id', { count: 'exact', head: true }).eq('status', 'Concluído'),
+        supabase.from('jobs').select('id', { count: 'exact', head: true }).not('issues', 'is', null).neq('issues', ''),
       ]);
       return {
         pendentes: pendRes.count ?? 0,
