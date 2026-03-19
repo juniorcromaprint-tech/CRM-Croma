@@ -29,6 +29,7 @@ import {
   PanelLeftClose, PanelLeftOpen, Search, Truck,
   Calendar, Megaphone, Package2, ArrowLeftRight, Building, Layers, BarChart2, GanttChart,
   TrendingUp, FileInput, Bot, Clock,
+  ChevronDown, ChevronRight,
   type LucideIcon,
 } from "lucide-react";
 
@@ -137,49 +138,110 @@ function SidebarNavLinkCollapsed({ item, isActive }: SidebarNavLinkProps) {
 }
 
 // ---------------------------------------------------------------------------
-// Nav Groups (full or collapsed)
+// Nav Groups (full or collapsed) — accordion behavior
 // ---------------------------------------------------------------------------
+
+const SIDEBAR_EXPANDED_KEY = "croma-sidebar-expanded-group";
+const ALWAYS_VISIBLE_GROUP = "PAINEL";
+
+/** Find which group label contains a given path */
+function findGroupForPath(groups: NavGroup[], path: string): string | null {
+  for (const group of groups) {
+    for (const item of group.items) {
+      if (isActivePath(path, item.path)) return group.label;
+    }
+  }
+  return null;
+}
 
 interface SidebarNavGroupsProps {
   groups: NavGroup[];
   currentPath: string;
   collapsed?: boolean;
+  expandedGroup: string | null;
+  onToggleGroup: (label: string) => void;
 }
 
-function SidebarNavGroups({ groups, currentPath, collapsed = false }: SidebarNavGroupsProps) {
+function SidebarNavGroups({
+  groups,
+  currentPath,
+  collapsed = false,
+  expandedGroup,
+  onToggleGroup,
+}: SidebarNavGroupsProps) {
   return (
     <>
-      {groups.map((group, groupIdx) => (
-        <div key={group.label}>
-          {!collapsed && (
-            <div className={groupIdx === 0 ? "pb-1" : "pt-4 pb-1"}>
-              <p className="px-4 text-[10px] font-bold text-slate-400 uppercase tracking-widest">
-                {group.label}
-              </p>
+      {groups.map((group, groupIdx) => {
+        const isAlwaysVisible = group.label === ALWAYS_VISIBLE_GROUP;
+        const isExpanded = isAlwaysVisible || expandedGroup === group.label;
+
+        // In collapsed (icon-only) mode, render all items flat — no accordion
+        if (collapsed) {
+          return (
+            <div key={group.label}>
+              {groupIdx > 0 && (
+                <div className="border-t border-slate-100 my-2 mx-2" />
+              )}
+              <div className="space-y-1 mt-1">
+                {group.items.map((item) => (
+                  <SidebarNavLinkCollapsed
+                    key={item.path}
+                    item={item}
+                    isActive={isActivePath(currentPath, item.path)}
+                  />
+                ))}
+              </div>
             </div>
-          )}
-          {collapsed && groupIdx > 0 && (
-            <div className="border-t border-slate-100 my-2 mx-2" />
-          )}
-          <div className={`${collapsed ? "space-y-1 mt-1" : "space-y-1"}`}>
-            {group.items.map((item) =>
-              collapsed ? (
-                <SidebarNavLinkCollapsed
-                  key={item.path}
-                  item={item}
-                  isActive={isActivePath(currentPath, item.path)}
-                />
+          );
+        }
+
+        return (
+          <div key={group.label}>
+            {/* Group header — clickable for non-PAINEL groups */}
+            <div className={groupIdx === 0 ? "pb-1" : "pt-4 pb-1"}>
+              {isAlwaysVisible ? (
+                <p className="px-4 text-[10px] font-bold text-slate-400 uppercase tracking-widest">
+                  {group.label}
+                </p>
               ) : (
-                <SidebarNavLink
-                  key={item.path}
-                  item={item}
-                  isActive={isActivePath(currentPath, item.path)}
-                />
-              )
-            )}
+                <button
+                  type="button"
+                  onClick={() => onToggleGroup(group.label)}
+                  className="flex items-center justify-between w-full px-4 py-0.5 group cursor-pointer"
+                >
+                  <p className="text-[10px] font-bold text-slate-400 uppercase tracking-widest group-hover:text-slate-600 transition-colors">
+                    {group.label}
+                  </p>
+                  {isExpanded ? (
+                    <ChevronDown size={12} className="text-slate-400 group-hover:text-slate-600 transition-colors" />
+                  ) : (
+                    <ChevronRight size={12} className="text-slate-400 group-hover:text-slate-600 transition-colors" />
+                  )}
+                </button>
+              )}
+            </div>
+
+            {/* Items container with CSS transition */}
+            <div
+              className="overflow-hidden transition-all duration-200 ease-in-out"
+              style={{
+                maxHeight: isExpanded ? `${group.items.length * 44}px` : "0px",
+                opacity: isExpanded ? 1 : 0,
+              }}
+            >
+              <div className="space-y-1">
+                {group.items.map((item) => (
+                  <SidebarNavLink
+                    key={item.path}
+                    item={item}
+                    isActive={isActivePath(currentPath, item.path)}
+                  />
+                ))}
+              </div>
+            </div>
           </div>
-        </div>
-      ))}
+        );
+      })}
     </>
   );
 }
@@ -288,6 +350,32 @@ export default function Layout() {
     [accessibleModules],
   );
 
+  // --- Accordion sidebar state ---
+  const [expandedGroup, setExpandedGroup] = useState<string | null>(() => {
+    try {
+      return localStorage.getItem(SIDEBAR_EXPANDED_KEY) || null;
+    } catch {
+      return null;
+    }
+  });
+
+  // Auto-expand the group containing the current active route
+  useEffect(() => {
+    const activeGroup = findGroupForPath(navGroups, location.pathname);
+    if (activeGroup && activeGroup !== ALWAYS_VISIBLE_GROUP) {
+      setExpandedGroup(activeGroup);
+      try { localStorage.setItem(SIDEBAR_EXPANDED_KEY, activeGroup); } catch { /* noop */ }
+    }
+  }, [location.pathname, navGroups]);
+
+  const handleToggleGroup = useCallback((label: string) => {
+    setExpandedGroup((prev) => {
+      const next = prev === label ? null : label;
+      try { localStorage.setItem(SIDEBAR_EXPANDED_KEY, next || ""); } catch { /* noop */ }
+      return next;
+    });
+  }, []);
+
   const mobileNavItems = useMemo(() => {
     const dashboard = NAV_GROUPS[0]?.items[0];
     const comercialGroup = navGroups.find((g) => g.label === "COMERCIAL");
@@ -374,6 +462,8 @@ export default function Layout() {
             groups={navGroups}
             currentPath={location.pathname}
             collapsed={collapsed}
+            expandedGroup={expandedGroup}
+            onToggleGroup={handleToggleGroup}
           />
         </nav>
 
@@ -408,7 +498,12 @@ export default function Layout() {
             </SheetTrigger>
             <SheetContent side="right" className="w-72 p-4 flex flex-col">
               <nav className="flex flex-col mt-8 flex-1 overflow-y-auto">
-                <SidebarNavGroups groups={navGroups} currentPath={location.pathname} />
+                <SidebarNavGroups
+                  groups={navGroups}
+                  currentPath={location.pathname}
+                  expandedGroup={expandedGroup}
+                  onToggleGroup={handleToggleGroup}
+                />
               </nav>
               <div className="mt-auto pt-4">
                 <UserSection />
