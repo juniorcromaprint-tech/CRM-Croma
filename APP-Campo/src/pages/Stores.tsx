@@ -9,6 +9,7 @@ import { supabase } from "@/integrations/supabase/client";
 import { useNavigate } from "react-router-dom";
 import StoreFormSheet from "@/components/StoreFormSheet";
 import { StoreCardSkeleton } from "@/components/Skeletons";
+import EmptyState from "@/components/EmptyState";
 
 // Componente customizado para Múltipla Seleção
 interface MultiSelectProps {
@@ -284,11 +285,11 @@ export default function Stores() {
           {Array.from({ length: 6 }).map((_, i) => <StoreCardSkeleton key={i} />)}
         </div>
       ) : filteredStores.length === 0 ? (
-        <div className="text-center py-12 bg-white rounded-2xl border border-slate-100 shadow-sm">
-          <Store className="mx-auto h-12 w-12 text-slate-300 mb-3" />
-          <h3 className="text-lg font-medium text-slate-900">Nenhuma loja encontrada</h3>
-          <p className="text-slate-500 mt-1">Tente ajustar sua busca ou filtro.</p>
-        </div>
+        <EmptyState
+          icon={Store}
+          title="Nenhuma loja encontrada"
+          description="Tente ajustar os filtros de busca"
+        />
       ) : (
         <div
           className="space-y-4"

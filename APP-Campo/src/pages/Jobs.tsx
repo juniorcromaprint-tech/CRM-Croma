@@ -5,6 +5,7 @@ import { usePullRefresh } from "@/hooks/use-pull-refresh";
 import { supabase } from "@/integrations/supabase/client";
 import { Search, Plus, MapPin, ClipboardList, Filter, ChevronLeft, ChevronRight, Calendar, AlertTriangle, User, Loader2, Download, Trash2, CalendarCheck } from "lucide-react";
 import { JobCardSkeleton } from "@/components/Skeletons";
+import EmptyState from "@/components/EmptyState";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
@@ -398,11 +399,12 @@ export default function Jobs() {
           {Array.from({ length: 5 }).map((_, i) => <JobCardSkeleton key={i} />)}
         </div>
       ) : allJobs.length === 0 ? (
-        <div className="text-center py-12 bg-white rounded-2xl border border-slate-100 shadow-sm">
-          <ClipboardList className="mx-auto h-12 w-12 text-slate-300 mb-3" />
-          <h3 className="text-lg font-medium text-slate-900">Nenhuma OS encontrada</h3>
-          <p className="text-slate-500 mt-1">Tente ajustar sua busca ou filtro.</p>
-        </div>
+        <EmptyState
+          icon={ClipboardList}
+          title="Nenhuma OS encontrada"
+          description="Tente ajustar os filtros ou crie uma nova OS"
+          action={{ label: "Nova OS", onClick: () => setIsJobSheetOpen(true) }}
+        />
       ) : (
         <div
           className="space-y-4"
