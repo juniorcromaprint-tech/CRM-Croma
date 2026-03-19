@@ -14,6 +14,10 @@ import { useInView } from "react-intersection-observer";
 import { useAuth } from "@/contexts/AuthContext";
 import * as XLSX from 'xlsx';
 import { showSuccess, showError } from "@/utils/toast";
+import {
+  AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent,
+  AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle,
+} from "@/components/ui/alert-dialog";
 
 export default function Jobs() {
   const [searchParams, setSearchParams] = useSearchParams();
@@ -31,6 +35,7 @@ export default function Jobs() {
   const [isJobSheetOpen, setIsJobSheetOpen] = useState(false);
   const [isExporting, setIsExporting] = useState(false);
   const [todayFilter, setTodayFilter] = useState(searchParams.get("today") === "true");
+  const [jobToDelete, setJobToDelete] = useState<string | null>(null);
   const { ref, inView } = useInView();
 
   // Sincroniza o filtro com a URL
@@ -158,50 +163,34 @@ export default function Jobs() {
 
   const totalCount = data?.pages[0]?.totalCount || 0;
 
-  // Mutação para excluir OS
+  // Mutação para excluir OS via Edge Function (contorna RLS, mobile-safe)
   const deleteJobMutation = useMutation({
     mutationFn: async (jobId: string) => {
-      const extractFileName = (url: string) => url.split('/').pop() || '';
-
-      // 1. Buscar e deletar arquivos do storage
-      const [{ data: photos }, { data: videos }] = await Promise.all([
-        supabase.from('job_photos').select('photo_url').eq('job_id', jobId),
-        supabase.from('job_videos').select('video_url').eq('job_id', jobId),
-      ]);
-
-      if (photos && photos.length > 0) {
-        await supabase.storage.from('job_photos').remove(photos.map(p => extractFileName(p.photo_url)));
-      }
-      if (videos && videos.length > 0) {
-        await supabase.storage.from('job_videos').remove(videos.map(v => extractFileName(v.video_url)));
-      }
-
-      // 2. Deletar registros filhos explicitamente (defesa extra além do CASCADE)
-      await Promise.all([
-        supabase.from('job_photos').delete().eq('job_id', jobId),
-        supabase.from('job_videos').delete().eq('job_id', jobId),
-      ]);
-
-      // 3. Deletar a OS
-      const { error } = await supabase.from('jobs').delete().eq('id', jobId);
+      const { data, error } = await supabase.functions.invoke('delete-job', { body: { jobId } });
       if (error) throw error;
+      if (data?.error) throw new Error(data.error);
+      return data;
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['infinite-jobs'] });
       queryClient.invalidateQueries({ queryKey: ['all-jobs'] });
       queryClient.invalidateQueries({ queryKey: ['recent-jobs'] });
       showSuccess("OS excluída com sucesso!");
+      setJobToDelete(null);
     },
-    onError: () => {
-      showError("Erro ao excluir a OS.");
+    onError: (error: any) => {
+      showError(error.message || "Erro ao excluir a OS.");
+      setJobToDelete(null);
     }
   });
 
   const handleDeleteClick = (e: React.MouseEvent, jobId: string) => {
-    e.stopPropagation(); // Evita que o clique abra os detalhes da OS
-    if (window.confirm("Tem certeza que deseja excluir esta OS? Todas as fotos vinculadas também serão apagadas.")) {
-      deleteJobMutation.mutate(jobId);
-    }
+    e.stopPropagation();
+    setJobToDelete(jobId);
+  };
+
+  const handleConfirmDelete = () => {
+    if (jobToDelete) deleteJobMutation.mutate(jobToDelete);
   };
 
   const exportToExcel = async () => {
@@ -540,6 +529,30 @@ export default function Jobs() {
         isOpen={isJobSheetOpen}
         onClose={() => setIsJobSheetOpen(false)}
       />
+
+      <AlertDialog open={!!jobToDelete} onOpenChange={(open) => !open && setJobToDelete(null)}>
+        <AlertDialogContent className="rounded-2xl max-w-md mx-4">
+          <AlertDialogHeader>
+            <div className="flex items-center gap-3 mb-2">
+              <div className="w-12 h-12 rounded-full bg-red-100 flex items-center justify-center shrink-0">
+                <AlertTriangle size={24} className="text-red-600" />
+              </div>
+              <AlertDialogTitle className="text-xl font-bold text-slate-800">Excluir OS</AlertDialogTitle>
+            </div>
+            <AlertDialogDescription className="text-slate-600 text-base leading-relaxed">
+              Tem certeza? Todas as fotos e registros vinculados serão apagados permanentemente.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter className="gap-3 mt-2">
+            <AlertDialogCancel className="h-12 rounded-xl border-slate-200 text-slate-600 font-medium" disabled={deleteJobMutation.isPending}>
+              Cancelar
+            </AlertDialogCancel>
+            <AlertDialogAction onClick={handleConfirmDelete} disabled={deleteJobMutation.isPending} className="h-12 rounded-xl bg-red-600 hover:bg-red-700 text-white font-bold">
+              {deleteJobMutation.isPending ? <><Loader2 className="animate-spin mr-2" size={18} />Excluindo...</> : <><Trash2 className="mr-2" size={18} />Sim, Excluir</>}
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </div>
   );
 }

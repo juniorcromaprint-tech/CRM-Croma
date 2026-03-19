@@ -58,7 +58,10 @@
       "WebFetch(domain:artta.com.br)",
       "Bash(find /c/Users/Caldera/Claude/CRM-Croma/src -type f \\\\\\(-name *ai* -o -name *AI* \\\\\\))",
       "Bash(xargs -I {} basename {})",
-      "mcp__claude_ai_Supabase__apply_migration"
+      "mcp__claude_ai_Supabase__apply_migration",
+      "mcp__Claude_Preview__preview_start",
+      "Bash(gh pr:*)",
+      "Bash(gh auth:*)"
     ],
     "additionalDirectories": [
       "C:\\Users\\Caldera\\Claude\\AutoBid-Instagram"
