@@ -15,6 +15,7 @@ import { applyWatermark } from "@/utils/watermark";
 import SignatureCanvas from 'react-signature-canvas';
 import ImageModal from "@/components/ImageModal";
 import { useAuth } from "@/contexts/AuthContext";
+import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from "@/components/ui/alert-dialog";
 
 export default function JobDetail() {
   const { id } = useParams();
@@ -45,6 +46,7 @@ export default function JobDetail() {
   const [isGeneratingPDF, setIsGeneratingPDF] = useState(false);
   const [notesValue, setNotesValue] = useState('');
   const [isRecording, setIsRecording] = useState(false);
+  const [showStartAlert, setShowStartAlert] = useState(false);
 
   const sigCanvasFullscreen = useRef<SignatureCanvas>(null);
   const canvasContainerRef = useRef<HTMLDivElement>(null);
@@ -188,6 +190,13 @@ export default function JobDetail() {
   useEffect(() => {
     return () => { recognitionRef.current?.stop(); };
   }, []);
+
+  // Alerta automático para iniciar contagem de tempo
+  useEffect(() => {
+    if (job && !isAdmin && (job.status === 'Pendente' || job.status === 'Agendado') && !job.started_at) {
+      setShowStartAlert(true);
+    }
+  }, [job?.id, job?.status]);
 
   const toggleVoice = () => {
     if (isRecording) {
@@ -1099,6 +1108,29 @@ export default function JobDetail() {
       )}
 
       <ImageModal isOpen={isImageModalOpen} onClose={() => setIsImageModalOpen(false)} imageUrl={selectedImageUrl} />
+
+      <AlertDialog open={showStartAlert} onOpenChange={setShowStartAlert}>
+        <AlertDialogContent className="rounded-2xl mx-4">
+          <AlertDialogHeader>
+            <AlertDialogTitle className="text-xl font-black flex items-center gap-2">
+              <PlayCircle className="text-blue-600" size={24} />
+              Iniciar Serviço?
+            </AlertDialogTitle>
+            <AlertDialogDescription className="text-base text-slate-600">
+              Você está na loja? Ao iniciar, a contagem de tempo e o GPS serão registrados automaticamente.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter className="flex-col sm:flex-row gap-2">
+            <AlertDialogCancel className="rounded-xl h-12">Ainda não</AlertDialogCancel>
+            <AlertDialogAction
+              onClick={handleStartJob}
+              className="bg-blue-600 hover:bg-blue-700 rounded-xl h-12 font-bold"
+            >
+              Sim, Iniciar Agora
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </div>
   );
 }
