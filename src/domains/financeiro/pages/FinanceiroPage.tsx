@@ -43,6 +43,7 @@ import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { Card, CardContent } from "@/components/ui/card";
 import { Skeleton } from "@/components/ui/skeleton";
+import QueryErrorState from "@/shared/components/QueryErrorState";
 
 import {
   Wallet,
@@ -356,7 +357,8 @@ function TabContasReceber() {
   const {
     data: contas = [],
     isLoading,
-    error,
+    isError,
+    refetch,
   } = useQuery({
     queryKey: ["financeiro", "contas_receber"],
     queryFn: async (): Promise<ContaReceber[]> => {
@@ -579,12 +581,8 @@ function TabContasReceber() {
     });
   };
 
-  if (error) {
-    return (
-      <div className="text-center py-12 text-red-500">
-        Erro ao carregar contas a receber. Verifique a conexao.
-      </div>
-    );
+  if (isError) {
+    return <QueryErrorState onRetry={refetch} />;
   }
 
   return (
@@ -1069,7 +1067,8 @@ function TabContasPagar() {
   const {
     data: contas = [],
     isLoading,
-    error,
+    isError,
+    refetch,
   } = useQuery({
     queryKey: ["financeiro", "contas_pagar"],
     queryFn: async (): Promise<ContaPagar[]> => {
@@ -1208,12 +1207,8 @@ function TabContasPagar() {
     });
   };
 
-  if (error) {
-    return (
-      <div className="text-center py-12 text-red-500">
-        Erro ao carregar contas a pagar. Verifique a conexao.
-      </div>
-    );
+  if (isError) {
+    return <QueryErrorState onRetry={refetch} />;
   }
 
   return (

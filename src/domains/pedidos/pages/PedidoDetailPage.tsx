@@ -2,7 +2,7 @@ import React, { useState } from 'react'
 import { useParams, useNavigate } from 'react-router-dom'
 import {
   ArrowLeft, FolderOpen, ExternalLink, Loader2,
-  Play, CheckCircle, Truck, Wrench, Award, FileText, XCircle,
+  Play, CheckCircle, Truck, Wrench, Award, FileText, XCircle, RefreshCw,
 } from 'lucide-react'
 import { useMutation, useQueryClient } from '@tanstack/react-query'
 import { Button } from '@/components/ui/button'
@@ -26,7 +26,7 @@ import { useCriarPastaOneDrive } from '../hooks/useOneDrive'
 import { brl } from '@/shared/utils/format'
 import { criarOrdemProducao } from '@/domains/producao/services/producao.service'
 import { criarNFeFromPedido } from '@/domains/fiscal/services/nfe-creation.service'
-import { gerarContasReceber } from '@/domains/financeiro/services/financeiro-automation.service'
+import { gerarContasReceber, gerarParcelas } from '@/domains/financeiro/services/financeiro-automation.service'
 import { showError, showSuccess } from '@/utils/toast'
 import { supabase } from '@/integrations/supabase/client'
 import { updateWithLock, OptimisticLockError } from '@/shared/utils/optimistic-lock'
@@ -36,21 +36,23 @@ const VALID_TRANSITIONS: Record<string, string[]> = {
   rascunho:              ['aguardando_aprovacao'],
   aguardando_aprovacao:  ['aprovado', 'cancelado'],
   aprovado:              ['em_producao', 'cancelado'],
-  em_producao:           ['produzido', 'cancelado'],
-  produzido:             ['aguardando_instalacao', 'cancelado'],
+  em_producao:           ['produzido', 'parcialmente_concluido', 'cancelado'],
+  parcialmente_concluido: ['em_producao', 'produzido', 'cancelado'],
+  produzido:             ['aguardando_instalacao', 'concluido', 'cancelado'],
   aguardando_instalacao: ['em_instalacao', 'cancelado'],
   em_instalacao:         ['concluido', 'cancelado'],
 }
 
 // Map of current status → next status action
 const FLOW_ACTIONS: Record<string, { label: string; next: string; icon: React.ReactNode; cls: string }> = {
-  rascunho:              { label: 'Enviar p/ Aprovação',  next: 'aguardando_aprovacao',   icon: <FileText size={14} />,     cls: 'bg-slate-600 hover:bg-slate-700' },
-  aguardando_aprovacao:  { label: 'Aprovar Pedido',       next: 'aprovado',               icon: <Award size={14} />,       cls: 'bg-blue-600 hover:bg-blue-700' },
-  aprovado:              { label: 'Iniciar Produção',     next: 'em_producao',            icon: <Play size={14} />,        cls: 'bg-orange-600 hover:bg-orange-700' },
-  em_producao:           { label: 'Marcar Produzido',     next: 'produzido',              icon: <CheckCircle size={14} />, cls: 'bg-teal-600 hover:bg-teal-700' },
-  produzido:             { label: 'Aguardar Instalação',  next: 'aguardando_instalacao',  icon: <Truck size={14} />,       cls: 'bg-purple-600 hover:bg-purple-700' },
-  aguardando_instalacao: { label: 'Iniciar Instalação',   next: 'em_instalacao',          icon: <Wrench size={14} />,      cls: 'bg-indigo-600 hover:bg-indigo-700' },
-  em_instalacao:         { label: 'Concluir Pedido',      next: 'concluido',              icon: <Award size={14} />,       cls: 'bg-emerald-600 hover:bg-emerald-700' },
+  rascunho:               { label: 'Enviar p/ Aprovação',  next: 'aguardando_aprovacao',   icon: <FileText size={14} />,     cls: 'bg-slate-600 hover:bg-slate-700' },
+  aguardando_aprovacao:   { label: 'Aprovar Pedido',       next: 'aprovado',               icon: <Award size={14} />,       cls: 'bg-blue-600 hover:bg-blue-700' },
+  aprovado:               { label: 'Iniciar Produção',     next: 'em_producao',            icon: <Play size={14} />,        cls: 'bg-orange-600 hover:bg-orange-700' },
+  em_producao:            { label: 'Marcar Produzido',     next: 'produzido',              icon: <CheckCircle size={14} />, cls: 'bg-teal-600 hover:bg-teal-700' },
+  parcialmente_concluido: { label: 'Retomar Produção',     next: 'em_producao',            icon: <RefreshCw size={14} />,   cls: 'bg-yellow-600 hover:bg-yellow-700' },
+  produzido:              { label: 'Aguardar Instalação',  next: 'aguardando_instalacao',  icon: <Truck size={14} />,       cls: 'bg-purple-600 hover:bg-purple-700' },
+  aguardando_instalacao:  { label: 'Iniciar Instalação',   next: 'em_instalacao',          icon: <Wrench size={14} />,      cls: 'bg-indigo-600 hover:bg-indigo-700' },
+  em_instalacao:          { label: 'Concluir Pedido',      next: 'concluido',              icon: <Award size={14} />,       cls: 'bg-emerald-600 hover:bg-emerald-700' },
 }
 
 const STATUS_CONFIG: Record<string, { label: string; cls: string }> = {
@@ -166,6 +168,7 @@ export default function PedidoDetailPage() {
     try {
       // 1. Gerar contas a receber ANTES de marcar como concluído
       await gerarContasReceber(id)
+      await gerarParcelas(id)
       // 2. Atualizar status com optimistic lock
       await updateWithLock('pedidos', id, { status: 'concluido' }, pedido.version)
       // 3. Invalidar cache para refletir no UI

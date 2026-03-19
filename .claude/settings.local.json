@@ -50,7 +50,15 @@
       "Bash(powershell -Command \"Start-Process ''https://ads.google.com/aw/bulk/scripts/edit/new?ocid=9928049560''\")",
       "Bash(clip)",
       "Bash(echo '{\"\"\"\"jsonrpc\"\"\"\":\"\"\"\"2.0\"\"\"\",\"\"\"\"id\"\"\"\":21,\"\"\"\"method\"\"\"\":\"\"\"\"tools/call\"\"\"\",\"\"\"\"params\"\"\"\":{\"\"\"\"name\"\"\"\":\"\"\"\"execute-gaql-query\"\"\"\",\"\"\"\"arguments\"\"\"\":{\"\"\"\"query\"\"\"\":\"\"\"\"SELECT campaign_criterion.negative, campaign_criterion.keyword.text, campaign_criterion.keyword.match_type FROM campaign_criterion WHERE campaign.name = ''''Leads-Search-1'''' AND campaign_criterion.negative = true ORDER BY campaign_criterion.keyword.text LIMIT 100\"\"\"\",\"\"\"\"customerId\"\"\"\":9928049560,\"\"\"\"loginCustomerId\"\"\"\":9928049560,\"\"\"\"reportAggregation\"\"\"\":\"\"\"\"\"\"\"\"}}}')",
-      "Bash(echo '{\"\"\"\"jsonrpc\"\"\"\":\"\"\"\"2.0\"\"\"\",\"\"\"\"id\"\"\"\":22,\"\"\"\"method\"\"\"\":\"\"\"\"tools/call\"\"\"\",\"\"\"\"params\"\"\"\":{\"\"\"\"name\"\"\"\":\"\"\"\"execute-gaql-query\"\"\"\",\"\"\"\"arguments\"\"\"\":{\"\"\"\"query\"\"\"\":\"\"\"\"SELECT campaign_criterion.keyword.text FROM campaign_criterion WHERE campaign.name = ''''Leads-Search-1'''' AND campaign_criterion.negative = true LIMIT 100\"\"\"\",\"\"\"\"customerId\"\"\"\":9928049560,\"\"\"\"loginCustomerId\"\"\"\":9928049560,\"\"\"\"reportAggregation\"\"\"\":\"\"\"\"\"\"\"\"}}}')"
+      "Bash(echo '{\"\"\"\"jsonrpc\"\"\"\":\"\"\"\"2.0\"\"\"\",\"\"\"\"id\"\"\"\":22,\"\"\"\"method\"\"\"\":\"\"\"\"tools/call\"\"\"\",\"\"\"\"params\"\"\"\":{\"\"\"\"name\"\"\"\":\"\"\"\"execute-gaql-query\"\"\"\",\"\"\"\"arguments\"\"\"\":{\"\"\"\"query\"\"\"\":\"\"\"\"SELECT campaign_criterion.keyword.text FROM campaign_criterion WHERE campaign.name = ''''Leads-Search-1'''' AND campaign_criterion.negative = true LIMIT 100\"\"\"\",\"\"\"\"customerId\"\"\"\":9928049560,\"\"\"\"loginCustomerId\"\"\"\":9928049560,\"\"\"\"reportAggregation\"\"\"\":\"\"\"\"\"\"\"\"}}}')",
+      "WebFetch(domain:docs.connectpay.vc)",
+      "Read(//d/OneDrive/Área de Trabalho/connectpay-pix-checkout-v2/**)",
+      "WebSearch",
+      "WebFetch(domain:connectpay.vc)",
+      "WebFetch(domain:artta.com.br)",
+      "Bash(find /c/Users/Caldera/Claude/CRM-Croma/src -type f \\\\\\(-name *ai* -o -name *AI* \\\\\\))",
+      "Bash(xargs -I {} basename {})",
+      "mcp__claude_ai_Supabase__apply_migration"
     ],
     "additionalDirectories": [
       "C:\\Users\\Caldera\\Claude\\AutoBid-Instagram"

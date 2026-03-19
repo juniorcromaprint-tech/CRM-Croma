@@ -31,10 +31,7 @@ import {
   ChevronUp,
 } from 'lucide-react';
 import { useFiscalCertificados } from '../hooks/useFiscal';
-
-function formatDate(d: string): string {
-  return new Date(d).toLocaleDateString('pt-BR');
-}
+import { formatDate } from '@/shared/utils/format';
 
 function formatDateTime(d: string): string {
   return new Date(d).toLocaleString('pt-BR');
@@ -184,7 +181,6 @@ export default function FiscalCertificadoPage() {
       );
 
       if (deployErr) {
-        console.warn('Deploy automático falhou (certificado salvo):', deployErr);
         showSuccess('Certificado salvo com sucesso! Deploy automático falhou — configure manualmente no Vercel.');
         setDeployStatus('failed');
       } else if ((deployResult as any)?.ok) {

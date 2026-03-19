@@ -1,6 +1,7 @@
 import { lazy } from "react";
 import { Route } from "react-router-dom";
 import LazyPage from "@/shared/components/LazyPage";
+import PermissionGuard from "@/shared/components/PermissionGuard";
 
 const FiscalDashboardPage = lazy(() => import("@/domains/fiscal/pages/FiscalDashboardPage"));
 const FiscalDocumentosPage = lazy(() => import("@/domains/fiscal/pages/FiscalDocumentosPage"));
@@ -11,11 +12,11 @@ const FiscalAuditoriaPage = lazy(() => import("@/domains/fiscal/pages/FiscalAudi
 
 export const fiscalRoutes = (
   <>
-    <Route path="fiscal" element={<LazyPage><FiscalDashboardPage /></LazyPage>} />
-    <Route path="fiscal/documentos" element={<LazyPage><FiscalDocumentosPage /></LazyPage>} />
-    <Route path="fiscal/fila" element={<LazyPage><FiscalFilaPage /></LazyPage>} />
-    <Route path="fiscal/configuracao" element={<LazyPage><FiscalConfiguracaoPage /></LazyPage>} />
-    <Route path="fiscal/certificado" element={<LazyPage><FiscalCertificadoPage /></LazyPage>} />
-    <Route path="fiscal/auditoria" element={<LazyPage><FiscalAuditoriaPage /></LazyPage>} />
+    <Route path="fiscal" element={<PermissionGuard module="fiscal" action="ver"><LazyPage><FiscalDashboardPage /></LazyPage></PermissionGuard>} />
+    <Route path="fiscal/documentos" element={<PermissionGuard module="fiscal" action="ver"><LazyPage><FiscalDocumentosPage /></LazyPage></PermissionGuard>} />
+    <Route path="fiscal/fila" element={<PermissionGuard module="fiscal" action="ver"><LazyPage><FiscalFilaPage /></LazyPage></PermissionGuard>} />
+    <Route path="fiscal/configuracao" element={<PermissionGuard module="fiscal" action="ver"><LazyPage><FiscalConfiguracaoPage /></LazyPage></PermissionGuard>} />
+    <Route path="fiscal/certificado" element={<PermissionGuard module="fiscal" action="ver"><LazyPage><FiscalCertificadoPage /></LazyPage></PermissionGuard>} />
+    <Route path="fiscal/auditoria" element={<PermissionGuard module="fiscal" action="ver"><LazyPage><FiscalAuditoriaPage /></LazyPage></PermissionGuard>} />
   </>
 );

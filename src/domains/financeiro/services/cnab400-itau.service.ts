@@ -273,9 +273,6 @@ export function generateRemessaFile(
   // Valida que todas as linhas têm 400 chars
   for (let i = 0; i < lines.length; i++) {
     if (lines[i].length !== 400) {
-      console.warn(
-        `[CNAB400] Linha ${i + 1} tem ${lines[i].length} chars (esperado 400). Ajustando...`,
-      );
       lines[i] = lines[i].length > 400
         ? lines[i].substring(0, 400)
         : lines[i].padEnd(400, ' ');

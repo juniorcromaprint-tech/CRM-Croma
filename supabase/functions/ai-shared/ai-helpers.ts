@@ -88,6 +88,19 @@ export async function authenticateAndAuthorize(
     };
   }
 
+  // Rate limiting: máx 30 chamadas de IA por hora por usuário
+  const { count: aiCount } = await supabase
+    .from('ai_logs')
+    .select('*', { count: 'exact', head: true })
+    .eq('user_id', user.id)
+    .gte('created_at', new Date(Date.now() - 3600000).toISOString());
+  if ((aiCount ?? 0) >= 30) {
+    return {
+      auth: null,
+      error: jsonResponse({ error: 'Rate limit excedido. Máximo 30 chamadas de IA por hora.' }, 429, corsHeaders),
+    };
+  }
+
   return { auth: { userId: user.id, userRole: role }, error: null };
 }
 

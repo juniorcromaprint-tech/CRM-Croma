@@ -65,9 +65,10 @@ serve(async (req) => {
 
     if (createError) throw createError
 
-    // Atualiza o cargo se for admin (a trigger do banco já cria o perfil como 'instalador' por padrão)
-    if (role === 'admin') {
-      await supabaseAdmin.from('profiles').update({ role: 'admin' }).eq('id', newUser.user.id)
+    // Atualiza o cargo para qualquer role válido (a trigger do banco já cria o perfil como 'instalador' por padrão)
+    const validRoles = ['admin', 'diretor', 'comercial', 'comercial_senior', 'financeiro', 'producao', 'compras', 'logistica', 'instalador'];
+    if (role && validRoles.includes(role)) {
+      await supabaseAdmin.from('profiles').update({ role }).eq('id', newUser.user.id)
     }
 
     console.log("[create-user] User created successfully", { userId: newUser.user.id })

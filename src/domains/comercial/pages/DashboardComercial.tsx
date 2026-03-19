@@ -4,7 +4,7 @@ import {
   UserPlus, FileText, TrendingUp, Building2, Clock, ArrowRight,
   Calculator, Plus, Target, Phone, Calendar, Zap, BarChart3,
 } from "lucide-react";
-import { brl as formatBRL } from "@/shared/utils/format";
+import { brl } from "@/shared/utils/format";
 import { useDashComercial } from "../hooks/useDashboardStats";
 import { useQuery } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
@@ -145,7 +145,7 @@ export default function DashboardComercial() {
         />
         <KpiRing
           label="Pipeline"
-          value={isLoading ? "—" : (comercial?.pipeline ? formatBRL(comercial.pipeline) : "R$ 0")}
+          value={isLoading ? "—" : (comercial?.pipeline ? brl(comercial.pipeline) : "R$ 0")}
           subtitle="Valor total estimado"
           color="bg-purple-50 text-purple-500"
           icon={<TrendingUp size={20} />}
@@ -213,7 +213,7 @@ export default function DashboardComercial() {
                     <p className="text-xs text-slate-400">{p.clientes?.nome_fantasia || "—"}</p>
                   </div>
                   <div className="flex items-center gap-2 ml-3 shrink-0">
-                    <span className="text-sm font-bold tabular-nums text-slate-700">{formatBRL(Number(p.total) || 0)}</span>
+                    <span className="text-sm font-bold tabular-nums text-slate-700">{brl(Number(p.total) || 0)}</span>
                     <span className={`text-[10px] px-2 py-0.5 rounded-full font-semibold ${statusColors[p.status] || "bg-slate-100 text-slate-600"}`}>
                       {p.status.replace(/_/g, " ")}
                     </span>

@@ -13,6 +13,7 @@ import {
   type PedidoPrioridade,
 } from "@/shared/constants/status";
 import StatusFiscalBadge from "@/domains/fiscal/components/StatusFiscalBadge";
+import QueryErrorState from "@/shared/components/QueryErrorState";
 import { usePedidoItens } from "../hooks/usePedidoItens";
 import {
   Table,
@@ -240,6 +241,7 @@ export default function PedidosPage() {
     data: pedidos = [],
     isLoading,
     isError,
+    refetch,
   } = useQuery({
     queryKey: ["pedidos"],
     staleTime: 2 * 60 * 1000,
@@ -447,6 +449,10 @@ export default function PedidosPage() {
   // =========================================================================
   // RENDER
   // =========================================================================
+
+  if (isError) {
+    return <QueryErrorState onRetry={refetch} />;
+  }
 
   return (
     <div className="space-y-6 animate-in fade-in duration-500">

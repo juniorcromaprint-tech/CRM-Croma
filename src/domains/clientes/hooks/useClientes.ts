@@ -82,6 +82,7 @@ export function useClientes(filters?: ClienteFilters) {
       let query = supabase
         .from('clientes')
         .select('id, razao_social, nome_fantasia, cnpj, email, telefone, cidade, estado, segmento, classificacao, ativo, created_at')
+        .is('excluido_em', null)
         .order('razao_social', { ascending: true });
 
       if (filters?.segmento) {
@@ -218,7 +219,7 @@ export function useDeleteCliente() {
 }
 
 /**
- * Hard-delete a cliente permanently. Admin/diretor only.
+ * Soft-delete a cliente (sets excluido_em). Admin/diretor only.
  */
 export function useHardDeleteCliente() {
   const queryClient = useQueryClient();
@@ -227,7 +228,7 @@ export function useHardDeleteCliente() {
     mutationFn: async (id: string) => {
       const { error } = await supabase
         .from('clientes')
-        .delete()
+        .update({ excluido_em: new Date().toISOString() })
         .eq('id', id);
 
       if (error) throw error;
@@ -235,7 +236,7 @@ export function useHardDeleteCliente() {
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: [CLIENTES_KEY] });
       queryClient.invalidateQueries({ queryKey: [CLIENTES_STATS_KEY] });
-      showSuccess('Cliente excluído permanentemente');
+      showSuccess('Cliente excluído com sucesso');
     },
     onError: (error: Error) => {
       showError(`Erro ao excluir cliente: ${error.message}`);

@@ -2,6 +2,7 @@ import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { supabase } from '@/integrations/supabase/client';
 import { showSuccess, showError } from '@/utils/toast';
 import { updateWithLock, OptimisticLockError } from '@/shared/utils/optimistic-lock';
+import { gerarContasReceber, gerarParcelas } from '@/domains/financeiro/services/financeiro-automation.service';
 
 export interface PedidoExpedicao {
   id: string;
@@ -41,6 +42,11 @@ export function useLiberarExpedicao() {
       const label =
         tipo === 'instalacao' ? 'instalação' :
         tipo === 'retirada' ? 'retirada pelo cliente' : 'envio/transportadora';
+
+      if (nextStatus === 'concluido') {
+        await gerarContasReceber(pedidoId);
+        await gerarParcelas(pedidoId);
+      }
 
       await updateWithLock('pedidos', pedidoId, { status: nextStatus, observacoes: `Liberado para ${label}` }, version);
     },

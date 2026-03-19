@@ -4,7 +4,7 @@ import {
   Wallet, DollarSign, AlertTriangle, TrendingUp, ArrowRight,
   TrendingDown, Calendar, BarChart3, CheckCircle2, Clock,
 } from "lucide-react";
-import { brl as formatBRL } from "@/shared/utils/format";
+import { brl } from "@/shared/utils/format";
 import { useDashFinanceiro } from "../hooks/useDashboardStats";
 import { useQuery } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
@@ -93,10 +93,10 @@ export default function DashboardFinanceiro() {
             {isLoading ? (
               <div className="h-10 w-40 bg-white/20 rounded-lg animate-pulse mt-1" />
             ) : (
-              <p className="text-4xl font-bold text-white tabular-nums mt-1">{formatBRL(saldo)}</p>
+              <p className="text-4xl font-bold text-white tabular-nums mt-1">{brl(saldo)}</p>
             )}
             <p className="text-sm text-white/70 mt-2">
-              Receber {formatBRL(fin?.totalReceber ?? 0)} − Pagar {formatBRL(fin?.totalPagar ?? 0)}
+              Receber {brl(fin?.totalReceber ?? 0)} − Pagar {brl(fin?.totalPagar ?? 0)}
             </p>
           </div>
           <div className="w-16 h-16 rounded-2xl bg-white/15 flex items-center justify-center">
@@ -108,10 +108,10 @@ export default function DashboardFinanceiro() {
       {/* ─── Summary Cards ─── */}
       <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
         {[
-          { label: "A Receber", value: formatBRL(fin?.totalReceber ?? 0), icon: <Wallet size={18} />, bg: "bg-emerald-50", text: "text-emerald-600", iconColor: "text-emerald-400" },
-          { label: "A Pagar", value: formatBRL(fin?.totalPagar ?? 0), icon: <DollarSign size={18} />, bg: "bg-rose-50", text: "text-rose-600", iconColor: "text-rose-400" },
-          { label: "Recebido", value: formatBRL(fin?.recebido ?? 0), icon: <CheckCircle2 size={18} />, bg: "bg-blue-50", text: "text-blue-600", iconColor: "text-blue-400" },
-          { label: "Inadimplência", value: formatBRL(fin?.vencidos ?? 0), icon: <AlertTriangle size={18} />, bg: (fin?.vencidos ?? 0) > 0 ? "bg-red-50" : "bg-slate-50", text: (fin?.vencidos ?? 0) > 0 ? "text-red-600" : "text-slate-400", iconColor: (fin?.vencidos ?? 0) > 0 ? "text-red-400" : "text-slate-300" },
+          { label: "A Receber", value: brl(fin?.totalReceber ?? 0), icon: <Wallet size={18} />, bg: "bg-emerald-50", text: "text-emerald-600", iconColor: "text-emerald-400" },
+          { label: "A Pagar", value: brl(fin?.totalPagar ?? 0), icon: <DollarSign size={18} />, bg: "bg-rose-50", text: "text-rose-600", iconColor: "text-rose-400" },
+          { label: "Recebido", value: brl(fin?.recebido ?? 0), icon: <CheckCircle2 size={18} />, bg: "bg-blue-50", text: "text-blue-600", iconColor: "text-blue-400" },
+          { label: "Inadimplência", value: brl(fin?.vencidos ?? 0), icon: <AlertTriangle size={18} />, bg: (fin?.vencidos ?? 0) > 0 ? "bg-red-50" : "bg-slate-50", text: (fin?.vencidos ?? 0) > 0 ? "text-red-600" : "text-slate-400", iconColor: (fin?.vencidos ?? 0) > 0 ? "text-red-400" : "text-slate-300" },
         ].map(({ label, value, icon, bg, text, iconColor }) => (
           <div key={label} className="bg-white rounded-2xl border border-slate-100 p-5 hover:shadow-sm transition-all">
             <div className="flex items-center gap-3 mb-3">
@@ -146,7 +146,7 @@ export default function DashboardFinanceiro() {
                     <p className="text-sm font-medium text-slate-700 truncate">{c.clientes?.nome_fantasia || "—"}</p>
                     <p className="text-xs text-slate-400">{c.data_vencimento}</p>
                   </div>
-                  <span className="text-sm font-bold tabular-nums text-amber-600 ml-3">{formatBRL(Number(c.valor_original) || 0)}</span>
+                  <span className="text-sm font-bold tabular-nums text-amber-600 ml-3">{brl(Number(c.valor_original) || 0)}</span>
                 </div>
               ))}
             </div>
@@ -176,7 +176,7 @@ export default function DashboardFinanceiro() {
                     <p className="text-sm font-medium text-slate-700 truncate">{c.clientes?.nome_fantasia || "—"}</p>
                     <p className="text-xs text-red-400">Venceu em {c.data_vencimento}</p>
                   </div>
-                  <span className="text-sm font-bold tabular-nums text-red-600 ml-3">{formatBRL(Number(c.valor_original) || 0)}</span>
+                  <span className="text-sm font-bold tabular-nums text-red-600 ml-3">{brl(Number(c.valor_original) || 0)}</span>
                 </div>
               ))}
             </div>

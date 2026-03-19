@@ -16,9 +16,9 @@ describe('OrcamentoEditorPage — handleAddItem contract', () => {
     expect(hookContent).toContain('useAdicionarItemDetalhado');
   });
 
-  it('handleAddItem should have error handling (showError in catch)', () => {
-    // Extract handleAddItem function body
-    const match = content.match(/const handleAddItem = async[\s\S]*?^\s{2}\};/m);
+  it('handleSaveItem should have error handling (showError in catch)', () => {
+    // Extract handleSaveItem function body
+    const match = content.match(/const handleSaveItem = async[\s\S]*?^\s{2}\};/m);
     expect(match).toBeTruthy();
     const fnBody = match![0];
 
@@ -27,8 +27,8 @@ describe('OrcamentoEditorPage — handleAddItem contract', () => {
     expect(fnBody).toContain('showError');
   });
 
-  it('handleAddItem should NOT have duplicate recalcularTotais call (only in comments)', () => {
-    const match = content.match(/const handleAddItem = async[\s\S]*?^\s{2}\};/m);
+  it('handleSaveItem should NOT have duplicate recalcularTotais call (only in comments)', () => {
+    const match = content.match(/const handleSaveItem = async[\s\S]*?^\s{2}\};/m);
     expect(match).toBeTruthy();
     const fnBody = match![0];
     // Strip line comments before counting — comment mentions recalcularTotais as explanation

@@ -78,8 +78,11 @@ export async function criarNFeFromPedido(pedidoId: string): Promise<string> {
       valor_cofins: 0,
     }));
 
-    // Falha silenciosa — não bloquear criação do documento se itens falharem
-    await supabase.from('fiscal_documentos_itens').insert(fiscalItens);
+    const { error: itensError } = await supabase.from('fiscal_documentos_itens').insert(fiscalItens);
+    if (itensError) {
+      await supabase.from('fiscal_documentos').delete().eq('id', docId);
+      throw new Error(`Erro ao inserir itens fiscais: ${itensError.message}`);
+    }
   }
 
   return docId;

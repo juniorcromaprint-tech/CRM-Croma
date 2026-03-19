@@ -141,6 +141,37 @@ export default function LeadDetailPage() {
     }
 
     try {
+      // Verificação de CNPJ duplicado (bloqueio obrigatório)
+      const cnpjSoNumeros = cnpjLimpo?.replace(/\D/g, '') || '';
+      if (cnpjSoNumeros) {
+        const { data: existingByCnpj } = await supabase
+          .from('clientes')
+          .select('id, razao_social')
+          .eq('cnpj', cnpjSoNumeros)
+          .is('excluido_em', null)
+          .maybeSingle();
+
+        if (existingByCnpj) {
+          showError(`Já existe um cliente com este CNPJ: ${existingByCnpj.razao_social}`);
+          return;
+        }
+      }
+
+      // Verificação de razão social duplicada (aviso com confirmação)
+      const { data: existingByName } = await supabase
+        .from('clientes')
+        .select('id, razao_social')
+        .ilike('razao_social', (lead?.empresa || '').trim())
+        .is('excluido_em', null)
+        .maybeSingle();
+
+      if (existingByName) {
+        const confirmar = window.confirm(
+          `Já existe um cliente "${existingByName.razao_social}". Deseja criar mesmo assim?`
+        );
+        if (!confirmar) return;
+      }
+
       const novoCliente = await createCliente.mutateAsync({
         razao_social: lead.empresa,
         nome_fantasia: lead.empresa,

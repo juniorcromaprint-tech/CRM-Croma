@@ -26,6 +26,7 @@ import {
   Pagination, PaginationContent, PaginationItem,
   PaginationNext, PaginationPrevious,
 } from "@/components/ui/pagination";
+import QueryErrorState from "@/shared/components/QueryErrorState";
 
 const PAGE_SIZE = 20;
 
@@ -76,7 +77,7 @@ export default function ClientesPage() {
     }
   }
 
-  const { data: clientesResult, isLoading } = useQuery({
+  const { data: clientesResult, isLoading, isError, refetch } = useQuery({
     queryKey: ["clientes", search, segFilter, classFilter, page],
     staleTime: 2 * 60 * 1000,
     queryFn: async () => {
@@ -145,6 +146,10 @@ export default function ClientesPage() {
       return { total: data?.length || 0, byClass };
     },
   });
+
+  if (isError) {
+    return <QueryErrorState onRetry={refetch} />;
+  }
 
   return (
     <div className="space-y-6">
