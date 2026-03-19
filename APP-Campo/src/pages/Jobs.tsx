@@ -460,15 +460,17 @@ export default function Jobs() {
                       </div>
                       
                       <div className="flex items-center justify-end shrink-0 gap-2">
-                        <Button
-                          variant="ghost"
-                          size="icon"
-                          onClick={(e) => handleDeleteClick(e, job.id)}
-                          className="w-10 h-10 rounded-full text-slate-400 hover:text-red-600 hover:bg-red-50 z-10"
-                          title="Excluir OS"
-                        >
-                          <Trash2 size={18} />
-                        </Button>
+                        {profile?.role === 'admin' && (
+                          <Button
+                            variant="ghost"
+                            size="icon"
+                            onClick={(e) => handleDeleteClick(e, job.id)}
+                            className="w-10 h-10 rounded-full text-slate-400 hover:text-red-600 hover:bg-red-50 z-10"
+                            title="Excluir OS"
+                          >
+                            <Trash2 size={18} />
+                          </Button>
+                        )}
                         <div className="w-10 h-10 rounded-full bg-slate-50 flex items-center justify-center text-slate-400 group-hover:bg-blue-50 group-hover:text-blue-600 transition-colors">
                           <ChevronRight size={20} />
                         </div>
