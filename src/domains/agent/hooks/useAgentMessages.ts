@@ -197,3 +197,44 @@ export function useSendApprovedMessage() {
     },
   });
 }
+
+/**
+ * Envia uma mensagem WhatsApp já aprovada via Edge Function `whatsapp-enviar`.
+ * Mesmo padrão que useSendApprovedMessage, mas usa a Edge Function de WhatsApp.
+ * Invalida queries de mensagens e conversas.
+ */
+export function useSendApprovedWhatsApp() {
+  const queryClient = useQueryClient();
+
+  return useMutation({
+    mutationFn: async ({
+      messageId,
+      conversationId,
+    }: {
+      messageId: string;
+      conversationId: string;
+    }) => {
+      const {
+        data: { session },
+      } = await supabase.auth.getSession();
+
+      const res = await supabase.functions.invoke('whatsapp-enviar', {
+        body: { message_id: messageId, conversation_id: conversationId },
+        headers: { Authorization: `Bearer ${session?.access_token}` },
+      });
+
+      if (res.error) throw new Error(res.error.message);
+
+      return { data: res.data, conversationId };
+    },
+    onSuccess: ({ conversationId }) => {
+      queryClient.invalidateQueries({ queryKey: MESSAGES_KEY });
+      queryClient.invalidateQueries({ queryKey: messagesQueryKey(conversationId) });
+      queryClient.invalidateQueries({ queryKey: ['agent', 'conversations'] });
+      showSuccess('WhatsApp enviado com sucesso');
+    },
+    onError: (error: Error) => {
+      showError(error.message);
+    },
+  });
+}

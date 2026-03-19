@@ -1,6 +1,6 @@
 import { useState } from 'react';
 import {
-  Mail, CheckCheck, Send, X, Edit2, Clock, Loader2,
+  Mail, MessageCircle, CheckCheck, Send, Edit2, Clock, Loader2,
   CheckCircle2, XCircle, AlertCircle, Bot,
 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
@@ -14,6 +14,7 @@ import {
   useApproveMessage,
   useRejectMessage,
   useSendApprovedMessage,
+  useSendApprovedWhatsApp,
 } from '../hooks/useAgentMessages';
 
 // ─── Types ────────────────────────────────────────────────────────────────────
@@ -60,6 +61,12 @@ const TEMP_COLOR: Record<string, string> = {
   frio: 'bg-blue-100 text-blue-700',
 };
 
+const CANAL_CONFIG: Record<string, { label: string; iconClass: string; badgeClass: string; Icon: typeof Mail }> = {
+  email:    { label: 'Email',     iconClass: 'bg-blue-50 text-blue-600',   badgeClass: 'bg-blue-100 text-blue-700',   Icon: Mail },
+  whatsapp: { label: 'WhatsApp',  iconClass: 'bg-green-50 text-green-600', badgeClass: 'bg-green-100 text-green-700', Icon: MessageCircle },
+  interno:  { label: 'Interno',   iconClass: 'bg-slate-50 text-slate-500', badgeClass: 'bg-slate-100 text-slate-600', Icon: Mail },
+};
+
 function formatCost(cost: number): string {
   if (!cost) return '$0.000';
   return `$${cost.toFixed(4)}`;
@@ -76,9 +83,11 @@ interface MessageCardProps {
   onApprove: () => void;
   onReject: () => void;
   onSaveAndApprove: () => void;
+  onSend: () => void;
   isApprovePending: boolean;
   isRejectPending: boolean;
   isSavePending: boolean;
+  isSendPending: boolean;
 }
 
 function MessageCard({
@@ -90,21 +99,26 @@ function MessageCard({
   onApprove,
   onReject,
   onSaveAndApprove,
+  onSend,
   isApprovePending,
   isRejectPending,
   isSavePending,
+  isSendPending,
 }: MessageCardProps) {
   const conv = msg.agent_conversations;
   const lead = conv?.leads;
   const etapa = conv?.etapa ?? 'abertura';
+  const canalKey = conv?.canal ?? msg.canal ?? 'email';
+  const canalCfg = CANAL_CONFIG[canalKey] ?? CANAL_CONFIG.email;
+  const CanalIcon = canalCfg.Icon;
 
   return (
     <div className="bg-white rounded-2xl border border-slate-200 overflow-hidden shadow-sm">
       {/* Header */}
       <div className="flex items-start justify-between gap-3 p-4 pb-3">
         <div className="flex items-start gap-3 min-w-0">
-          <div className="p-2 bg-blue-50 rounded-xl shrink-0">
-            <Mail size={16} className="text-blue-600" />
+          <div className={`p-2 rounded-xl shrink-0 ${canalCfg.iconClass}`}>
+            <CanalIcon size={16} />
           </div>
           <div className="min-w-0">
             <p className="font-semibold text-slate-800 truncate">
@@ -131,6 +145,11 @@ function MessageCard({
         </div>
 
         <div className="flex flex-col items-end gap-1 shrink-0 text-right">
+          {/* Canal badge */}
+          <span className={`inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-xs font-medium ${canalCfg.badgeClass}`}>
+            <CanalIcon size={11} />
+            {canalCfg.label}
+          </span>
           <Badge variant="outline" className="text-xs">
             {ETAPA_LABEL[etapa] ?? etapa}
           </Badge>
@@ -200,7 +219,7 @@ function MessageCard({
               size="sm"
               className="bg-green-600 hover:bg-green-700 rounded-xl"
               onClick={onApprove}
-              disabled={isApprovePending || isRejectPending}
+              disabled={isApprovePending || isRejectPending || isSendPending}
             >
               {isApprovePending ? (
                 <Loader2 size={14} className="mr-1.5 animate-spin" />
@@ -208,6 +227,23 @@ function MessageCard({
                 <CheckCircle2 size={14} className="mr-1.5" />
               )}
               Aprovar
+            </Button>
+            <Button
+              size="sm"
+              className={`rounded-xl ${
+                canalKey === 'whatsapp'
+                  ? 'bg-green-500 hover:bg-green-600 text-white'
+                  : 'bg-blue-600 hover:bg-blue-700 text-white'
+              }`}
+              onClick={onSend}
+              disabled={isSendPending || isApprovePending || isRejectPending}
+            >
+              {isSendPending ? (
+                <Loader2 size={14} className="mr-1.5 animate-spin" />
+              ) : (
+                <Send size={14} className="mr-1.5" />
+              )}
+              Enviar
             </Button>
             <Button
               size="sm"
@@ -223,7 +259,7 @@ function MessageCard({
               variant="ghost"
               className="text-red-600 hover:text-red-700 hover:bg-red-50 rounded-xl"
               onClick={onReject}
-              disabled={isRejectPending || isApprovePending}
+              disabled={isRejectPending || isApprovePending || isSendPending}
             >
               {isRejectPending ? (
                 <Loader2 size={14} className="mr-1.5 animate-spin" />
@@ -245,12 +281,14 @@ export default function AgentApprovalPage() {
   const { data: pending = [], isLoading } = usePendingMessages();
   const approveMessage = useApproveMessage();
   const rejectMessage = useRejectMessage();
-  const sendMessage = useSendApprovedMessage();
+  const sendEmail = useSendApprovedMessage();
+  const sendWhatsApp = useSendApprovedWhatsApp();
 
   // Editing state: msgId → draft content
   const [editingId, setEditingId] = useState<string | null>(null);
   const [editContent, setEditContent] = useState('');
   const [savingId, setSavingId] = useState<string | null>(null);
+  const [sendingId, setSendingId] = useState<string | null>(null);
 
   // Bulk actions state
   const [bulkApproving, setBulkApproving] = useState(false);
@@ -265,6 +303,13 @@ export default function AgentApprovalPage() {
 
   // Stats: just count pending (all rows here are pending_aprovacao)
   const pendingCount = messages.length;
+
+  // ── Helpers ─────────────────────────────────────────────────────────────────
+
+  /** Detecta canal da mensagem a partir do join com agent_conversations */
+  function detectCanal(msg: PendingRow): string {
+    return msg.agent_conversations?.canal ?? msg.canal ?? 'email';
+  }
 
   // ── Handlers ────────────────────────────────────────────────────────────────
 
@@ -290,6 +335,22 @@ export default function AgentApprovalPage() {
       messageId: msg.id,
       conversationId: msg.conversation_id,
     });
+  }
+
+  async function handleSend(msg: PendingRow) {
+    const canal = detectCanal(msg);
+    setSendingId(msg.id);
+    try {
+      const sender = canal === 'whatsapp' ? sendWhatsApp : sendEmail;
+      await sender.mutateAsync({
+        messageId: msg.id,
+        conversationId: msg.conversation_id,
+      });
+    } catch {
+      // error handled in mutation onError
+    } finally {
+      setSendingId(null);
+    }
   }
 
   async function handleSaveAndApprove(msg: PendingRow) {
@@ -347,10 +408,10 @@ export default function AgentApprovalPage() {
   }
 
   async function handleSendAllApproved() {
-    // Re-query approved messages
+    // Re-query approved messages including canal via conversation join
     const { data: approved, error } = await supabase
       .from('agent_messages')
-      .select('id, conversation_id')
+      .select('id, conversation_id, agent_conversations(canal)')
       .eq('status', 'aprovada');
 
     if (error) {
@@ -366,9 +427,11 @@ export default function AgentApprovalPage() {
     setSendingAllProgress({ active: true, done: 0, total: approved.length });
 
     for (let i = 0; i < approved.length; i++) {
-      const msg = approved[i];
+      const msg = approved[i] as { id: string; conversation_id: string; agent_conversations: { canal: string } | null };
+      const canal = msg.agent_conversations?.canal ?? 'email';
+      const sender = canal === 'whatsapp' ? sendWhatsApp : sendEmail;
       try {
-        await sendMessage.mutateAsync({
+        await sender.mutateAsync({
           messageId: msg.id,
           conversationId: msg.conversation_id,
         });
@@ -482,6 +545,7 @@ export default function AgentApprovalPage() {
               onApprove={() => handleApprove(msg)}
               onReject={() => handleReject(msg)}
               onSaveAndApprove={() => handleSaveAndApprove(msg)}
+              onSend={() => handleSend(msg)}
               isApprovePending={
                 approveMessage.isPending && approveMessage.variables?.messageId === msg.id
               }
@@ -489,6 +553,7 @@ export default function AgentApprovalPage() {
                 rejectMessage.isPending && rejectMessage.variables?.messageId === msg.id
               }
               isSavePending={savingId === msg.id}
+              isSendPending={sendingId === msg.id}
             />
           ))}
         </div>
