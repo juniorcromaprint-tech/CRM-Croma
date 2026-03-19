@@ -19,6 +19,7 @@ export default function Jobs() {
   const { profile } = useAuth();
   
   const [searchTerm, setSearchTerm] = useState("");
+  const [debouncedSearch, setDebouncedSearch] = useState("");
   const [statusFilter, setStatusFilter] = useState(searchParams.get("status") || "Todos");
   const [myJobsFilter, setMyJobsFilter] = useState(searchParams.get("my_jobs") === "true");
   const [startDate, setStartDate] = useState("");
@@ -90,8 +91,8 @@ export default function Jobs() {
       query = query.eq('assigned_to', profile.id);
     }
 
-    if (searchTerm) {
-      query = query.or(`os_number.ilike.%${searchTerm}%,type.ilike.%${searchTerm}%`);
+    if (debouncedSearch) {
+      query = query.or(`os_number.ilike.%${debouncedSearch}%,type.ilike.%${debouncedSearch}%`);
     }
 
     if (todayFilter) {
@@ -125,11 +126,16 @@ export default function Jobs() {
     hasNextPage,
     isFetchingNextPage
   } = useInfiniteQuery({
-    queryKey: ['infinite-jobs', statusFilter, searchTerm, myJobsFilter, profile?.id, startDate, endDate, todayFilter],
+    queryKey: ['infinite-jobs', statusFilter, debouncedSearch, myJobsFilter, profile?.id, startDate, endDate, todayFilter],
     queryFn: fetchJobs,
     initialPageParam: 0,
     getNextPageParam: (lastPage) => lastPage.nextPage,
   });
+
+  useEffect(() => {
+    const timer = setTimeout(() => setDebouncedSearch(searchTerm), 300);
+    return () => clearTimeout(timer);
+  }, [searchTerm]);
 
   useEffect(() => {
     if (inView && hasNextPage) {
