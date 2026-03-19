@@ -1,6 +1,6 @@
-import React from "react";
+import React, { useState, useEffect } from "react";
 import { Link, useLocation, Outlet } from "react-router-dom";
-import { Home, ClipboardList, Users, Settings as SettingsIcon, Menu, ShieldCheck, Map as MapIcon, BarChart3, FileText } from "lucide-react";
+import { Home, ClipboardList, Users, Settings as SettingsIcon, Menu, ShieldCheck, Map as MapIcon, BarChart3, FileText, WifiOff } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Sheet, SheetContent, SheetTrigger } from "@/components/ui/sheet";
 import { useAuth } from "@/contexts/AuthContext";
@@ -31,6 +31,19 @@ export const CromaLogoFallback = ({ className = "" }: { className?: string }) =>
 export default function Layout() {
   const location = useLocation();
   const { profile } = useAuth();
+
+  const [isOffline, setIsOffline] = useState(!navigator.onLine);
+
+  useEffect(() => {
+    const onOnline = () => setIsOffline(false);
+    const onOffline = () => setIsOffline(true);
+    window.addEventListener('online', onOnline);
+    window.addEventListener('offline', onOffline);
+    return () => {
+      window.removeEventListener('online', onOnline);
+      window.removeEventListener('offline', onOffline);
+    };
+  }, []);
 
   const navItems = [
     { name: "Início", path: "/", icon: Home },
@@ -69,7 +82,12 @@ export default function Layout() {
   );
 
   return (
-    <div className="h-[100dvh] print:h-auto print:min-h-screen overflow-hidden print:overflow-visible bg-slate-50 flex flex-col md:flex-row print:block font-sans">
+    <div className={`h-[100dvh] print:h-auto print:min-h-screen overflow-hidden print:overflow-visible bg-slate-50 flex flex-col md:flex-row print:block font-sans${isOffline ? " pt-10" : ""}`}>
+      {isOffline && (
+        <div className="bg-amber-500 text-white text-center py-2 px-4 text-sm font-bold flex items-center justify-center gap-2 z-50 fixed top-0 left-0 right-0">
+          <WifiOff size={16} /> Sem conexão — dados podem estar desatualizados
+        </div>
+      )}
       {/* Desktop Sidebar */}
       <aside className="hidden md:flex flex-col w-64 bg-white border-r border-slate-200 p-4 print:hidden z-20">
         <div className="px-2 py-4 mb-6">
