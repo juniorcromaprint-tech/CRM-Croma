@@ -37,6 +37,14 @@ export const NAV_GROUPS: NavGroup[] = [
     ],
   },
   {
+    label: 'AGENTE DE VENDAS',
+    items: [
+      { name: 'Agente', path: '/agente', icon: 'Bot', module: 'comercial' },
+      { name: 'Aprovação', path: '/agente/aprovacao', icon: 'Clock', module: 'comercial' },
+      { name: 'Config. Agente', path: '/agente/config', icon: 'Settings', module: 'comercial' },
+    ],
+  },
+  {
     label: 'OPERACIONAL',
     items: [
       { name: 'Pedidos', path: '/pedidos', icon: 'ClipboardList', module: 'pedidos' },
@@ -87,14 +95,6 @@ export const NAV_GROUPS: NavGroup[] = [
       { name: 'Balancete', path: '/contabilidade/balancete', icon: 'BarChart2', module: 'financeiro' },
       { name: 'Razão Contábil', path: '/contabilidade/razao', icon: 'FileText', module: 'financeiro' },
       { name: 'DEFIS', path: '/contabilidade/defis', icon: 'FileCheck', module: 'financeiro' },
-    ],
-  },
-  {
-    label: 'AGENTE DE VENDAS',
-    items: [
-      { name: 'Dashboard', path: '/agente', icon: 'Bot', module: 'comercial' },
-      { name: 'Aprovação', path: '/agente/aprovacao', icon: 'Clock', module: 'comercial' },
-      { name: 'Configurações', path: '/agente/config', icon: 'Settings', module: 'comercial' },
     ],
   },
   {
