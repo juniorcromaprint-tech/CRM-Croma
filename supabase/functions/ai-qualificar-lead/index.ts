@@ -1,7 +1,8 @@
 // supabase/functions/ai-qualificar-lead/index.ts
 
 import { serve } from 'https://deno.land/std@0.168.0/http/server.ts';
-import { handleCorsOptions, getCorsHeaders, jsonResponse, authenticateAndAuthorize, getServiceClient } from '../ai-shared/ai-helpers.ts';
+import { handleCorsOptions, getCorsHeaders, jsonResponse, getServiceClient } from '../ai-shared/ai-helpers.ts';
+import { createClient } from 'https://esm.sh/@supabase/supabase-js@2';
 import { callOpenRouter } from '../ai-shared/openrouter-provider.ts';
 import { buildSystemPrompt, buildUserPrompt } from '../ai-shared/prompt-builder.ts';
 import { logAICall } from '../ai-shared/ai-logger.ts';
@@ -51,9 +52,34 @@ serve(async (req: Request) => {
   const corsHeaders = getCorsHeaders(req);
 
   try {
-    // Auth + role check
-    const { auth, error: authError } = await authenticateAndAuthorize(req, 'qualificar-lead');
-    if (authError) return authError;
+    // Auth: validate JWT and check role
+    const authHeader = req.headers.get('Authorization');
+    if (!authHeader?.startsWith('Bearer ')) {
+      return new Response(JSON.stringify({ error: 'Token não fornecido' }), {
+        status: 401, headers: { ...corsHeaders, 'Content-Type': 'application/json' }
+      });
+    }
+    const authToken = authHeader.replace('Bearer ', '');
+    const supabaseAuth = createClient(
+      Deno.env.get('SUPABASE_URL')!,
+      Deno.env.get('SUPABASE_ANON_KEY')!
+    );
+    const { data: { user }, error: userAuthError } = await supabaseAuth.auth.getUser(authToken);
+    if (userAuthError || !user) {
+      return new Response(JSON.stringify({ error: 'Token inválido' }), {
+        status: 401, headers: { ...corsHeaders, 'Content-Type': 'application/json' }
+      });
+    }
+    {
+      const supabaseService = getServiceClient();
+      const { data: profile } = await supabaseService.from('profiles').select('role').eq('id', user.id).single();
+      const allowedRoles = ['comercial', 'gerente', 'admin'];
+      if (!profile || !allowedRoles.includes(profile.role)) {
+        return new Response(JSON.stringify({ error: 'Sem permissão' }), {
+          status: 403, headers: { ...corsHeaders, 'Content-Type': 'application/json' }
+        });
+      }
+    }
 
     const { lead_id, model } = await req.json();
     if (!lead_id) {
@@ -89,7 +115,7 @@ serve(async (req: Request) => {
     // Fetch pricing rules for product suggestions context
     const { data: regras } = await supabase
       .from('regras_precificacao')
-      .select('categoria, margem_minima, markup_padrao')
+      .select('categoria, margem_minima, markup_sugerido')
       .limit(11);
 
     // Calculate days since last contact
@@ -144,7 +170,7 @@ serve(async (req: Request) => {
 
     // Log AI call
     await logAICall({
-      user_id: auth!.userId,
+      user_id: user.id,
       function_name: 'qualificar-lead',
       entity_type: 'geral',
       entity_id: lead_id,
