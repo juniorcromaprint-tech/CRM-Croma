@@ -15,6 +15,7 @@ import { applyWatermark } from "@/utils/watermark";
 import SignatureCanvas from 'react-signature-canvas';
 import ImageModal from "@/components/ImageModal";
 import { useAuth } from "@/contexts/AuthContext";
+import JobChecklist from "@/components/JobChecklist";
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from "@/components/ui/alert-dialog";
 
 export default function JobDetail() {
@@ -738,7 +739,13 @@ export default function JobDetail() {
             </Button>
           </div>
         ) : (
-          <Tabs defaultValue="photos" className="w-full">
+          <>
+            <JobChecklist
+              jobId={id!}
+              initialData={JSON.parse(localStorage.getItem(`checklist_${id}`) || '{}')}
+              onSave={(data) => localStorage.setItem(`checklist_${id}`, JSON.stringify(data))}
+            />
+            <Tabs defaultValue="photos" className="w-full">
             <TabsList className="grid w-full grid-cols-4 mb-6 rounded-xl p-1 bg-slate-200/50">
               <TabsTrigger value="photos">Fotos</TabsTrigger>
               <TabsTrigger value="videos">Vídeos</TabsTrigger>
@@ -905,6 +912,7 @@ export default function JobDetail() {
               </div>
             </TabsContent>
           </Tabs>
+          </>
         )}
       </div>
 
