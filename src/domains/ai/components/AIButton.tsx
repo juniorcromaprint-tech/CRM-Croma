@@ -1,5 +1,5 @@
-import { useState } from 'react';
 import { Sparkles, Loader2, Settings, Check } from 'lucide-react';
+import { useState } from 'react';
 import { Button } from '@/components/ui/button';
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
 import { useAIModels } from '@/domains/ai/hooks/useAIModels';
@@ -24,18 +24,15 @@ export default function AIButton({
   size = 'sm',
   className = '',
 }: AIButtonProps) {
-  const { models, defaultModel } = useAIModels();
-  const [selectedModel, setSelectedModel] = useState<string | undefined>(undefined);
+  const { models, defaultModel, setDefaultModel } = useAIModels();
   const [open, setOpen] = useState(false);
 
-  const activeModel = selectedModel ?? defaultModel;
-
   function handleMain() {
-    onClick(activeModel);
+    onClick(defaultModel);
   }
 
   function handleSelectModel(slug: string) {
-    setSelectedModel(slug);
+    setDefaultModel.mutate(slug);
     setOpen(false);
   }
 
@@ -75,7 +72,7 @@ export default function AIButton({
               onClick={() => handleSelectModel(m.slug)}
               className={cn(
                 'w-full flex items-center justify-between px-2 py-1.5 rounded-lg text-sm hover:bg-slate-100 transition-colors',
-                activeModel === m.slug && 'bg-blue-50'
+                defaultModel === m.slug && 'bg-blue-50'
               )}
             >
               <span className="flex items-center gap-2">
@@ -84,7 +81,7 @@ export default function AIButton({
                   <span className="text-[10px] bg-green-100 text-green-700 px-1.5 py-0.5 rounded-full">Free</span>
                 )}
               </span>
-              {activeModel === m.slug && <Check size={14} className="text-blue-600" />}
+              {defaultModel === m.slug && <Check size={14} className="text-blue-600" />}
             </button>
           ))}
         </PopoverContent>
