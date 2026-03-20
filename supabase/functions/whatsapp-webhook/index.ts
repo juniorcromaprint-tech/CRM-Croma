@@ -160,7 +160,20 @@ async function generateAutoResponse(
       return;
     }
 
-    const modeloComposicao = (agentConfig.modelo_composicao as string) ?? 'openai/gpt-4.1-mini';
+    // Read default model from admin_config (same source as the CRM UI)
+    let modeloComposicao = (agentConfig.modelo_composicao as string) ?? '';
+    if (!modeloComposicao) {
+      const { data: defaultModelRow } = await supabase
+        .from('admin_config')
+        .select('valor')
+        .eq('chave', 'ai_default_model')
+        .single();
+      try {
+        modeloComposicao = defaultModelRow?.valor ? JSON.parse(defaultModelRow.valor) : 'openai/gpt-4.1-mini';
+      } catch {
+        modeloComposicao = 'openai/gpt-4.1-mini';
+      }
+    }
     const nomeRemetente = (agentConfig.nome_remetente as string) ?? 'Croma Print';
 
     // Load last 10 messages for context
