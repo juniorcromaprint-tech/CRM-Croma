@@ -5,7 +5,7 @@
 
 import { serve } from 'https://deno.land/std@0.168.0/http/server.ts';
 import { getServiceClient } from '../ai-shared/ai-helpers.ts';
-import { callOpenRouter } from '../ai-shared/openrouter-provider.ts';
+import { callOpenRouter, setFallbackModel } from '../ai-shared/openrouter-provider.ts';
 
 // ─────────────────────────────────────────────────────────────
 // Phone normalization
@@ -174,6 +174,12 @@ async function generateAutoResponse(
         modeloComposicao = 'openai/gpt-4.1-mini';
       }
     }
+    // Set fallback model from config (user-configurable)
+    const modeloFallback = (agentConfig.modelo_fallback as string) ?? '';
+    if (modeloFallback) {
+      setFallbackModel(modeloFallback);
+    }
+
     const nomeRemetente = (agentConfig.nome_remetente as string) ?? 'Croma Print';
 
     // Load last 10 messages for context
@@ -453,10 +459,10 @@ serve(async (req: Request) => {
     // ── 3. Find or create active conversation ─────────────────
     const { data: convRows } = await supabase
       .from('agent_conversations')
-      .select('id, mensagens_recebidas, score_engajamento')
+      .select('id, status, mensagens_recebidas, score_engajamento')
       .eq('lead_id', lead.id)
       .eq('canal', 'whatsapp')
-      .eq('status', 'ativa')
+      .in('status', ['ativa', 'escalada'])
       .order('created_at', { ascending: false })
       .limit(1);
 
@@ -486,7 +492,23 @@ serve(async (req: Request) => {
       console.log('whatsapp-webhook: new conversation created', conversation.id);
     }
 
-    // ── 4. Save incoming message ──────────────────────────────
+    // ── 4. Deduplication — skip if this WhatsApp message was already processed ─
+    {
+      const { data: existing } = await supabase
+        .from('agent_messages')
+        .select('id')
+        .eq('conversation_id', conversation.id)
+        .eq('direcao', 'recebida')
+        .contains('metadata', { whatsapp_message_id: messageId })
+        .limit(1);
+
+      if (existing && existing.length > 0) {
+        console.log('whatsapp-webhook: duplicate message ignored', messageId);
+        return new Response('OK', { status: 200 });
+      }
+    }
+
+    // ── 5. Save incoming message ──────────────────────────────
     const preview = textBody.substring(0, 80) + (textBody.length > 80 ? '…' : '');
 
     await supabase.from('agent_messages').insert({
@@ -502,7 +524,7 @@ serve(async (req: Request) => {
       },
     });
 
-    // ── 5. Update conversation counters ───────────────────────
+    // ── 6. Update conversation counters ───────────────────────
     await supabase
       .from('agent_conversations')
       .update({
@@ -512,7 +534,7 @@ serve(async (req: Request) => {
       })
       .eq('id', conversation.id);
 
-    // ── 6. Log atividade comercial ────────────────────────────
+    // ── 7. Log atividade comercial ────────────────────────────
     await supabase.from('atividades_comerciais').insert({
       entidade_tipo: 'lead',
       entidade_id: lead.id,
@@ -522,7 +544,13 @@ serve(async (req: Request) => {
       data_atividade: now,
     });
 
-    // ── 7. Generate AI auto-response ──────────────────────────
+    // ── 8. Skip auto-response if conversation is escalated ───
+    if (conversation.status === 'escalada') {
+      console.log('whatsapp-webhook: conversation escalated — skipping AI auto-response');
+      return new Response('OK', { status: 200 });
+    }
+
+    // ── 9. Generate AI auto-response ──────────────────────────
     // Runs inline — Meta gives us ~20s, OpenRouter takes ~3-5s
     await generateAutoResponse(supabase, lead, conversation, textBody);
 

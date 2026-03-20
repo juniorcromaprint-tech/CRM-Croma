@@ -1,5 +1,5 @@
 export type AgentCanal = 'email' | 'whatsapp' | 'interno';
-export type AgentConversationStatus = 'ativa' | 'pausada' | 'aguardando_aprovacao' | 'convertida' | 'encerrada';
+export type AgentConversationStatus = 'ativa' | 'pausada' | 'aguardando_aprovacao' | 'convertida' | 'encerrada' | 'escalada';
 export type AgentEtapa = 'abertura' | 'followup1' | 'followup2' | 'followup3' | 'reengajamento' | 'proposta' | 'negociacao';
 export type AgentMessageStatus = 'rascunho' | 'pendente_aprovacao' | 'aprovada' | 'enviada' | 'entregue' | 'lida' | 'respondida' | 'erro';
 
@@ -76,6 +76,7 @@ export interface AgentConfig {
   tom: string;
   modelo_qualificacao: string;
   modelo_composicao: string;
+  modelo_fallback: string;
   email_remetente: string;
   nome_remetente: string;
 }
