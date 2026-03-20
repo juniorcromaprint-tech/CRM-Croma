@@ -108,8 +108,16 @@ ESTRUTURA DO JSON DE RESPOSTA (obrigatorio):
   "tom_detectado": "frio|morno|quente|neutro",
   "upsell_sugerido": "descricao do upsell mais relevante, ou null",
   "pergunta_feita": "a pergunta exata feita ao cliente",
-  "etapa_sugerida": "abertura|followup1|followup2|followup3|proposta|negociacao"
-}`;
+  "etapa_sugerida": "abertura|followup1|followup2|followup3|proposta|negociacao",
+  "intent_detectada": "conversa|orcamento|suporte|reclamacao|negociacao"
+}
+
+REGRAS PARA intent_detectada:
+- "orcamento": cliente pediu preco, orcamento, cotacao, "quanto custa", "preciso de X", mencionou produto + quantidade/dimensao
+- "negociacao": cliente quer desconto, prazo, condicao especial sobre proposta JA enviada
+- "suporte": cliente tem problema com pedido existente, instalacao, qualidade
+- "reclamacao": cliente esta insatisfeito, reclamando
+- "conversa": qualquer outra interacao (saudacao, duvida geral, informacao)`;
 }
 
 // ─────────────────────────────────────────────────────────────
@@ -270,7 +278,41 @@ async function generateAutoResponse(
       upsell_sugerido: string | null;
       pergunta_feita: string;
       etapa_sugerida?: string;
+      intent_detectada?: string;
     };
+
+    const intentDetectada = aiData.intent_detectada || 'conversa';
+
+    // Se detectou intenção de orçamento, acionar geração de proposta
+    if (intentDetectada === 'orcamento') {
+      try {
+        const orcamentoUrl = `${Deno.env.get('SUPABASE_URL')}/functions/v1/ai-gerar-orcamento`;
+        const orcamentoResp = await fetch(orcamentoUrl, {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+            'Authorization': `Bearer ${Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')}`,
+          },
+          body: JSON.stringify({
+            conversation_id: conversation.id as string,
+            lead_id: lead.id as string,
+            mensagens: historico,
+            canal: 'whatsapp',
+          }),
+        });
+        const orcamentoResult = await orcamentoResp.json();
+
+        if (orcamentoResult.status === 'proposta_criada' || orcamentoResult.status === 'info_faltante') {
+          // ai-gerar-orcamento criou a mensagem adequada — não salvar a genérica
+          console.log('whatsapp-webhook: ai-gerar-orcamento status:', orcamentoResult.status);
+          return;
+        }
+        // Qualquer outro status: continua com mensagem normal
+      } catch (orcErr) {
+        console.error('whatsapp-webhook: ai-gerar-orcamento failed (non-blocking):', orcErr);
+        // Continua com mensagem normal
+      }
+    }
 
     // Replace template variables
     const conteudoFinal = aiData.conteudo
@@ -291,6 +333,7 @@ async function generateAutoResponse(
         tom_detectado: aiData.tom_detectado,
         upsell_sugerido: aiData.upsell_sugerido,
         pergunta_feita: aiData.pergunta_feita,
+        intent_detectada: intentDetectada,
         etapa_sugerida: aiData.etapa_sugerida,
         tokens_input: aiResult.tokens_input,
         tokens_output: aiResult.tokens_output,
