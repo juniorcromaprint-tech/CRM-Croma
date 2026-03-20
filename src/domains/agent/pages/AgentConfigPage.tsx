@@ -182,7 +182,7 @@ function TabGeralConfig() {
               <Settings className="h-5 w-5 text-blue-600" />
               <CardTitle className="text-slate-800 text-base">Limites de Operação</CardTitle>
             </div>
-            <CardDescription>Controles de volume e cadência do agente</CardDescription>
+            <CardDescription>Controles de volume e cadência do agente (vale para todos os canais: WhatsApp, Email, etc.)</CardDescription>
           </CardHeader>
           <CardContent className="space-y-4">
             <div className="space-y-1.5">
@@ -1024,49 +1024,6 @@ function TabWhatsApp() {
               placeholder="croma_abertura"
             />
             <p className="text-xs text-slate-400">Nome exato do template aprovado no Meta para a primeira mensagem de contato.</p>
-          </div>
-        </CardContent>
-      </Card>
-
-      {/* Section 4: Configurações de Envio */}
-      <Card className="rounded-2xl border-none shadow-sm">
-        <CardHeader className="pb-3">
-          <CardTitle className="text-slate-800 text-base">Configurações de Envio</CardTitle>
-          <CardDescription>Limites e horários para envios via WhatsApp</CardDescription>
-        </CardHeader>
-        <CardContent className="space-y-4">
-          <div className="space-y-1.5">
-            <Label className="text-slate-700 font-medium">Máximo de Mensagens por Dia</Label>
-            <Input
-              type="number"
-              min={1}
-              max={1000}
-              value={waConfig.max_whatsapp_dia}
-              onChange={(e) => setWaConfig((p) => ({ ...p, max_whatsapp_dia: parseInt(e.target.value, 10) || 50 }))}
-              className="h-11 rounded-xl"
-            />
-            <p className="text-xs text-slate-400">Contas novas do WhatsApp Business têm limite de 250 conversas/dia. Contas verificadas podem ter até 100k.</p>
-          </div>
-
-          <div className="grid grid-cols-2 gap-4">
-            <div className="space-y-1.5">
-              <Label className="text-slate-700 font-medium">Horário Início</Label>
-              <Input
-                type="time"
-                value={waConfig.horario_whatsapp_inicio}
-                onChange={(e) => setWaConfig((p) => ({ ...p, horario_whatsapp_inicio: e.target.value }))}
-                className="h-11 rounded-xl"
-              />
-            </div>
-            <div className="space-y-1.5">
-              <Label className="text-slate-700 font-medium">Horário Fim</Label>
-              <Input
-                type="time"
-                value={waConfig.horario_whatsapp_fim}
-                onChange={(e) => setWaConfig((p) => ({ ...p, horario_whatsapp_fim: e.target.value }))}
-                className="h-11 rounded-xl"
-              />
-            </div>
           </div>
         </CardContent>
       </Card>

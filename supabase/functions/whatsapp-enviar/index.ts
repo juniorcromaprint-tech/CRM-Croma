@@ -100,6 +100,56 @@ serve(async (req: Request) => {
 
     const supabase = getServiceClient();
 
+    // ── 0. Check daily send limit ───────────────────────────────
+    {
+      const { data: configRow } = await supabase
+        .from('admin_config')
+        .select('valor')
+        .eq('chave', 'agent_config')
+        .single();
+
+      let maxPerDay = 50;
+      let horarioInicio = '08:00';
+      let horarioFim = '18:00';
+      if (configRow?.valor) {
+        try {
+          const cfg = JSON.parse(configRow.valor);
+          maxPerDay = cfg.max_contatos_dia ?? 50;
+          horarioInicio = cfg.horario_inicio ?? '08:00';
+          horarioFim = cfg.horario_fim ?? '18:00';
+        } catch { /* use default */ }
+      }
+
+      // Check business hours (Brazil timezone UTC-3)
+      const nowBR = new Date(Date.now() - 3 * 60 * 60 * 1000);
+      const hhmm = `${String(nowBR.getUTCHours()).padStart(2, '0')}:${String(nowBR.getUTCMinutes()).padStart(2, '0')}`;
+      if (hhmm < horarioInicio || hhmm >= horarioFim) {
+        return jsonResponse(
+          { error: `Fora do horário de envio (${horarioInicio}–${horarioFim})` },
+          429,
+          corsHeaders
+        );
+      }
+
+      const todayStart = new Date();
+      todayStart.setHours(0, 0, 0, 0);
+
+      const { count } = await supabase
+        .from('agent_messages')
+        .select('id', { count: 'exact', head: true })
+        .eq('canal', 'whatsapp')
+        .eq('status', 'enviada')
+        .gte('enviado_em', todayStart.toISOString());
+
+      if ((count ?? 0) >= maxPerDay) {
+        return jsonResponse(
+          { error: `Limite diário de ${maxPerDay} mensagens atingido` },
+          429,
+          corsHeaders
+        );
+      }
+    }
+
     // ── 1. Fetch agent_message (must be aprovada + whatsapp) ──
     const { data: msg, error: msgErr } = await supabase
       .from('agent_messages')
