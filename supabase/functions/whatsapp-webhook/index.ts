@@ -1,10 +1,11 @@
 // supabase/functions/whatsapp-webhook/index.ts
 // Receives incoming WhatsApp messages from Meta Cloud API webhook.
 // GET  → webhook verification challenge
-// POST → incoming message handler
+// POST → incoming message handler + AI auto-response generation
 
 import { serve } from 'https://deno.land/std@0.168.0/http/server.ts';
 import { getServiceClient } from '../ai-shared/ai-helpers.ts';
+import { callOpenRouter } from '../ai-shared/openrouter-provider.ts';
 
 // ─────────────────────────────────────────────────────────────
 // Phone normalization
@@ -62,6 +63,250 @@ async function validateSignature(req: Request, rawBody: string): Promise<boolean
     .join('');
 
   return sigHex === signature;
+}
+
+// ─────────────────────────────────────────────────────────────
+// AI auto-response system prompt
+// ─────────────────────────────────────────────────────────────
+function buildAutoResponseSystemPrompt(): string {
+  return `Voce e um vendedor consultivo da Croma Print Comunicacao Visual (www.cromaprint.com.br).
+Producao propria de banners, faixas, adesivos, placas, totens, fachadas, paineis e materiais de comunicacao visual.
+Atendimento nacional. Clientes: redes de lojas, franquias, fabricantes de calcados, grandes varejistas.
+
+PERSONALIDADE: Profissional mas caloroso. Confiante e estrategico. Nunca pressiona, educa e gera valor.
+
+CONTEXTO: Voce esta respondendo a uma MENSAGEM RECEBIDA do cliente via WhatsApp.
+Analise o que o cliente disse e responda de forma natural e relevante.
+
+REGRAS ABSOLUTAS:
+- Responda SEMPRE em portugues brasileiro coloquial mas profissional
+- Responda SEMPRE em JSON valido
+- Maximo 3 paragrafos no campo "conteudo" (WhatsApp precisa ser curto)
+- Use *negrito* para destaques (funciona no WhatsApp)
+- Emojis com moderacao (1-2 no maximo)
+- Sempre faca 1 pergunta inteligente ao final (mas apenas 1)
+- NUNCA forneca preco sem antes diagnosticar a necessidade do cliente
+- Se o cliente responde positivamente → avance a conversa
+- Se o cliente faz pergunta → responda e redirecione para valor
+- Se o cliente mostra objecao → trate com empatia e reformule
+
+GATILHOS DE UPSELL:
+- 1 banner → proponha kit campanha completo
+- Fachada → sugira fachada + totem + adesivos
+- 1 loja → pergunte sobre outras lojas da rede
+- Pedido pontual → apresente contrato recorrente
+
+TRATAMENTO DE OBJECOES:
+- "Muito caro" → apresente ROI e durabilidade
+- "Vou pensar" → gere urgencia real com prazo/campanha
+- "Ja tenho fornecedor" → oferea piloto sem compromisso
+- "Nao preciso agora" → pergunte sobre proxima campanha
+
+ESTRUTURA DO JSON DE RESPOSTA (obrigatorio):
+{
+  "conteudo": "corpo da mensagem — texto puro, paragrafos separados por \\n\\n",
+  "tom_detectado": "frio|morno|quente|neutro",
+  "upsell_sugerido": "descricao do upsell mais relevante, ou null",
+  "pergunta_feita": "a pergunta exata feita ao cliente",
+  "etapa_sugerida": "abertura|followup1|followup2|followup3|proposta|negociacao"
+}`;
+}
+
+// ─────────────────────────────────────────────────────────────
+// Generate AI response for incoming message
+// ─────────────────────────────────────────────────────────────
+async function generateAutoResponse(
+  supabase: ReturnType<typeof getServiceClient>,
+  lead: Record<string, unknown>,
+  conversation: Record<string, unknown>,
+  incomingMessage: string,
+): Promise<void> {
+  try {
+    // Check if OPENROUTER_API_KEY is available
+    const apiKey = Deno.env.get('OPENROUTER_API_KEY');
+    if (!apiKey) {
+      // Check admin_config fallback
+      const { data: keyConfig } = await supabase
+        .from('admin_config')
+        .select('valor')
+        .eq('chave', 'OPENROUTER_API_KEY')
+        .single();
+      if (!keyConfig?.valor) {
+        console.log('whatsapp-webhook: OPENROUTER_API_KEY not set — skipping auto-response');
+        return;
+      }
+      // Set it for the callOpenRouter function
+      Deno.env.set('OPENROUTER_API_KEY', keyConfig.valor as string);
+    }
+
+    // Check agent_config for auto-response settings
+    const { data: configRow } = await supabase
+      .from('admin_config')
+      .select('valor')
+      .eq('chave', 'agent_config')
+      .single();
+
+    const agentConfig = (configRow?.valor as Record<string, unknown>) ?? {};
+    const canaisAtivos = (agentConfig.canais_ativos as string[]) ?? [];
+
+    // Only generate if whatsapp channel is active
+    if (!canaisAtivos.includes('whatsapp')) {
+      console.log('whatsapp-webhook: whatsapp not in canais_ativos — skipping auto-response');
+      return;
+    }
+
+    const modeloComposicao = (agentConfig.modelo_composicao as string) ?? 'openai/gpt-4.1-mini';
+    const nomeRemetente = (agentConfig.nome_remetente as string) ?? 'Croma Print';
+
+    // Load last 10 messages for context
+    const { data: recentMsgs } = await supabase
+      .from('agent_messages')
+      .select('direcao, conteudo, status, created_at')
+      .eq('conversation_id', conversation.id)
+      .order('created_at', { ascending: false })
+      .limit(10);
+
+    const historico = (recentMsgs ?? []).reverse();
+
+    // Load full lead data
+    const { data: fullLead } = await supabase
+      .from('leads')
+      .select('id, empresa, contato_nome, segmento, status, temperatura, valor_estimado, cargo, observacoes, score')
+      .eq('id', lead.id)
+      .single();
+
+    // Load conversation details
+    const { data: fullConv } = await supabase
+      .from('agent_conversations')
+      .select('etapa, mensagens_enviadas, mensagens_recebidas, score_engajamento, tentativas')
+      .eq('id', conversation.id)
+      .single();
+
+    // Try to find a relevant template
+    const etapaAtual = (fullConv?.etapa as string) ?? 'abertura';
+    let template: { conteudo: string } | null = null;
+
+    if (fullLead?.segmento) {
+      const { data: tpl } = await supabase
+        .from('agent_templates')
+        .select('conteudo')
+        .eq('canal', 'whatsapp')
+        .eq('etapa', etapaAtual)
+        .eq('segmento', fullLead.segmento)
+        .eq('ativo', true)
+        .limit(1)
+        .single();
+      template = tpl;
+    }
+    if (!template) {
+      const { data: tpl } = await supabase
+        .from('agent_templates')
+        .select('conteudo')
+        .eq('canal', 'whatsapp')
+        .eq('etapa', etapaAtual)
+        .is('segmento', null)
+        .eq('ativo', true)
+        .limit(1)
+        .single();
+      template = tpl;
+    }
+
+    // Build AI context
+    const aiContext = {
+      mensagem_recebida: incomingMessage,
+      lead: {
+        empresa: fullLead?.empresa,
+        contato_nome: fullLead?.contato_nome,
+        segmento: fullLead?.segmento,
+        temperatura: fullLead?.temperatura,
+        score: fullLead?.score,
+        observacoes: fullLead?.observacoes,
+      },
+      conversa: {
+        etapa: etapaAtual,
+        mensagens_enviadas: fullConv?.mensagens_enviadas ?? 0,
+        mensagens_recebidas: fullConv?.mensagens_recebidas ?? 0,
+        score_engajamento: fullConv?.score_engajamento ?? 0,
+      },
+      historico_mensagens: historico,
+      template_referencia: template?.conteudo ?? null,
+      agente: { nome_remetente: nomeRemetente },
+      data_atual: new Date().toISOString().split('T')[0],
+    };
+
+    // Call OpenRouter
+    const aiResult = await callOpenRouter(
+      buildAutoResponseSystemPrompt(),
+      JSON.stringify(aiContext, null, 2),
+      {
+        model: modeloComposicao,
+        temperature: 0.7,
+        max_tokens: 800,
+      }
+    );
+
+    // Parse response
+    const aiData = JSON.parse(aiResult.content) as {
+      conteudo: string;
+      tom_detectado: string;
+      upsell_sugerido: string | null;
+      pergunta_feita: string;
+      etapa_sugerida?: string;
+    };
+
+    // Replace template variables
+    const conteudoFinal = aiData.conteudo
+      .replace(/\{\{contato_nome\}\}/g, (fullLead?.contato_nome as string) ?? '')
+      .replace(/\{\{empresa\}\}/g, (fullLead?.empresa as string) ?? '')
+      .replace(/\{\{nome_remetente\}\}/g, nomeRemetente);
+
+    // Save AI response as pendente_aprovacao
+    await supabase.from('agent_messages').insert({
+      conversation_id: conversation.id,
+      direcao: 'enviada',
+      canal: 'whatsapp',
+      conteudo: conteudoFinal,
+      status: 'pendente_aprovacao',
+      custo_ia: aiResult.cost_usd,
+      modelo_ia: aiResult.model_used,
+      metadata: {
+        tom_detectado: aiData.tom_detectado,
+        upsell_sugerido: aiData.upsell_sugerido,
+        pergunta_feita: aiData.pergunta_feita,
+        etapa_sugerida: aiData.etapa_sugerida,
+        tokens_input: aiResult.tokens_input,
+        tokens_output: aiResult.tokens_output,
+        duration_ms: aiResult.duration_ms,
+        auto_generated: true,
+      },
+    });
+
+    // Update conversation etapa if AI suggests progression
+    if (aiData.etapa_sugerida && aiData.etapa_sugerida !== etapaAtual) {
+      await supabase
+        .from('agent_conversations')
+        .update({ etapa: aiData.etapa_sugerida })
+        .eq('id', conversation.id);
+    }
+
+    // Log AI call
+    await supabase.from('ai_logs').insert({
+      function_name: 'auto-resposta-whatsapp',
+      entity_type: 'geral',
+      entity_id: lead.id as string,
+      model_used: aiResult.model_used,
+      tokens_input: aiResult.tokens_input,
+      tokens_output: aiResult.tokens_output,
+      cost_usd: aiResult.cost_usd,
+      duration_ms: aiResult.duration_ms,
+      status: 'success',
+    });
+
+    console.log('whatsapp-webhook: AI auto-response generated for lead', lead.id);
+  } catch (err) {
+    // Never fail the webhook due to AI errors
+    console.error('whatsapp-webhook: AI auto-response failed (non-blocking):', err);
+  }
 }
 
 // ─────────────────────────────────────────────────────────────
@@ -258,6 +503,10 @@ serve(async (req: Request) => {
       resultado: 'recebido',
       data_atividade: now,
     });
+
+    // ── 7. Generate AI auto-response ──────────────────────────
+    // Runs inline — Meta gives us ~20s, OpenRouter takes ~3-5s
+    await generateAutoResponse(supabase, lead, conversation, textBody);
 
     console.log('whatsapp-webhook: message processed for lead', lead.id);
 
