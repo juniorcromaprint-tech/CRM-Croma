@@ -146,7 +146,12 @@ async function generateAutoResponse(
       .eq('chave', 'agent_config')
       .single();
 
-    const agentConfig = (configRow?.valor as Record<string, unknown>) ?? {};
+    let agentConfig: Record<string, unknown> = {};
+    try {
+      agentConfig = typeof configRow?.valor === 'string'
+        ? JSON.parse(configRow.valor)
+        : (configRow?.valor as Record<string, unknown>) ?? {};
+    } catch { /* invalid JSON — use defaults */ }
     const canaisAtivos = (agentConfig.canais_ativos as string[]) ?? [];
 
     // Only generate if whatsapp channel is active

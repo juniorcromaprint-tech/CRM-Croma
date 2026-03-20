@@ -1,6 +1,6 @@
 import { useState } from 'react';
 import {
-  Mail, MessageCircle, CheckCheck, Send, Edit2, Clock, Loader2,
+  Mail, MessageCircle, Send, Edit2, Clock, Loader2,
   CheckCircle2, XCircle, AlertCircle, Bot,
 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
@@ -80,14 +80,12 @@ interface MessageCardProps {
   editContent: string;
   onEditToggle: () => void;
   onEditChange: (v: string) => void;
-  onApprove: () => void;
+  onApproveAndSend: () => void;
   onReject: () => void;
   onSaveAndApprove: () => void;
-  onSend: () => void;
-  isApprovePending: boolean;
+  isApproveAndSendPending: boolean;
   isRejectPending: boolean;
   isSavePending: boolean;
-  isSendPending: boolean;
 }
 
 function MessageCard({
@@ -96,14 +94,12 @@ function MessageCard({
   editContent,
   onEditToggle,
   onEditChange,
-  onApprove,
+  onApproveAndSend,
   onReject,
   onSaveAndApprove,
-  onSend,
-  isApprovePending,
+  isApproveAndSendPending,
   isRejectPending,
   isSavePending,
-  isSendPending,
 }: MessageCardProps) {
   const conv = msg.agent_conversations;
   const lead = conv?.leads;
@@ -201,7 +197,7 @@ function MessageCard({
               ) : (
                 <CheckCircle2 size={14} className="mr-1.5" />
               )}
-              Salvar e Aprovar
+              Salvar e Enviar
             </Button>
             <Button
               size="sm"
@@ -217,33 +213,20 @@ function MessageCard({
           <>
             <Button
               size="sm"
-              className="bg-green-600 hover:bg-green-700 rounded-xl"
-              onClick={onApprove}
-              disabled={isApprovePending || isRejectPending || isSendPending}
-            >
-              {isApprovePending ? (
-                <Loader2 size={14} className="mr-1.5 animate-spin" />
-              ) : (
-                <CheckCircle2 size={14} className="mr-1.5" />
-              )}
-              Aprovar
-            </Button>
-            <Button
-              size="sm"
               className={`rounded-xl ${
                 canalKey === 'whatsapp'
-                  ? 'bg-green-500 hover:bg-green-600 text-white'
+                  ? 'bg-green-600 hover:bg-green-700 text-white'
                   : 'bg-blue-600 hover:bg-blue-700 text-white'
               }`}
-              onClick={onSend}
-              disabled={isSendPending || isApprovePending || isRejectPending}
+              onClick={onApproveAndSend}
+              disabled={isApproveAndSendPending || isRejectPending}
             >
-              {isSendPending ? (
+              {isApproveAndSendPending ? (
                 <Loader2 size={14} className="mr-1.5 animate-spin" />
               ) : (
                 <Send size={14} className="mr-1.5" />
               )}
-              Enviar
+              Aprovar e Enviar
             </Button>
             <Button
               size="sm"
@@ -259,7 +242,7 @@ function MessageCard({
               variant="ghost"
               className="text-red-600 hover:text-red-700 hover:bg-red-50 rounded-xl"
               onClick={onReject}
-              disabled={isRejectPending || isApprovePending || isSendPending}
+              disabled={isRejectPending || isApproveAndSendPending}
             >
               {isRejectPending ? (
                 <Loader2 size={14} className="mr-1.5 animate-spin" />
@@ -288,7 +271,7 @@ export default function AgentApprovalPage() {
   const [editingId, setEditingId] = useState<string | null>(null);
   const [editContent, setEditContent] = useState('');
   const [savingId, setSavingId] = useState<string | null>(null);
-  const [sendingId, setSendingId] = useState<string | null>(null);
+  const [approveAndSendId, setApproveAndSendId] = useState<string | null>(null);
 
   // Bulk actions state
   const [bulkApproving, setBulkApproving] = useState(false);
@@ -323,13 +306,6 @@ export default function AgentApprovalPage() {
     }
   }
 
-  function handleApprove(msg: PendingRow) {
-    approveMessage.mutate({
-      messageId: msg.id,
-      conversationId: msg.conversation_id,
-    });
-  }
-
   function handleReject(msg: PendingRow) {
     rejectMessage.mutate({
       messageId: msg.id,
@@ -337,10 +313,16 @@ export default function AgentApprovalPage() {
     });
   }
 
-  async function handleSend(msg: PendingRow) {
+  async function handleApproveAndSend(msg: PendingRow) {
     const canal = detectCanal(msg);
-    setSendingId(msg.id);
+    setApproveAndSendId(msg.id);
     try {
+      // 1. Approve
+      await approveMessage.mutateAsync({
+        messageId: msg.id,
+        conversationId: msg.conversation_id,
+      });
+      // 2. Send via appropriate channel
       const sender = canal === 'whatsapp' ? sendWhatsApp : sendEmail;
       await sender.mutateAsync({
         messageId: msg.id,
@@ -349,7 +331,7 @@ export default function AgentApprovalPage() {
     } catch {
       // error handled in mutation onError
     } finally {
-      setSendingId(null);
+      setApproveAndSendId(null);
     }
   }
 
@@ -359,6 +341,7 @@ export default function AgentApprovalPage() {
       return;
     }
 
+    const canal = detectCanal(msg);
     setSavingId(msg.id);
     try {
       // 1. Save edited content
@@ -375,6 +358,13 @@ export default function AgentApprovalPage() {
         conversationId: msg.conversation_id,
       });
 
+      // 3. Send via appropriate channel
+      const sender = canal === 'whatsapp' ? sendWhatsApp : sendEmail;
+      await sender.mutateAsync({
+        messageId: msg.id,
+        conversationId: msg.conversation_id,
+      });
+
       setEditingId(null);
       setEditContent('');
     } catch (err) {
@@ -384,14 +374,24 @@ export default function AgentApprovalPage() {
     }
   }
 
-  async function handleApproveAll() {
+  async function handleApproveAndSendAll() {
     if (messages.length === 0) return;
     setBulkApproving(true);
+    setSendingAllProgress({ active: true, done: 0, total: messages.length });
     let successCount = 0;
 
-    for (const msg of messages) {
+    for (let i = 0; i < messages.length; i++) {
+      const msg = messages[i];
+      const canal = detectCanal(msg);
       try {
+        // 1. Approve
         await approveMessage.mutateAsync({
+          messageId: msg.id,
+          conversationId: msg.conversation_id,
+        });
+        // 2. Send
+        const sender = canal === 'whatsapp' ? sendWhatsApp : sendEmail;
+        await sender.mutateAsync({
           messageId: msg.id,
           conversationId: msg.conversation_id,
         });
@@ -399,50 +399,14 @@ export default function AgentApprovalPage() {
       } catch {
         // continue with next
       }
+      setSendingAllProgress({ active: true, done: i + 1, total: messages.length });
     }
 
     setBulkApproving(false);
-    if (successCount > 0) {
-      showSuccess(`${successCount} mensagem(ns) aprovada(s)`);
-    }
-  }
-
-  async function handleSendAllApproved() {
-    // Re-query approved messages including canal via conversation join
-    const { data: approved, error } = await supabase
-      .from('agent_messages')
-      .select('id, conversation_id, agent_conversations(canal)')
-      .eq('status', 'aprovada');
-
-    if (error) {
-      showError('Erro ao buscar mensagens aprovadas');
-      return;
-    }
-
-    if (!approved || approved.length === 0) {
-      showError('Nenhuma mensagem aprovada para enviar');
-      return;
-    }
-
-    setSendingAllProgress({ active: true, done: 0, total: approved.length });
-
-    for (let i = 0; i < approved.length; i++) {
-      const msg = approved[i] as { id: string; conversation_id: string; agent_conversations: { canal: string } | null };
-      const canal = msg.agent_conversations?.canal ?? 'email';
-      const sender = canal === 'whatsapp' ? sendWhatsApp : sendEmail;
-      try {
-        await sender.mutateAsync({
-          messageId: msg.id,
-          conversationId: msg.conversation_id,
-        });
-      } catch {
-        // continue
-      }
-      setSendingAllProgress({ active: true, done: i + 1, total: approved.length });
-    }
-
     setSendingAllProgress({ active: false, done: 0, total: 0 });
-    showSuccess('Envio em lote concluído');
+    if (successCount > 0) {
+      showSuccess(`${successCount} mensagem(ns) aprovada(s) e enviada(s)`);
+    }
   }
 
   // ── Render ──────────────────────────────────────────────────────────────────
@@ -459,26 +423,10 @@ export default function AgentApprovalPage() {
         </div>
 
         <div className="flex items-center gap-2 shrink-0">
-          {/* Approve All */}
-          <Button
-            variant="outline"
-            className="rounded-xl"
-            onClick={handleApproveAll}
-            disabled={bulkApproving || messages.length === 0 || isLoading}
-          >
-            {bulkApproving ? (
-              <Loader2 size={15} className="mr-2 animate-spin" />
-            ) : (
-              <CheckCheck size={15} className="mr-2" />
-            )}
-            Aprovar Todas
-          </Button>
-
-          {/* Send All Approved */}
           <Button
             className="bg-blue-600 hover:bg-blue-700 rounded-xl"
-            onClick={handleSendAllApproved}
-            disabled={sendingAllProgress.active}
+            onClick={handleApproveAndSendAll}
+            disabled={bulkApproving || sendingAllProgress.active || messages.length === 0 || isLoading}
           >
             {sendingAllProgress.active ? (
               <>
@@ -488,7 +436,7 @@ export default function AgentApprovalPage() {
             ) : (
               <>
                 <Send size={15} className="mr-2" />
-                Enviar Todas Aprovadas
+                Aprovar e Enviar Todas
               </>
             )}
           </Button>
@@ -542,18 +490,14 @@ export default function AgentApprovalPage() {
               editContent={editContent}
               onEditToggle={() => handleEditToggle(msg)}
               onEditChange={setEditContent}
-              onApprove={() => handleApprove(msg)}
+              onApproveAndSend={() => handleApproveAndSend(msg)}
               onReject={() => handleReject(msg)}
               onSaveAndApprove={() => handleSaveAndApprove(msg)}
-              onSend={() => handleSend(msg)}
-              isApprovePending={
-                approveMessage.isPending && approveMessage.variables?.messageId === msg.id
-              }
+              isApproveAndSendPending={approveAndSendId === msg.id}
               isRejectPending={
                 rejectMessage.isPending && rejectMessage.variables?.messageId === msg.id
               }
               isSavePending={savingId === msg.id}
-              isSendPending={sendingId === msg.id}
             />
           ))}
         </div>
