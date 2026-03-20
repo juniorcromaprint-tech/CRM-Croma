@@ -3,6 +3,7 @@
 // Standalone page for /agente/conversa/:id — shows full conversation timeline
 // ============================================================================
 
+import { useState } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import { useQuery } from '@tanstack/react-query';
 import {
@@ -19,12 +20,14 @@ import {
   AlertCircle,
   Eye,
   CornerDownRight,
+  Bot,
 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
+import { Textarea } from '@/components/ui/textarea';
 import { supabase } from '@/integrations/supabase/client';
 import { formatDate } from '@/shared/utils/format';
-import { useAgentMessages } from '../hooks/useAgentMessages';
+import { useAgentMessages, useEscalateConversation, useResumeConversation, useSendManualWhatsApp } from '../hooks/useAgentMessages';
 import type { AgentConversation, AgentCanal, AgentMessageStatus } from '../types/agent.types';
 
 // ─── Fetch single conversation ───────────────────────────────────────────────
@@ -136,6 +139,10 @@ export default function AgentConversationPage() {
   const navigate = useNavigate();
   const { data: conversation, isLoading: convLoading, error: convError } = useConversationById(id);
   const { data: messages = [], isLoading: msgsLoading } = useAgentMessages(id);
+  const escalate = useEscalateConversation();
+  const resume = useResumeConversation();
+  const sendManual = useSendManualWhatsApp();
+  const [manualText, setManualText] = useState('');
 
   if (convLoading) {
     return (
@@ -195,6 +202,8 @@ export default function AgentConversationPage() {
               className={`text-xs ${
                 conversation.status === 'ativa'
                   ? 'bg-blue-100 text-blue-700'
+                  : conversation.status === 'escalada'
+                  ? 'bg-amber-100 text-amber-700'
                   : conversation.status === 'convertida'
                   ? 'bg-emerald-100 text-emerald-700'
                   : 'bg-slate-100 text-slate-600'
@@ -237,23 +246,69 @@ export default function AgentConversationPage() {
         )}
       </div>
 
-      {/* Action buttons */}
-      <div className="flex items-center gap-3">
-        <Button
-          onClick={() => navigate('/agente/aprovacao')}
-          className="bg-blue-600 hover:bg-blue-700 gap-2"
-        >
-          <Send size={16} />
-          Ir para Aprovacao
-        </Button>
-        <Button
-          variant="outline"
-          className="gap-2 text-amber-700 border-amber-200 hover:bg-amber-50"
-        >
-          <UserCog size={16} />
-          Escalar para Humano
-        </Button>
-      </div>
+      {/* Escalated: manual message input */}
+      {conversation.status === 'escalada' && (
+        <div className="bg-white rounded-2xl border border-amber-200 p-6 space-y-4">
+          <div className="flex items-center gap-2 text-amber-700">
+            <UserCog size={18} />
+            <h2 className="font-semibold">Conversa sob controle humano</h2>
+          </div>
+          <p className="text-xs text-slate-500">A IA não responde automaticamente. Escreva sua mensagem e envie diretamente pelo WhatsApp.</p>
+          <Textarea
+            value={manualText}
+            onChange={(e) => setManualText(e.target.value)}
+            placeholder="Escreva sua mensagem para o lead..."
+            className="rounded-xl text-sm min-h-[100px] resize-y"
+          />
+          <div className="flex items-center gap-3">
+            <Button
+              onClick={() => {
+                if (!manualText.trim()) return;
+                sendManual.mutate(
+                  { conversationId: conversation.id, conteudo: manualText.trim() },
+                  { onSuccess: () => setManualText('') }
+                );
+              }}
+              disabled={!manualText.trim() || sendManual.isPending}
+              className="bg-green-600 hover:bg-green-700 gap-2"
+            >
+              {sendManual.isPending ? <Loader2 size={16} className="animate-spin" /> : <Send size={16} />}
+              {sendManual.isPending ? 'Enviando...' : 'Enviar via WhatsApp'}
+            </Button>
+            <Button
+              variant="outline"
+              onClick={() => resume.mutate({ conversationId: conversation.id })}
+              disabled={resume.isPending}
+              className="gap-2 text-blue-700 border-blue-200 hover:bg-blue-50"
+            >
+              {resume.isPending ? <Loader2 size={16} className="animate-spin" /> : <Bot size={16} />}
+              Devolver para IA
+            </Button>
+          </div>
+        </div>
+      )}
+
+      {/* Action buttons (non-escalated) */}
+      {conversation.status !== 'escalada' && (
+        <div className="flex items-center gap-3">
+          <Button
+            onClick={() => navigate('/agente/aprovacao')}
+            className="bg-blue-600 hover:bg-blue-700 gap-2"
+          >
+            <Send size={16} />
+            Ir para Aprovacao
+          </Button>
+          <Button
+            variant="outline"
+            onClick={() => escalate.mutate({ conversationId: conversation.id })}
+            disabled={escalate.isPending}
+            className="gap-2 text-amber-700 border-amber-200 hover:bg-amber-50"
+          >
+            {escalate.isPending ? <Loader2 size={16} className="animate-spin" /> : <UserCog size={16} />}
+            Escalar para Humano
+          </Button>
+        </div>
+      )}
     </div>
   );
 }

@@ -3,6 +3,7 @@
 // Sheet com timeline completa de uma conversa do agente
 // ============================================================================
 
+import { useState } from 'react';
 import {
   Sheet,
   SheetContent,
@@ -13,6 +14,7 @@ import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Separator } from '@/components/ui/separator';
 import { ScrollArea } from '@/components/ui/scroll-area';
+import { Textarea } from '@/components/ui/textarea';
 import {
   Mail,
   Smartphone,
@@ -26,9 +28,10 @@ import {
   AlertCircle,
   Eye,
   CornerDownRight,
+  Bot,
 } from 'lucide-react';
 import { formatDate } from '@/shared/utils/format';
-import { useAgentMessages } from '../hooks/useAgentMessages';
+import { useAgentMessages, useEscalateConversation, useResumeConversation, useSendManualWhatsApp } from '../hooks/useAgentMessages';
 import type { AgentConversation, AgentCanal, AgentMessageStatus } from '../types/agent.types';
 
 // ─── Props ────────────────────────────────────────────────────────────────────
@@ -129,11 +132,33 @@ export default function ConversationDetail({
   open,
   onOpenChange,
   onComposeMessage,
-  onEscalate,
 }: ConversationDetailProps) {
   const { data: messages = [], isLoading } = useAgentMessages(conversation?.id);
+  const escalate = useEscalateConversation();
+  const resume = useResumeConversation();
+  const sendManual = useSendManualWhatsApp();
+  const [manualText, setManualText] = useState('');
 
   const lead = conversation?.leads;
+  const isEscalated = conversation?.status === 'escalada';
+
+  function handleEscalate() {
+    if (!conversation) return;
+    escalate.mutate({ conversationId: conversation.id });
+  }
+
+  function handleResume() {
+    if (!conversation) return;
+    resume.mutate({ conversationId: conversation.id });
+  }
+
+  function handleSendManual() {
+    if (!conversation || !manualText.trim()) return;
+    sendManual.mutate(
+      { conversationId: conversation.id, conteudo: manualText.trim() },
+      { onSuccess: () => setManualText('') }
+    );
+  }
 
   return (
     <Sheet open={open} onOpenChange={onOpenChange}>
@@ -185,6 +210,11 @@ export default function ConversationDetail({
                     {conversation.etapa}
                   </Badge>
                 )}
+                {isEscalated && (
+                  <Badge variant="secondary" className="text-[10px] px-1.5 py-0 bg-amber-100 text-amber-700">
+                    Escalada — Humano
+                  </Badge>
+                )}
               </div>
             </div>
           )}
@@ -198,6 +228,14 @@ export default function ConversationDetail({
             </div>
           )}
         </SheetHeader>
+
+        {/* Escalated banner */}
+        {isEscalated && (
+          <div className="mx-5 mt-3 bg-amber-50 border border-amber-200 rounded-xl px-4 py-3 text-xs text-amber-700 flex items-center gap-2">
+            <UserCog size={14} className="shrink-0" />
+            <span>Conversa sob controle humano. A IA não responde automaticamente. Escreva sua mensagem abaixo.</span>
+          </div>
+        )}
 
         {/* Messages timeline */}
         <ScrollArea className="flex-1 px-5 py-4">
@@ -221,8 +259,52 @@ export default function ConversationDetail({
           )}
         </ScrollArea>
 
-        {/* Action buttons */}
-        {conversation && (
+        {/* Manual message input (escalated conversations) */}
+        {conversation && isEscalated && (
+          <>
+            <Separator />
+            <div className="px-5 py-3 space-y-2">
+              <Textarea
+                value={manualText}
+                onChange={(e) => setManualText(e.target.value)}
+                placeholder="Escreva sua mensagem para o lead..."
+                className="rounded-xl text-sm min-h-[80px] resize-none"
+              />
+              <div className="flex items-center gap-2">
+                <Button
+                  size="sm"
+                  onClick={handleSendManual}
+                  disabled={!manualText.trim() || sendManual.isPending}
+                  className="h-9 bg-green-600 hover:bg-green-700 text-white gap-1.5 flex-1"
+                >
+                  {sendManual.isPending ? (
+                    <Loader2 size={14} className="animate-spin" />
+                  ) : (
+                    <Send size={14} />
+                  )}
+                  {sendManual.isPending ? 'Enviando...' : 'Enviar via WhatsApp'}
+                </Button>
+                <Button
+                  size="sm"
+                  variant="outline"
+                  onClick={handleResume}
+                  disabled={resume.isPending}
+                  className="h-9 gap-1.5 text-blue-700 border-blue-200 hover:bg-blue-50"
+                >
+                  {resume.isPending ? (
+                    <Loader2 size={14} className="animate-spin" />
+                  ) : (
+                    <Bot size={14} />
+                  )}
+                  Devolver para IA
+                </Button>
+              </div>
+            </div>
+          </>
+        )}
+
+        {/* Action buttons (non-escalated conversations) */}
+        {conversation && !isEscalated && (
           <>
             <Separator />
             <div className="px-5 py-4 flex items-center gap-3 flex-wrap">
@@ -237,10 +319,15 @@ export default function ConversationDetail({
               <Button
                 size="sm"
                 variant="outline"
-                onClick={() => onEscalate?.(conversation)}
+                onClick={handleEscalate}
+                disabled={escalate.isPending}
                 className="h-9 gap-1.5 text-amber-700 border-amber-200 hover:bg-amber-50 flex-1"
               >
-                <UserCog size={14} />
+                {escalate.isPending ? (
+                  <Loader2 size={14} className="animate-spin" />
+                ) : (
+                  <UserCog size={14} />
+                )}
                 Escalar para Humano
               </Button>
             </div>

@@ -58,6 +58,7 @@ const DEFAULT_CONFIG: AgentConfig = {
   tom: 'consultivo',
   modelo_qualificacao: 'openai/gpt-4.1-mini',
   modelo_composicao: 'openai/gpt-4.1-mini',
+  modelo_fallback: 'openai/gpt-4.1-mini',
   email_remetente: 'comercial@cromaprint.com.br',
   nome_remetente: 'Croma Print',
 };
@@ -408,6 +409,7 @@ function TabModelosIA() {
 
   const [modeloQual, setModeloQual] = useState('');
   const [modeloComp, setModeloComp] = useState('');
+  const [modeloFallback, setModeloFallback] = useState('');
   const [initialized, setInitialized] = useState(false);
 
   // Sync state from query data once loaded
@@ -415,6 +417,7 @@ function TabModelosIA() {
     if (agentConfigData && !initialized) {
       setModeloQual(agentConfigData.modelo_qualificacao ?? 'openai/gpt-4.1-mini');
       setModeloComp(agentConfigData.modelo_composicao ?? 'openai/gpt-4.1-mini');
+      setModeloFallback(agentConfigData.modelo_fallback ?? 'openai/gpt-4.1-mini');
       setInitialized(true);
     }
   }, [agentConfigData, initialized]);
@@ -433,7 +436,7 @@ function TabModelosIA() {
         try { current = JSON.parse(data.valor); } catch { /* ignore */ }
       }
 
-      const updated = { ...current, modelo_qualificacao: modeloQual, modelo_composicao: modeloComp };
+      const updated = { ...current, modelo_qualificacao: modeloQual, modelo_composicao: modeloComp, modelo_fallback: modeloFallback };
       const { error } = await supabase
         .from('admin_config')
         .upsert({ chave: 'agent_config', valor: JSON.stringify(updated) }, { onConflict: 'chave' });
@@ -511,10 +514,33 @@ function TabModelosIA() {
             </Select>
           </div>
 
+          <Separator />
+
+          <div className="space-y-1.5">
+            <Label className="text-slate-700 font-medium">Modelo de Fallback</Label>
+            <p className="text-xs text-slate-400">Usado automaticamente se o modelo principal falhar (ex: modelo gratuito indisponível)</p>
+            <Select value={modeloFallback} onValueChange={setModeloFallback}>
+              <SelectTrigger className="h-11 rounded-xl">
+                <SelectValue placeholder="Selecione o modelo de fallback" />
+              </SelectTrigger>
+              <SelectContent>
+                {models.map((m) => (
+                  <SelectItem key={m.slug} value={m.slug}>
+                    <span>{m.label}</span>
+                    {m.free && (
+                      <Badge variant="secondary" className="ml-2 text-[10px] px-1.5 py-0">Free</Badge>
+                    )}
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+          </div>
+
           <div className="bg-blue-50 border border-blue-100 rounded-xl p-3 text-xs text-blue-700 space-y-1">
             <p className="font-semibold">Informação de custo</p>
             <p>Cada qualificação de lead realiza 1 chamada ao modelo de qualificação.</p>
             <p>Cada mensagem composta realiza 1 chamada ao modelo de composição.</p>
+            <p>Se o modelo principal falhar, o sistema usa o <strong>modelo de fallback</strong> automaticamente.</p>
             <p>Modelos marcados como <strong>Free</strong> não geram custo no OpenRouter.</p>
           </div>
         </CardContent>

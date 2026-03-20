@@ -4,7 +4,12 @@ import { AIModel, AIRequestConfig, MODEL_COSTS } from './ai-types.ts';
 
 const OPENROUTER_URL = 'https://openrouter.ai/api/v1/chat/completions';
 const DEFAULT_MODEL: AIModel = 'openai/gpt-4.1-mini';
-const FALLBACK_MODEL: AIModel = 'anthropic/claude-sonnet-4';
+const DEFAULT_FALLBACK_MODEL: AIModel = 'openai/gpt-4.1-mini';
+
+// Fallback can be overridden via config.fallback_model
+let _fallbackOverride: AIModel | null = null;
+export function setFallbackModel(model: AIModel) { _fallbackOverride = model; }
+function getFallbackModel(): AIModel { return _fallbackOverride ?? DEFAULT_FALLBACK_MODEL; }
 
 interface OpenRouterMessage {
   role: 'system' | 'user' | 'assistant';
@@ -47,11 +52,12 @@ export async function callOpenRouter(
     const result = await fetchCompletion(apiKey, model, messages, config);
     return buildResult(result, model, startTime);
   } catch (error) {
-    // Fallback to stronger model if primary fails
-    if (model !== FALLBACK_MODEL) {
-      console.warn(`Primary model ${model} failed, falling back to ${FALLBACK_MODEL}:`, error);
-      const result = await fetchCompletion(apiKey, FALLBACK_MODEL, messages, config);
-      return buildResult(result, FALLBACK_MODEL, startTime);
+    // Fallback to cheaper model if primary fails
+    const fallback = getFallbackModel();
+    if (model !== fallback) {
+      console.warn(`Primary model ${model} failed, falling back to ${fallback}:`, error);
+      const result = await fetchCompletion(apiKey, fallback, messages, config);
+      return buildResult(result, fallback, startTime);
     }
     throw error;
   }

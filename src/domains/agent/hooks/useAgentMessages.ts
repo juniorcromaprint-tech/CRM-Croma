@@ -229,3 +229,118 @@ export function useSendApprovedWhatsApp() {
     },
   });
 }
+
+/**
+ * Escala uma conversa para atendimento humano.
+ * Muda status da conversa para 'escalada' e a IA para de responder automaticamente.
+ */
+export function useEscalateConversation() {
+  const queryClient = useQueryClient();
+
+  return useMutation({
+    mutationFn: async ({ conversationId }: { conversationId: string }) => {
+      const { error } = await supabase
+        .from('agent_conversations')
+        .update({ status: 'escalada' })
+        .eq('id', conversationId);
+
+      if (error) throw new Error(`Erro ao escalar conversa: ${error.message}`);
+
+      return { conversationId };
+    },
+    onSuccess: ({ conversationId }) => {
+      queryClient.invalidateQueries({ queryKey: ['agent', 'conversations'] });
+      queryClient.invalidateQueries({ queryKey: messagesQueryKey(conversationId) });
+      showSuccess('Conversa escalada para atendimento humano');
+    },
+    onError: (error: Error) => {
+      showError(error.message);
+    },
+  });
+}
+
+/**
+ * Retorna uma conversa escalada para a IA (status → ativa novamente).
+ */
+export function useResumeConversation() {
+  const queryClient = useQueryClient();
+
+  return useMutation({
+    mutationFn: async ({ conversationId }: { conversationId: string }) => {
+      const { error } = await supabase
+        .from('agent_conversations')
+        .update({ status: 'ativa' })
+        .eq('id', conversationId);
+
+      if (error) throw new Error(`Erro ao retomar conversa: ${error.message}`);
+
+      return { conversationId };
+    },
+    onSuccess: ({ conversationId }) => {
+      queryClient.invalidateQueries({ queryKey: ['agent', 'conversations'] });
+      queryClient.invalidateQueries({ queryKey: messagesQueryKey(conversationId) });
+      showSuccess('Conversa devolvida para o agente IA');
+    },
+    onError: (error: Error) => {
+      showError(error.message);
+    },
+  });
+}
+
+/**
+ * Envia mensagem manual de um humano numa conversa escalada.
+ * Cria a mensagem como aprovada, depois chama whatsapp-enviar.
+ */
+export function useSendManualWhatsApp() {
+  const queryClient = useQueryClient();
+
+  return useMutation({
+    mutationFn: async ({
+      conversationId,
+      conteudo,
+    }: {
+      conversationId: string;
+      conteudo: string;
+    }) => {
+      const {
+        data: { session },
+      } = await supabase.auth.getSession();
+
+      // 1. Create message as aprovada (skip approval queue)
+      const { data: msg, error: insertErr } = await supabase
+        .from('agent_messages')
+        .insert({
+          conversation_id: conversationId,
+          direcao: 'enviada',
+          canal: 'whatsapp',
+          conteudo,
+          status: 'aprovada',
+          aprovado_por: session?.user?.id ?? null,
+          aprovado_em: new Date().toISOString(),
+          metadata: { manual: true, sent_by: session?.user?.id },
+        })
+        .select('id')
+        .single();
+
+      if (insertErr || !msg) throw new Error(`Erro ao criar mensagem: ${insertErr?.message}`);
+
+      // 2. Send via whatsapp-enviar Edge Function
+      const res = await supabase.functions.invoke('whatsapp-enviar', {
+        body: { message_id: msg.id },
+      });
+
+      if (res.error) throw new Error(res.error.message);
+
+      return { conversationId };
+    },
+    onSuccess: ({ conversationId }) => {
+      queryClient.invalidateQueries({ queryKey: MESSAGES_KEY });
+      queryClient.invalidateQueries({ queryKey: messagesQueryKey(conversationId) });
+      queryClient.invalidateQueries({ queryKey: ['agent', 'conversations'] });
+      showSuccess('Mensagem manual enviada via WhatsApp');
+    },
+    onError: (error: Error) => {
+      showError(error.message);
+    },
+  });
+}
