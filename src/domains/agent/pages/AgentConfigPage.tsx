@@ -386,10 +386,7 @@ function TabModelosIA() {
   const queryClient = useQueryClient();
   const { models, isLoading: modelsLoading } = useAIModels();
 
-  const [modeloQual, setModeloQual] = useState('openai/gpt-4.1-mini');
-  const [modeloComp, setModeloComp] = useState('openai/gpt-4.1-mini');
-
-  useQuery({
+  const { data: agentConfigData, isLoading: configLoading } = useQuery({
     queryKey: ['agent_config'],
     queryFn: async () => {
       const { data, error } = await supabase
@@ -400,16 +397,27 @@ function TabModelosIA() {
       if (error) throw error;
       if (data?.valor) {
         try {
-          const parsed = JSON.parse(data.valor) as Partial<AgentConfig>;
-          if (parsed.modelo_qualificacao) setModeloQual(parsed.modelo_qualificacao);
-          if (parsed.modelo_composicao) setModeloComp(parsed.modelo_composicao);
+          return JSON.parse(data.valor) as Partial<AgentConfig>;
         } catch {
-          // keep defaults
+          return null;
         }
       }
       return null;
     },
   });
+
+  const [modeloQual, setModeloQual] = useState('');
+  const [modeloComp, setModeloComp] = useState('');
+  const [initialized, setInitialized] = useState(false);
+
+  // Sync state from query data once loaded
+  useEffect(() => {
+    if (agentConfigData && !initialized) {
+      setModeloQual(agentConfigData.modelo_qualificacao ?? 'openai/gpt-4.1-mini');
+      setModeloComp(agentConfigData.modelo_composicao ?? 'openai/gpt-4.1-mini');
+      setInitialized(true);
+    }
+  }, [agentConfigData, initialized]);
 
   const saveModelos = useMutation({
     mutationFn: async () => {
@@ -438,7 +446,7 @@ function TabModelosIA() {
     onError: () => showError('Erro ao salvar modelos.'),
   });
 
-  if (modelsLoading) {
+  if (modelsLoading || configLoading) {
     return (
       <div className="flex items-center justify-center py-16 gap-2 text-slate-400">
         <Loader2 className="h-5 w-5 animate-spin" />
