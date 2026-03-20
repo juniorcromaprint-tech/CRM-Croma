@@ -45,8 +45,16 @@ ESTRUTURA DO JSON DE RESPOSTA (obrigatorio):
   "conteudo": "corpo da mensagem — texto puro, sem markdown, paragrafos separados por \\n\\n",
   "tom_detectado": "frio|morno|quente|neutro",
   "upsell_sugerido": "descricao do upsell mais relevante para este lead, ou null",
-  "pergunta_feita": "a pergunta exata feita ao cliente"
-}`;
+  "pergunta_feita": "a pergunta exata feita ao cliente",
+  "intent_detectada": "conversa|orcamento|suporte|reclamacao|negociacao"
+}
+
+REGRAS PARA intent_detectada:
+- "orcamento": lead pediu preco, orcamento, cotacao, "quanto custa", "preciso de X", mencionou produto + quantidade/dimensao
+- "negociacao": lead quer desconto, prazo, condicao especial sobre proposta JA enviada
+- "suporte": lead tem problema com pedido existente, instalacao, qualidade
+- "reclamacao": lead esta insatisfeito, reclamando
+- "conversa": qualquer outra interacao (saudacao, duvida geral, informacao)`;
 }
 
 // ─────────────────────────────────────────────────────────────
@@ -260,7 +268,10 @@ serve(async (req: Request) => {
       tom_detectado: string;
       upsell_sugerido: string | null;
       pergunta_feita: string;
+      intent_detectada?: string;
     } = JSON.parse(aiResult.content);
+
+    const intentDetectada = aiData.intent_detectada || 'conversa';
 
     // ── 10. Substituir variáveis de template ──────────────────
     const templateVars: Record<string, string> = {
@@ -314,6 +325,7 @@ serve(async (req: Request) => {
           tom_detectado: aiData.tom_detectado,
           upsell_sugerido: aiData.upsell_sugerido,
           pergunta_feita: aiData.pergunta_feita,
+          intent_detectada: intentDetectada,
           tokens_input: aiResult.tokens_input,
           tokens_output: aiResult.tokens_output,
           duration_ms: aiResult.duration_ms,
@@ -327,7 +339,88 @@ serve(async (req: Request) => {
       throw new Error(`Falha ao salvar mensagem: ${msgErr?.message}`);
     }
 
-    // ── 13. Log ───────────────────────────────────────────────
+    // ── 13. Se intent === 'orcamento', acionar geração de proposta ──
+    if (intentDetectada === 'orcamento' && activeConversation) {
+      try {
+        const orcamentoUrl = `${Deno.env.get('SUPABASE_URL')}/functions/v1/ai-gerar-orcamento`;
+        const orcamentoResp = await fetch(orcamentoUrl, {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+            'Authorization': `Bearer ${Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')}`,
+          },
+          body: JSON.stringify({
+            conversation_id: conversationId,
+            lead_id,
+            mensagens: recentMessages,
+            canal,
+          }),
+        });
+        const orcamentoResult = await orcamentoResp.json();
+
+        if (orcamentoResult.status === 'proposta_criada') {
+          // ai-gerar-orcamento já criou mensagem pendente_aprovacao com o link
+          // Deletar a mensagem genérica que acabamos de salvar
+          await supabase.from('agent_messages').delete().eq('id', savedMsg.id);
+
+          await logAICall({
+            user_id: user.id,
+            function_name: 'compor-mensagem' as any,
+            entity_type: 'geral',
+            entity_id: lead_id,
+            model_used: aiResult.model_used,
+            tokens_input: aiResult.tokens_input,
+            tokens_output: aiResult.tokens_output,
+            cost_usd: aiResult.cost_usd,
+            duration_ms: aiResult.duration_ms,
+            status: 'success',
+          });
+
+          return jsonResponse(
+            {
+              conversation_id: conversationId,
+              message_id: null,
+              intent: 'orcamento',
+              proposta_id: orcamentoResult.proposta_id,
+              proposta_numero: orcamentoResult.proposta_numero,
+              portal_url: orcamentoResult.portal_url,
+            },
+            200,
+            corsHeaders
+          );
+        }
+
+        if (orcamentoResult.status === 'info_faltante') {
+          // ai-gerar-orcamento criou mensagem de clarificação — deletar a genérica
+          await supabase.from('agent_messages').delete().eq('id', savedMsg.id);
+
+          await logAICall({
+            user_id: user.id,
+            function_name: 'compor-mensagem' as any,
+            entity_type: 'geral',
+            entity_id: lead_id,
+            model_used: aiResult.model_used,
+            tokens_input: aiResult.tokens_input,
+            tokens_output: aiResult.tokens_output,
+            cost_usd: aiResult.cost_usd,
+            duration_ms: aiResult.duration_ms,
+            status: 'success',
+          });
+
+          return jsonResponse(
+            { conversation_id: conversationId, intent: 'orcamento_incompleto' },
+            200,
+            corsHeaders
+          );
+        }
+        // Qualquer outro status: continua com a mensagem genérica
+      } catch (err) {
+        console.error('Erro ao acionar ai-gerar-orcamento:', err);
+        // Fallback: continua com mensagem normal composta pela IA
+      }
+    }
+
+    // ── 15. Log ───────────────────────────────────────────────
     await logAICall({
       user_id: user.id,
       function_name: 'compor-mensagem' as any,
@@ -341,7 +434,7 @@ serve(async (req: Request) => {
       status: 'success',
     });
 
-    // ── 14. Resposta ──────────────────────────────────────────
+    // ── 16. Resposta ──────────────────────────────────────────
     return jsonResponse(
       {
         conversation_id: conversationId,
@@ -356,6 +449,7 @@ serve(async (req: Request) => {
           tom_detectado: aiData.tom_detectado,
           upsell_sugerido: aiData.upsell_sugerido,
           pergunta_feita: aiData.pergunta_feita,
+          intent_detectada: intentDetectada,
           model_used: aiResult.model_used,
           tokens_used: aiResult.tokens_input + aiResult.tokens_output,
           cost_usd: aiResult.cost_usd,
