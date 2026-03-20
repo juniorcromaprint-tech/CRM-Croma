@@ -27,7 +27,17 @@ function last10(phone: string): string {
 // HMAC SHA-256 signature validation (X-Hub-Signature-256)
 // ─────────────────────────────────────────────────────────────
 async function validateSignature(req: Request, rawBody: string): Promise<boolean> {
-  const appSecret = Deno.env.get('WHATSAPP_APP_SECRET');
+  let appSecret = Deno.env.get('WHATSAPP_APP_SECRET');
+  // Fallback: read from admin_config
+  if (!appSecret) {
+    const supabase = getServiceClient();
+    const { data } = await supabase
+      .from('admin_config')
+      .select('valor')
+      .eq('chave', 'WHATSAPP_APP_SECRET')
+      .single();
+    appSecret = data?.valor ?? null;
+  }
   if (!appSecret) {
     // If secret not configured, skip validation (dev mode)
     console.warn('whatsapp-webhook: WHATSAPP_APP_SECRET not set — skipping signature check');
@@ -66,7 +76,13 @@ serve(async (req: Request) => {
     const token = url.searchParams.get('hub.verify_token');
     const challenge = url.searchParams.get('hub.challenge');
 
-    const verifyToken = Deno.env.get('WHATSAPP_VERIFY_TOKEN');
+    let verifyToken = Deno.env.get('WHATSAPP_VERIFY_TOKEN');
+    // Fallback: read from admin_config
+    if (!verifyToken) {
+      const supa = getServiceClient();
+      const { data: vtData } = await supa.from('admin_config').select('valor').eq('chave', 'WHATSAPP_VERIFY_TOKEN').single();
+      verifyToken = vtData?.valor ?? undefined;
+    }
 
     if (mode === 'subscribe' && token === verifyToken && challenge) {
       console.log('whatsapp-webhook: verification OK');
