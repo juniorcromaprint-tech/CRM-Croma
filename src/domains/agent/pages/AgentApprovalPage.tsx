@@ -3,6 +3,7 @@ import {
   Mail, MessageCircle, Send, Edit2, Clock, Loader2,
   CheckCircle2, XCircle, AlertCircle, Bot,
 } from 'lucide-react';
+import { OrcamentoApprovalCard } from '../components/OrcamentoApprovalCard';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { Textarea } from '@/components/ui/textarea';
@@ -29,6 +30,7 @@ type PendingRow = {
   modelo_ia: string | null;
   created_at: string;
   status: string;
+  metadata?: Record<string, unknown> | null;
   agent_conversations: {
     id: string;
     canal: string;
@@ -107,6 +109,31 @@ function MessageCard({
   const canalKey = conv?.canal ?? msg.canal ?? 'email';
   const canalCfg = CANAL_CONFIG[canalKey] ?? CANAL_CONFIG.email;
   const CanalIcon = canalCfg.Icon;
+
+  // Card especial para orçamentos gerados pela IA
+  if (msg.metadata?.tipo === 'orcamento') {
+    return (
+      <OrcamentoApprovalCard
+        msg={{
+          ...msg,
+          metadata: msg.metadata as {
+            tipo: 'orcamento';
+            proposta_id: string;
+            proposta_numero: string;
+            share_token: string;
+            portal_url: string;
+            total: number;
+            itens_count: number;
+          },
+        }}
+        lead={lead ?? null}
+        onApproveAndSend={onApproveAndSend}
+        onReject={onReject}
+        isApproveAndSendPending={isApproveAndSendPending}
+        isRejectPending={isRejectPending}
+      />
+    );
+  }
 
   return (
     <div className="bg-white rounded-2xl border border-slate-200 overflow-hidden shadow-sm">
