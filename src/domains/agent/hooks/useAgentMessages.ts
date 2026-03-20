@@ -54,7 +54,8 @@ export function useAgentMessages(conversationId?: string) {
 export function usePendingMessages() {
   return useQuery({
     queryKey: PENDING_MESSAGES_KEY,
-    staleTime: 30 * 1000,
+    staleTime: 10 * 1000,
+    refetchInterval: 15 * 1000,
     queryFn: async () => {
       const { data, error } = await supabase
         .from('agent_messages')
