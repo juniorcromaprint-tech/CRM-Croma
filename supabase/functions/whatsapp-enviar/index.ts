@@ -141,10 +141,22 @@ serve(async (req: Request) => {
 
     const toPhone = normalizePhone(lead.contato_telefone);
 
-    // ── 3. Env vars ───────────────────────────────────────────
-    const PHONE_NUMBER_ID = Deno.env.get('WHATSAPP_PHONE_NUMBER_ID');
-    const ACCESS_TOKEN = Deno.env.get('WHATSAPP_ACCESS_TOKEN');
+    // ── 3. Credentials: env vars → fallback admin_config ──────
+    let PHONE_NUMBER_ID = Deno.env.get('WHATSAPP_PHONE_NUMBER_ID');
+    let ACCESS_TOKEN = Deno.env.get('WHATSAPP_ACCESS_TOKEN');
     const now = new Date().toISOString();
+
+    // Fallback: read from admin_config table if env vars not set
+    if (!PHONE_NUMBER_ID || !ACCESS_TOKEN) {
+      const { data: configs } = await supabase
+        .from('admin_config')
+        .select('chave, valor')
+        .in('chave', ['WHATSAPP_PHONE_NUMBER_ID', 'WHATSAPP_ACCESS_TOKEN']);
+      for (const cfg of configs ?? []) {
+        if (cfg.chave === 'WHATSAPP_PHONE_NUMBER_ID' && !PHONE_NUMBER_ID) PHONE_NUMBER_ID = cfg.valor;
+        if (cfg.chave === 'WHATSAPP_ACCESS_TOKEN' && !ACCESS_TOKEN) ACCESS_TOKEN = cfg.valor;
+      }
+    }
 
     // ── 4. Demo mode if ACCESS_TOKEN not set ──────────────────
     if (!ACCESS_TOKEN) {
