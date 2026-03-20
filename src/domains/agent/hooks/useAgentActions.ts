@@ -81,12 +81,17 @@ export function useRunOrchestrator() {
 
       if (res.error) throw new Error(res.error.message);
 
-      return res.data as { actions: AgentAction[]; processed: number };
+      // A Edge Function retorna { acoes, total_processadas } em português
+      const raw = res.data as { acoes?: AgentAction[]; total_processadas?: number; actions?: AgentAction[]; processed?: number };
+      return {
+        actions: raw.acoes ?? raw.actions ?? [],
+        processed: raw.total_processadas ?? raw.processed ?? 0,
+      };
     },
     onSuccess: (data) => {
       queryClient.invalidateQueries({ queryKey: ['agent'] });
       const count = data.processed ?? data.actions?.length ?? 0;
-      showSuccess(`Orquestrador concluído — ${count} ação${count !== 1 ? 'ões' : ''} processada${count !== 1 ? 's' : ''}`);
+      showSuccess(`Orquestrador concluído — ${count} conversa${count !== 1 ? 's' : ''} processada${count !== 1 ? 's' : ''}`);
     },
     onError: (error: Error) => {
       showError(error.message);
