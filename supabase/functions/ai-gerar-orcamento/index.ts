@@ -45,9 +45,12 @@ Responda APENAS em JSON valido:
 }
 
 REGRAS:
-- Se o lead nao especificou dimensoes, infira do contexto (ex: "banner para fachada" = provavel 3x1m)
-- Se nao da pra inferir dimensao, coloque em info_faltante como array de strings
-- confianca 0.0-1.0: 1.0 = certeza total, 0.5 = chute, 0.0 = sem ideia
+- SEMPRE infira dimensoes quando o cliente nao especificar — use dimensoes padrao da industria:
+  banner externo: 300x100cm | banner interno: 150x60cm | fachada: 500x120cm
+  adesivo vitrine: 100x150cm | placa: 100x70cm | totem: 60x180cm | backdrop: 300x200cm
+  letreiro: 400x80cm | painel: 200x120cm | pdv: 60x60cm | envelopamento: 200x150cm
+- info_faltante deve ser null na grande maioria dos casos — so use quando ABSOLUTAMENTE impossivel inferir
+- confianca 0.0-1.0: 1.0 = certeza total, 0.7 = dimensoes inferidas, 0.5 = chute razoavel
 - Sempre use cm para dimensoes
 - Se o lead pediu algo fora de comunicacao visual, retorne itens=[] e mensagem_clarificacao`;
 
@@ -224,8 +227,11 @@ serve(async (req: Request) => {
       dados_cliente_faltantes?: string[] | null;
     };
 
-    // Se faltam informações, criar mensagem de clarificação
+    // Só bloqueia para clarificação se NÃO há itens válidos E faltam dados essenciais
+    // (a IA agora infere dimensões padrão, então info_faltante deve ser raro)
+    const semItensValidos = !extracao.itens?.length;
     if (
+      semItensValidos &&
       (extracao.info_faltante?.length || extracao.dados_cliente_faltantes?.length)
     ) {
       const mensagemClarificacao = extracao.mensagem_clarificacao ||
@@ -306,14 +312,14 @@ serve(async (req: Request) => {
     const itensSemMatch: Array<{ item: ItemExtraido }> = [];
 
     for (const item of extracao.itens) {
-      if (item.confianca < 0.5) {
+      if (item.confianca < 0.3) {
         itensSemMatch.push({ item });
         continue;
       }
 
       const match = await matchModelo(supabase, item, regrasMap);
 
-      if (!match || match.confianca < 0.7) {
+      if (!match || match.confianca < 0.5) {
         itensSemMatch.push({ item });
         continue;
       }

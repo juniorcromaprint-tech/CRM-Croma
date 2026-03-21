@@ -11,6 +11,25 @@ let _fallbackOverride: AIModel | null = null;
 export function setFallbackModel(model: AIModel) { _fallbackOverride = model; }
 function getFallbackModel(): AIModel { return _fallbackOverride ?? DEFAULT_FALLBACK_MODEL; }
 
+// Modelos que suportam response_format: { type: 'json_object' }
+// Modelos gratuitos (:free suffix) geralmente NÃO suportam — omitir o parâmetro para eles
+const SUPPORTS_JSON_FORMAT = new Set([
+  'openai/gpt-4.1-mini',
+  'openai/gpt-4.1',
+  'openai/gpt-4.1-nano',
+  'openai/gpt-4o',
+  'openai/gpt-4o-mini',
+  'openai/gpt-3.5-turbo',
+  'anthropic/claude-sonnet-4',
+  'anthropic/claude-haiku-3.5',
+  'anthropic/claude-opus-4',
+  'google/gemini-2.0-flash-001',
+  'google/gemini-2.5-flash-preview',
+  'google/gemini-2.5-pro-preview',
+  'mistralai/mistral-large',
+  'mistralai/mistral-medium',
+]);
+
 interface OpenRouterMessage {
   role: 'system' | 'user' | 'assistant';
   content: string;
@@ -52,14 +71,18 @@ export async function callOpenRouter(
     const result = await fetchCompletion(apiKey, model, messages, config);
     return buildResult(result, model, startTime);
   } catch (error) {
-    // Fallback to cheaper model if primary fails
+    // Fallback sempre para modelo confiável — nunca o mesmo modelo que falhou
     const fallback = getFallbackModel();
-    if (model !== fallback) {
-      console.warn(`Primary model ${model} failed, falling back to ${fallback}:`, error);
-      const result = await fetchCompletion(apiKey, fallback, messages, config);
-      return buildResult(result, fallback, startTime);
+    const safeFallback = (model === fallback || fallback === model) ? DEFAULT_FALLBACK_MODEL : fallback;
+
+    if (model === safeFallback) {
+      console.error(`Primary model ${model} failed and equals fallback — no retry possible:`, error);
+      throw error;
     }
-    throw error;
+
+    console.warn(`Primary model ${model} failed, falling back to ${safeFallback}:`, error);
+    const result = await fetchCompletion(apiKey, safeFallback, messages, config);
+    return buildResult(result, safeFallback, startTime);
   }
 }
 
@@ -73,6 +96,18 @@ async function fetchCompletion(
   const timeoutId = setTimeout(() => controller.abort(), config?.timeout_ms ?? 30000);
 
   try {
+    // Só envia response_format para modelos que suportam — modelos gratuitos ignoram ou rejeitam
+    const supportsJsonFormat = SUPPORTS_JSON_FORMAT.has(model) && !model.endsWith(':free');
+    const bodyPayload: Record<string, unknown> = {
+      model,
+      messages,
+      temperature: config?.temperature ?? 0.3,
+      max_tokens: config?.max_tokens ?? 2000,
+    };
+    if (supportsJsonFormat) {
+      bodyPayload.response_format = { type: 'json_object' };
+    }
+
     const response = await fetch(OPENROUTER_URL, {
       method: 'POST',
       headers: {
@@ -81,13 +116,7 @@ async function fetchCompletion(
         'HTTP-Referer': 'https://crm-croma.vercel.app',
         'X-Title': 'Croma AI Engine',
       },
-      body: JSON.stringify({
-        model,
-        messages,
-        temperature: config?.temperature ?? 0.3,
-        max_tokens: config?.max_tokens ?? 2000,
-        response_format: { type: 'json_object' },
-      }),
+      body: JSON.stringify(bodyPayload),
       signal: controller.signal,
     });
 
@@ -102,6 +131,32 @@ async function fetchCompletion(
   }
 }
 
+/**
+ * Extrai JSON válido de uma string que pode conter texto extra ou markdown code blocks.
+ * Necessário para modelos que não suportam response_format e retornam JSON misturado com texto.
+ */
+function extractJSON(raw: string): string {
+  // Já é JSON válido
+  try { JSON.parse(raw); return raw; } catch { /* continua */ }
+
+  // Tenta extrair de ```json ... ``` ou ``` ... ```
+  const mdMatch = raw.match(/```(?:json)?\s*([\s\S]*?)```/);
+  if (mdMatch?.[1]) {
+    const candidate = mdMatch[1].trim();
+    try { JSON.parse(candidate); return candidate; } catch { /* continua */ }
+  }
+
+  // Tenta extrair o maior objeto JSON da string
+  const objMatch = raw.match(/(\{[\s\S]*\})/);
+  if (objMatch?.[1]) {
+    try { JSON.parse(objMatch[1]); return objMatch[1]; } catch { /* continua */ }
+  }
+
+  // Último recurso: retorna o raw (vai falhar no parse do caller com mensagem útil)
+  console.warn('extractJSON: não foi possível extrair JSON válido, retornando raw');
+  return raw;
+}
+
 function buildResult(
   response: OpenRouterResponse,
   model: string,
@@ -111,8 +166,10 @@ function buildResult(
   const costs = MODEL_COSTS[model] ?? MODEL_COSTS['openai/gpt-4.1-mini'];
   const costUsd = (usage.prompt_tokens * costs.input + usage.completion_tokens * costs.output) / 1_000_000;
 
+  const rawContent = response.choices[0]?.message?.content ?? '';
+
   return {
-    content: response.choices[0]?.message?.content ?? '',
+    content: extractJSON(rawContent),
     model_used: model,
     tokens_input: usage.prompt_tokens,
     tokens_output: usage.completion_tokens,

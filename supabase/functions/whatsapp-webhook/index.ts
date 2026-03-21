@@ -84,8 +84,8 @@ REGRAS ABSOLUTAS:
 - Maximo 3 paragrafos no campo "conteudo" (WhatsApp precisa ser curto)
 - Use *negrito* para destaques (funciona no WhatsApp)
 - Emojis com moderacao (1-2 no maximo)
-- Sempre faca 1 pergunta inteligente ao final (mas apenas 1)
-- NUNCA forneca preco sem antes diagnosticar a necessidade do cliente
+- Se o cliente JA descreveu o que precisa (produto, quantidade ou dimensao), classifique intent_detectada como "orcamento" — NAO faca mais perguntas, o sistema gerara o orcamento automaticamente
+- Se o cliente NAO especificou o que quer (apenas saudacao ou duvida generica), faca 1 pergunta objetiva sobre qual produto/servico precisa
 - Se o cliente responde positivamente → avance a conversa
 - Se o cliente faz pergunta → responda e redirecione para valor
 - Se o cliente mostra objecao → trate com empatia e reformule
@@ -113,7 +113,7 @@ ESTRUTURA DO JSON DE RESPOSTA (obrigatorio):
 }
 
 REGRAS PARA intent_detectada:
-- "orcamento": cliente pediu preco, orcamento, cotacao, "quanto custa", "preciso de X", mencionou produto + quantidade/dimensao
+- "orcamento": cliente pediu preco, orcamento, cotacao, "quanto custa", "preciso de X", mencionou produto + quantidade/dimensao — quando for "orcamento", o etapa_sugerida DEVE ser "proposta"
 - "negociacao": cliente quer desconto, prazo, condicao especial sobre proposta JA enviada
 - "suporte": cliente tem problema com pedido existente, instalacao, qualidade
 - "reclamacao": cliente esta insatisfeito, reclamando
@@ -287,7 +287,18 @@ async function generateAutoResponse(
       intent_detectada?: string;
     };
 
-    const intentDetectada = aiData.intent_detectada || 'conversa';
+    // Detecção determinística — palavras-chave claras sobrescrevem a IA para evitar falsos negativos
+    const ORCAMENTO_REGEX = /\b(or[cç]amento|cota[cç][aã]o|quanto(?:\s+(?:custa|fica|cobra|sai))|preciso\s+de|quero\s+(?:fazer|encomendar|\d+)|precisa(?:mos)?\s+de|banner|fachada|adesivo|placa|letreiro|painel|totem|backdrop|envelopamento|pdv)\b/i;
+    const forceOrcamento = ORCAMENTO_REGEX.test(incomingMessage);
+    const intentDetectada = forceOrcamento ? 'orcamento' : (aiData.intent_detectada || 'conversa');
+
+    // Quando for orçamento, forçar etapa para proposta imediatamente
+    if (intentDetectada === 'orcamento') {
+      await supabase
+        .from('agent_conversations')
+        .update({ etapa: 'proposta' })
+        .eq('id', conversation.id as string);
+    }
 
     // Se detectou intenção de orçamento, acionar geração de proposta
     if (intentDetectada === 'orcamento') {

@@ -3,7 +3,7 @@
 // Sheet com timeline completa de uma conversa do agente
 // ============================================================================
 
-import { useState } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import {
   Sheet,
   SheetContent,
@@ -138,9 +138,17 @@ export default function ConversationDetail({
   const resume = useResumeConversation();
   const sendManual = useSendManualWhatsApp();
   const [manualText, setManualText] = useState('');
+  const messagesEndRef = useRef<HTMLDivElement>(null);
 
   const lead = conversation?.leads;
   const isEscalated = conversation?.status === 'escalada';
+
+  // Auto-scroll para última mensagem sempre que a lista mudar
+  useEffect(() => {
+    if (messagesEndRef.current) {
+      messagesEndRef.current.scrollIntoView({ behavior: 'smooth' });
+    }
+  }, [messages]);
 
   function handleEscalate() {
     if (!conversation) return;
@@ -255,6 +263,7 @@ export default function ConversationDetail({
               {messages.map((msg) => (
                 <MessageBubble key={msg.id} message={msg} />
               ))}
+              <div ref={messagesEndRef} />
             </div>
           )}
         </ScrollArea>
