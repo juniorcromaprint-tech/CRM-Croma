@@ -11,7 +11,7 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Badge } from '@/components/ui/badge';
-import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
+import { Card, CardContent } from '@/components/ui/card';
 import { Checkbox } from '@/components/ui/checkbox';
 import {
   Dialog,
@@ -30,7 +30,7 @@ import {
   XCircle,
   Eye,
   EyeOff,
-  Toggle,
+  ToggleLeft,
 } from 'lucide-react';
 
 // ─── Types ────────────────────────────────────────────────────────────────────
@@ -348,7 +348,7 @@ export default function WebhooksPage() {
                       title={wh.ativo ? 'Desativar' : 'Ativar'}
                       onClick={() => toggleWebhook.mutate({ id: wh.id, ativo: !wh.ativo })}
                     >
-                      <Toggle size={15} className={wh.ativo ? 'text-emerald-600' : 'text-slate-400'} />
+                      <ToggleLeft size={15} className={wh.ativo ? 'text-emerald-600' : 'text-slate-400'} />
                     </Button>
 
                     {/* Testar */}

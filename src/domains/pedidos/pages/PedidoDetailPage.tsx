@@ -186,7 +186,6 @@ export default function PedidoDetailPage() {
         pedido_id: id,
         cliente_id: pedido.cliente_id,
       }).then(() => {
-        console.log('[NPS] token gerado para pedido', id);
       });
       // 4. Invalidar cache para refletir no UI
       queryClient.invalidateQueries({ queryKey: ['pedidos'] })

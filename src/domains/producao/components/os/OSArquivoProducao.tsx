@@ -17,7 +17,6 @@ interface OSArquivoProducaoProps {
   instrucoes?: string | null;       // instruções existentes do item
 }
 
-const ALLOWED_TYPES = ['image/jpeg', 'image/png', 'image/gif', 'application/pdf', 'application/postscript'];
 const ALLOWED_EXT = '.jpg,.jpeg,.png,.gif,.pdf,.ai,.eps';
 const MAX_SIZE_MB = 50;
 
@@ -57,7 +56,6 @@ export function OSArquivoProducao({ opId, arteUrl, instrucoes }: OSArquivoProduc
 
     setUploading(true);
     try {
-      const ext = file.name.split('.').pop() ?? 'bin';
       const path = `${opId}/${Date.now()}-${file.name.replace(/[^a-zA-Z0-9._-]/g, '_')}`;
 
       const { error: uploadError } = await supabase.storage
