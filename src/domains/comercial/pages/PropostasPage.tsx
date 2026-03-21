@@ -64,6 +64,7 @@ export default function PropostasPage() {
 
   // Converter em pedido state
   const [convertingId, setConvertingId] = useState<string | null>(null)
+  const [confirmDialog, setConfirmDialog] = useState<{ open: boolean; propostaId: string | null; proposta: Proposta | null }>({ open: false, propostaId: null, proposta: null })
 
   // Queries
   const filtros = useMemo(() => ({
@@ -87,6 +88,13 @@ export default function PropostasPage() {
   }, [todos])
 
   function handleConverter(p: Proposta) {
+    setConfirmDialog({ open: true, propostaId: p.id, proposta: p })
+  }
+
+  function handleConverterConfirm() {
+    const p = confirmDialog.proposta
+    if (!p) return
+    setConfirmDialog({ open: false, propostaId: null, proposta: null })
     setConvertingId(p.id)
     converter.mutate(
       { id: p.id, cliente_id: p.cliente_id, valor_estimado: p.valor_estimado ?? 0 },
@@ -456,6 +464,27 @@ export default function PropostasPage() {
           </DialogFooter>
         </DialogContent>
       </Dialog>
+
+      {/* Confirm converter dialog */}
+      <AlertDialog open={confirmDialog.open} onOpenChange={(open) => !open && setConfirmDialog({ open: false, propostaId: null, proposta: null })}>
+        <AlertDialogContent className="rounded-2xl max-w-md mx-4">
+          <AlertDialogHeader>
+            <AlertDialogTitle>Converter em Pedido</AlertDialogTitle>
+            <AlertDialogDescription>
+              Deseja criar um pedido a partir desta proposta? Um pedido será gerado com os itens da proposta.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter className="gap-2">
+            <AlertDialogCancel className="rounded-xl">Cancelar</AlertDialogCancel>
+            <AlertDialogAction
+              onClick={handleConverterConfirm}
+              className="rounded-xl bg-blue-600 hover:bg-blue-700 text-white"
+            >
+              Converter
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
 
       {/* Delete dialog */}
       <AlertDialog open={!!deleteId} onOpenChange={(open) => !open && setDeleteId(null)}>

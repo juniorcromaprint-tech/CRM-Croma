@@ -43,7 +43,7 @@ export default function AIKPIBar({ kpis }: AIKPIBarProps) {
           >
             <div className="flex items-center gap-1.5 mb-1.5">
               <config.Icon size={12} className="text-slate-400" />
-              <span className="text-[10px] text-slate-400 uppercase tracking-wider font-semibold">{config.label}</span>
+              <span className="text-xs text-slate-400 uppercase tracking-wider font-semibold">{config.label}</span>
             </div>
             <div className={`text-base font-bold ${config.color ?? 'text-slate-800'}`}>
               {config.format(value)}

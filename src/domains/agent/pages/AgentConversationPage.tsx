@@ -110,7 +110,7 @@ function MessageBubble({ message }: { message: ReturnType<typeof useAgentMessage
           {message.conteudo}
         </div>
 
-        <div className={`flex items-center gap-2 text-[10px] text-slate-400 ${isSent ? 'flex-row-reverse' : ''}`}>
+        <div className={`flex items-center gap-2 text-xs text-slate-400 ${isSent ? 'flex-row-reverse' : ''}`}>
           <span>{message.enviado_em ? formatDate(message.enviado_em) : formatDate(message.created_at)}</span>
           {message.modelo_ia && (
             <span className="hidden sm:block truncate max-w-[120px]">{message.modelo_ia}</span>

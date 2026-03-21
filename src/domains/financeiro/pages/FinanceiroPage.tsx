@@ -1412,7 +1412,7 @@ function TabContasPagar() {
             >
               {f.label}
               {'badge' in f && (f as { badge: number }).badge > 0 && (
-                <span className={`ml-1.5 inline-flex items-center justify-center w-4 h-4 text-[10px] font-bold rounded-full ${
+                <span className={`ml-1.5 inline-flex items-center justify-center w-4 h-4 text-xs font-bold rounded-full ${
                   statusFilter === f.key ? "bg-white/30 text-white" : "bg-amber-500 text-white"
                 }`}>
                   {(f as { badge: number }).badge}
@@ -2080,7 +2080,7 @@ export default function FinanceiroPage() {
             <ArrowUpRight size={16} className="hidden sm:block" />
             A Pagar
             {pendentesCount > 0 && (
-              <span className="inline-flex items-center justify-center w-5 h-5 text-[10px] font-bold rounded-full bg-amber-500 text-white">
+              <span className="inline-flex items-center justify-center w-5 h-5 text-xs font-bold rounded-full bg-amber-500 text-white">
                 {pendentesCount}
               </span>
             )}

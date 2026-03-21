@@ -203,7 +203,7 @@ function SidebarNavGroups({
             {/* Group header — clickable for non-PAINEL groups */}
             <div className={groupIdx === 0 ? "pb-1" : "pt-4 pb-1"}>
               {isAlwaysVisible ? (
-                <p className="px-4 text-[10px] font-bold text-slate-400 uppercase tracking-widest">
+                <p className="px-4 text-xs font-bold text-slate-400 uppercase tracking-widest">
                   {group.label}
                 </p>
               ) : (
@@ -212,7 +212,7 @@ function SidebarNavGroups({
                   onClick={() => onToggleGroup(group.label)}
                   className="flex items-center justify-between w-full px-4 py-0.5 group cursor-pointer"
                 >
-                  <p className="text-[10px] font-bold text-slate-400 uppercase tracking-widest group-hover:text-slate-600 transition-colors">
+                  <p className="text-xs font-bold text-slate-400 uppercase tracking-widest group-hover:text-slate-600 transition-colors">
                     {group.label}
                   </p>
                   {isExpanded ? (
@@ -313,7 +313,7 @@ function UserSection({ collapsed = false }: UserSectionProps) {
         </div>
         <div className="min-w-0 flex-1">
           <p className="text-sm font-semibold text-slate-800 truncate">{displayName}</p>
-          <p className="text-[11px] text-slate-500 truncate">{roleLabel}</p>
+          <p className="text-xs text-slate-500 truncate">{roleLabel}</p>
         </div>
       </div>
       <Link
@@ -443,7 +443,7 @@ export default function Layout() {
           >
             <Search size={14} />
             <span className="flex-1 text-left">Buscar...</span>
-            <kbd className="text-[10px] bg-white border border-slate-200 rounded px-1.5 py-0.5 font-mono">⌘K</kbd>
+            <kbd className="text-xs bg-white border border-slate-200 rounded px-1.5 py-0.5 font-mono">⌘K</kbd>
           </button>
         ) : (
           <Tooltip>
@@ -542,7 +542,7 @@ export default function Layout() {
               }`}
             >
               <Icon size={24} className="mb-1" />
-              <span className="text-[10px] font-medium">{item.name}</span>
+              <span className="text-xs font-medium">{item.name}</span>
             </Link>
           );
         })}
@@ -553,7 +553,7 @@ export default function Layout() {
           }`}
         >
           <Settings size={24} className="mb-1" />
-          <span className="text-[10px] font-medium">Ajustes</span>
+          <span className="text-xs font-medium">Ajustes</span>
         </Link>
       </nav>
     </div>

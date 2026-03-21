@@ -468,7 +468,7 @@ export default function OrcamentoViewPage() {
 
                               {/* Cost breakdown bar */}
                               <div className="md:col-span-2">
-                                <div className="flex items-center gap-4 text-[11px] text-slate-500">
+                                <div className="flex items-center gap-4 text-xs text-slate-500">
                                   <span>MP: {brl(item.custo_mp ?? 0)}</span>
                                   <span>MO: {brl(item.custo_mo ?? 0)}</span>
                                   <span>Fixo: {brl(item.custo_fixo ?? 0)}</span>

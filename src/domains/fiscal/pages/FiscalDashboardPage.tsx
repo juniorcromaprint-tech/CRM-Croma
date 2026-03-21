@@ -343,7 +343,7 @@ export default function FiscalDashboardPage() {
                   <ListOrdered className="w-4 h-4 text-amber-500" />
                   Fila de Emissão
                   {(filasTravadas as any[]).length > 0 && (
-                    <Badge className="bg-red-500 text-white text-[10px] px-1.5 py-0">
+                    <Badge className="bg-red-500 text-white text-xs px-1.5 py-0">
                       {(filasTravadas as any[]).length}
                     </Badge>
                   )}

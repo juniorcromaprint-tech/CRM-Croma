@@ -114,7 +114,7 @@ export default function AISidebar({
               </div>
               <div>
                 <h2 className="font-bold text-sm text-white">Croma AI</h2>
-                <p className="text-[11px] text-blue-100">{title}</p>
+                <p className="text-xs text-blue-100">{title}</p>
               </div>
             </div>
             <button
@@ -168,7 +168,7 @@ export default function AISidebar({
 
               {/* Actions */}
               <div className="space-y-2.5">
-                <h3 className="text-[11px] font-semibold text-slate-400 uppercase tracking-wider">
+                <h3 className="text-xs font-semibold text-slate-400 uppercase tracking-wider">
                   Sugestões ({response.actions.length})
                 </h3>
                 {response.actions.map((action) => (
@@ -200,7 +200,7 @@ export default function AISidebar({
         )}
 
         {response && (
-          <div className="px-5 py-2 border-t border-slate-100 flex justify-between text-[10px] text-slate-400">
+          <div className="px-5 py-2 border-t border-slate-100 flex justify-between text-xs text-slate-400">
             <span>{response.model_used}</span>
             <span>{response.tokens_used.toLocaleString()} tokens</span>
           </div>

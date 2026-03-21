@@ -44,7 +44,7 @@ export default function ResumoVendedor({
 
       {isPrecoOverride && (
         <div className="bg-amber-50 border border-amber-200 rounded-xl px-3 py-1.5 text-center">
-          <span className="text-[10px] font-medium text-amber-700">Preço ajustado manualmente</span>
+          <span className="text-xs font-medium text-amber-700">Preço ajustado manualmente</span>
         </div>
       )}
 
@@ -63,7 +63,7 @@ export default function ResumoVendedor({
               <span className="text-xs font-semibold text-slate-700 tabular-nums">{brl(resultado.custoMP)}</span>
             </div>
             {resultado.custoMP === 0 && (
-              <p className="text-[10px] text-amber-600 mt-0.5 flex items-center gap-1"><AlertTriangle size={10} /> Sem materiais cadastrados</p>
+              <p className="text-xs text-amber-600 mt-0.5 flex items-center gap-1"><AlertTriangle size={10} /> Sem materiais cadastrados</p>
             )}
           </div>
         </div>
@@ -107,7 +107,7 @@ export default function ResumoVendedor({
             </span>
           </div>
           {!margemBoa && (
-            <p className="text-[10px] mt-0.5 text-slate-500">
+            <p className="text-xs mt-0.5 text-slate-500">
               Markup sugerido: {markupSugerido}% · Mínimo: {markupMinimo}%
             </p>
           )}

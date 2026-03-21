@@ -538,12 +538,12 @@ export default function PipelinePage() {
                   </h3>
                   <Badge
                     variant="secondary"
-                    className="ml-auto text-[10px] px-1.5 py-0 h-5 bg-white/60"
+                    className="ml-auto text-xs px-1.5 py-0 h-5 bg-white/60"
                   >
                     {stageLeads.length}
                   </Badge>
                 </div>
-                <p className="text-[11px] text-slate-500 font-medium">
+                <p className="text-xs text-slate-500 font-medium">
                   {brl(stageValor)}
                 </p>
               </div>
@@ -582,7 +582,7 @@ export default function PipelinePage() {
                               {lead.empresa}
                             </h4>
                             {lead.contato_nome && (
-                              <p className="text-[11px] text-slate-500 truncate mt-0.5">
+                              <p className="text-xs text-slate-500 truncate mt-0.5">
                                 {lead.contato_nome}
                                 {lead.cargo ? ` · ${lead.cargo}` : ""}
                               </p>
@@ -607,12 +607,12 @@ export default function PipelinePage() {
                           {/* Temperature + Days */}
                           <div className="flex items-center justify-between">
                             <span
-                              className={`inline-flex items-center gap-1 text-[11px] font-medium ${tempCfg.textClass}`}
+                              className={`inline-flex items-center gap-1 text-xs font-medium ${tempCfg.textClass}`}
                             >
                               <TempIcon size={12} />
                               {tempCfg.label}
                             </span>
-                            <span className="inline-flex items-center gap-1 text-[11px] text-slate-400">
+                            <span className="inline-flex items-center gap-1 text-xs text-slate-400">
                               <Clock size={11} />
                               {daysLabel(days)}
                             </span>

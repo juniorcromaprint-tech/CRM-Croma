@@ -186,7 +186,7 @@ function ActivityItem({ title, subtitle, time, type }: { title: string; subtitle
         <p className="text-sm text-slate-700 truncate font-medium">{title}</p>
         <p className="text-xs text-slate-400">{subtitle}</p>
       </div>
-      <span className="text-[11px] text-slate-400 tabular-nums whitespace-nowrap">{time}</span>
+      <span className="text-xs text-slate-400 tabular-nums whitespace-nowrap">{time}</span>
     </div>
   );
 }
@@ -522,7 +522,7 @@ export default function DashboardDiretor() {
                 <div className="text-right">
                   <span className="text-sm font-bold tabular-nums text-amber-600">{brl(receitaProjetada)}</span>
                   {pedidosAtrasados > 0 && (
-                    <p className="text-[10px] text-red-500 font-medium">⚠ {pedidosAtrasados} atrasados</p>
+                    <p className="text-xs text-red-500 font-medium">⚠ {pedidosAtrasados} atrasados</p>
                   )}
                 </div>
               </div>
@@ -553,7 +553,7 @@ export default function DashboardDiretor() {
                   {icon}
                   <div>
                     <p className={`text-lg font-bold tabular-nums ${text}`}>{value}</p>
-                    <p className="text-[11px] text-slate-400">{label}</p>
+                    <p className="text-xs text-slate-400">{label}</p>
                   </div>
                 </div>
               ))}
@@ -583,7 +583,7 @@ export default function DashboardDiretor() {
                   {i > 0 && <div className="w-px h-10 bg-slate-100" />}
                   <div className="flex-1">
                     <p className={`text-2xl font-bold tabular-nums ${color}`}>{value}</p>
-                    <p className="text-[11px] text-slate-400 mt-0.5">{label}</p>
+                    <p className="text-xs text-slate-400 mt-0.5">{label}</p>
                   </div>
                 </React.Fragment>
               ))}
@@ -612,11 +612,11 @@ export default function DashboardDiretor() {
                     }`}>
                       {(nps.score ?? 0) > 0 ? `+${nps.score}` : nps.score}
                     </p>
-                    <p className="text-[11px] text-slate-400 mt-0.5">NPS Score</p>
+                    <p className="text-xs text-slate-400 mt-0.5">NPS Score</p>
                   </div>
                   <div className="ml-auto text-right">
                     <p className="text-xl font-bold tabular-nums text-slate-700">{nps.media}</p>
-                    <p className="text-[11px] text-slate-400">Média (0–10)</p>
+                    <p className="text-xs text-slate-400">Média (0–10)</p>
                   </div>
                 </div>
 
@@ -655,13 +655,13 @@ export default function DashboardDiretor() {
                       {i > 0 && <div className="w-px h-10 bg-slate-100" />}
                       <div className="flex-1">
                         <p className={`text-xl font-bold tabular-nums ${color}`}>{value}</p>
-                        <p className="text-[11px] text-slate-400 mt-0.5">{label}</p>
+                        <p className="text-xs text-slate-400 mt-0.5">{label}</p>
                       </div>
                     </React.Fragment>
                   ))}
                 </div>
 
-                <p className="text-[11px] text-slate-400 text-center">
+                <p className="text-xs text-slate-400 text-center">
                   {nps.total} resposta{nps.total !== 1 ? 's' : ''} este mês
                 </p>
               </div>

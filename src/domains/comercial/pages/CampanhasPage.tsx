@@ -59,7 +59,7 @@ function fmtDate(iso: string | null) {
 
 function Badge({ label, cls }: { label: string; cls: string }) {
   return (
-    <span className={`inline-flex items-center px-2 py-0.5 rounded-full text-[11px] font-medium ${cls}`}>
+    <span className={`inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium ${cls}`}>
       {label}
     </span>
   )
@@ -161,7 +161,7 @@ function CampanhaSheet({
               <TabsTrigger value="destinatarios" className="flex-1">
                 <Users size={14} className="mr-1.5" /> Destinatários
                 {destinatarios.length > 0 && (
-                  <span className="ml-1.5 bg-blue-100 text-blue-700 text-[10px] font-semibold px-1.5 py-0.5 rounded-full">
+                  <span className="ml-1.5 bg-blue-100 text-blue-700 text-xs font-semibold px-1.5 py-0.5 rounded-full">
                     {destinatarios.length}
                   </span>
                 )}

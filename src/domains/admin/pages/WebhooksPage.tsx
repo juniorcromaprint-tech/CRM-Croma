@@ -299,7 +299,7 @@ export default function WebhooksPage() {
                     <div className="flex items-center gap-2 flex-wrap">
                       <p className="font-semibold text-slate-800">{wh.nome}</p>
                       <Badge
-                        className={`text-[10px] px-2 py-0.5 rounded-full ${
+                        className={`text-xs px-2 py-0.5 rounded-full ${
                           wh.ativo
                             ? 'bg-emerald-100 text-emerald-700 border-emerald-200'
                             : 'bg-slate-100 text-slate-500 border-slate-200'
@@ -330,7 +330,7 @@ export default function WebhooksPage() {
                         <Badge
                           key={ev}
                           variant="secondary"
-                          className="text-[10px] h-5 bg-blue-50 text-blue-700 border-blue-200 px-2"
+                          className="text-xs h-5 bg-blue-50 text-blue-700 border-blue-200 px-2"
                         >
                           {ev}
                         </Badge>

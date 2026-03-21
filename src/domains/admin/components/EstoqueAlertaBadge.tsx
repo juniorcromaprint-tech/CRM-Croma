@@ -24,7 +24,7 @@ export default function EstoqueAlertaBadge({ collapsed = false }: EstoqueAlertaB
   }
 
   return (
-    <span className="ml-auto min-w-[20px] h-5 flex items-center justify-center rounded-full bg-red-500 text-white text-[10px] font-bold px-1.5">
+    <span className="ml-auto min-w-[20px] h-5 flex items-center justify-center rounded-full bg-red-500 text-white text-xs font-bold px-1.5">
       {count > 99 ? '99+' : count}
     </span>
   );

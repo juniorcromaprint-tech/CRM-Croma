@@ -111,7 +111,7 @@ export default function PricingCalculator({ resultado, quantidade = 1 }: Pricing
               ].map(({ color, label, pct }) => (
                 <div key={label} className="flex items-center gap-1">
                   <div className={`w-2 h-2 rounded-full ${color}`} />
-                  <span className="text-[10px] text-slate-500">{label} {pct.toFixed(0)}%</span>
+                  <span className="text-xs text-slate-500">{label} {pct.toFixed(0)}%</span>
                 </div>
               ))}
             </div>

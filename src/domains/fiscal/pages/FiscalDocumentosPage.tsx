@@ -185,7 +185,7 @@ export default function FiscalDocumentosPage() {
                     {doc.numero ? `NF-e ${doc.numero}` : <span className="text-slate-400 font-normal italic">Pendente</span>}
                   </div>
                   <div className="text-xs text-slate-400 mt-0.5">Pedido: {doc.pedidos?.numero ?? '---'}</div>
-                  {doc.protocolo && <div className="text-[10px] text-slate-300 font-mono truncate max-w-[120px]" title={doc.protocolo}>Prot: {doc.protocolo.slice(-8)}</div>}
+                  {doc.protocolo && <div className="text-xs text-slate-300 font-mono truncate max-w-[120px]" title={doc.protocolo}>Prot: {doc.protocolo.slice(-8)}</div>}
                 </TableCell>
                 <TableCell>
                   <div className="font-medium text-sm text-slate-800">{doc.clientes?.nome_fantasia ?? doc.clientes?.razao_social ?? '---'}</div>
@@ -201,7 +201,7 @@ export default function FiscalDocumentosPage() {
                 <TableCell>
                   <StatusFiscalBadge status={doc.status} />
                   {doc.mensagem_erro && (
-                    <p className="text-[10px] text-red-500 mt-1 max-w-[180px] truncate" title={doc.mensagem_erro}>
+                    <p className="text-xs text-red-500 mt-1 max-w-[180px] truncate" title={doc.mensagem_erro}>
                       ⚠ {doc.mensagem_erro}
                     </p>
                   )}

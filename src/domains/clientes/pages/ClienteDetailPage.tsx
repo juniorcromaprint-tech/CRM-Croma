@@ -1033,7 +1033,7 @@ export default function ClienteDetailPage() {
                     </h3>
                     <Badge
                       variant={u.ativo !== false ? "default" : "secondary"}
-                      className="text-[10px]"
+                      className="text-xs"
                     >
                       {u.ativo !== false ? "Ativa" : "Inativa"}
                     </Badge>
@@ -1233,7 +1233,7 @@ export default function ClienteDetailPage() {
                     </div>
                     <div className="flex items-center gap-1.5">
                       {c.e_decisor && (
-                        <Badge className="text-[10px] bg-amber-100 text-amber-700 border-amber-200 hover:bg-amber-100">
+                        <Badge className="text-xs bg-amber-100 text-amber-700 border-amber-200 hover:bg-amber-100">
                           Decisor
                         </Badge>
                       )}
@@ -1428,7 +1428,7 @@ export default function ClienteDetailPage() {
                               </span>
                             )}
                             <span
-                              className={`px-2 py-0.5 rounded-full text-[10px] font-medium ${sConf.color}`}
+                              className={`px-2 py-0.5 rounded-full text-xs font-medium ${sConf.color}`}
                             >
                               {sConf.label}
                             </span>
@@ -1547,7 +1547,7 @@ export default function ClienteDetailPage() {
                           </span>
                         )}
                         <span
-                          className={`px-2 py-0.5 rounded-full text-[10px] font-medium ${fConf.color}`}
+                          className={`px-2 py-0.5 rounded-full text-xs font-medium ${fConf.color}`}
                         >
                           {fConf.label}
                         </span>

@@ -1137,7 +1137,7 @@ export default function ProducaoPage() {
                         </h3>
                         <Badge
                           variant="secondary"
-                          className="ml-auto text-[10px] px-1.5 py-0 h-5 bg-white/60"
+                          className="ml-auto text-xs px-1.5 py-0 h-5 bg-white/60"
                         >
                           {colOPs.length}
                         </Badge>
@@ -1177,12 +1177,12 @@ export default function ProducaoPage() {
                               <div className="flex items-start justify-between gap-1 mb-2">
                                 <div className="flex-1 min-w-0">
                                   <div className="flex items-center gap-1.5 flex-wrap">
-                                    <span className="font-mono text-[11px] text-slate-400 font-semibold">
+                                    <span className="font-mono text-xs text-slate-400 font-semibold">
                                       {op.numero}
                                     </span>
                                     {op.prioridade > 0 && (
                                       <span
-                                        className={`text-[10px] font-semibold px-1.5 py-0 rounded border ${prioCfg.color}`}
+                                        className={`text-xs font-semibold px-1.5 py-0 rounded border ${prioCfg.color}`}
                                       >
                                         {prioCfg.label}
                                       </span>
@@ -1197,7 +1197,7 @@ export default function ProducaoPage() {
                                   <h4 className="font-semibold text-slate-800 text-sm truncate leading-tight mt-0.5" title={getClienteName(op)}>
                                     {getClienteName(op)}
                                   </h4>
-                                  <p className="text-[11px] text-slate-500 truncate mt-0.5" title={`${getPedidoNumero(op)} • ${getItemDescricao(op)}`}>
+                                  <p className="text-xs text-slate-500 truncate mt-0.5" title={`${getPedidoNumero(op)} • ${getItemDescricao(op)}`}>
                                     {getPedidoNumero(op)}
                                     {" \u2022 "}
                                     {getItemDescricao(op)}
@@ -1220,7 +1220,7 @@ export default function ProducaoPage() {
 
                               {/* Progress */}
                               <div className="space-y-1.5">
-                                <div className="flex items-center justify-between text-[11px]">
+                                <div className="flex items-center justify-between text-xs">
                                   <span className="text-slate-500 flex items-center gap-1">
                                     <CircleDashed size={11} />
                                     {etapaAtual}
@@ -1230,7 +1230,7 @@ export default function ProducaoPage() {
                                 <Progress value={progress} className="h-1" />
 
                                 {op.prazo_interno && (
-                                  <div className="flex items-center gap-1 text-[11px] text-slate-400">
+                                  <div className="flex items-center gap-1 text-xs text-slate-400">
                                     <Calendar size={11} />
                                     <span>
                                       Prazo: {formatDate(op.prazo_interno)}
@@ -1716,12 +1716,12 @@ export default function ProducaoPage() {
                                   {ETAPA_LABELS[etapa.nome] ?? etapa.nome}
                                 </span>
                                 {etapa.inicio && (
-                                  <span className="text-[11px] text-slate-400 ml-2">
+                                  <span className="text-xs text-slate-400 ml-2">
                                     Inicio: {formatDateTime(etapa.inicio)}
                                   </span>
                                 )}
                                 {etapa.fim && (
-                                  <span className="text-[11px] text-slate-400 ml-2">
+                                  <span className="text-xs text-slate-400 ml-2">
                                     Fim: {formatDateTime(etapa.fim)}
                                   </span>
                                 )}
@@ -1771,7 +1771,7 @@ export default function ProducaoPage() {
                             </div>
 
                             {etapa.tempo_real_min != null && etapa.tempo_real_min > 0 && (
-                              <p className="text-[11px] text-slate-400 mt-0.5">
+                              <p className="text-xs text-slate-400 mt-0.5">
                                 Tempo real: {formatMinutes(etapa.tempo_real_min)}
                               </p>
                             )}
@@ -1811,7 +1811,7 @@ export default function ProducaoPage() {
                 </p>
                 <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
                   <div className="bg-white rounded-xl p-3 border border-slate-100 text-center">
-                    <p className="text-[10px] text-slate-400 uppercase tracking-wide font-semibold mb-1">
+                    <p className="text-xs text-slate-400 uppercase tracking-wide font-semibold mb-1">
                       MP Estimado
                     </p>
                     <p className="text-sm font-bold text-slate-700">
@@ -1819,7 +1819,7 @@ export default function ProducaoPage() {
                     </p>
                   </div>
                   <div className="bg-white rounded-xl p-3 border border-slate-100 text-center">
-                    <p className="text-[10px] text-slate-400 uppercase tracking-wide font-semibold mb-1">
+                    <p className="text-xs text-slate-400 uppercase tracking-wide font-semibold mb-1">
                       MP Real
                     </p>
                     <p
@@ -1833,7 +1833,7 @@ export default function ProducaoPage() {
                     </p>
                   </div>
                   <div className="bg-white rounded-xl p-3 border border-slate-100 text-center">
-                    <p className="text-[10px] text-slate-400 uppercase tracking-wide font-semibold mb-1">
+                    <p className="text-xs text-slate-400 uppercase tracking-wide font-semibold mb-1">
                       MO Estimado
                     </p>
                     <p className="text-sm font-bold text-slate-700">
@@ -1841,7 +1841,7 @@ export default function ProducaoPage() {
                     </p>
                   </div>
                   <div className="bg-white rounded-xl p-3 border border-slate-100 text-center">
-                    <p className="text-[10px] text-slate-400 uppercase tracking-wide font-semibold mb-1">
+                    <p className="text-xs text-slate-400 uppercase tracking-wide font-semibold mb-1">
                       MO Real
                     </p>
                     <p

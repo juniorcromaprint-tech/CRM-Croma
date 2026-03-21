@@ -189,7 +189,7 @@ export default function DashboardProducao() {
                     <p className="text-sm font-medium text-slate-700 truncate">{op.numero || "OP"} — {op.pedidos?.clientes?.nome_fantasia || "—"}</p>
                     <p className="text-xs text-slate-400">Prazo: {op.prazo_interno || "—"}</p>
                   </div>
-                  <span className={`text-[10px] px-2 py-0.5 rounded-full font-semibold ml-3 shrink-0 ${statusBadge[op.status] || "bg-slate-100 text-slate-600"}`}>
+                  <span className={`text-xs px-2 py-0.5 rounded-full font-semibold ml-3 shrink-0 ${statusBadge[op.status] || "bg-slate-100 text-slate-600"}`}>
                     {op.status.replace(/_/g, " ")}
                   </span>
                 </div>
@@ -221,7 +221,7 @@ export default function DashboardProducao() {
                     <p className="text-sm font-medium text-slate-700 truncate">{op.numero} — {op.pedidos?.clientes?.nome_fantasia || "—"}</p>
                     <p className="text-xs text-red-400">Prazo: {op.prazo_interno}</p>
                   </div>
-                  <span className={`text-[10px] px-2 py-0.5 rounded-full font-semibold ml-3 shrink-0 ${statusBadge[op.status] || "bg-red-100 text-red-600"}`}>
+                  <span className={`text-xs px-2 py-0.5 rounded-full font-semibold ml-3 shrink-0 ${statusBadge[op.status] || "bg-red-100 text-red-600"}`}>
                     {op.status.replace(/_/g, " ")}
                   </span>
                 </div>

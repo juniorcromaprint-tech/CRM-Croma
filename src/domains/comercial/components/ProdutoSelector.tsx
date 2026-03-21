@@ -272,7 +272,7 @@ export default function ProdutoSelector({
                   <span className="flex items-center gap-2">
                     <span>{m.nome}</span>
                     {m.linha_qualidade === 'primeira' && (
-                      <span className="text-[10px] text-amber-600 font-medium">★ 1ª linha</span>
+                      <span className="text-xs text-amber-600 font-medium">★ 1ª linha</span>
                     )}
                   </span>
                 </SelectItem>
@@ -361,7 +361,7 @@ export default function ProdutoSelector({
           {/* Descritivo técnico */}
           {selectedModelo.descritivo_tecnico && (
             <div className="border-t border-blue-200 pt-2">
-              <p className="text-[10px] font-semibold text-blue-500 uppercase tracking-wider mb-1">
+              <p className="text-xs font-semibold text-blue-500 uppercase tracking-wider mb-1">
                 Descritivo Técnico
               </p>
               <p className="text-xs text-slate-700 leading-relaxed">
@@ -373,7 +373,7 @@ export default function ProdutoSelector({
           {/* Garantia descrição */}
           {selectedModelo.garantia_descricao && (
             <div className="border-t border-blue-200 pt-2">
-              <p className="text-[10px] font-semibold text-emerald-600 uppercase tracking-wider mb-1">
+              <p className="text-xs font-semibold text-emerald-600 uppercase tracking-wider mb-1">
                 Garantia
               </p>
               <p className="text-xs text-slate-600">

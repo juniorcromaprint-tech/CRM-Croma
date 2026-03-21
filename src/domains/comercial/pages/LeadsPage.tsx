@@ -294,10 +294,10 @@ export default function LeadsPage() {
                 <div className="flex-1 min-w-0">
                   <div className="flex items-center gap-2 mb-1">
                     <h3 className="font-semibold text-slate-800 truncate">{lead.empresa}</h3>
-                    <span className={`px-2 py-0.5 rounded-full text-[10px] font-medium ${getStatusConfig(LEAD_STATUS_CONFIG, lead.status as any).color}`}>
+                    <span className={`px-2 py-0.5 rounded-full text-xs font-medium ${getStatusConfig(LEAD_STATUS_CONFIG, lead.status as any).color}`}>
                       {getStatusConfig(LEAD_STATUS_CONFIG, lead.status as any).label}
                     </span>
-                    <span className={`px-2 py-0.5 rounded-full text-[10px] font-medium ${TEMPERATURA_CONFIG[lead.temperatura as keyof typeof TEMPERATURA_CONFIG]?.badgeColor || "bg-slate-100"}`}>
+                    <span className={`px-2 py-0.5 rounded-full text-xs font-medium ${TEMPERATURA_CONFIG[lead.temperatura as keyof typeof TEMPERATURA_CONFIG]?.badgeColor || "bg-slate-100"}`}>
                       {TEMPERATURA_CONFIG[lead.temperatura as keyof typeof TEMPERATURA_CONFIG]?.label || lead.temperatura}
                     </span>
                   </div>
@@ -434,7 +434,7 @@ export default function LeadsPage() {
                       {lead.empresa ?? lead.contato_nome}
                       {lead.empresa && lead.contato_nome ? ` — ${lead.contato_nome}` : ""}
                     </span>
-                    <Badge variant="outline" className="text-yellow-600 border-yellow-300 text-[10px]">
+                    <Badge variant="outline" className="text-yellow-600 border-yellow-300 text-xs">
                       {getStatusConfig(LEAD_STATUS_CONFIG, lead.status as any).label}
                     </Badge>
                   </div>

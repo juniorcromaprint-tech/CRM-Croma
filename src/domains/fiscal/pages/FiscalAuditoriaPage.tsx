@@ -82,7 +82,7 @@ function AmbienbadBadge({ ambiente }: { ambiente: string }) {
     ambiente.includes('prod');
   return (
     <span
-      className={`inline-flex items-center px-1.5 py-0.5 rounded text-[10px] font-bold uppercase tracking-wide ${
+      className={`inline-flex items-center px-1.5 py-0.5 rounded text-xs font-bold uppercase tracking-wide ${
         isPrd
           ? 'bg-green-100 text-green-700 border border-green-300'
           : 'bg-blue-100 text-blue-700 border border-blue-300'

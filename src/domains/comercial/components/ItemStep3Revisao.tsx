@@ -181,7 +181,7 @@ export default function ItemStep3Revisao({
           )}
         </div>
         {isPrecoOverride && (
-          <Badge variant="secondary" className="text-[10px] bg-amber-50 text-amber-700 border-amber-200">
+          <Badge variant="secondary" className="text-xs bg-amber-50 text-amber-700 border-amber-200">
             Preço ajustado manualmente
           </Badge>
         )}

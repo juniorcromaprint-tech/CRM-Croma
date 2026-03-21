@@ -23,7 +23,7 @@ export function PortalFooter() {
             <p className="text-xs text-slate-400">
               {nomeEmpresa} &copy; {year}
             </p>
-            <p className="text-[11px] text-slate-300 mt-0.5">
+            <p className="text-xs text-slate-300 mt-0.5">
               Comunicacao visual profissional para varejo e industria
             </p>
           </div>

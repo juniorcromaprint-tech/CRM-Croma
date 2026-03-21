@@ -225,7 +225,7 @@ export default function FornecedoresPage() {
                           {(f.categorias ?? []).map((cat) => (
                             <span
                               key={cat}
-                              className="text-[11px] font-semibold px-2 py-0.5 rounded-md border bg-blue-50 text-blue-700 border-blue-200"
+                              className="text-xs font-semibold px-2 py-0.5 rounded-md border bg-blue-50 text-blue-700 border-blue-200"
                             >
                               {cat}
                             </span>

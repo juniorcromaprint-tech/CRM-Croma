@@ -23,7 +23,7 @@ interface Props {
 export function StatusFiscalBadge({ status, size = 'default' }: Props) {
   const config = STATUS_CONFIG[status] ?? { label: status, className: 'bg-slate-100 text-slate-600' };
   return (
-    <span className={`inline-flex items-center px-2 py-0.5 rounded-full border text-xs font-medium ${config.className} ${size === 'sm' ? 'text-[10px] px-1.5' : ''}`}>
+    <span className={`inline-flex items-center px-2 py-0.5 rounded-full border text-xs font-medium ${config.className} ${size === 'sm' ? 'text-xs px-1.5' : ''}`}>
       {config.label}
     </span>
   );

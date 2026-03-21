@@ -20,7 +20,7 @@ export default function ComposicaoSugestao({ result, onClose, onApply }: Composi
           {/* Modelo sugerido */}
           {data.modelo_sugerido?.nome && (
             <div className="bg-blue-50 rounded-xl p-3">
-              <span className="text-[10px] text-blue-500 uppercase tracking-wide">Modelo Base</span>
+              <span className="text-xs text-blue-500 uppercase tracking-wide">Modelo Base</span>
               <p className="text-sm font-semibold text-blue-800 mt-1">
                 {data.modelo_sugerido.nome}
                 {data.modelo_sugerido.categoria && (

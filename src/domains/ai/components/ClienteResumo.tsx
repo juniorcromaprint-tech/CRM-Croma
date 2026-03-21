@@ -24,15 +24,15 @@ export default function ClienteResumo({ result, onClose }: ClienteResumoProps) {
         <div className="space-y-3 mt-3">
           <div className="grid grid-cols-3 gap-3">
             <div className="bg-slate-50 rounded-xl p-3">
-              <span className="text-[10px] text-slate-400 uppercase tracking-wide">Ticket Medio</span>
+              <span className="text-xs text-slate-400 uppercase tracking-wide">Ticket Medio</span>
               <p className="text-lg font-bold text-slate-800">{brl(data.ticket_medio)}</p>
             </div>
             <div className="bg-slate-50 rounded-xl p-3">
-              <span className="text-[10px] text-slate-400 uppercase tracking-wide">Total Pedidos</span>
+              <span className="text-xs text-slate-400 uppercase tracking-wide">Total Pedidos</span>
               <p className="text-lg font-bold text-slate-800">{data.total_pedidos}</p>
             </div>
             <div className={`rounded-xl p-3 ${riscoColor}`}>
-              <span className="text-[10px] uppercase tracking-wide opacity-70">Risco</span>
+              <span className="text-xs uppercase tracking-wide opacity-70">Risco</span>
               <p className="text-lg font-bold capitalize">{data.risco}</p>
             </div>
           </div>
@@ -50,14 +50,14 @@ export default function ClienteResumo({ result, onClose }: ClienteResumoProps) {
 
           {data.padrao_compra && (
             <div className="bg-slate-50 rounded-xl p-3">
-              <span className="text-[10px] text-slate-400 uppercase tracking-wide">Padrao de Compra</span>
+              <span className="text-xs text-slate-400 uppercase tracking-wide">Padrao de Compra</span>
               <p className="text-xs text-slate-700 mt-1">{data.padrao_compra}</p>
             </div>
           )}
 
           {data.sugestao_abordagem && (
             <div className="bg-blue-50 rounded-xl p-3">
-              <span className="text-[10px] text-blue-500 uppercase tracking-wide">Sugestao de Abordagem</span>
+              <span className="text-xs text-blue-500 uppercase tracking-wide">Sugestao de Abordagem</span>
               <p className="text-xs text-blue-800 mt-1">{data.sugestao_abordagem}</p>
             </div>
           )}

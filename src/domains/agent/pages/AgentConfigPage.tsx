@@ -317,7 +317,7 @@ function TabGeralConfig() {
                         {canal.label}
                       </Label>
                       {isDisabled && (
-                        <span className="text-[10px] text-amber-600 bg-amber-50 border border-amber-200 rounded px-1.5 py-0.5 leading-none">
+                        <span className="text-xs text-amber-600 bg-amber-50 border border-amber-200 rounded px-1.5 py-0.5 leading-none">
                           Configure na aba WhatsApp primeiro
                         </span>
                       )}
@@ -484,7 +484,7 @@ function TabModelosIA() {
                   <SelectItem key={m.slug} value={m.slug}>
                     <span>{m.label}</span>
                     {m.free && (
-                      <Badge variant="secondary" className="ml-2 text-[10px] px-1.5 py-0">Free</Badge>
+                      <Badge variant="secondary" className="ml-2 text-xs px-1.5 py-0">Free</Badge>
                     )}
                   </SelectItem>
                 ))}
@@ -506,7 +506,7 @@ function TabModelosIA() {
                   <SelectItem key={m.slug} value={m.slug}>
                     <span>{m.label}</span>
                     {m.free && (
-                      <Badge variant="secondary" className="ml-2 text-[10px] px-1.5 py-0">Free</Badge>
+                      <Badge variant="secondary" className="ml-2 text-xs px-1.5 py-0">Free</Badge>
                     )}
                   </SelectItem>
                 ))}
@@ -528,7 +528,7 @@ function TabModelosIA() {
                   <SelectItem key={m.slug} value={m.slug}>
                     <span>{m.label}</span>
                     {m.free && (
-                      <Badge variant="secondary" className="ml-2 text-[10px] px-1.5 py-0">Free</Badge>
+                      <Badge variant="secondary" className="ml-2 text-xs px-1.5 py-0">Free</Badge>
                     )}
                   </SelectItem>
                 ))}
@@ -582,10 +582,10 @@ function TemplateRow({ template, onToggle, onEdit, isUpdating }: TemplateRowProp
       <div className="flex-1 min-w-0">
         <p className="font-medium text-slate-800 truncate">{template.nome}</p>
         <div className="flex items-center gap-2 mt-1 flex-wrap">
-          <Badge variant="secondary" className="text-[10px] px-1.5 py-0">
+          <Badge variant="secondary" className="text-xs px-1.5 py-0">
             {template.etapa}
           </Badge>
-          <Badge variant="secondary" className="text-[10px] px-1.5 py-0 bg-blue-50 text-blue-700">
+          <Badge variant="secondary" className="text-xs px-1.5 py-0 bg-blue-50 text-blue-700">
             {template.canal}
           </Badge>
           {template.segmento && (

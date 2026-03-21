@@ -112,7 +112,7 @@ export default function AIResultPanel({ result, title, onClose, children }: AIRe
       </div>
 
       {/* Footer */}
-      <div className="px-5 py-2 bg-slate-50 border-t border-slate-100 flex items-center justify-between text-[10px] text-slate-400">
+      <div className="px-5 py-2 bg-slate-50 border-t border-slate-100 flex items-center justify-between text-xs text-slate-400">
         <span>Modelo: {result.model_used}</span>
         <span>{result.tokens_used} tokens</span>
       </div>
@@ -167,7 +167,7 @@ function SuggestionItem({ suggestion }: { suggestion: AISuggestion }) {
 
   return (
     <div className="flex items-start gap-2 text-xs text-slate-700 bg-slate-50 rounded-xl p-3">
-      <span className={`px-1.5 py-0.5 rounded text-[10px] font-medium shrink-0 ${priorityColor}`}>
+      <span className={`px-1.5 py-0.5 rounded text-xs font-medium shrink-0 ${priorityColor}`}>
         {suggestion.priority}
       </span>
       <div>

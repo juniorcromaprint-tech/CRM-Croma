@@ -22,7 +22,7 @@ export default function AIAlertsBadge({ onClick }: AIAlertsBadgeProps) {
     >
       <Bell size={18} className="text-slate-600" />
       <span
-        className={`absolute -top-0.5 -right-0.5 min-w-[18px] h-[18px] flex items-center justify-center rounded-full text-[10px] font-bold text-white ${
+        className={`absolute -top-0.5 -right-0.5 min-w-[18px] h-[18px] flex items-center justify-center rounded-full text-xs font-bold text-white ${
           hasAlta ? 'bg-red-500' : 'bg-amber-500'
         }`}
       >

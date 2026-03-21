@@ -24,7 +24,7 @@ export function PortalApproval({ onApprove, isLoading, disabled }: Props) {
           </div>
           <div>
             <p className="text-xs font-semibold text-slate-700">Aprovação segura</p>
-            <p className="text-[10px] text-slate-400">Dados protegidos</p>
+            <p className="text-xs text-slate-400">Dados protegidos</p>
           </div>
         </div>
         <div className="flex items-center gap-2.5 bg-white rounded-xl border border-slate-200 p-3">
@@ -33,7 +33,7 @@ export function PortalApproval({ onApprove, isLoading, disabled }: Props) {
           </div>
           <div>
             <p className="text-xs font-semibold text-slate-700">Processamento rápido</p>
-            <p className="text-[10px] text-slate-400">Confirmação imediata</p>
+            <p className="text-xs text-slate-400">Confirmação imediata</p>
           </div>
         </div>
         <div className="flex items-center gap-2.5 bg-white rounded-xl border border-slate-200 p-3">
@@ -42,7 +42,7 @@ export function PortalApproval({ onApprove, isLoading, disabled }: Props) {
           </div>
           <div>
             <p className="text-xs font-semibold text-slate-700">Suporte dedicado</p>
-            <p className="text-[10px] text-slate-400">Acompanhamento total</p>
+            <p className="text-xs text-slate-400">Acompanhamento total</p>
           </div>
         </div>
       </div>

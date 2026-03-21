@@ -319,7 +319,7 @@ export default function Settings() {
                   <h3 className="font-bold text-slate-800 text-lg flex items-center gap-2">
                     {profile?.first_name ? `${profile.first_name} ${profile.last_name || ''}` : 'Usuário'}
                     {profile?.role === 'admin' && (
-                      <span className="bg-blue-100 text-blue-700 text-[10px] px-2 py-0.5 rounded-full uppercase tracking-wider flex items-center gap-1">
+                      <span className="bg-blue-100 text-blue-700 text-xs px-2 py-0.5 rounded-full uppercase tracking-wider flex items-center gap-1">
                         <ShieldCheck size={10} /> Admin
                       </span>
                     )}
@@ -667,7 +667,7 @@ export default function Settings() {
                           <span className="text-xs font-bold text-blue-600 bg-blue-50 px-2 py-0.5 rounded uppercase">
                             {log.action.replace('_', ' ')}
                           </span>
-                          <span className="text-[10px] text-slate-400 font-medium">
+                          <span className="text-xs text-slate-400 font-medium">
                             {new Date(log.created_at).toLocaleString('pt-BR')}
                           </span>
                         </div>
@@ -675,7 +675,7 @@ export default function Settings() {
                           <span className="font-bold">{log.profiles?.first_name || 'Sistema'}</span> alterou dados na OS/Loja <span className="font-mono text-xs bg-slate-100 px-1 rounded">{log.target_id.substring(0,8)}</span>
                         </p>
                         {log.new_value?.status && (
-                          <p className="text-[10px] text-slate-500 mt-1">
+                          <p className="text-xs text-slate-500 mt-1">
                             Status alterado para: <span className="font-bold text-slate-700">{log.new_value.status}</span>
                           </p>
                         )}
