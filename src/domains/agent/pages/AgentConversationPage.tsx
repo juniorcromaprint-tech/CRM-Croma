@@ -21,13 +21,25 @@ import {
   Eye,
   CornerDownRight,
   Bot,
+  Trash2,
 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { Textarea } from '@/components/ui/textarea';
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+  AlertDialogTrigger,
+} from '@/components/ui/alert-dialog';
 import { supabase } from '@/integrations/supabase/client';
 import { formatDate } from '@/shared/utils/format';
-import { useAgentMessages, useEscalateConversation, useResumeConversation, useSendManualWhatsApp } from '../hooks/useAgentMessages';
+import { useAgentMessages, useEscalateConversation, useResumeConversation, useSendManualWhatsApp, useDeleteConversation, useDeleteMessage } from '../hooks/useAgentMessages';
 import type { AgentConversation, AgentCanal, AgentMessageStatus } from '../types/agent.types';
 
 // ─── Fetch single conversation ───────────────────────────────────────────────
@@ -79,14 +91,20 @@ const STATUS_CONFIG: Record<AgentMessageStatus, { label: string; icon: typeof Ch
 
 // ─── Message bubble ──────────────────────────────────────────────────────────
 
-function MessageBubble({ message }: { message: ReturnType<typeof useAgentMessages>['data'] extends (infer U)[] ? U : never }) {
+function MessageBubble({
+  message,
+  onDelete,
+}: {
+  message: ReturnType<typeof useAgentMessages>['data'] extends (infer U)[] ? U : never;
+  onDelete?: (messageId: string) => void;
+}) {
   const isSent = message.direcao === 'enviada';
   const CanalIcon = CANAL_ICON[message.canal] ?? Mail;
   const statusCfg = STATUS_CONFIG[message.status] ?? STATUS_CONFIG.enviada;
   const StatusIcon = statusCfg.icon;
 
   return (
-    <div className={`flex gap-3 ${isSent ? 'flex-row-reverse' : 'flex-row'}`}>
+    <div className={`group flex gap-3 ${isSent ? 'flex-row-reverse' : 'flex-row'}`}>
       <div className={`w-8 h-8 rounded-full flex items-center justify-center shrink-0 mt-1 ${
         isSent ? 'bg-blue-100' : 'bg-slate-100'
       }`}>
@@ -102,12 +120,23 @@ function MessageBubble({ message }: { message: ReturnType<typeof useAgentMessage
           <p className="text-xs font-semibold text-slate-500">{message.assunto}</p>
         )}
 
-        <div className={`rounded-2xl px-4 py-3 text-sm leading-relaxed whitespace-pre-wrap ${
-          isSent
-            ? 'bg-blue-600 text-white rounded-tr-md'
-            : 'bg-slate-100 text-slate-700 rounded-tl-md'
-        }`}>
-          {message.conteudo}
+        <div className="relative">
+          <div className={`rounded-2xl px-4 py-3 text-sm leading-relaxed whitespace-pre-wrap ${
+            isSent
+              ? 'bg-blue-600 text-white rounded-tr-md'
+              : 'bg-slate-100 text-slate-700 rounded-tl-md'
+          }`}>
+            {message.conteudo}
+          </div>
+          {onDelete && (
+            <button
+              onClick={() => onDelete(message.id)}
+              className={`absolute top-1 ${isSent ? 'left-1' : 'right-1'} opacity-0 group-hover:opacity-100 transition-opacity p-1 rounded-full bg-white/90 shadow-sm hover:bg-red-50 text-slate-400 hover:text-red-500`}
+              title="Excluir mensagem"
+            >
+              <Trash2 size={12} />
+            </button>
+          )}
         </div>
 
         <div className={`flex items-center gap-2 text-xs text-slate-400 ${isSent ? 'flex-row-reverse' : ''}`}>
@@ -142,6 +171,8 @@ export default function AgentConversationPage() {
   const escalate = useEscalateConversation();
   const resume = useResumeConversation();
   const sendManual = useSendManualWhatsApp();
+  const deleteConversation = useDeleteConversation();
+  const deleteMessage = useDeleteMessage();
   const [manualText, setManualText] = useState('');
 
   if (convLoading) {
@@ -211,6 +242,44 @@ export default function AgentConversationPage() {
             >
               {conversation.status}
             </Badge>
+            <AlertDialog>
+              <AlertDialogTrigger asChild>
+                <Button
+                  variant="ghost"
+                  size="icon"
+                  className="h-8 w-8 text-slate-400 hover:text-red-600 hover:bg-red-50"
+                >
+                  <Trash2 size={15} />
+                </Button>
+              </AlertDialogTrigger>
+              <AlertDialogContent>
+                <AlertDialogHeader>
+                  <AlertDialogTitle>Excluir conversa</AlertDialogTitle>
+                  <AlertDialogDescription>
+                    Todas as mensagens desta conversa serão excluídas permanentemente. Esta ação não pode ser desfeita.
+                  </AlertDialogDescription>
+                </AlertDialogHeader>
+                <AlertDialogFooter>
+                  <AlertDialogCancel>Cancelar</AlertDialogCancel>
+                  <AlertDialogAction
+                    onClick={() =>
+                      deleteConversation.mutate(
+                        { conversationId: conversation.id },
+                        { onSuccess: () => navigate('/agente') }
+                      )
+                    }
+                    className="bg-red-600 hover:bg-red-700"
+                  >
+                    {deleteConversation.isPending ? (
+                      <Loader2 size={14} className="animate-spin mr-2" />
+                    ) : (
+                      <Trash2 size={14} className="mr-2" />
+                    )}
+                    Excluir
+                  </AlertDialogAction>
+                </AlertDialogFooter>
+              </AlertDialogContent>
+            </AlertDialog>
           </div>
         </div>
 
@@ -240,7 +309,13 @@ export default function AgentConversationPage() {
         ) : (
           <div className="space-y-6">
             {messages.map((msg) => (
-              <MessageBubble key={msg.id} message={msg} />
+              <MessageBubble
+                key={msg.id}
+                message={msg}
+                onDelete={(messageId) =>
+                  deleteMessage.mutate({ messageId, conversationId: conversation.id })
+                }
+              />
             ))}
           </div>
         )}

@@ -344,3 +344,71 @@ export function useSendManualWhatsApp() {
     },
   });
 }
+
+// ─── Delete hooks ────────────────────────────────────────────────────────────
+
+/**
+ * Exclui uma mensagem individual.
+ */
+export function useDeleteMessage() {
+  const queryClient = useQueryClient();
+
+  return useMutation({
+    mutationFn: async ({
+      messageId,
+      conversationId,
+    }: {
+      messageId: string;
+      conversationId: string;
+    }) => {
+      const { error } = await supabase
+        .from('agent_messages')
+        .delete()
+        .eq('id', messageId);
+
+      if (error) throw new Error(`Erro ao excluir mensagem: ${error.message}`);
+      return { conversationId };
+    },
+    onSuccess: ({ conversationId }) => {
+      queryClient.invalidateQueries({ queryKey: MESSAGES_KEY });
+      queryClient.invalidateQueries({ queryKey: messagesQueryKey(conversationId) });
+      queryClient.invalidateQueries({ queryKey: ['agent', 'conversations', 'stats'] });
+      showSuccess('Mensagem excluída');
+    },
+    onError: (error: Error) => {
+      showError(error.message);
+    },
+  });
+}
+
+/**
+ * Exclui uma conversa inteira (e suas mensagens em cascata via FK).
+ */
+export function useDeleteConversation() {
+  const queryClient = useQueryClient();
+
+  return useMutation({
+    mutationFn: async ({ conversationId }: { conversationId: string }) => {
+      // Deletar mensagens primeiro (caso FK não tenha ON DELETE CASCADE)
+      await supabase
+        .from('agent_messages')
+        .delete()
+        .eq('conversation_id', conversationId);
+
+      const { error } = await supabase
+        .from('agent_conversations')
+        .delete()
+        .eq('id', conversationId);
+
+      if (error) throw new Error(`Erro ao excluir conversa: ${error.message}`);
+      return { conversationId };
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['agent'] });
+      showSuccess('Conversa excluída');
+    },
+    onError: (error: Error) => {
+      showError(error.message);
+    },
+  });
+}

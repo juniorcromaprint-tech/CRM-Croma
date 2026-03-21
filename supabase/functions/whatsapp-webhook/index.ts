@@ -90,11 +90,17 @@ REGRAS ABSOLUTAS:
 - Se o cliente faz pergunta → responda e redirecione para valor
 - Se o cliente mostra objecao → trate com empatia e reformule
 
-GATILHOS DE UPSELL:
-- 1 banner → proponha kit campanha completo
-- Fachada → sugira fachada + totem + adesivos
-- 1 loja → pergunte sobre outras lojas da rede
-- Pedido pontual → apresente contrato recorrente
+LEITURA DE CONTEXTO (OBRIGATORIO):
+- Analise TODAS as mensagens do historico_mensagens ANTES de responder
+- NUNCA repita uma pergunta que o lead ja respondeu no historico
+- NUNCA sugira um produto que o lead ja recusou ou disse que nao precisa
+- Se o lead ja informou dimensoes, quantidade ou produto — use essas informacoes, nao pergunte de novo
+- Se o lead ja disse "so quero X", nao oferea Y — respeite a decisao
+
+UPSELL (somente quando apropriado):
+- Somente sugira upsell se o lead NAO demonstrou pressa ou foco em 1 item especifico
+- Se o lead ja recusou um upsell → nunca repita
+- Upsell deve ser sutil e em 1 frase no maximo, nunca o foco da mensagem
 
 TRATAMENTO DE OBJECOES:
 - "Muito caro" → apresente ROI e durabilidade
@@ -243,6 +249,15 @@ async function generateAutoResponse(
       template = tpl;
     }
 
+    // Format history as readable conversation for better AI context
+    const historicoFormatado = historico.map((m) => {
+      const quem = (m as Record<string, unknown>).direcao === 'recebida' ? 'LEAD' : 'VENDEDOR';
+      const status = (m as Record<string, unknown>).status as string;
+      const conteudo = (m as Record<string, unknown>).conteudo as string;
+      const statusLabel = status === 'pendente_aprovacao' ? ' (aguardando aprovacao)' : '';
+      return `${quem}${statusLabel}: ${conteudo}`;
+    }).join('\n---\n');
+
     // Build AI context
     const aiContext = {
       mensagem_recebida: incomingMessage,
@@ -260,7 +275,8 @@ async function generateAutoResponse(
         mensagens_recebidas: fullConv?.mensagens_recebidas ?? 0,
         score_engajamento: fullConv?.score_engajamento ?? 0,
       },
-      historico_mensagens: historico,
+      historico_conversa: historicoFormatado,
+      instrucao_contexto: 'LEIA o historico_conversa acima com atencao. NAO repita perguntas ja respondidas pelo lead. NAO sugira produtos que ele ja recusou.',
       template_referencia: template?.conteudo ?? null,
       agente: { nome_remetente: nomeRemetente },
       data_atual: new Date().toISOString().split('T')[0],

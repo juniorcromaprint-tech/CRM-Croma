@@ -12,12 +12,14 @@ import {
   ChevronRight,
   Mail,
   Smartphone,
+  Trash2,
 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import KpiCard from '@/shared/components/KpiCard';
 import { formatDate } from '@/shared/utils/format';
 import { useAgentConversations, useAgentStats } from '../hooks/useAgentConversations';
 import { useRunOrchestrator } from '../hooks/useAgentActions';
+import { useDeleteConversation } from '../hooks/useAgentMessages';
 import LeadDiscoveryDialog from '../components/LeadDiscoveryDialog';
 import type { AgentConversation, AgentCanal, AgentConversationStatus, AgentEtapa } from '../types/agent.types';
 
@@ -35,6 +37,7 @@ const STATUS_CONFIG: Record<AgentConversationStatus, { label: string; className:
   aguardando_aprovacao:  { label: 'Aguard. Aprovação',  className: 'bg-amber-100 text-amber-700' },
   convertida:            { label: 'Convertida',         className: 'bg-emerald-100 text-emerald-700' },
   encerrada:             { label: 'Encerrada',          className: 'bg-slate-100 text-slate-500' },
+  escalada:              { label: 'Escalada',           className: 'bg-orange-100 text-orange-700' },
 };
 
 const ETAPA_CONFIG: Record<AgentEtapa, { label: string; className: string }> = {
@@ -67,7 +70,7 @@ function ScoreBar({ score }: { score: number }) {
 
 // ─── Conversation row ─────────────────────────────────────────────────────────
 
-function ConversationRow({ conv, onClick }: { conv: AgentConversation; onClick: () => void }) {
+function ConversationRow({ conv, onClick, onDelete }: { conv: AgentConversation; onClick: () => void; onDelete: () => void }) {
   const canalCfg  = CANAL_CONFIG[conv.canal]  ?? CANAL_CONFIG.interno;
   const statusCfg = STATUS_CONFIG[conv.status] ?? STATUS_CONFIG.encerrada;
   const etapaCfg  = ETAPA_CONFIG[conv.etapa]  ?? ETAPA_CONFIG.abertura;
@@ -122,6 +125,15 @@ function ConversationRow({ conv, onClick }: { conv: AgentConversation; onClick: 
         </span>
       </div>
 
+      {/* Excluir */}
+      <button
+        onClick={(e) => { e.stopPropagation(); onDelete(); }}
+        className="opacity-0 group-hover:opacity-100 transition-opacity p-1.5 rounded-lg hover:bg-red-50 text-slate-300 hover:text-red-500 shrink-0"
+        title="Excluir conversa"
+      >
+        <Trash2 size={14} />
+      </button>
+
       {/* Ação */}
       <ChevronRight size={16} className="text-slate-300 group-hover:text-blue-500 transition-colors shrink-0" />
     </div>
@@ -137,6 +149,7 @@ export default function AgentDashboardPage() {
   const { data: stats, isLoading: statsLoading } = useAgentStats();
   const { data: conversations = [], isLoading: convsLoading } = useAgentConversations();
   const runOrchestrator = useRunOrchestrator();
+  const deleteConversation = useDeleteConversation();
 
   const handleOrquestrador = () => {
     runOrchestrator.mutate();
@@ -261,6 +274,11 @@ export default function AgentDashboardPage() {
                 key={conv.id}
                 conv={conv}
                 onClick={() => navigate(`/agente/conversa/${conv.id}`)}
+                onDelete={() => {
+                  if (window.confirm(`Excluir conversa com ${conv.leads?.empresa ?? 'este lead'}?`)) {
+                    deleteConversation.mutate({ conversationId: conv.id });
+                  }
+                }}
               />
             ))}
           </div>
