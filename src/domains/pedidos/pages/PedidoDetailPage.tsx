@@ -24,7 +24,7 @@ import { Textarea } from '@/components/ui/textarea'
 import { usePedido, useUpdatePedido } from '../hooks/usePedidos'
 import { useCriarPastaOneDrive } from '../hooks/useOneDrive'
 import { brl } from '@/shared/utils/format'
-import { criarOrdemProducao } from '@/domains/producao/services/producao.service'
+import { criarOrdemProducao, EstoqueInsuficienteError } from '@/domains/producao/services/producao.service'
 import { criarNFeFromPedido } from '@/domains/fiscal/services/nfe-creation.service'
 import { gerarContasReceber, gerarParcelas, gerarComissao } from '@/domains/financeiro/services/financeiro-automation.service'
 import { showError, showSuccess } from '@/utils/toast'
@@ -161,6 +161,11 @@ export default function PedidoDetailPage() {
       if (err instanceof OptimisticLockError) {
         showError(err.message)
         refetch()
+      } else if (err instanceof EstoqueInsuficienteError) {
+        const lista = err.materiais
+          .map((m) => `• ${m.nome}: necessário ${m.necessario} ${m.unidade}, disponível ${m.disponivel} ${m.unidade}`)
+          .join('\n')
+        showError(`Estoque insuficiente para iniciar produção:\n${lista}`)
       } else {
         showError(err.message || 'Erro ao iniciar produção')
       }

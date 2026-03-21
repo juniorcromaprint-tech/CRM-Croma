@@ -48,7 +48,7 @@
     "@radix-ui/react-toggle-group": "^1.1.0",
     "@radix-ui/react-tooltip": "^1.1.4",
     "@supabase/supabase-js": "^2.97.0",
-    "@tanstack/react-query": "^5.56.2",
+    "@tanstack/react-query": "^5.94.4",
     "@types/leaflet": "^1.9.21",
     "@types/papaparse": "^5.5.2",
     "@types/react-signature-canvas": "^1.0.7",

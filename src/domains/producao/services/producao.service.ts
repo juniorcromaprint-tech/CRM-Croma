@@ -1,4 +1,7 @@
 import { supabase } from '@/integrations/supabase/client';
+import { reservarMateriais, liberarReserva, EstoqueInsuficienteError } from './estoque-reserva.service';
+
+export { liberarReserva, EstoqueInsuficienteError };
 
 const ETAPA_NOMES = ['criacao', 'impressao', 'acabamento', 'conferencia', 'expedicao'] as const;
 
@@ -77,8 +80,15 @@ export async function criarOrdemProducao(pedidoId: string): Promise<void> {
           custo_total:
             Number(b.quantidade_por_unidade) * quantidade * (Number((b.material as any)?.preco_medio) || 0),
         }));
-        // Falha silenciosa — não bloquear criação da OP
+        // Falha silenciosa no registro de producao_materiais — não bloquear criação da OP
         await supabase.from('producao_materiais').insert(materiaisOp);
+
+        // Reservar materiais no estoque (pode lançar EstoqueInsuficienteError)
+        const reservas = bom.map((b) => ({
+          material_id: b.material_id as string,
+          quantidade: Number(b.quantidade_por_unidade) * quantidade,
+        }));
+        await reservarMateriais(op.id, reservas);
       }
     }
   }

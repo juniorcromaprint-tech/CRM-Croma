@@ -1,5 +1,7 @@
-import React from "react";
+import React, { useEffect, useRef } from "react";
 import { useAuth } from "@/contexts/AuthContext";
+import { useAlertasEstoque } from "@/domains/admin/hooks/useAlertasEstoque";
+import { toast } from "sonner";
 
 // Role-specific dashboards (lazy import for code splitting)
 const DashboardDiretor = React.lazy(() => import("./DashboardDiretor"));
@@ -28,6 +30,19 @@ function DashboardSkeleton() {
 export default function DashboardPage() {
   const { profile } = useAuth();
   const role = profile?.role ?? "admin";
+
+  // Alerta de estoque mínimo na primeira carga do dashboard
+  const { data: alertasEstoque = [] } = useAlertasEstoque();
+  const alertadoRef = useRef(false);
+  useEffect(() => {
+    if (alertadoRef.current) return;
+    if (alertasEstoque.length === 0) return;
+    alertadoRef.current = true;
+    toast.warning(
+      `${alertasEstoque.length} ${alertasEstoque.length === 1 ? 'material abaixo' : 'materiais abaixo'} do estoque mínimo — verificar em Estoque`,
+      { duration: 6000 },
+    );
+  }, [alertasEstoque]);
 
   return (
     <React.Suspense fallback={<DashboardSkeleton />}>

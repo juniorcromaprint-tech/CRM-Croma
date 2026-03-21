@@ -4,7 +4,7 @@ import { useNavigate } from "react-router-dom";
 import { ilikeTerm } from "@/shared/utils/searchUtils";
 import { supabase } from "@/integrations/supabase/client";
 import { criarOrdemInstalacao } from "@/domains/instalacao/services/instalacao-criacao.service";
-import { finalizarCustosOP } from "@/domains/producao/services/producao.service";
+import { finalizarCustosOP, liberarReserva } from "@/domains/producao/services/producao.service";
 import { useProducaoStats } from "@/domains/producao/hooks/useProducao";
 import KpiCard from "@/shared/components/KpiCard";
 import OPMateriais from "@/domains/producao/components/OPMateriais";
@@ -121,10 +121,20 @@ interface OrdemProducaoRow {
   custo_mo_estimado: number | null;
   custo_mo_real: number | null;
   observacoes: string | null;
+  maquina_id: string | null;
+  data_inicio_prevista: string | null;
+  data_fim_prevista: string | null;
   created_at: string;
   updated_at: string;
   pedido_itens: PedidoItemJoin | null;
   producao_etapas: EtapaRow[];
+}
+
+interface MaquinaOption {
+  id: string;
+  nome: string;
+  tipo: string;
+  ativo: boolean;
 }
 
 interface PedidoItemOption {
@@ -163,17 +173,19 @@ const STATUS_BADGE_COLORS: Record<ProducaoStatus, string> = {
   liberado: "bg-green-50 text-green-700 border-green-200",
   retrabalho: "bg-red-50 text-red-700 border-red-200",
   finalizado: "bg-emerald-50 text-emerald-700 border-emerald-200",
+  cancelada: "bg-slate-100 text-slate-500 border-slate-200",
 };
 
 const STATUS_TRANSITIONS: Record<ProducaoStatus, ProducaoStatus[]> = {
-  aguardando_programacao: ["em_fila"],
-  em_fila: ["em_producao", "aguardando_programacao"],
-  em_producao: ["em_acabamento", "retrabalho"],
-  em_acabamento: ["em_conferencia", "retrabalho"],
-  em_conferencia: ["liberado", "retrabalho"],
-  liberado: ["finalizado"],
-  retrabalho: ["em_producao"],
+  aguardando_programacao: ["em_fila", "cancelada"],
+  em_fila: ["em_producao", "aguardando_programacao", "cancelada"],
+  em_producao: ["em_acabamento", "retrabalho", "cancelada"],
+  em_acabamento: ["em_conferencia", "retrabalho", "cancelada"],
+  em_conferencia: ["liberado", "retrabalho", "cancelada"],
+  liberado: ["finalizado", "cancelada"],
+  retrabalho: ["em_producao", "cancelada"],
   finalizado: [],
+  cancelada: [],
 };
 
 // Kanban columns mapping
@@ -383,6 +395,9 @@ export default function ProducaoPage() {
   const [formPrazoInterno, setFormPrazoInterno] = useState("");
   const [formTempoEstimado, setFormTempoEstimado] = useState("");
   const [formObservacoes, setFormObservacoes] = useState("");
+  const [formMaquinaId, setFormMaquinaId] = useState("");
+  const [formDataInicioPrevista, setFormDataInicioPrevista] = useState("");
+  const [formDataFimPrevista, setFormDataFimPrevista] = useState("");
 
   // --- Drag & drop ---
   const [draggedOPId, setDraggedOPId] = useState<string | null>(null);
@@ -457,6 +472,20 @@ export default function ProducaoPage() {
     },
   });
 
+  const { data: maquinas = [] } = useQuery({
+    queryKey: ["producao", "maquinas"],
+    queryFn: async () => {
+      const { data, error } = await supabase
+        .from("maquinas")
+        .select("id, nome, tipo, ativo")
+        .eq("ativo", true)
+        .order("nome");
+      if (error) throw error;
+      return (data ?? []) as MaquinaOption[];
+    },
+    staleTime: 5 * 60 * 1000,
+  });
+
   // =========================================================================
   // MUTATIONS
   // =========================================================================
@@ -480,6 +509,9 @@ export default function ProducaoPage() {
           observacoes: formObservacoes || null,
           custo_mp_estimado: Number(selectedItem?.custo_mp) || 0,
           custo_mo_estimado: Number(selectedItem?.custo_mo) || 0,
+          maquina_id: formMaquinaId || null,
+          data_inicio_prevista: formDataInicioPrevista || null,
+          data_fim_prevista: formDataFimPrevista || null,
         })
         .select()
         .single();
@@ -529,6 +561,11 @@ export default function ProducaoPage() {
         .eq("id", id);
 
       if (error) throw error;
+
+      // Ao cancelar uma OP, liberar as reservas de estoque
+      if (newStatus === "cancelada") {
+        await liberarReserva(id);
+      }
     },
     onSuccess: (_data, variables) => {
       queryClient.invalidateQueries({ queryKey: ["producao"] });
@@ -690,6 +727,9 @@ export default function ProducaoPage() {
     setFormPrazoInterno("");
     setFormTempoEstimado("");
     setFormObservacoes("");
+    setFormMaquinaId("");
+    setFormDataInicioPrevista("");
+    setFormDataFimPrevista("");
   }
 
   function handleCreate() {
@@ -1436,7 +1476,7 @@ export default function ProducaoPage() {
             {/* Observacoes */}
             <div className="space-y-2">
               <Label htmlFor="create-obs" className="text-slate-700 font-medium">
-                Observacoes
+                Observações
               </Label>
               <Textarea
                 id="create-obs"
@@ -1445,6 +1485,69 @@ export default function ProducaoPage() {
                 placeholder="Informações adicionais sobre a OP..."
                 className="rounded-xl border-slate-200 min-h-[80px]"
               />
+            </div>
+
+            {/* Separador — Agendamento de máquina */}
+            <div className="border-t border-slate-100 pt-3">
+              <p className="text-xs font-semibold text-slate-400 uppercase tracking-wide mb-3">
+                Agendamento de Máquina (opcional)
+              </p>
+
+              {/* Máquina */}
+              <div className="space-y-2 mb-3">
+                <Label htmlFor="create-maquina" className="text-slate-700 font-medium">
+                  Máquina
+                </Label>
+                <Select value={formMaquinaId} onValueChange={setFormMaquinaId}>
+                  <SelectTrigger id="create-maquina" className="rounded-xl border-slate-200">
+                    <SelectValue placeholder="Sem máquina alocada" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="">Sem máquina alocada</SelectItem>
+                    {maquinas.map((m) => (
+                      <SelectItem key={m.id} value={m.id}>
+                        {m.nome}
+                        <span className="ml-1 text-slate-400 text-xs">({m.tipo})</span>
+                      </SelectItem>
+                    ))}
+                    {maquinas.length === 0 && (
+                      <div className="px-3 py-2 text-sm text-slate-400">
+                        Nenhuma máquina cadastrada
+                      </div>
+                    )}
+                  </SelectContent>
+                </Select>
+              </div>
+
+              {/* Datas previstas — só aparece quando máquina selecionada */}
+              {formMaquinaId && (
+                <div className="grid grid-cols-2 gap-3">
+                  <div className="space-y-2">
+                    <Label htmlFor="create-inicio-previsto" className="text-slate-700 font-medium">
+                      Início previsto
+                    </Label>
+                    <Input
+                      id="create-inicio-previsto"
+                      type="datetime-local"
+                      value={formDataInicioPrevista}
+                      onChange={(e) => setFormDataInicioPrevista(e.target.value)}
+                      className="rounded-xl border-slate-200"
+                    />
+                  </div>
+                  <div className="space-y-2">
+                    <Label htmlFor="create-fim-previsto" className="text-slate-700 font-medium">
+                      Fim previsto
+                    </Label>
+                    <Input
+                      id="create-fim-previsto"
+                      type="datetime-local"
+                      value={formDataFimPrevista}
+                      onChange={(e) => setFormDataFimPrevista(e.target.value)}
+                      className="rounded-xl border-slate-200"
+                    />
+                  </div>
+                </div>
+              )}
             </div>
           </div>
 

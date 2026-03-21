@@ -101,6 +101,27 @@ export interface GanttBar {
   tipo: string;
 }
 
+export interface MaquinaOPAgendada {
+  op_id: string;
+  op_numero: string;
+  pedido_numero: string;
+  cliente_nome: string;
+  status: string;
+  data_inicio_prevista: string;
+  data_fim_prevista: string | null;
+  maquina_id: string;
+  maquina_nome: string;
+  maquina_tipo: string;
+  atrasada: boolean;
+}
+
+export interface MaquinaUtilizacao {
+  id: string;
+  nome: string;
+  tipo: string;
+  ops_hoje: number;
+}
+
 export interface EtapaComOp {
   etapa_id: string;
   etapa_nome: string;

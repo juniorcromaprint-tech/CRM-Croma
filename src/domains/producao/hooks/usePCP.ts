@@ -6,6 +6,8 @@ import {
   calcularKpis,
   moverOpParaSetor,
   atualizarStatusOp,
+  listarOpsAgendadasMaquina,
+  listarUtilizacaoMaquinas,
 } from '../services/pcp.service';
 import {
   iniciarEtapa,
@@ -21,6 +23,8 @@ export const PCP_KEYS = {
   ops: ['pcp', 'ops-ativas'] as const,
   capacidade: ['pcp', 'capacidade'] as const,
   kpis: ['pcp', 'kpis'] as const,
+  opsAgendadas: ['pcp', 'ops-agendadas-maquina'] as const,
+  utilizacaoMaquinas: ['pcp', 'utilizacao-maquinas'] as const,
   apontamentoAberto: (etapaId: string) => ['pcp', 'apontamento-aberto', etapaId] as const,
 };
 
@@ -66,6 +70,24 @@ export function useApontamentoAberto(etapaId: string | undefined) {
     enabled: !!etapaId,
     staleTime: 0, // sempre revalida — estado em tempo real
     refetchInterval: 15 * 1000,
+  });
+}
+
+export function useOpsAgendadasMaquina() {
+  return useQuery({
+    queryKey: PCP_KEYS.opsAgendadas,
+    queryFn: listarOpsAgendadasMaquina,
+    staleTime: 30 * 1000,
+    refetchInterval: 60 * 1000,
+  });
+}
+
+export function useUtilizacaoMaquinas() {
+  return useQuery({
+    queryKey: PCP_KEYS.utilizacaoMaquinas,
+    queryFn: listarUtilizacaoMaquinas,
+    staleTime: 60 * 1000,
+    refetchInterval: 60 * 1000,
   });
 }
 
