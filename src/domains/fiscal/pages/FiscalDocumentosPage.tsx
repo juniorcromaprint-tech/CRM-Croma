@@ -142,13 +142,13 @@ export default function FiscalDocumentosPage() {
           </SelectTrigger>
           <SelectContent>
             <SelectItem value="todos">Todos os status</SelectItem>
-            <SelectItem value="rascunho">📝 Rascunho</SelectItem>
-            <SelectItem value="apto">✅ Apto</SelectItem>
-            <SelectItem value="emitindo">⏳ Emitindo</SelectItem>
-            <SelectItem value="autorizado">🟢 Autorizado</SelectItem>
-            <SelectItem value="rejeitado">❌ Rejeitado</SelectItem>
-            <SelectItem value="cancelado">🚫 Cancelado</SelectItem>
-            <SelectItem value="erro_transmissao">💥 Erro Transmissão</SelectItem>
+            <SelectItem value="rascunho">Rascunho</SelectItem>
+            <SelectItem value="apto">Apto</SelectItem>
+            <SelectItem value="emitindo">Emitindo</SelectItem>
+            <SelectItem value="autorizado">Autorizado</SelectItem>
+            <SelectItem value="rejeitado">Rejeitado</SelectItem>
+            <SelectItem value="cancelado">Cancelado</SelectItem>
+            <SelectItem value="erro_transmissao">Erro Transmissão</SelectItem>
           </SelectContent>
         </Select>
       </div>
@@ -251,7 +251,7 @@ export default function FiscalDocumentosPage() {
           </DialogHeader>
           <div className="space-y-4">
             <div className="bg-red-50 border border-red-200 rounded-lg p-3 text-sm text-red-800">
-              <strong>⚠️ Ação irreversível!</strong> O cancelamento será transmitido à SEFAZ.
+              <strong>Ação irreversível!</strong> O cancelamento será transmitido à SEFAZ.
             </div>
             {cancelarDoc && (
               <div className="bg-slate-50 rounded-lg p-3 text-sm space-y-1">

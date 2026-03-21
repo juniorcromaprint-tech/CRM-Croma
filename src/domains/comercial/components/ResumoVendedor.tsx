@@ -1,7 +1,7 @@
 // src/domains/comercial/components/ResumoVendedor.tsx
 
 import React from "react";
-import { TrendingUp, Package, Wrench } from "lucide-react";
+import { TrendingUp, Package, Wrench, AlertTriangle } from "lucide-react";
 import { brl } from "@/shared/utils/format";
 import type { OrcamentoItemPricingResult } from "@/shared/services/orcamento-pricing.service";
 
@@ -63,7 +63,7 @@ export default function ResumoVendedor({
               <span className="text-xs font-semibold text-slate-700 tabular-nums">{brl(resultado.custoMP)}</span>
             </div>
             {resultado.custoMP === 0 && (
-              <p className="text-[10px] text-amber-600 mt-0.5">⚠️ Sem materiais cadastrados</p>
+              <p className="text-[10px] text-amber-600 mt-0.5 flex items-center gap-1"><AlertTriangle size={10} /> Sem materiais cadastrados</p>
             )}
           </div>
         </div>

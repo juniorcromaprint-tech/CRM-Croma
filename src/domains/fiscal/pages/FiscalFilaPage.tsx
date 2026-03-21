@@ -10,12 +10,12 @@ import { List, RefreshCw, Loader2, RotateCcw, AlertTriangle, CheckCircle2, Clock
 import { useFiscalFila } from '../hooks/useFiscal';
 
 const FILA_STATUS_CONFIG: Record<string, { label: string; className: string }> = {
-  pendente: { label: '⏳ Pendente', className: 'bg-slate-100 text-slate-600' },
-  processando: { label: '🔄 Processando', className: 'bg-blue-100 text-blue-700 animate-pulse' },
-  aguardando_retorno: { label: '⌛ Aguardando', className: 'bg-amber-100 text-amber-700' },
-  sucesso: { label: '✅ Sucesso', className: 'bg-green-100 text-green-700' },
-  falha: { label: '❌ Falha', className: 'bg-red-100 text-red-700' },
-  cancelado: { label: '🚫 Cancelado', className: 'bg-slate-100 text-slate-500' },
+  pendente: { label: 'Pendente', className: 'bg-slate-100 text-slate-600' },
+  processando: { label: 'Processando', className: 'bg-blue-100 text-blue-700 animate-pulse' },
+  aguardando_retorno: { label: 'Aguardando', className: 'bg-amber-100 text-amber-700' },
+  sucesso: { label: 'Sucesso', className: 'bg-green-100 text-green-700' },
+  falha: { label: 'Falha', className: 'bg-red-100 text-red-700' },
+  cancelado: { label: 'Cancelado', className: 'bg-slate-100 text-slate-500' },
 };
 
 export default function FiscalFilaPage() {
