@@ -60,6 +60,26 @@ export default function DashboardFinanceiro() {
     },
   });
 
+  const { data: pedidosEmAndamento } = useQuery({
+    queryKey: ['financeiro', 'pedidos_em_andamento'],
+    queryFn: async () => {
+      const { data } = await supabase
+        .from('pedidos')
+        .select('id, status, valor_total, data_prometida, numero, clientes(nome_fantasia, razao_social)')
+        .in('status', ['aprovado', 'em_producao', 'parcialmente_concluido', 'produzido', 'aguardando_instalacao', 'em_instalacao'])
+        .is('excluido_em', null)
+        .order('data_prometida', { ascending: true });
+      return data ?? [];
+    },
+    staleTime: 1000 * 60 * 3,
+  });
+
+  const receitaProjetada = (pedidosEmAndamento ?? []).reduce((s, p) => s + (Number(p.valor_total) || 0), 0);
+  const pedidosAtrasados = (pedidosEmAndamento ?? []).filter(p => {
+    if (!p.data_prometida) return false;
+    return new Date(p.data_prometida) < new Date();
+  }).length;
+
   const saldo = fin?.saldo ?? 0;
   const isPositive = saldo >= 0;
 
@@ -123,6 +143,21 @@ export default function DashboardFinanceiro() {
             <p className={`text-xl font-bold tabular-nums ${text}`}>{value}</p>
           </div>
         ))}
+      </div>
+
+      {/* ─── Receita em Andamento ─── */}
+      <div className="bg-white rounded-2xl border border-slate-100 p-5">
+        <div className="flex items-center gap-3 mb-3">
+          <div className="w-10 h-10 rounded-xl bg-amber-100 flex items-center justify-center">
+            <Clock size={20} className="text-amber-600" />
+          </div>
+          <span className="text-sm text-slate-500 font-medium">Receita em Andamento</span>
+        </div>
+        <p className="text-2xl font-bold text-slate-800 tabular-nums">{brl(receitaProjetada)}</p>
+        <p className="text-xs text-slate-400 mt-1">{pedidosEmAndamento?.length ?? 0} pedidos em produção</p>
+        {pedidosAtrasados > 0 && (
+          <p className="text-xs text-red-500 mt-1 font-medium">⚠ {pedidosAtrasados} com prazo vencido</p>
+        )}
       </div>
 
       {/* ─── Tables ─── */}

@@ -2,10 +2,11 @@ import React from "react";
 import { Link } from "react-router-dom";
 import {
   UserPlus, FileText, TrendingUp, Building2, Clock, ArrowRight,
-  Calculator, Plus, Target, Phone, Calendar, Zap, BarChart3,
+  Calculator, Plus, Target, Phone, Calendar, Zap,
 } from "lucide-react";
 import { brl } from "@/shared/utils/format";
-import { useDashComercial } from "../hooks/useDashboardStats";
+import { useDashComercial, useFunnelStats } from "../hooks/useDashboardStats";
+import FunnelCard from "../components/FunnelCard";
 import { useQuery } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 
@@ -78,6 +79,7 @@ const prioridadeColors: Record<string, string> = {
 
 export default function DashboardComercial() {
   const { data: comercial, isLoading } = useDashComercial();
+  const { data: funil } = useFunnelStats();
 
   const { data: tarefas } = useQuery({
     queryKey: ["dash-comercial", "tarefas"],
@@ -159,34 +161,8 @@ export default function DashboardComercial() {
         />
       </div>
 
-      {/* ─── Conversion funnel mini */}
-      {comercial && (comercial.totalClientes > 0 || comercial.leadsAtivos > 0) && (
-        <div className="bg-white rounded-2xl border border-slate-100 p-5">
-          <div className="flex items-center gap-2.5 mb-4">
-            <div className="w-8 h-8 rounded-lg bg-purple-50 flex items-center justify-center">
-              <BarChart3 size={16} className="text-purple-500" />
-            </div>
-            <h2 className="font-semibold text-slate-800">Funil resumido</h2>
-          </div>
-          <div className="flex items-center gap-2 overflow-x-auto pb-1">
-            {[
-              { label: "Leads", value: comercial.leadsAtivos, color: "bg-emerald-500" },
-              { label: "Propostas", value: comercial.totalPropostas, color: "bg-blue-500" },
-              { label: "Pendentes", value: comercial.propostasPendentes, color: "bg-amber-500" },
-              { label: "Aprovadas", value: comercial.propostasAprovadas, color: "bg-green-500" },
-            ].map((step, i) => (
-              <React.Fragment key={step.label}>
-                {i > 0 && <ArrowRight size={16} className="text-slate-300 shrink-0" />}
-                <div className="flex items-center gap-2 bg-slate-50 rounded-xl px-4 py-2.5 shrink-0">
-                  <div className={`w-2.5 h-2.5 rounded-full ${step.color}`} />
-                  <span className="text-sm font-bold text-slate-700 tabular-nums">{step.value}</span>
-                  <span className="text-xs text-slate-400">{step.label}</span>
-                </div>
-              </React.Fragment>
-            ))}
-          </div>
-        </div>
-      )}
+      {/* ─── Funil de Conversão ─── */}
+      {funil && <FunnelCard data={funil} />}
 
       {/* ─── Content: Propostas + Tarefas ─── */}
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">

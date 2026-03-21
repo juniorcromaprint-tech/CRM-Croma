@@ -4,6 +4,7 @@ import { Loader2, AlertTriangle, CalendarClock, TrendingDown, Receipt } from 'lu
 import { brl } from '@/shared/utils/format';
 import { usePortalProposta, useAprovarProposta } from '../hooks/usePortalProposta';
 import { usePortalTracking } from '../hooks/usePortalTracking';
+import { useAdminConfig } from '../hooks/useAdminConfig';
 import { PortalHeader } from '../components/PortalHeader';
 import { PortalItemList } from '../components/PortalItemList';
 import { PortalApproval } from '../components/PortalApproval';
@@ -11,12 +12,14 @@ import { PortalFileUpload } from '../components/PortalFileUpload';
 import { PortalConfirmation } from '../components/PortalConfirmation';
 import { PortalFooter } from '../components/PortalFooter';
 import { CondicoesPagamentoView } from '@/domains/comercial/components/CondicoesPagamentoView';
+import PortalPixInfo from '../components/PortalPixInfo';
 
 export default function PortalOrcamentoPage() {
   const { token } = useParams<{ token: string }>();
   const { data: proposta, isLoading, error } = usePortalProposta(token || '');
   const aprovar = useAprovarProposta();
   const { trackClick } = usePortalTracking(token || '');
+  const { data: chavePix } = useAdminConfig('chave_pix');
 
   if (isLoading) {
     return (
@@ -129,6 +132,9 @@ export default function PortalOrcamentoPage() {
                 }}
                 valorTotal={proposta.valor_total}
               />
+              {proposta.forma_pagamento === 'pix' && chavePix && (
+                <PortalPixInfo chavePix={chavePix} valor={proposta.valor_total ?? 0} />
+              )}
             </div>
           )}
         </div>

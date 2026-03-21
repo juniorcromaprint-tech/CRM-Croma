@@ -124,3 +124,48 @@ export async function gerarParcelas(pedidoId: string): Promise<void> {
   const { error: pErr } = await supabase.from('parcelas_receber' as any).insert(parcelas);
   if (pErr) throw new Error(`Erro ao gerar parcelas: ${pErr.message}`);
 }
+
+/**
+ * Gera um registro de comissão ao concluir um pedido.
+ * Chamado automaticamente quando o pedido avança para status "concluido".
+ * Não lança erro — comissão é side-effect e não deve bloquear o fluxo principal.
+ */
+export async function gerarComissao(pedidoId: string): Promise<void> {
+  // Guard de idempotência: evita criar comissão duplicada
+  const { count } = await supabase
+    .from('comissoes')
+    .select('id', { count: 'exact', head: true })
+    .eq('pedido_id', pedidoId);
+  if (count && count > 0) return;
+
+  // Buscar pedido + proposta + vendedor
+  const { data: pedido, error } = await supabase
+    .from('pedidos')
+    .select('id, valor_total, proposta_id, vendedor_id, propostas(percentual_comissao)')
+    .eq('id', pedidoId)
+    .single();
+
+  if (error || !pedido) return; // silencioso — pedido não encontrado
+
+  const vendedorId = (pedido as any).vendedor_id;
+  if (!vendedorId) return; // sem vendedor = sem comissão
+
+  const proposta = (pedido as any).propostas;
+  const percentual: number = proposta?.percentual_comissao ?? 5; // fallback 5%
+  const valorBase: number = (pedido as any).valor_total ?? 0;
+  const valorComissao = Math.round(valorBase * (percentual / 100) * 100) / 100;
+
+  if (valorComissao <= 0) return;
+
+  const { error: insErr } = await supabase.from('comissoes' as any).insert({
+    pedido_id: pedido.id,
+    vendedor_id: vendedorId,
+    percentual,
+    valor_base: valorBase,
+    valor_comissao: valorComissao,
+    status: 'gerada',
+  });
+
+  if (insErr) console.error('[gerarComissao] Erro:', insErr.message);
+  // Não lança erro — comissão é side-effect, não bloqueia o fluxo
+}

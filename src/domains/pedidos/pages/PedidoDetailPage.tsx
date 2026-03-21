@@ -2,7 +2,7 @@ import React, { useState } from 'react'
 import { useParams, useNavigate } from 'react-router-dom'
 import {
   ArrowLeft, FolderOpen, ExternalLink, Loader2,
-  Play, CheckCircle, Truck, Wrench, Award, FileText, XCircle, RefreshCw,
+  Play, CheckCircle, Truck, Wrench, Award, FileText, XCircle, RefreshCw, DollarSign,
 } from 'lucide-react'
 import { useMutation, useQueryClient } from '@tanstack/react-query'
 import { Button } from '@/components/ui/button'
@@ -26,7 +26,7 @@ import { useCriarPastaOneDrive } from '../hooks/useOneDrive'
 import { brl } from '@/shared/utils/format'
 import { criarOrdemProducao } from '@/domains/producao/services/producao.service'
 import { criarNFeFromPedido } from '@/domains/fiscal/services/nfe-creation.service'
-import { gerarContasReceber, gerarParcelas } from '@/domains/financeiro/services/financeiro-automation.service'
+import { gerarContasReceber, gerarParcelas, gerarComissao } from '@/domains/financeiro/services/financeiro-automation.service'
 import { showError, showSuccess } from '@/utils/toast'
 import { supabase } from '@/integrations/supabase/client'
 import { updateWithLock, OptimisticLockError } from '@/shared/utils/optimistic-lock'
@@ -41,6 +41,8 @@ const VALID_TRANSITIONS: Record<string, string[]> = {
   produzido:             ['aguardando_instalacao', 'concluido', 'cancelado'],
   aguardando_instalacao: ['em_instalacao', 'cancelado'],
   em_instalacao:         ['concluido', 'cancelado'],
+  concluido:             ['faturado'],
+  faturado:              [],
 }
 
 // Map of current status → next status action
@@ -53,6 +55,7 @@ const FLOW_ACTIONS: Record<string, { label: string; next: string; icon: React.Re
   produzido:              { label: 'Aguardar Instalação',  next: 'aguardando_instalacao',  icon: <Truck size={14} />,       cls: 'bg-purple-600 hover:bg-purple-700' },
   aguardando_instalacao:  { label: 'Iniciar Instalação',   next: 'em_instalacao',          icon: <Wrench size={14} />,      cls: 'bg-indigo-600 hover:bg-indigo-700' },
   em_instalacao:          { label: 'Concluir Pedido',      next: 'concluido',              icon: <Award size={14} />,       cls: 'bg-emerald-600 hover:bg-emerald-700' },
+  concluido:              { label: 'Marcar Faturado',      next: 'faturado',               icon: <DollarSign size={14} />,  cls: 'bg-green-600 hover:bg-green-700' },
 }
 
 const STATUS_CONFIG: Record<string, { label: string; cls: string }> = {
@@ -65,6 +68,7 @@ const STATUS_CONFIG: Record<string, { label: string; cls: string }> = {
   em_instalacao:           { label: 'Em Instalação',          cls: 'bg-indigo-100 text-indigo-700' },
   parcialmente_concluido:  { label: 'Parcial.',               cls: 'bg-yellow-100 text-yellow-700' },
   concluido:               { label: 'Concluído',              cls: 'bg-emerald-100 text-emerald-700' },
+  faturado:                { label: 'Faturado',               cls: 'bg-green-100 text-green-700' },
   cancelado:               { label: 'Cancelado',              cls: 'bg-red-100 text-red-700' },
 }
 
@@ -166,12 +170,20 @@ export default function PedidoDetailPage() {
   const concluirPedido = async () => {
     if (!id || !pedido) return
     try {
-      // 1. Gerar contas a receber ANTES de marcar como concluído
+      // 1. Gerar contas a receber e comissão ANTES de marcar como concluído
       await gerarContasReceber(id)
       await gerarParcelas(id)
+      await gerarComissao(id) // side-effect: não lança erro se falhar
       // 2. Atualizar status com optimistic lock
       await updateWithLock('pedidos', id, { status: 'concluido' }, pedido.version)
-      // 3. Invalidar cache para refletir no UI
+      // 3. Criar registro NPS (fire-and-forget)
+      supabase.from('nps_respostas').insert({
+        pedido_id: id,
+        cliente_id: pedido.cliente_id,
+      }).then(() => {
+        console.log('[NPS] token gerado para pedido', id);
+      });
+      // 4. Invalidar cache para refletir no UI
       queryClient.invalidateQueries({ queryKey: ['pedidos'] })
       queryClient.invalidateQueries({ queryKey: ['dashboard'] })
       showSuccess('Pedido concluído com sucesso!')
@@ -326,8 +338,8 @@ export default function PedidoDetailPage() {
               {FLOW_ACTIONS[pedido.status].label}
             </Button>
           )}
-          {/* Botão cancelar: visível para qualquer status que não seja concluido/cancelado */}
-          {!['concluido', 'cancelado'].includes(pedido.status) && (
+          {/* Botão cancelar: visível para qualquer status que não seja concluido/faturado/cancelado */}
+          {!['concluido', 'faturado', 'cancelado'].includes(pedido.status) && (
             <Button
               size="sm"
               variant="outline"

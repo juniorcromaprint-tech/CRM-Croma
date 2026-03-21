@@ -103,6 +103,74 @@ export function useCriarProposta() {
 }
 
 /**
+ * Converte uma proposta aprovada em pedido.
+ * Insere o pedido, linkando proposta_id e copiando cliente_id / valor_total.
+ * A proposta NÃO precisa de pedido_id — o vínculo é por pedidos.proposta_id.
+ */
+export function useConverterPropostaEmPedido() {
+  const qc = useQueryClient()
+  return useMutation({
+    mutationFn: async (proposta: {
+      id: string
+      cliente_id: string | null
+      valor_estimado: number
+      total?: number
+    }) => {
+      if (!proposta.cliente_id) {
+        throw new Error('Proposta sem cliente vinculado. Associe um cliente antes de converter.')
+      }
+      // Verifica idempotência: já existe pedido vinculado a esta proposta?
+      const { data: existing } = await supabase
+        .from('pedidos')
+        .select('id')
+        .eq('proposta_id', proposta.id)
+        .maybeSingle()
+      if (existing) {
+        throw new Error('Já existe um pedido vinculado a esta proposta.')
+      }
+      const { data, error } = await supabase
+        .from('pedidos')
+        .insert({
+          proposta_id: proposta.id,
+          cliente_id: proposta.cliente_id,
+          valor_total: proposta.total ?? proposta.valor_estimado ?? 0,
+          status: 'aprovado',
+          observacoes: 'Pedido gerado manualmente a partir de proposta aprovada.',
+        })
+        .select()
+        .single()
+      if (error) throw new Error(error.message)
+      return data as { id: string; numero: string | null }
+    },
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: [KEY] })
+      qc.invalidateQueries({ queryKey: ['pedidos'] })
+    },
+    onError: (e: Error) => showError(e.message),
+  })
+}
+
+/**
+ * Verifica se uma proposta já possui pedido vinculado.
+ */
+export function usePedidoDaProposta(propostaId: string | null) {
+  return useQuery({
+    queryKey: ['pedido-da-proposta', propostaId],
+    enabled: !!propostaId,
+    staleTime: 1000 * 60,
+    queryFn: async () => {
+      if (!propostaId) return null
+      const { data } = await supabase
+        .from('pedidos')
+        .select('id, numero')
+        .eq('proposta_id', propostaId)
+        .maybeSingle()
+      return data as { id: string; numero: string | null } | null
+    },
+  })
+}
+
+/**
  * Soft-delete de proposta.
  */
 export function useExcluirProposta() {
