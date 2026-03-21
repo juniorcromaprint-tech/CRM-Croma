@@ -87,6 +87,7 @@ export const PEDIDO_STATUS = {
   EM_INSTALACAO: 'em_instalacao',
   PARCIALMENTE_CONCLUIDO: 'parcialmente_concluido',
   CONCLUIDO: 'concluido',
+  FATURADO: 'faturado',
   CANCELADO: 'cancelado',
 } as const;
 
@@ -102,6 +103,7 @@ export const PEDIDO_STATUS_CONFIG: Record<PedidoStatus, StatusConfig> = {
   em_instalacao: { label: 'Em instalação', color: 'bg-violet-50 text-violet-700 border-violet-100', icon: 'HardHat' },
   parcialmente_concluido: { label: 'Parcialmente concluído', color: 'bg-teal-50 text-teal-700 border-teal-100', icon: 'CircleDashed' },
   concluido: { label: 'Concluído', color: 'bg-emerald-50 text-emerald-700 border-emerald-100', icon: 'CheckCircle2' },
+  faturado: { label: 'Faturado', color: 'bg-green-50 text-green-700 border-green-100', icon: 'DollarSign' },
   cancelado: { label: 'Cancelado', color: 'bg-red-50 text-red-700 border-red-100', icon: 'Ban' },
 } as const;
 

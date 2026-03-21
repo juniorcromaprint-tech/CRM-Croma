@@ -11,13 +11,15 @@ import {
   Building2, UserPlus, TrendingUp, FileText, Package, Factory,
   Truck, Wallet, DollarSign, AlertTriangle, Wrench,
   ArrowRight, Plus, Calendar, BarChart3, Target,
-  ShoppingCart, CheckCircle2, Clock, Activity, Zap,
+  ShoppingCart, CheckCircle2, Clock, Activity, Zap, SmilePlus,
 } from "lucide-react";
 import { brl } from "@/shared/utils/format";
 import {
   useDashComercial, useDashPedidos, useDashProducao,
   useDashFinanceiro, useDashInstalacoes, useDashEstoque, useDashQualidade,
+  useFunnelStats, useDashNPS,
 } from "../hooks/useDashboardStats";
+import FunnelCard from "../components/FunnelCard";
 import { useQuery } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 
@@ -223,6 +225,28 @@ export default function DashboardDiretor() {
   const { data: inst } = useDashInstalacoes();
   const { data: estoque } = useDashEstoque();
   const { data: qual } = useDashQualidade();
+  const { data: funil } = useFunnelStats();
+  const { data: nps } = useDashNPS();
+
+  const { data: pedidosEmAndamento } = useQuery({
+    queryKey: ['financeiro', 'pedidos_em_andamento'],
+    queryFn: async () => {
+      const { data } = await supabase
+        .from('pedidos')
+        .select('id, status, valor_total, data_prometida, numero, clientes(nome_fantasia, razao_social)')
+        .in('status', ['aprovado', 'em_producao', 'parcialmente_concluido', 'produzido', 'aguardando_instalacao', 'em_instalacao'])
+        .is('excluido_em', null)
+        .order('data_prometida', { ascending: true });
+      return data ?? [];
+    },
+    staleTime: 1000 * 60 * 3,
+  });
+
+  const receitaProjetada = (pedidosEmAndamento ?? []).reduce((s, p) => s + (Number(p.valor_total) || 0), 0);
+  const pedidosAtrasados = (pedidosEmAndamento ?? []).filter(p => {
+    if (!p.data_prometida) return false;
+    return new Date(p.data_prometida) < new Date();
+  }).length;
 
   const { data: recentLeads } = useQuery({
     queryKey: ["dash", "recent-leads"],
@@ -457,6 +481,18 @@ export default function DashboardDiretor() {
                   <span className={`text-sm font-bold tabular-nums ${color}`}>{value}</span>
                 </div>
               ))}
+              <div className="flex items-center justify-between py-2 pt-3 border-t border-amber-100 mt-1">
+                <div className="flex items-center gap-2.5">
+                  <Clock size={14} className="text-amber-500" />
+                  <span className="text-sm text-slate-500">Em Produção</span>
+                </div>
+                <div className="text-right">
+                  <span className="text-sm font-bold tabular-nums text-amber-600">{brl(receitaProjetada)}</span>
+                  {pedidosAtrasados > 0 && (
+                    <p className="text-[10px] text-red-500 font-medium">⚠ {pedidosAtrasados} atrasados</p>
+                  )}
+                </div>
+              </div>
             </div>
           </div>
 
@@ -520,6 +556,95 @@ export default function DashboardDiretor() {
               ))}
             </div>
           </div>
+
+          {/* NPS do Mês */}
+          <div className="bg-white rounded-2xl border border-slate-100 p-6">
+            <div className="flex items-center justify-between mb-5">
+              <div className="flex items-center gap-2.5">
+                <div className="w-8 h-8 rounded-lg bg-violet-50 flex items-center justify-center">
+                  <SmilePlus size={16} className="text-violet-500" />
+                </div>
+                <h2 className="font-semibold text-slate-800">NPS do Mês</h2>
+              </div>
+            </div>
+            {nps && nps.total > 0 ? (
+              <div className="space-y-4">
+                {/* Score principal */}
+                <div className="flex items-end gap-3">
+                  <div>
+                    <p className={`text-4xl font-bold tabular-nums leading-none ${
+                      (nps.score ?? 0) >= 50 ? 'text-emerald-600'
+                      : (nps.score ?? 0) >= 0  ? 'text-amber-500'
+                      : 'text-red-500'
+                    }`}>
+                      {(nps.score ?? 0) > 0 ? `+${nps.score}` : nps.score}
+                    </p>
+                    <p className="text-[11px] text-slate-400 mt-0.5">NPS Score</p>
+                  </div>
+                  <div className="ml-auto text-right">
+                    <p className="text-xl font-bold tabular-nums text-slate-700">{nps.media}</p>
+                    <p className="text-[11px] text-slate-400">Média (0–10)</p>
+                  </div>
+                </div>
+
+                {/* Barra visual promotores / neutros / detratores */}
+                {nps.total > 0 && (
+                  <div className="h-2.5 rounded-full overflow-hidden flex gap-0.5">
+                    {nps.promotores > 0 && (
+                      <div
+                        className="bg-emerald-500 rounded-full transition-all"
+                        style={{ width: `${(nps.promotores / nps.total) * 100}%` }}
+                      />
+                    )}
+                    {nps.neutros > 0 && (
+                      <div
+                        className="bg-amber-400 rounded-full transition-all"
+                        style={{ width: `${(nps.neutros / nps.total) * 100}%` }}
+                      />
+                    )}
+                    {nps.detratores > 0 && (
+                      <div
+                        className="bg-red-400 rounded-full transition-all"
+                        style={{ width: `${(nps.detratores / nps.total) * 100}%` }}
+                      />
+                    )}
+                  </div>
+                )}
+
+                {/* Contagens */}
+                <div className="flex items-center justify-between text-center">
+                  {[
+                    { label: 'Promotores', value: nps.promotores, color: 'text-emerald-600' },
+                    { label: 'Neutros',    value: nps.neutros,    color: 'text-amber-500'   },
+                    { label: 'Detratores', value: nps.detratores, color: 'text-red-500'     },
+                  ].map(({ label, value, color }, i) => (
+                    <React.Fragment key={label}>
+                      {i > 0 && <div className="w-px h-10 bg-slate-100" />}
+                      <div className="flex-1">
+                        <p className={`text-xl font-bold tabular-nums ${color}`}>{value}</p>
+                        <p className="text-[11px] text-slate-400 mt-0.5">{label}</p>
+                      </div>
+                    </React.Fragment>
+                  ))}
+                </div>
+
+                <p className="text-[11px] text-slate-400 text-center">
+                  {nps.total} resposta{nps.total !== 1 ? 's' : ''} este mês
+                </p>
+              </div>
+            ) : (
+              <div className="text-center py-6">
+                <SmilePlus size={32} className="text-slate-200 mx-auto mb-3" />
+                <p className="text-sm text-slate-400">Nenhuma avaliação este mês</p>
+                <p className="text-xs text-slate-300 mt-1">
+                  Enviada automaticamente ao concluir pedidos
+                </p>
+              </div>
+            )}
+          </div>
+
+          {/* Funil de Conversão */}
+          {funil && <FunnelCard data={funil} />}
 
         </div>
 

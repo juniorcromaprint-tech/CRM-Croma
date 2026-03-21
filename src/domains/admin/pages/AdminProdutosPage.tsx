@@ -491,6 +491,10 @@ function DialogModelo({ open, onClose, produtoId, modelo }: DialogModeloProps) {
   });
 
   function handleSave() {
+    // BUG-02: Avisar se NCM não preenchido (NF-e vai falhar sem ele)
+    if (!form.ncm.trim()) {
+      showError("Aviso: NCM não preenchido — NF-e pode falhar. Preencha o NCM para emitir notas fiscais.");
+    }
     mutation.mutate(undefined, {
       onSuccess: () => {
         showSuccess(isEdit ? "Modelo atualizado!" : "Modelo criado!");
@@ -542,26 +546,31 @@ function DialogModelo({ open, onClose, produtoId, modelo }: DialogModeloProps) {
 
           <div className="grid grid-cols-2 gap-3">
             <div className="space-y-1">
-              <Label>Largura (cm)</Label>
+              <Label>Largura padrão (cm)</Label>
               <Input
                 type="number"
                 value={form.largura_cm}
                 onChange={(e) => setForm((f) => ({ ...f, largura_cm: e.target.value }))}
-                placeholder="60"
+                placeholder="90"
                 className="rounded-xl"
               />
             </div>
             <div className="space-y-1">
-              <Label>Altura (cm)</Label>
+              <Label>Altura padrão (cm)</Label>
               <Input
                 type="number"
                 value={form.altura_cm}
                 onChange={(e) => setForm((f) => ({ ...f, altura_cm: e.target.value }))}
-                placeholder="160"
+                placeholder="120"
                 className="rounded-xl"
               />
             </div>
           </div>
+          {form.largura_cm && form.altura_cm && parseFloat(form.largura_cm) > 0 && parseFloat(form.altura_cm) > 0 && (
+            <p className="text-xs text-slate-500 -mt-1">
+              Área calculada: = {((parseFloat(form.largura_cm) / 100) * (parseFloat(form.altura_cm) / 100)).toLocaleString("pt-BR", { minimumFractionDigits: 2, maximumFractionDigits: 2 })} m²
+            </p>
+          )}
 
           <div className="grid grid-cols-2 gap-3">
             <div className="space-y-1">

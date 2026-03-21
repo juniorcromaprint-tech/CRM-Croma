@@ -1,8 +1,9 @@
 import React, { useState, useMemo } from 'react'
 import {
   Plus, Search, FileText, Trash2, Loader2,
-  TrendingUp, CheckCircle2, Clock, DollarSign,
+  TrendingUp, CheckCircle2, Clock, DollarSign, ShoppingCart,
 } from 'lucide-react'
+import { useNavigate } from 'react-router-dom'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
@@ -17,9 +18,12 @@ import {
   AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent,
   AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle,
 } from '@/components/ui/alert-dialog'
-import { usePropostas, useCriarProposta, useExcluirProposta } from '../hooks/usePropostas'
-import type { PropostaStatus } from '../hooks/usePropostas'
+import {
+  usePropostas, useCriarProposta, useExcluirProposta, useConverterPropostaEmPedido,
+} from '../hooks/usePropostas'
+import type { PropostaStatus, Proposta } from '../hooks/usePropostas'
 import { brl } from '@/shared/utils/format'
+import { showSuccess } from '@/utils/toast'
 import { useAuth } from '@/contexts/AuthContext'
 
 // ─── Status config ───────────────────────────────────────────────────────────
@@ -36,6 +40,7 @@ const STATUS_CONFIG: Record<PropostaStatus, { label: string; cls: string }> = {
 // ─── Component ───────────────────────────────────────────────────────────────
 
 export default function PropostasPage() {
+  const navigate = useNavigate()
   const { profile, can } = useAuth()
   const isAdmin = !profile?.role || profile.role === 'admin'
   const canCriar = can('comercial', 'criar')
@@ -57,6 +62,9 @@ export default function PropostasPage() {
   const [deleteId, setDeleteId] = useState<string | null>(null)
   const [deleteName, setDeleteName] = useState('')
 
+  // Converter em pedido state
+  const [convertingId, setConvertingId] = useState<string | null>(null)
+
   // Queries
   const filtros = useMemo(() => ({
     search: search || undefined,
@@ -67,6 +75,7 @@ export default function PropostasPage() {
   const { data: todos = [] } = usePropostas()
   const criar = useCriarProposta()
   const excluir = useExcluirProposta()
+  const converter = useConverterPropostaEmPedido()
 
   // KPIs
   const kpis = useMemo(() => {
@@ -76,6 +85,21 @@ export default function PropostasPage() {
     const valorTotal = todos.reduce((acc, p) => acc + (p.valor_estimado ?? 0), 0)
     return { total, emNegociacao, aprovadas, valorTotal }
   }, [todos])
+
+  function handleConverter(p: Proposta) {
+    setConvertingId(p.id)
+    converter.mutate(
+      { id: p.id, cliente_id: p.cliente_id, valor_estimado: p.valor_estimado ?? 0 },
+      {
+        onSuccess: (pedido) => {
+          setConvertingId(null)
+          showSuccess(`Pedido ${pedido.numero ?? ''} criado com sucesso!`)
+          navigate(`/pedidos/${pedido.id}`)
+        },
+        onSettled: () => setConvertingId(null),
+      },
+    )
+  }
 
   function resetForm() {
     setFormTitulo('')
@@ -272,6 +296,20 @@ export default function PropostasPage() {
                       </td>
                       <td className="py-3.5 px-4">
                         <div className="flex items-center justify-end gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
+                          {p.status === 'aprovada' && (
+                            <Button
+                              variant="ghost" size="sm"
+                              className="h-8 px-2 rounded-xl text-emerald-600 hover:text-emerald-700 hover:bg-emerald-50 text-xs font-medium gap-1"
+                              onClick={() => handleConverter(p)}
+                              disabled={convertingId === p.id || converter.isPending}
+                              title="Converter em pedido"
+                            >
+                              {convertingId === p.id
+                                ? <Loader2 size={13} className="animate-spin" />
+                                : <ShoppingCart size={13} />}
+                              Converter em Pedido
+                            </Button>
+                          )}
                           {canExcluir && (canDelete(p.status) || isAdmin) && (
                             <Button
                               variant="ghost" size="icon"
@@ -306,6 +344,19 @@ export default function PropostasPage() {
                       </div>
                       <p className="font-semibold text-slate-800">{p.titulo}</p>
                       <p className="text-sm text-slate-500 mt-0.5">{clienteNome}</p>
+                      {p.status === 'aprovada' && (
+                        <Button
+                          variant="outline" size="sm"
+                          className="mt-2 h-7 px-2 rounded-xl text-emerald-600 border-emerald-200 hover:bg-emerald-50 text-xs font-medium gap-1"
+                          onClick={() => handleConverter(p)}
+                          disabled={convertingId === p.id || converter.isPending}
+                        >
+                          {convertingId === p.id
+                            ? <Loader2 size={12} className="animate-spin" />
+                            : <ShoppingCart size={12} />}
+                          Converter em Pedido
+                        </Button>
+                      )}
                     </div>
                     <div className="text-right shrink-0">
                       <p className="font-bold tabular-nums text-slate-800">{brl(p.valor_estimado)}</p>

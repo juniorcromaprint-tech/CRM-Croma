@@ -488,9 +488,34 @@ function TabContasReceber() {
         })
         .eq("id", id);
       if (error) throw new Error(error.message);
+
+      // BUG-03: Se conta ficou totalmente paga, sincronizar status do pedido
+      if (novoStatus === "pago") {
+        const { data: contaFull } = await supabase
+          .from("contas_receber")
+          .select("pedido_id")
+          .eq("id", id)
+          .single();
+
+        if (contaFull?.pedido_id) {
+          const { data: pedidoCheck } = await supabase
+            .from("pedidos")
+            .select("id, status")
+            .eq("id", contaFull.pedido_id)
+            .single();
+
+          if (pedidoCheck?.status === "concluido") {
+            await supabase
+              .from("pedidos")
+              .update({ status: "faturado" })
+              .eq("id", contaFull.pedido_id);
+          }
+        }
+      }
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["financeiro"] });
+      queryClient.invalidateQueries({ queryKey: ["pedidos"] });
       showSuccess("Pagamento registrado com sucesso");
       setBaixaTarget(null);
       setBaixaValor("");
@@ -516,6 +541,26 @@ function TabContasReceber() {
     }
     return list;
   }, [contas, statusFilter, search]);
+
+  const { data: pedidosEmAndamento } = useQuery({
+    queryKey: ['financeiro', 'pedidos_em_andamento'],
+    queryFn: async () => {
+      const { data } = await supabase
+        .from('pedidos')
+        .select('id, status, valor_total, data_prometida')
+        .in('status', ['aprovado', 'em_producao', 'parcialmente_concluido', 'produzido', 'aguardando_instalacao', 'em_instalacao'])
+        .is('excluido_em', null)
+        .order('data_prometida', { ascending: true });
+      return data ?? [];
+    },
+    staleTime: 1000 * 60 * 3,
+  });
+
+  const receitaProjetada = (pedidosEmAndamento ?? []).reduce((s, p) => s + (Number(p.valor_total) || 0), 0);
+  const pedidosAtrasados = (pedidosEmAndamento ?? []).filter(p => {
+    if (!p.data_prometida) return false;
+    return new Date(p.data_prometida) < new Date();
+  }).length;
 
   const stats = useMemo(() => {
     let totalReceber = 0;
@@ -589,13 +634,13 @@ function TabContasReceber() {
     <div className="space-y-6">
       {/* Stats */}
       {isLoading ? (
-        <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
-          {Array.from({ length: 4 }).map((_, i) => (
+        <div className="grid grid-cols-2 lg:grid-cols-5 gap-4">
+          {Array.from({ length: 5 }).map((_, i) => (
             <KpiSkeleton key={i} />
           ))}
         </div>
       ) : (
-        <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
+        <div className="grid grid-cols-2 lg:grid-cols-5 gap-4">
           <KpiCard
             label="Total a Receber"
             value={brl(stats.totalReceber)}
@@ -630,6 +675,17 @@ function TabContasReceber() {
             iconColor="text-emerald-600"
             sub={`${contas.filter((c) => c.status === "pago").length} titulos`}
             subColor="text-emerald-600"
+          />
+          <KpiCard
+            label="Em Produção"
+            value={brl(receitaProjetada)}
+            icon={Clock}
+            iconBg="bg-amber-50"
+            iconColor="text-amber-600"
+            sub={pedidosAtrasados > 0
+              ? `⚠ ${pedidosAtrasados} com prazo vencido`
+              : `${pedidosEmAndamento?.length ?? 0} pedidos em andamento`}
+            subColor={pedidosAtrasados > 0 ? "text-red-500" : "text-amber-600"}
           />
         </div>
       )}

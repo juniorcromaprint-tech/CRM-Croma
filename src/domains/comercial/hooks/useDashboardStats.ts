@@ -233,6 +233,54 @@ export function useDashEstoque() {
   });
 }
 
+// ─── Funil de Conversão ───────────────────────────────────────────────────────
+
+export function useFunnelStats() {
+  return useQuery({
+    queryKey: ['dash', 'funil'],
+    queryFn: async () => {
+      const now = new Date();
+      const inicio = new Date(now.getFullYear(), now.getMonth() - 2, 1); // últimos 3 meses
+      const isoInicio = inicio.toISOString();
+
+      const [leadsRes, propostasRes, pedidosRes] = await Promise.all([
+        supabase.from('leads').select('id, status, created_at').gte('created_at', isoInicio),
+        supabase.from('propostas').select('id, status, total, created_at').is('excluido_em', null).gte('created_at', isoInicio),
+        supabase.from('pedidos').select('id, status, valor_total, created_at').is('excluido_em', null).gte('created_at', isoInicio),
+      ]);
+
+      const leads = leadsRes.data ?? [];
+      const propostas = propostasRes.data ?? [];
+      const pedidos = pedidosRes.data ?? [];
+
+      const totalLeads = leads.length;
+      const totalPropostas = propostas.length;
+      const totalPedidos = pedidos.filter(p => !['cancelado'].includes(p.status)).length;
+      const totalFaturados = pedidos.filter(p => p.status === 'faturado').length;
+      const valorFaturado = pedidos.filter(p => p.status === 'faturado').reduce((s, p) => s + (Number(p.valor_total) || 0), 0);
+
+      const txLeadProposta = totalLeads > 0 ? Math.round((totalPropostas / totalLeads) * 100) : 0;
+      const txPropostaPedido = totalPropostas > 0 ? Math.round((totalPedidos / totalPropostas) * 100) : 0;
+      const txPedidoFaturado = totalPedidos > 0 ? Math.round((totalFaturados / totalPedidos) * 100) : 0;
+      const txGeral = totalLeads > 0 ? Math.round((totalFaturados / totalLeads) * 100) : 0;
+
+      return {
+        totalLeads,
+        totalPropostas,
+        totalPedidos,
+        totalFaturados,
+        valorFaturado,
+        txLeadProposta,
+        txPropostaPedido,
+        txPedidoFaturado,
+        txGeral,
+        periodo: `${inicio.toLocaleDateString('pt-BR', { month: 'short' })} – hoje`,
+      };
+    },
+    staleTime: 1000 * 60 * 5,
+  });
+}
+
 // ─── Qualidade ────────────────────────────────────────────────────────────────
 
 export function useDashQualidade() {
@@ -251,6 +299,44 @@ export function useDashQualidade() {
         retrabalhos: all.filter((o) => o.tipo === "retrabalho").length,
         custoTotal: all.reduce((s, o) => s + (Number(o.custo_total) || 0), 0),
       };
+    },
+    staleTime: STALE,
+    refetchInterval: STALE,
+  });
+}
+
+// ─── NPS ──────────────────────────────────────────────────────────────────────
+
+export function useDashNPS() {
+  return useQuery({
+    queryKey: ["dash", "nps_v1"],
+    queryFn: async () => {
+      const now = new Date();
+      const inicioMes = new Date(now.getFullYear(), now.getMonth(), 1).toISOString();
+
+      const { data } = await supabase
+        .from("nps_respostas")
+        .select("nota")
+        .not("respondido_em", "is", null)
+        .gte("respondido_em", inicioMes);
+
+      const respostas = (data ?? []).filter((r) => r.nota !== null) as { nota: number }[];
+      const total = respostas.length;
+
+      if (total === 0) {
+        return { media: null, total: 0, promotores: 0, neutros: 0, detratores: 0, score: null };
+      }
+
+      const promotores = respostas.filter((r) => r.nota >= 9).length;
+      const neutros    = respostas.filter((r) => r.nota >= 7 && r.nota <= 8).length;
+      const detratores = respostas.filter((r) => r.nota <= 6).length;
+      const soma       = respostas.reduce((s, r) => s + r.nota, 0);
+      const media      = Math.round((soma / total) * 10) / 10;
+
+      // NPS score = %promotores - %detratores (escala -100 a +100)
+      const score = Math.round(((promotores - detratores) / total) * 100);
+
+      return { media, total, promotores, neutros, detratores, score };
     },
     staleTime: STALE,
     refetchInterval: STALE,

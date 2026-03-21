@@ -12,6 +12,7 @@ import LoginPage from "@/shared/pages/LoginPage";
 import TvPage from "@/domains/producao/pages/TvPage";
 
 const PortalOrcamentoPage = lazy(() => import('./domains/portal/pages/PortalOrcamentoPage'));
+const NpsPage = lazy(() => import('./domains/portal/pages/NpsPage'));
 
 // Domain route groups
 import { comercialRoutes } from "./routes/comercialRoutes";
@@ -63,6 +64,7 @@ const App = () => (
             <Route path="/login" element={<LoginPage />} />
             <Route path="/tv" element={<ProtectedRoute><TvPage /></ProtectedRoute>} />
             <Route path="/p/:token" element={<LazyPage><PortalOrcamentoPage /></LazyPage>} />
+            <Route path="/nps/:token" element={<LazyPage><NpsPage /></LazyPage>} />
 
             <Route
               path="/"
