@@ -8,6 +8,8 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
+import { Textarea } from "@/components/ui/textarea";
 import {
   Select,
   SelectContent,
@@ -43,6 +45,7 @@ import {
   FileText,
   Image,
   ClipboardList,
+  Loader2,
 } from "lucide-react";
 
 import {
@@ -672,6 +675,9 @@ export default function InstalacaoPage() {
   const [jobDetalhes, setJobDetalhes] = useState<CampoInstalacao | null>(null);
   const [sheetDetalhesAberta, setSheetDetalhesAberta] = useState(false);
 
+  // Agendamento dialog state
+  const [agendamentoDialog, setAgendamentoDialog] = useState<{ open: boolean; ordemId: string | null }>({ open: false, ordemId: null });
+
   // Realtime global — invalida queries automaticamente
   useCampoRealtimeGlobal();
 
@@ -756,6 +762,54 @@ export default function InstalacaoPage() {
       queryClient.invalidateQueries({ queryKey: ["ordens-instalacao-erp"] });
     },
     onError: () => showError("Erro ao concluir instalação"),
+  });
+
+  // Query: Instaladores (profiles com role='instalador')
+  const { data: instaladores = [] } = useQuery({
+    queryKey: ["instaladores"],
+    queryFn: async () => {
+      const { data } = await (supabase as any)
+        .from("profiles")
+        .select("id, first_name, last_name")
+        .eq("role", "instalador")
+        .order("first_name");
+      return (data ?? []) as Array<{ id: string; first_name: string | null; last_name: string | null }>;
+    },
+  });
+
+  // Mutation: Agendar instalação
+  const agendarMutation = useMutation({
+    mutationFn: async ({
+      ordemId,
+      equipeId,
+      dataAgendada,
+      horaPrevista,
+      instrucoes,
+    }: {
+      ordemId: string;
+      equipeId: string;
+      dataAgendada: string;
+      horaPrevista?: string;
+      instrucoes?: string;
+    }) => {
+      const { error } = await (supabase as any)
+        .from("ordens_instalacao")
+        .update({
+          equipe_id: equipeId,
+          data_agendada: dataAgendada,
+          hora_prevista: horaPrevista || null,
+          instrucoes: instrucoes || null,
+          status: "agendada",
+        })
+        .eq("id", ordemId);
+      if (error) throw error;
+    },
+    onSuccess: () => {
+      showSuccess("Instalação agendada com sucesso!");
+      setAgendamentoDialog({ open: false, ordemId: null });
+      queryClient.invalidateQueries({ queryKey: ["ordens-instalacao-erp"] });
+    },
+    onError: (err: Error) => showError(err.message),
   });
 
   // KPIs baseados em "hoje"
@@ -1093,6 +1147,17 @@ export default function InstalacaoPage() {
                         <span className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium border ${sc.cls}`}>
                           {sc.label}
                         </span>
+                        {os.status === "aguardando_agendamento" && (
+                          <Button
+                            size="sm"
+                            variant="outline"
+                            className="h-8 rounded-xl text-xs gap-1.5"
+                            onClick={() => setAgendamentoDialog({ open: true, ordemId: os.id })}
+                          >
+                            <CalendarDays size={14} className="mr-1" />
+                            Agendar
+                          </Button>
+                        )}
                         {!isConcluida && !isCancelada && (
                           <Button
                             size="sm"
@@ -1134,7 +1199,159 @@ export default function InstalacaoPage() {
         open={sheetDetalhesAberta}
         onClose={() => setSheetDetalhesAberta(false)}
       />
+
+      {/* Sheet de Agendamento */}
+      <AgendamentoSheet
+        open={agendamentoDialog.open}
+        ordemId={agendamentoDialog.ordemId}
+        instaladores={instaladores}
+        isPending={agendarMutation.isPending}
+        onClose={() => setAgendamentoDialog({ open: false, ordemId: null })}
+        onConfirm={(data) => agendarMutation.mutate(data)}
+      />
     </div>
+  );
+}
+
+// ============================================================
+// AGENDAMENTO SHEET
+// ============================================================
+
+function AgendamentoSheet({
+  open,
+  ordemId,
+  instaladores,
+  isPending,
+  onClose,
+  onConfirm,
+}: {
+  open: boolean;
+  ordemId: string | null;
+  instaladores: Array<{ id: string; first_name: string | null; last_name: string | null }>;
+  isPending: boolean;
+  onClose: () => void;
+  onConfirm: (data: { ordemId: string; equipeId: string; dataAgendada: string; horaPrevista?: string; instrucoes?: string }) => void;
+}) {
+  const [equipeId, setEquipeId] = useState("");
+  const [dataAgendada, setDataAgendada] = useState("");
+  const [horaPrevista, setHoraPrevista] = useState("");
+  const [instrucoes, setInstrucoes] = useState("");
+
+  // Reset form when dialog opens
+  React.useEffect(() => {
+    if (open) {
+      setEquipeId("");
+      setDataAgendada("");
+      setHoraPrevista("");
+      setInstrucoes("");
+    }
+  }, [open]);
+
+  const canSubmit = !!equipeId && !!dataAgendada && !!ordemId;
+
+  return (
+    <Sheet open={open} onOpenChange={(v) => !v && onClose()}>
+      <SheetContent className="w-full sm:max-w-md overflow-y-auto">
+        <SheetHeader className="mb-6">
+          <SheetTitle className="flex items-center gap-2">
+            <CalendarDays size={20} className="text-blue-600" />
+            Agendar Instalação
+          </SheetTitle>
+        </SheetHeader>
+
+        <div className="space-y-5">
+          {/* Instalador */}
+          <div className="space-y-2">
+            <Label htmlFor="instalador" className="text-sm font-medium text-slate-700">
+              Instalador *
+            </Label>
+            <Select value={equipeId} onValueChange={setEquipeId}>
+              <SelectTrigger className="rounded-xl h-10 border-slate-200">
+                <SelectValue placeholder="Selecione o instalador" />
+              </SelectTrigger>
+              <SelectContent>
+                {instaladores.map((inst) => (
+                  <SelectItem key={inst.id} value={inst.id}>
+                    {[inst.first_name, inst.last_name].filter(Boolean).join(" ") || "Sem nome"}
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+          </div>
+
+          {/* Data */}
+          <div className="space-y-2">
+            <Label htmlFor="data-agendada" className="text-sm font-medium text-slate-700">
+              Data Agendada *
+            </Label>
+            <Input
+              id="data-agendada"
+              type="date"
+              value={dataAgendada}
+              onChange={(e) => setDataAgendada(e.target.value)}
+              className="rounded-xl h-10 border-slate-200"
+            />
+          </div>
+
+          {/* Hora */}
+          <div className="space-y-2">
+            <Label htmlFor="hora-prevista" className="text-sm font-medium text-slate-700">
+              Hora Prevista
+            </Label>
+            <Input
+              id="hora-prevista"
+              type="time"
+              value={horaPrevista}
+              onChange={(e) => setHoraPrevista(e.target.value)}
+              className="rounded-xl h-10 border-slate-200"
+            />
+          </div>
+
+          {/* Instruções */}
+          <div className="space-y-2">
+            <Label htmlFor="instrucoes" className="text-sm font-medium text-slate-700">
+              Instruções
+            </Label>
+            <Textarea
+              id="instrucoes"
+              placeholder="Observações ou instruções para o instalador..."
+              value={instrucoes}
+              onChange={(e) => setInstrucoes(e.target.value)}
+              className="rounded-xl border-slate-200 min-h-[100px] resize-none"
+            />
+          </div>
+
+          <Separator />
+
+          {/* Botão Confirmar */}
+          <Button
+            className="w-full h-11 rounded-xl bg-blue-600 hover:bg-blue-700 text-white font-semibold gap-2"
+            disabled={!canSubmit || isPending}
+            onClick={() =>
+              onConfirm({
+                ordemId: ordemId!,
+                equipeId,
+                dataAgendada,
+                horaPrevista: horaPrevista || undefined,
+                instrucoes: instrucoes || undefined,
+              })
+            }
+          >
+            {isPending ? (
+              <>
+                <Loader2 size={16} className="animate-spin" />
+                Agendando...
+              </>
+            ) : (
+              <>
+                <CalendarDays size={16} />
+                Confirmar Agendamento
+              </>
+            )}
+          </Button>
+        </div>
+      </SheetContent>
+    </Sheet>
   );
 }
 
