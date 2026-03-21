@@ -516,7 +516,7 @@ function TabSeries() {
                     {s.fiscal_ambientes?.nome ?? '—'}
                     {s.fiscal_ambientes?.tipo && (
                       <span
-                        className={`ml-1 text-[10px] px-1.5 py-0.5 rounded-full ${
+                        className={`ml-1 text-xs px-1.5 py-0.5 rounded-full ${
                           s.fiscal_ambientes.tipo === 'producao'
                             ? 'bg-green-100 text-green-700'
                             : 'bg-blue-100 text-blue-700'

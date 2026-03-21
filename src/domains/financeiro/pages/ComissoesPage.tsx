@@ -402,24 +402,24 @@ function TabPorVendedor({
               {/* Stats row */}
               <div className="grid grid-cols-2 gap-3">
                 <div className="bg-blue-50/60 rounded-xl px-3 py-2.5">
-                  <p className="text-[10px] text-blue-500 font-semibold uppercase tracking-wider">
+                  <p className="text-xs text-blue-500 font-semibold uppercase tracking-wider">
                     Geradas
                   </p>
                   <p className="text-sm font-bold text-blue-700 tabular-nums">
                     {brl(v.totalGerada)}
                   </p>
-                  <p className="text-[10px] text-blue-400">
+                  <p className="text-xs text-blue-400">
                     {v.countGerada} registro{v.countGerada !== 1 ? "s" : ""}
                   </p>
                 </div>
                 <div className="bg-emerald-50/60 rounded-xl px-3 py-2.5">
-                  <p className="text-[10px] text-emerald-500 font-semibold uppercase tracking-wider">
+                  <p className="text-xs text-emerald-500 font-semibold uppercase tracking-wider">
                     Pagas
                   </p>
                   <p className="text-sm font-bold text-emerald-700 tabular-nums">
                     {brl(v.totalPaga)}
                   </p>
-                  <p className="text-[10px] text-emerald-400">
+                  <p className="text-xs text-emerald-400">
                     {v.countPaga} registro{v.countPaga !== 1 ? "s" : ""}
                   </p>
                 </div>
@@ -438,7 +438,7 @@ function TabPorVendedor({
                     </span>
                   </div>
                   <ProgressBar value={v.realizado} max={v.meta} size="sm" />
-                  <div className="flex justify-between text-[10px] text-slate-400">
+                  <div className="flex justify-between text-xs text-slate-400">
                     <span>{brl(v.realizado)}</span>
                     <span>{brl(v.meta)}</span>
                   </div>

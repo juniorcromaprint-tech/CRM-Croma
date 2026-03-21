@@ -114,7 +114,7 @@ export default function DashboardComercial() {
       {/* ─── Header ─── */}
       <div className="flex flex-col sm:flex-row sm:items-end justify-between gap-4">
         <div>
-          <h1 className="text-2xl font-bold text-slate-800">{getGreeting()}, Comercial 🎯</h1>
+          <h1 className="text-2xl font-bold text-slate-800">{getGreeting()}, Comercial</h1>
           <p className="text-sm text-slate-400 mt-0.5 flex items-center gap-1.5">
             <Calendar size={13} />
             {formatDate()}
@@ -190,7 +190,7 @@ export default function DashboardComercial() {
                   </div>
                   <div className="flex items-center gap-2 ml-3 shrink-0">
                     <span className="text-sm font-bold tabular-nums text-slate-700">{brl(Number(p.total) || 0)}</span>
-                    <span className={`text-[10px] px-2 py-0.5 rounded-full font-semibold ${statusColors[p.status] || "bg-slate-100 text-slate-600"}`}>
+                    <span className={`text-xs px-2 py-0.5 rounded-full font-semibold ${statusColors[p.status] || "bg-slate-100 text-slate-600"}`}>
                       {p.status.replace(/_/g, " ")}
                     </span>
                   </div>

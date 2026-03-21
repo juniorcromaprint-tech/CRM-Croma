@@ -94,11 +94,11 @@ function TimelineItem({ msg }: { msg: TimelineMessage }) {
       <div className={`flex-1 min-w-0 max-w-[85%] space-y-1 flex flex-col ${isSent ? 'items-end' : 'items-start'}`}>
         {/* Canal + etapa header */}
         <div className={`flex items-center gap-1.5 ${isSent ? 'flex-row-reverse' : ''}`}>
-          <span className={`inline-flex items-center gap-1 px-1.5 py-0.5 rounded-full text-[10px] font-medium ${CANAL_CLASS[msg.conversa_canal]}`}>
+          <span className={`inline-flex items-center gap-1 px-1.5 py-0.5 rounded-full text-xs font-medium ${CANAL_CLASS[msg.conversa_canal]}`}>
             <CanalIcon size={9} />
             {CANAL_LABEL[msg.conversa_canal]}
           </span>
-          <span className="flex items-center gap-0.5 text-[10px] text-slate-400">
+          <span className="flex items-center gap-0.5 text-xs text-slate-400">
             <DirIcon size={10} />
             {isSent ? 'Agente' : 'Lead'}
           </span>
@@ -119,7 +119,7 @@ function TimelineItem({ msg }: { msg: TimelineMessage }) {
         </div>
 
         {/* Meta */}
-        <div className={`flex items-center gap-2 text-[10px] text-slate-400 ${isSent ? 'flex-row-reverse' : ''}`}>
+        <div className={`flex items-center gap-2 text-xs text-slate-400 ${isSent ? 'flex-row-reverse' : ''}`}>
           <span>{msg.enviado_em ? formatDate(msg.enviado_em) : formatDate(msg.created_at)}</span>
           {/* Status badge */}
           <span className={`inline-flex items-center gap-1 px-1.5 py-0.5 rounded-full font-medium ${statusCfg.className}`}>
@@ -302,7 +302,7 @@ export default function LeadAgentPanel({ leadId, onComposeEmail, onComposeWhatsA
                   {idx === 0 || !isSameDay(timeline[idx - 1].created_at, msg.created_at) ? (
                     <div className="flex items-center gap-3 mb-4">
                       <Separator className="flex-1" />
-                      <span className="text-[10px] text-slate-400 font-medium shrink-0">
+                      <span className="text-xs text-slate-400 font-medium shrink-0">
                         {formatDayLabel(msg.created_at)}
                       </span>
                       <Separator className="flex-1" />

@@ -152,7 +152,7 @@ export function EscalaPrecos({
             </tbody>
           </table>
 
-          <p className="mt-3 text-[11px] text-emerald-600/70 leading-snug">
+          <p className="mt-3 text-xs text-emerald-600/70 leading-snug">
             * Preços com desconto progressivo por volume. Válido por pedido.
           </p>
         </div>

@@ -156,7 +156,7 @@ export function OSArquivoProducao({ opId, arteUrl, instrucoes }: OSArquivoProduc
         <Label className="text-xs font-semibold text-slate-600">
           Upload de Arquivo de Produção
         </Label>
-        <p className="text-[11px] text-slate-400">
+        <p className="text-xs text-slate-400">
           JPG, PNG, PDF, AI, EPS — máximo {MAX_SIZE_MB}MB
         </p>
 
@@ -195,7 +195,7 @@ export function OSArquivoProducao({ opId, arteUrl, instrucoes }: OSArquivoProduc
                 <FileText size={14} className="text-emerald-600 flex-shrink-0" />
                 <div className="flex-1 min-w-0">
                   <p className="text-xs font-medium text-emerald-800 truncate">{f.name}</p>
-                  <p className="text-[10px] text-emerald-600">{formatBytes(f.size)}</p>
+                  <p className="text-xs text-emerald-600">{formatBytes(f.size)}</p>
                 </div>
                 <a
                   href={f.url}

@@ -19,7 +19,7 @@ export default function ProducaoBriefing({ result, onClose }: ProducaoBriefingPr
           {/* Prazo */}
           {data.prazo_producao && (
             <div className="bg-blue-50 rounded-xl p-3">
-              <span className="text-[10px] text-blue-500 uppercase tracking-wide">Prazo Estimado</span>
+              <span className="text-xs text-blue-500 uppercase tracking-wide">Prazo Estimado</span>
               <p className="text-sm font-semibold text-blue-800 mt-1">{data.prazo_producao}</p>
             </div>
           )}
@@ -70,7 +70,7 @@ export default function ProducaoBriefing({ result, onClose }: ProducaoBriefingPr
           {/* Pendencias */}
           {data.pendencias?.length > 0 && (
             <div className="bg-amber-50 rounded-xl p-3">
-              <span className="text-[10px] text-amber-500 uppercase tracking-wide">Pendencias</span>
+              <span className="text-xs text-amber-500 uppercase tracking-wide">Pendencias</span>
               <ul className="mt-1 space-y-0.5">
                 {data.pendencias.map((p, i) => (
                   <li key={i} className="text-xs text-amber-700">- {p}</li>
@@ -82,7 +82,7 @@ export default function ProducaoBriefing({ result, onClose }: ProducaoBriefingPr
           {/* Observacoes criticas */}
           {data.observacoes_criticas?.length > 0 && (
             <div className="bg-red-50 rounded-xl p-3">
-              <span className="text-[10px] text-red-500 uppercase tracking-wide">Observacoes Criticas</span>
+              <span className="text-xs text-red-500 uppercase tracking-wide">Observacoes Criticas</span>
               <ul className="mt-1 space-y-0.5">
                 {data.observacoes_criticas.map((o, i) => (
                   <li key={i} className="text-xs text-red-700">- {o}</li>

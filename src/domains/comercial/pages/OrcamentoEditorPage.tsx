@@ -98,7 +98,7 @@ function StepIndicator({ currentStep }: StepIndicatorProps) {
                 <Icon size={14} />
               </div>
               <span
-                className={`text-[10px] font-medium leading-tight text-center ${
+                className={`text-xs font-medium leading-tight text-center ${
                   isDone
                     ? "text-emerald-600"
                     : isActive
@@ -849,12 +849,12 @@ export default function OrcamentoEditorPage() {
                           {(item.materiais?.length || item.acabamentos?.length) ? (
                             <div className="flex flex-wrap gap-1 mt-1">
                               {item.materiais?.map((m, i) => (
-                                <Badge key={i} variant="secondary" className="text-[10px] h-5 bg-blue-50 text-blue-700 border-blue-200">
+                                <Badge key={i} variant="secondary" className="text-xs h-5 bg-blue-50 text-blue-700 border-blue-200">
                                   {m.descricao}
                                 </Badge>
                               ))}
                               {item.acabamentos?.map((a, i) => (
-                                <Badge key={i} variant="secondary" className="text-[10px] h-5 bg-amber-50 text-amber-700 border-amber-200">
+                                <Badge key={i} variant="secondary" className="text-xs h-5 bg-amber-50 text-amber-700 border-amber-200">
                                   {a.descricao}
                                 </Badge>
                               ))}
@@ -1047,7 +1047,7 @@ export default function OrcamentoEditorPage() {
                                 </div>
                               </div>
                               {newItem.largura_cm && newItem.altura_cm && (
-                                <p className="text-[11px] text-slate-400 mt-1.5">
+                                <p className="text-xs text-slate-400 mt-1.5">
                                   Area: {((newItem.largura_cm * newItem.altura_cm) / 10000).toFixed(2)} m²
                                 </p>
                               )}

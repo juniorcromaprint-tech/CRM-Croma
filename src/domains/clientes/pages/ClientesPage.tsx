@@ -222,11 +222,11 @@ export default function ClientesPage() {
                   <div className="flex-1 min-w-0">
                     <div className="flex items-center gap-2 mb-1.5">
                       <h3 className="font-semibold text-slate-800 truncate">{c.nome_fantasia || c.razao_social}</h3>
-                      <span className={`px-2 py-0.5 rounded-full text-[10px] font-medium border ${CLASSIFICACAO_CONFIG[c.classificacao]?.color || "bg-slate-100"}`}>
+                      <span className={`px-2 py-0.5 rounded-full text-xs font-medium border ${CLASSIFICACAO_CONFIG[c.classificacao]?.color || "bg-slate-100"}`}>
                         {CLASSIFICACAO_CONFIG[c.classificacao]?.icon} {CLASSIFICACAO_CONFIG[c.classificacao]?.label}
                       </span>
                       {c.segmento && (
-                        <span className="px-2 py-0.5 rounded-full text-[10px] font-medium bg-slate-50 text-slate-500 border border-slate-200">
+                        <span className="px-2 py-0.5 rounded-full text-xs font-medium bg-slate-50 text-slate-500 border border-slate-200">
                           {SEGMENTO_LABELS[c.segmento] || c.segmento}
                         </span>
                       )}

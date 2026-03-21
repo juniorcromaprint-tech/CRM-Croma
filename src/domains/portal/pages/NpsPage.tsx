@@ -189,7 +189,7 @@ export default function NpsPage() {
           </div>
 
           {/* Legenda das cores */}
-          <div className="flex justify-between text-[10px] text-slate-400 gap-1">
+          <div className="flex justify-between text-xs text-slate-400 gap-1">
             <div className="flex items-center gap-1">
               <div className="w-2 h-2 rounded-full bg-red-400" />
               Detratores (0–6)

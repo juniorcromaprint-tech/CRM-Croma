@@ -196,7 +196,7 @@ export default function TemplateSelector({
 
         {/* Items table */}
         <div className="border border-slate-200 rounded-xl overflow-hidden">
-          <div className="grid grid-cols-[1fr_auto_auto] gap-2 bg-slate-50 px-3 py-2 text-[10px] font-semibold uppercase tracking-wider text-slate-400">
+          <div className="grid grid-cols-[1fr_auto_auto] gap-2 bg-slate-50 px-3 py-2 text-xs font-semibold uppercase tracking-wider text-slate-400">
             <span>Item</span>
             <span className="text-right">Qtd</span>
             <span className="text-right">Dimensoes</span>
@@ -211,7 +211,7 @@ export default function TemplateSelector({
                 <div>
                   <p className="text-slate-700 font-medium">{item.descricao}</p>
                   {item.especificacao && (
-                    <p className="text-[10px] text-slate-400 mt-0.5">
+                    <p className="text-xs text-slate-400 mt-0.5">
                       {item.especificacao}
                     </p>
                   )}
@@ -274,14 +274,14 @@ export default function TemplateSelector({
                       </p>
                     )}
                     <div className="flex items-center gap-2 mt-1.5">
-                      <span className="text-[10px] text-slate-400">
+                      <span className="text-xs text-slate-400">
                         {template.itens.length}{" "}
                         {template.itens.length === 1 ? "item" : "itens"}
                       </span>
                       {template.categoria && (
                         <Badge
                           variant="secondary"
-                          className="text-[10px] px-1.5 py-0 h-4 bg-slate-100 text-slate-500 font-normal"
+                          className="text-xs px-1.5 py-0 h-4 bg-slate-100 text-slate-500 font-normal"
                         >
                           {template.categoria}
                         </Badge>

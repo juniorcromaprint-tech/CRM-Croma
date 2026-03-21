@@ -14,7 +14,7 @@ export default function AIActionPreview({ valorAtual, valorSugerido, tipo }: AIA
 
   return (
     <div className="mt-3 rounded-lg overflow-hidden border border-slate-200 text-xs bg-slate-50">
-      <div className="grid grid-cols-[1fr_24px_1fr] bg-slate-100 text-slate-400 font-semibold text-[10px] uppercase tracking-wider">
+      <div className="grid grid-cols-[1fr_24px_1fr] bg-slate-100 text-slate-400 font-semibold text-xs uppercase tracking-wider">
         <div className="px-3 py-1.5">Antes</div>
         <div />
         <div className="px-3 py-1.5">Depois</div>

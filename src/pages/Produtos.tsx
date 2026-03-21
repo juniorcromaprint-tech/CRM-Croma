@@ -210,7 +210,7 @@ function ModeloDetalhePanel({ modeloId }: { modeloId: string }) {
 
       {/* ── MATERIAL BASE ── */}
       <div>
-        <p className="text-[11px] font-bold text-slate-500 uppercase tracking-wider mb-2 flex items-center gap-1.5">
+        <p className="text-xs font-bold text-slate-500 uppercase tracking-wider mb-2 flex items-center gap-1.5">
           <FlaskConical size={12} /> Material Base / Substrato
         </p>
         {materiaisBase.length === 0 ? (
@@ -244,7 +244,7 @@ function ModeloDetalhePanel({ modeloId }: { modeloId: string }) {
 
       {/* ── ACABAMENTOS ── */}
       <div>
-        <p className="text-[11px] font-bold text-slate-500 uppercase tracking-wider mb-2 flex items-center gap-1.5">
+        <p className="text-xs font-bold text-slate-500 uppercase tracking-wider mb-2 flex items-center gap-1.5">
           <Scissors size={12} /> Materiais de Acabamento
         </p>
         {acabamentos.length === 0 ? (
@@ -277,9 +277,9 @@ function ModeloDetalhePanel({ modeloId }: { modeloId: string }) {
       {/* ── ADD MATERIAL FORM ── */}
       <div className="bg-white border border-slate-100 rounded-xl p-3 space-y-2">
         <div className="flex items-center justify-between">
-          <p className="text-[11px] font-semibold text-slate-400 uppercase tracking-wider">Adicionar Material</p>
+          <p className="text-xs font-semibold text-slate-400 uppercase tracking-wider">Adicionar Material</p>
           {/* Toggle tipo */}
-          <div className="flex rounded-lg overflow-hidden border border-slate-200 text-[11px] font-medium">
+          <div className="flex rounded-lg overflow-hidden border border-slate-200 text-xs font-medium">
             <button
               className={`px-3 py-1 flex items-center gap-1 transition-colors ${matTipo === "material" ? "bg-blue-600 text-white" : "bg-white text-slate-500 hover:bg-slate-50"}`}
               onClick={() => setMatTipo("material")}
@@ -332,7 +332,7 @@ function ModeloDetalhePanel({ modeloId }: { modeloId: string }) {
 
       {/* ── PROCESSOS ── */}
       <div>
-        <p className="text-[11px] font-bold text-slate-500 uppercase tracking-wider mb-2 flex items-center gap-1.5">
+        <p className="text-xs font-bold text-slate-500 uppercase tracking-wider mb-2 flex items-center gap-1.5">
           <Workflow size={12} /> Processos de Produção
         </p>
 
@@ -341,7 +341,7 @@ function ModeloDetalhePanel({ modeloId }: { modeloId: string }) {
             {mProcessos.map((proc) => (
               <div key={proc.id} className="flex items-center justify-between gap-2 bg-white border border-slate-100 rounded-lg px-3 py-2">
                 <div className="flex items-center gap-2 min-w-0">
-                  <span className="text-[10px] text-slate-400 font-mono w-5 shrink-0">{proc.ordem}.</span>
+                  <span className="text-xs text-slate-400 font-mono w-5 shrink-0">{proc.ordem}.</span>
                   <span className="text-sm font-medium text-slate-700 truncate">{proc.etapa}</span>
                 </div>
                 <div className="flex items-center gap-3 shrink-0">
@@ -360,7 +360,7 @@ function ModeloDetalhePanel({ modeloId }: { modeloId: string }) {
 
         {/* Add processo form */}
         <div className="bg-white border border-slate-100 rounded-xl p-3 space-y-2">
-          <p className="text-[11px] font-semibold text-slate-400 uppercase tracking-wider">Adicionar Etapa</p>
+          <p className="text-xs font-semibold text-slate-400 uppercase tracking-wider">Adicionar Etapa</p>
           <div className="flex gap-2">
             <Input placeholder="Ex: Impressão UV, Corte Router, Aplicação..." value={etapa} onChange={(e) => setEtapa(e.target.value)}
               className="h-8 text-xs rounded-lg flex-1"
@@ -371,7 +371,7 @@ function ModeloDetalhePanel({ modeloId }: { modeloId: string }) {
                 className="h-8 w-20 text-xs rounded-lg pr-7"
                 onKeyDown={(e) => { if (e.key === "Enter" && etapa && tempo) addProc.mutate(); }}
               />
-              <span className="absolute right-2 top-1/2 -translate-y-1/2 text-[10px] text-slate-400">min</span>
+              <span className="absolute right-2 top-1/2 -translate-y-1/2 text-xs text-slate-400">min</span>
             </div>
             <Button size="sm" onClick={() => addProc.mutate()} disabled={addProc.isPending || !etapa || !tempo}
               className="h-8 text-xs bg-violet-600 hover:bg-violet-700 text-white rounded-lg px-3">
@@ -592,7 +592,7 @@ function ModelsDialog({
                           <div className="flex flex-wrap gap-x-3 gap-y-0.5 text-xs text-slate-500 mt-0.5">
                             <span className="flex items-center gap-1"><Settings size={10} /> {m.markup_padrao}% markup</span>
                             {m.tempo_producao_min && <span className="flex items-center gap-1"><Clock size={10} /> {m.tempo_producao_min} min</span>}
-                            <span className={`font-medium px-1.5 py-0.5 rounded border text-[10px] ${margemColor(m.margem_minima)}`}>
+                            <span className={`font-medium px-1.5 py-0.5 rounded border text-xs ${margemColor(m.margem_minima)}`}>
                               mín {m.margem_minima}%
                             </span>
                           </div>
@@ -882,7 +882,7 @@ export default function ProdutosPage() {
                     <div className={`w-10 h-10 rounded-xl flex items-center justify-center flex-shrink-0 ${style.bgIcon}`}>
                       <Package size={20} />
                     </div>
-                    <span className={`text-[11px] font-semibold px-2 py-0.5 rounded-md border flex-shrink-0 max-w-[140px] truncate ${style.color}`}
+                    <span className={`text-xs font-semibold px-2 py-0.5 rounded-md border flex-shrink-0 max-w-[140px] truncate ${style.color}`}
                       title={cat?.nome ?? produto.categoria}>
                       {cat?.nome ?? produto.categoria}
                     </span>

@@ -133,7 +133,7 @@ function ChecklistItemRow({
     <div className={`rounded-xl border p-3 transition-colors ${cfg.bg}`}>
       <div className="flex items-start gap-3">
         {/* Número */}
-        <span className="text-[11px] font-bold text-slate-400 w-6 flex-shrink-0 pt-0.5 tabular-nums">
+        <span className="text-xs font-bold text-slate-400 w-6 flex-shrink-0 pt-0.5 tabular-nums">
           {item.numero_item}.
         </span>
 
@@ -144,11 +144,11 @@ function ChecklistItemRow({
               {item.descricao}
             </p>
             {item.obrigatorio && (
-              <span className="text-[10px] text-red-500 font-semibold">*obrigatório</span>
+              <span className="text-xs text-red-500 font-semibold">*obrigatório</span>
             )}
           </div>
           <div className="flex items-center gap-1.5">
-            <span className={`inline-flex items-center gap-1 text-[10px] font-medium px-2 py-0.5 rounded-full border ${catCfg.color}`}>
+            <span className={`inline-flex items-center gap-1 text-xs font-medium px-2 py-0.5 rounded-full border ${catCfg.color}`}>
               <span>{catCfg.emoji}</span>
               {catCfg.label}
             </span>
@@ -196,7 +196,7 @@ function ChecklistItemRow({
 
         {/* Status badge (modo somente leitura) */}
         {disabled && (
-          <Badge variant="secondary" className={`text-[10px] flex-shrink-0 ${cfg.badgeClass}`}>
+          <Badge variant="secondary" className={`text-xs flex-shrink-0 ${cfg.badgeClass}`}>
             <Icon size={10} className="mr-1" />
             {cfg.label}
           </Badge>

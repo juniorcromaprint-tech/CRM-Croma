@@ -101,7 +101,7 @@ function MessageBubble({ message }: { message: ReturnType<typeof useAgentMessage
         </div>
 
         {/* Meta */}
-        <div className={`flex items-center gap-2 text-[10px] text-slate-400 ${isSent ? 'flex-row-reverse' : ''}`}>
+        <div className={`flex items-center gap-2 text-xs text-slate-400 ${isSent ? 'flex-row-reverse' : ''}`}>
           <span>{message.enviado_em ? formatDate(message.enviado_em) : formatDate(message.created_at)}</span>
           {message.modelo_ia && (
             <span className="hidden sm:block truncate max-w-[120px]">{message.modelo_ia}</span>
@@ -182,14 +182,14 @@ export default function ConversationDetail({
               )}
               <div className="flex items-center gap-2 flex-wrap pt-1">
                 {lead.segmento && (
-                  <Badge variant="secondary" className="text-[10px] px-1.5 py-0 bg-slate-100">
+                  <Badge variant="secondary" className="text-xs px-1.5 py-0 bg-slate-100">
                     {lead.segmento}
                   </Badge>
                 )}
                 {lead.temperatura && (
                   <Badge
                     variant="secondary"
-                    className={`text-[10px] px-1.5 py-0 ${
+                    className={`text-xs px-1.5 py-0 ${
                       lead.temperatura === 'quente'
                         ? 'bg-red-100 text-red-700'
                         : lead.temperatura === 'morno'
@@ -201,17 +201,17 @@ export default function ConversationDetail({
                   </Badge>
                 )}
                 {lead.score !== null && lead.score !== undefined && (
-                  <Badge variant="secondary" className="text-[10px] px-1.5 py-0 bg-purple-50 text-purple-700">
+                  <Badge variant="secondary" className="text-xs px-1.5 py-0 bg-purple-50 text-purple-700">
                     Score {lead.score}/100
                   </Badge>
                 )}
                 {conversation && (
-                  <Badge variant="secondary" className="text-[10px] px-1.5 py-0 bg-blue-50 text-blue-700">
+                  <Badge variant="secondary" className="text-xs px-1.5 py-0 bg-blue-50 text-blue-700">
                     {conversation.etapa}
                   </Badge>
                 )}
                 {isEscalated && (
-                  <Badge variant="secondary" className="text-[10px] px-1.5 py-0 bg-amber-100 text-amber-700">
+                  <Badge variant="secondary" className="text-xs px-1.5 py-0 bg-amber-100 text-amber-700">
                     Escalada — Humano
                   </Badge>
                 )}

@@ -78,7 +78,7 @@ export default function AIButton({
               <span className="flex items-center gap-2">
                 <span className="font-medium text-slate-700">{m.label}</span>
                 {m.free && (
-                  <span className="text-[10px] bg-green-100 text-green-700 px-1.5 py-0.5 rounded-full">Free</span>
+                  <span className="text-xs bg-green-100 text-green-700 px-1.5 py-0.5 rounded-full">Free</span>
                 )}
               </span>
               {defaultModel === m.slug && <Check size={14} className="text-blue-600" />}

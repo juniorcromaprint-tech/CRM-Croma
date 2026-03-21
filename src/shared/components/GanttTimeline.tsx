@@ -62,7 +62,7 @@ export default function GanttTimeline({
                 className="absolute top-0 flex items-center justify-center"
                 style={{ left: (h - inicioHora) * HORA_W - 16, width: 32, height: 32 }}
               >
-                <span className="text-[11px] text-slate-400">{h}h</span>
+                <span className="text-xs text-slate-400">{h}h</span>
               </div>
             ))}
           </div>
@@ -126,7 +126,7 @@ export default function GanttTimeline({
                   <div className="relative flex-1 h-full">
                     {barsDoRecurso.length === 0 && (
                       <div className="absolute inset-0 flex items-center px-2">
-                        <span className="text-[11px] text-slate-300">Sem apontamentos hoje</span>
+                        <span className="text-xs text-slate-300">Sem apontamentos hoje</span>
                       </div>
                     )}
                     {barsDoRecurso.map((bar) => {
@@ -151,7 +151,7 @@ export default function GanttTimeline({
                           }}
                         >
                           {w > 56 && (
-                            <span className="text-[11px] text-white font-medium truncate">
+                            <span className="text-xs text-white font-medium truncate">
                               {bar.op_numero}
                             </span>
                           )}

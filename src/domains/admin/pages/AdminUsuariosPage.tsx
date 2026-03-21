@@ -522,18 +522,18 @@ function TabUsuarios() {
                           {user.full_name || "Sem nome"}
                         </h3>
                         <span
-                          className={`px-2 py-0.5 rounded-full text-[10px] font-medium border ${
+                          className={`px-2 py-0.5 rounded-full text-xs font-medium border ${
                             ROLE_COLORS[user.role] || "bg-slate-100 text-slate-600 border-slate-200"
                           }`}
                         >
                           {ROLE_LABELS[user.role] || user.role}
                         </span>
                         {user.ativo ? (
-                          <span className="px-2 py-0.5 rounded-full text-[10px] font-medium bg-emerald-50 text-emerald-600 border border-emerald-200">
+                          <span className="px-2 py-0.5 rounded-full text-xs font-medium bg-emerald-50 text-emerald-600 border border-emerald-200">
                             Ativo
                           </span>
                         ) : (
-                          <span className="px-2 py-0.5 rounded-full text-[10px] font-medium bg-red-50 text-red-500 border border-red-200">
+                          <span className="px-2 py-0.5 rounded-full text-xs font-medium bg-red-50 text-red-500 border border-red-200">
                             Inativo
                           </span>
                         )}
@@ -598,7 +598,7 @@ function TabUsuarios() {
                   <span className="font-medium text-slate-700">Email:</span>{" "}
                   {editUser.email}
                 </p>
-                <p className="text-[10px] text-slate-400 mt-1">
+                <p className="text-xs text-slate-400 mt-1">
                   Nome e email são gerenciados pelo Auth e não podem ser alterados aqui.
                 </p>
               </div>
@@ -882,7 +882,7 @@ function TabPerfis() {
                       {role.nome}
                     </h3>
                     <span
-                      className={`text-[10px] font-medium px-2 py-0.5 rounded-full ${
+                      className={`text-xs font-medium px-2 py-0.5 rounded-full ${
                         isSelected
                           ? "bg-blue-100 text-blue-600"
                           : "bg-slate-100 text-slate-500"
@@ -912,7 +912,7 @@ function TabPerfis() {
                           }}
                         />
                       </div>
-                      <p className="text-[10px] text-slate-400 mt-1">
+                      <p className="text-xs text-slate-400 mt-1">
                         {Math.round((count / permissions.length) * 100)}% de
                         cobertura
                       </p>
@@ -1321,7 +1321,7 @@ function TabAuditoria() {
                           <span className="text-slate-700 font-medium text-xs">
                             {formatDateTime(log.created_at)}
                           </span>
-                          <span className="block text-[10px] text-slate-400">
+                          <span className="block text-xs text-slate-400">
                             {formatDateRelative(log.created_at)}
                           </span>
                         </div>
@@ -1331,7 +1331,7 @@ function TabAuditoria() {
                           <span className="text-slate-700 font-medium text-xs truncate block">
                             {log.profiles?.full_name || "---"}
                           </span>
-                          <span className="text-[10px] text-slate-400 truncate block">
+                          <span className="text-xs text-slate-400 truncate block">
                             {log.profiles?.email || log.user_id?.slice(0, 8) || "Sistema"}
                           </span>
                         </div>
@@ -1343,14 +1343,14 @@ function TabAuditoria() {
                       </td>
                       <td className="px-4 py-3.5 text-center">
                         <span
-                          className={`inline-flex items-center gap-1.5 text-[10px] font-semibold px-2.5 py-1 rounded-full border ${acaoCfg.color}`}
+                          className={`inline-flex items-center gap-1.5 text-xs font-semibold px-2.5 py-1 rounded-full border ${acaoCfg.color}`}
                         >
                           <AcaoIcon size={11} />
                           {acaoCfg.label}
                         </span>
                       </td>
                       <td className="px-4 py-3.5 hidden md:table-cell">
-                        <span className="font-mono text-[10px] text-slate-400">
+                        <span className="font-mono text-xs text-slate-400">
                           {log.registro_id?.slice(0, 8)}...
                         </span>
                       </td>
@@ -1435,7 +1435,7 @@ function TabAuditoria() {
               Detalhes da Auditoria
               {selectedLog && (
                 <span
-                  className={`text-[10px] font-semibold px-2 py-0.5 rounded-full border ${
+                  className={`text-xs font-semibold px-2 py-0.5 rounded-full border ${
                     ACAO_CONFIG[selectedLog.acao]?.color || "bg-slate-100"
                   }`}
                 >
@@ -1463,7 +1463,7 @@ function TabAuditoria() {
                   <p className="text-slate-700 font-medium mt-0.5">
                     {selectedLog.profiles?.full_name || "---"}
                   </p>
-                  <p className="text-[10px] text-slate-400">
+                  <p className="text-xs text-slate-400">
                     {selectedLog.profiles?.email || selectedLog.user_id || "Sistema"}
                   </p>
                 </div>

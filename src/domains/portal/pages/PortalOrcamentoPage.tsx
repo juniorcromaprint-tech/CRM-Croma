@@ -39,9 +39,9 @@ export default function PortalOrcamentoPage() {
           <div className="w-16 h-16 rounded-2xl bg-amber-100 flex items-center justify-center mx-auto mb-4">
             <AlertTriangle size={32} className="text-amber-500" />
           </div>
-          <h2 className="text-xl font-bold text-slate-800 mb-2">Link Invalido</h2>
+          <h2 className="text-xl font-bold text-slate-800 mb-2">Link Inválido</h2>
           <p className="text-sm text-slate-500 leading-relaxed">
-            Esta proposta nao foi encontrada ou o link expirou.
+            Esta proposta não foi encontrada ou o link expirou.
             Entre em contato com nosso time comercial para obter um novo link.
           </p>
         </div>
@@ -148,7 +148,7 @@ export default function PortalOrcamentoPage() {
         {/* Observations */}
         {proposta.observacoes && (
           <div className="bg-white rounded-2xl border border-slate-200 p-5 sm:p-6">
-            <h4 className="text-sm font-semibold text-slate-700 mb-2">Observacoes</h4>
+            <h4 className="text-sm font-semibold text-slate-700 mb-2">Observações</h4>
             <p className="text-sm text-slate-500 whitespace-pre-wrap leading-relaxed">{proposta.observacoes}</p>
           </div>
         )}

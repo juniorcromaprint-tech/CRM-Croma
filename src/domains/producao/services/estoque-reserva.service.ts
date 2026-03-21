@@ -44,13 +44,25 @@ export async function reservarMateriais(
 
   const materialIds = materiais.map((m) => m.material_id);
 
-  // Buscar saldo disponível via view (movement-based tracking)
-  const { data: saldos, error: saldosErr } = await (supabase as any)
-    .from('vw_estoque_disponivel')
-    .select('material_id, nome, unidade, disponivel')
-    .in('material_id', materialIds);
+  // Buscar saldo disponível e flag estoque_controlado em paralelo
+  const [{ data: saldos, error: saldosErr }, { data: mats }] = await Promise.all([
+    (supabase as any)
+      .from('vw_estoque_disponivel')
+      .select('material_id, nome, unidade, disponivel')
+      .in('material_id', materialIds),
+    (supabase as any)
+      .from('materiais')
+      .select('id, estoque_controlado')
+      .in('id', materialIds),
+  ]);
 
   if (saldosErr) throw new Error(`Erro ao consultar estoque: ${saldosErr.message}`);
+
+  // Mapa de controle de estoque por material
+  const controladoMap: Record<string, boolean> = {};
+  for (const m of mats ?? []) {
+    controladoMap[m.id] = m.estoque_controlado === true;
+  }
 
   const saldoMap: Record<string, { nome: string; disponivel: number; unidade: string }> = {};
   for (const s of saldos ?? []) {
@@ -61,9 +73,10 @@ export async function reservarMateriais(
     };
   }
 
-  // Verificar suficiência
+  // Verificar suficiência — apenas materiais com estoque_controlado = true
   const faltantes: MaterialInsuficiente[] = [];
   for (const req of materiais) {
+    if (!controladoMap[req.material_id]) continue; // sem controle formal, pular
     const s = saldoMap[req.material_id];
     if (!s) continue;
     if (s.disponivel < req.quantidade) {
@@ -81,8 +94,13 @@ export async function reservarMateriais(
     throw new EstoqueInsuficienteError(faltantes);
   }
 
+  // Apenas materiais controlados entram nas reservas e movimentos
+  const materiaisControlados = materiais.filter((m) => controladoMap[m.material_id] === true);
+
+  if (materiaisControlados.length === 0) return;
+
   // Inserir reservas na tabela estoque_reservas_op
-  const reservasPayload = materiais.map((m) => ({
+  const reservasPayload = materiaisControlados.map((m) => ({
     ordem_producao_id: ordemProducaoId,
     material_id: m.material_id,
     quantidade_reservada: m.quantidade,
@@ -95,7 +113,7 @@ export async function reservarMateriais(
   if (insertErr) throw new Error(`Erro ao registrar reservas: ${insertErr.message}`);
 
   // Registrar movimentos tipo 'reserva' para atualizar saldo na view
-  const movimentos = materiais.map((m) => ({
+  const movimentos = materiaisControlados.map((m) => ({
     material_id: m.material_id,
     tipo: 'reserva',
     quantidade: m.quantidade,

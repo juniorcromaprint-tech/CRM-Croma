@@ -40,6 +40,7 @@ export default function LeadDetailPage() {
   const [editing, setEditing] = useState(false);
   const [convertOpen, setConvertOpen] = useState(false);
   const [confirmDelete, setConfirmDelete] = useState(false);
+  const [duplicateNameDialog, setDuplicateNameDialog] = useState<{ open: boolean; razaoSocial: string; cnpjLimpo: string | null }>({ open: false, razaoSocial: '', cnpjLimpo: null });
 
   const deleteLead = useMutation({
     mutationFn: async (leadId: string) => {
@@ -166,12 +167,20 @@ export default function LeadDetailPage() {
         .maybeSingle();
 
       if (existingByName) {
-        const confirmar = window.confirm(
-          `Já existe um cliente "${existingByName.razao_social}". Deseja criar mesmo assim?`
-        );
-        if (!confirmar) return;
+        setDuplicateNameDialog({ open: true, razaoSocial: existingByName.razao_social, cnpjLimpo });
+        return;
       }
 
+      await doConvert(cnpjLimpo);
+    } catch (err: any) {
+      console.error("[handleConverter] Erro:", err);
+      showError(err?.message || "Erro ao converter lead em cliente.");
+    }
+  };
+
+  const doConvert = async (cnpjLimpo: string | null) => {
+    if (!id || !lead) return;
+    try {
       const novoCliente = await createCliente.mutateAsync({
         razao_social: lead.empresa,
         nome_fantasia: lead.empresa,
@@ -491,6 +500,33 @@ export default function LeadDetailPage() {
               onClick={handleConverter}
             >
               <UserCheck size={14} className="mr-1.5" /> Converter
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
+
+      {/* Confirmação de nome duplicado */}
+      <AlertDialog
+        open={duplicateNameDialog.open}
+        onOpenChange={(open) => !open && setDuplicateNameDialog({ open: false, razaoSocial: '', cnpjLimpo: null })}
+      >
+        <AlertDialogContent className="rounded-2xl max-w-md mx-4">
+          <AlertDialogHeader>
+            <AlertDialogTitle>Cliente já existe</AlertDialogTitle>
+            <AlertDialogDescription>
+              Já existe um cliente com o nome <strong>"{duplicateNameDialog.razaoSocial}"</strong>. Deseja criar mesmo assim?
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter className="gap-2">
+            <AlertDialogCancel className="rounded-xl">Cancelar</AlertDialogCancel>
+            <AlertDialogAction
+              className="rounded-xl bg-blue-600 hover:bg-blue-700 text-white"
+              onClick={() => {
+                setDuplicateNameDialog({ open: false, razaoSocial: '', cnpjLimpo: null });
+                doConvert(duplicateNameDialog.cnpjLimpo);
+              }}
+            >
+              Criar mesmo assim
             </AlertDialogAction>
           </AlertDialogFooter>
         </AlertDialogContent>

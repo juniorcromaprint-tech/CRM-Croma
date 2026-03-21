@@ -979,7 +979,7 @@ export default function InstalacaoPage() {
             <TabsTrigger value="hoje" className="rounded-lg text-sm px-4">
               Hoje
               {kpis.total > 0 && (
-                <span className="ml-2 inline-flex items-center justify-center w-5 h-5 rounded-full bg-blue-600 text-white text-[10px] font-bold">
+                <span className="ml-2 inline-flex items-center justify-center w-5 h-5 rounded-full bg-blue-600 text-white text-xs font-bold">
                   {kpis.total}
                 </span>
               )}
@@ -990,7 +990,7 @@ export default function InstalacaoPage() {
             <TabsTrigger value="ordens" className="rounded-lg text-sm px-4">
               Ordens ERP
               {ordensErp.filter((o) => o.status !== "concluida" && o.status !== "cancelada").length > 0 && (
-                <span className="ml-2 inline-flex items-center justify-center w-5 h-5 rounded-full bg-orange-500 text-white text-[10px] font-bold">
+                <span className="ml-2 inline-flex items-center justify-center w-5 h-5 rounded-full bg-orange-500 text-white text-xs font-bold">
                   {ordensErp.filter((o) => o.status !== "concluida" && o.status !== "cancelada").length}
                 </span>
               )}
