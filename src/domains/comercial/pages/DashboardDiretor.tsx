@@ -11,7 +11,7 @@ import {
   Building2, UserPlus, TrendingUp, FileText, Package, Factory,
   Truck, Wallet, DollarSign, AlertTriangle, Wrench,
   ArrowRight, Plus, Calendar, BarChart3, Target,
-  ShoppingCart, CheckCircle2, Clock, Activity, Zap, SmilePlus,
+  ShoppingCart, CheckCircle2, Clock, Activity, Zap, SmilePlus, RefreshCw,
 } from "lucide-react";
 import { brl } from "@/shared/utils/format";
 import {
@@ -264,6 +264,20 @@ export default function DashboardDiretor() {
     },
   });
 
+  const { data: mrrData } = useQuery({
+    queryKey: ["dash", "mrr"],
+    queryFn: async () => {
+      const { data } = await supabase
+        .from("contratos_servico")
+        .select("valor_mensal")
+        .eq("status", "ativo")
+        .is("excluido_em", null);
+      const mrr = (data ?? []).reduce((sum, c) => sum + (Number(c.valor_mensal) || 0), 0);
+      return { mrr, count: (data ?? []).length };
+    },
+    staleTime: 1000 * 60 * 5,
+  });
+
   const pedidoBreakdown = pedidos?.byStatus ?? {};
   const pedidoSegments = Object.entries(pedidoBreakdown)
     .sort(([, a], [, b]) => b - a)
@@ -364,6 +378,25 @@ export default function DashboardDiretor() {
           to="/producao"
         />
       </div>
+
+      {/* ─── Receita Recorrente (MRR) ─── */}
+      {(mrrData?.mrr ?? 0) > 0 && (
+        <Link to="/contratos" className="block">
+          <div className="flex items-center gap-4 px-5 py-4 bg-gradient-to-r from-teal-500 to-teal-600 rounded-2xl hover:shadow-md hover:scale-[1.01] transition-all duration-200">
+            <div className="w-10 h-10 rounded-xl bg-white/20 flex items-center justify-center shrink-0">
+              <RefreshCw size={20} className="text-white" />
+            </div>
+            <div className="flex-1 min-w-0">
+              <p className="text-sm font-medium text-white/80">Receita Recorrente (MRR)</p>
+              <p className="text-2xl font-bold text-white tabular-nums font-mono leading-tight">{brl(mrrData?.mrr ?? 0)}</p>
+            </div>
+            <div className="text-right shrink-0">
+              <p className="text-xs text-white/70">{mrrData?.count ?? 0} contratos ativos</p>
+              <p className="text-sm font-semibold text-white/90 font-mono">{brl((mrrData?.mrr ?? 0) * 12)}/ano</p>
+            </div>
+          </div>
+        </Link>
+      )}
 
       {/* ─── Secondary Metrics Strip ─── */}
       <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-3">

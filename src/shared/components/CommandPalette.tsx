@@ -15,7 +15,7 @@ import {
   LayoutDashboard, UserPlus, Kanban, FileText, Calculator,
   Building2, ClipboardList, Factory, Wrench, Warehouse,
   ShoppingCart, Package, Wallet, BarChart3, BadgeDollarSign,
-  AlertTriangle, Users, Settings, Shield, Receipt, BookOpen,
+  AlertTriangle, Users, Settings, Shield, Receipt, BookOpen, Webhook,
 } from "lucide-react";
 
 // Use component references (not JSX) at module level to avoid
@@ -57,6 +57,7 @@ const COMMANDS: CommandEntry[] = [
   { label: "Precificação", path: "/admin/precificacao", group: "Admin", Icon: Settings },
   { label: "Auditoria", path: "/admin/auditoria", group: "Admin", Icon: Shield },
   { label: "Fiscal", path: "/fiscal", group: "Fiscal", Icon: Receipt },
+  { label: "Webhooks", path: "/admin/webhooks", group: "Admin", Icon: Webhook },
 ];
 
 interface CommandPaletteProps {

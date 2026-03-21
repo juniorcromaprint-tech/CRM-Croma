@@ -158,6 +158,7 @@ export const PRODUCAO_STATUS = {
   LIBERADO: 'liberado',
   RETRABALHO: 'retrabalho',
   FINALIZADO: 'finalizado',
+  CANCELADA: 'cancelada',
 } as const;
 
 export type ProducaoStatus = (typeof PRODUCAO_STATUS)[keyof typeof PRODUCAO_STATUS];
@@ -171,6 +172,7 @@ export const PRODUCAO_STATUS_CONFIG: Record<ProducaoStatus, StatusConfig> = {
   liberado: { label: 'Liberado', color: 'bg-emerald-50 text-emerald-700 border-emerald-100', icon: 'CheckCircle' },
   retrabalho: { label: 'Retrabalho', color: 'bg-red-50 text-red-700 border-red-100', icon: 'RotateCcw' },
   finalizado: { label: 'Finalizado', color: 'bg-green-50 text-green-700 border-green-100', icon: 'CheckCircle2' },
+  cancelada: { label: 'Cancelada', color: 'bg-slate-50 text-slate-500 border-slate-100', icon: 'Ban' },
 } as const;
 
 // ---------------------------------------------------------------------------

@@ -32,6 +32,7 @@ import {
 import { useRegrasPrecificacao } from "../hooks/useOrcamentoPricing";
 import { useItemEditor } from "../hooks/useItemEditor";
 import PricingCalculator from "../components/PricingCalculator";
+import { EscalaPrecos } from "../components/EscalaPrecos";
 import ProdutoSelector from "../components/ProdutoSelector";
 import MaterialEditor from "../components/MaterialEditor";
 import AcabamentoSelector from "../components/AcabamentoSelector";
@@ -1141,6 +1142,14 @@ export default function OrcamentoEditorPage() {
                       <div className="lg:col-span-2">
                         <div className="sticky top-4 space-y-4">
                           <PricingCalculator resultado={pricingResult} quantidade={newItem.quantidade} />
+
+                          {/* Escala de preços por volume */}
+                          {pricingResult && pricingResult.precoUnitario > 0 && (
+                            <EscalaPrecos
+                              precoUnitarioBase={pricingResult.precoUnitario}
+                              quantidadeAtual={newItem.quantidade}
+                            />
+                          )}
 
                           {/* Quick summary */}
                           {pricingResult && (

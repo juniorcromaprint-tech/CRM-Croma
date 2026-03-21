@@ -66,7 +66,7 @@ interface Material {
   categoria: string | null;
   unidade: string;
   preco_medio: number | null;
-  estoque_atual: number;
+
   estoque_minimo: number | null;
   estoque_ideal: number | null;
   fornecedor_principal: string | null;
@@ -130,6 +130,41 @@ export default function AdminMateriaisPage() {
         .order("nome");
       if (error) throw error;
       return (data ?? []) as Material[];
+    },
+  });
+
+  // Reservas ativas por material (migration 084)
+  const { data: reservasMap = {} } = useQuery<Record<string, number>>({
+    queryKey: ["estoque-reservas-ativas"],
+    staleTime: 60 * 1000,
+    queryFn: async () => {
+      const { data, error } = await (supabase as any)
+        .from("estoque_reservas_op")
+        .select("material_id, quantidade_reservada")
+        .is("liberado_em", null);
+      if (error) return {};
+      const map: Record<string, number> = {};
+      for (const r of data ?? []) {
+        map[r.material_id] = (map[r.material_id] ?? 0) + Number(r.quantidade_reservada);
+      }
+      return map;
+    },
+  });
+
+  // Saldo disponível por material via v_estoque_saldos
+  const { data: saldoMap = {} } = useQuery<Record<string, number>>({
+    queryKey: ['estoque-saldos-disponiveis'],
+    staleTime: 2 * 60 * 1000,
+    queryFn: async () => {
+      const { data, error } = await (supabase as any)
+        .from('v_estoque_saldos')
+        .select('material_id, saldo_disponivel');
+      if (error) return {};
+      const map: Record<string, number> = {};
+      for (const s of data ?? []) {
+        map[s.material_id] = Number(s.saldo_disponivel);
+      }
+      return map;
     },
   });
 
@@ -268,8 +303,8 @@ export default function AdminMateriaisPage() {
 
   function stockColor(m: Material): string {
     if (!m.estoque_minimo) return "bg-slate-200";
-    if (m.estoque_atual <= m.estoque_minimo) return "bg-red-500";
-    if (m.estoque_ideal && m.estoque_atual < m.estoque_ideal) return "bg-yellow-400";
+    if ((saldoMap[m.id] ?? 0) <= m.estoque_minimo) return "bg-red-500";
+    if (m.estoque_ideal && (saldoMap[m.id] ?? 0) < m.estoque_ideal) return "bg-yellow-400";
     return "bg-green-500";
   }
 
@@ -398,14 +433,15 @@ export default function AdminMateriaisPage() {
       {/* Table */}
       <div className="border border-slate-200 rounded-xl overflow-hidden">
         {/* Table header */}
-        <div className="grid grid-cols-[36px_80px_1fr_80px_70px_110px_120px_100px_60px] gap-2 px-4 py-2.5 bg-slate-50 border-b border-slate-200 text-xs font-medium text-slate-500">
+        <div className="grid grid-cols-[36px_80px_1fr_80px_70px_100px_90px_110px_100px_60px] gap-2 px-4 py-2.5 bg-slate-50 border-b border-slate-200 text-xs font-medium text-slate-500">
           <span />
           <span>Código</span>
           <span>Nome</span>
           <span>Unid.</span>
           <span className="text-right">Preço/Un.</span>
+          <span className="text-right">Estoque</span>
+          <span className="text-right text-amber-600">Reservado</span>
           <span>NCM</span>
-          <span>Plano Saída</span>
           <span className="text-center">V. Direta</span>
           <span />
         </div>
@@ -434,7 +470,7 @@ export default function AdminMateriaisPage() {
             {filtered.map((m) => (
               <div
                 key={m.id}
-                className="grid grid-cols-[36px_80px_1fr_80px_70px_110px_120px_100px_60px] gap-2 items-center px-4 py-2.5 hover:bg-slate-50/80 transition-colors"
+                className="grid grid-cols-[36px_80px_1fr_80px_70px_100px_90px_110px_100px_60px] gap-2 items-center px-4 py-2.5 hover:bg-slate-50/80 transition-colors"
               >
                 {/* Semáforo */}
                 <div className="flex justify-center">
@@ -460,13 +496,33 @@ export default function AdminMateriaisPage() {
                   {m.preco_medio != null ? brl(m.preco_medio) : <span className="text-amber-500 text-xs">S/ preço</span>}
                 </span>
 
+                {/* Estoque atual vs disponível */}
+                <div className="text-right">
+                  {(() => {
+                    const reservado = reservasMap[m.id] ?? 0;
+                    const disponivel = (saldoMap[m.id] ?? 0) - reservado;
+                    return (
+                      <span className={`text-xs tabular-nums font-medium ${disponivel < (m.estoque_minimo ?? 0) ? "text-red-600" : "text-slate-700"}`}>
+                        {disponivel.toFixed(2)}
+                      </span>
+                    );
+                  })()}
+                </div>
+
+                {/* Reservado */}
+                <div className="text-right">
+                  {(() => {
+                    const reservado = reservasMap[m.id] ?? 0;
+                    return reservado > 0 ? (
+                      <span className="text-xs tabular-nums font-medium text-amber-600">{reservado.toFixed(2)}</span>
+                    ) : (
+                      <span className="text-xs text-slate-300">—</span>
+                    );
+                  })()}
+                </div>
+
                 {/* NCM */}
                 <span className="text-xs font-mono text-slate-600 truncate">{m.ncm ?? "—"}</span>
-
-                {/* Plano saída */}
-                <span className="text-xs text-slate-500 truncate" title={m.plano_contas_saida ?? ""}>
-                  {m.plano_contas_saida ? m.plano_contas_saida.slice(0, 18) + (m.plano_contas_saida.length > 18 ? "…" : "") : "—"}
-                </span>
 
                 {/* Venda direta */}
                 <div className="flex justify-center">

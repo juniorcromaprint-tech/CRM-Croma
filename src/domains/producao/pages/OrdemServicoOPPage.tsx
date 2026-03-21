@@ -17,6 +17,7 @@ import { OSLogistica } from '../components/os/OSLogistica';
 import { OSQRCode } from '../components/os/OSQRCode';
 import { OSActions } from '../components/os/OSActions';
 import { OSPrintLayout } from '../components/os/OSPrintLayout';
+import { OSArquivoProducao } from '../components/os/OSArquivoProducao';
 import { useEmpresaPrincipal } from "@/shared/hooks/useEmpresaPrincipal";
 
 export default function OrdemServicoOPPage() {
@@ -171,6 +172,15 @@ export default function OrdemServicoOPPage() {
             dataPrometida={op.data_prometida}
             cliente={op.cliente}
             observacoes={op.observacoes ?? null}
+          />
+        </div>
+
+        {/* Arquivo para Produção */}
+        <div className="mt-4">
+          <OSArquivoProducao
+            opId={op.op_id}
+            arteUrl={op.item.arte_url}
+            instrucoes={op.item.instrucoes}
           />
         </div>
 

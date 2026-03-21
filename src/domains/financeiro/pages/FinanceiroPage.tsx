@@ -64,7 +64,11 @@ import {
   CircleDollarSign,
   Banknote,
   Loader2,
+  ShieldCheck,
+  ShieldX,
+  AlertTriangle,
 } from "lucide-react";
+import { useAuth } from "@/contexts/AuthContext";
 
 // ─── Types ──────────────────────────────────────────────────────────────────
 
@@ -82,7 +86,9 @@ type ContaPagarStatus =
   | "vencido"
   | "parcial"
   | "pago"
-  | "cancelado";
+  | "cancelado"
+  | "pendente_aprovacao"
+  | "rejeitado";
 
 interface ContaReceber {
   id: string;
@@ -124,6 +130,10 @@ interface ContaPagar {
   excluido_em: string | null;
   created_at: string;
   updated_at: string;
+  requer_aprovacao: boolean | null;
+  aprovado_por: string | null;
+  aprovado_em: string | null;
+  motivo_rejeicao: string | null;
   fornecedores?: { nome_fantasia: string | null; razao_social: string } | null;
 }
 
@@ -173,6 +183,14 @@ const STATUS_PAGAR_CONFIG: Record<
   ContaPagarStatus,
   { label: string; className: string }
 > = {
+  pendente_aprovacao: {
+    label: "Aguard. Aprovação",
+    className: "bg-amber-50 text-amber-700 border-amber-200",
+  },
+  rejeitado: {
+    label: "Rejeitado",
+    className: "bg-red-50 text-red-700 border-red-200",
+  },
   a_pagar: {
     label: "A pagar",
     className: "bg-blue-50 text-blue-700 border-blue-200",
@@ -1113,11 +1131,19 @@ function TabContasReceber() {
 
 // ─── Tab: Contas a Pagar ────────────────────────────────────────────────────
 
+const LIMITE_AUTO_APROVACAO = 500;
+
 function TabContasPagar() {
   const queryClient = useQueryClient();
+  const { profile } = useAuth();
+  const userRole = profile?.role ?? "comercial";
+  const podeAprovar = userRole === "diretor" || userRole === "financeiro";
+
   const [statusFilter, setStatusFilter] = useState<string>("todos");
   const [search, setSearch] = useState("");
   const [showCreateDialog, setShowCreateDialog] = useState(false);
+  const [rejeicaoTarget, setRejeicaoTarget] = useState<ContaPagar | null>(null);
+  const [motivoRejeicao, setMotivoRejeicao] = useState("");
 
   // ── Queries ──
   const {
@@ -1148,6 +1174,8 @@ function TabContasPagar() {
       numero_nf?: string;
       observacoes?: string;
     }) => {
+      const requerAprovacao = payload.valor_original > LIMITE_AUTO_APROVACAO;
+      const status: ContaPagarStatus = requerAprovacao ? "pendente_aprovacao" : "a_pagar";
       const { data, error } = await supabase
         .from("contas_pagar")
         .insert({
@@ -1156,18 +1184,64 @@ function TabContasPagar() {
           data_vencimento: payload.data_vencimento,
           numero_nf: payload.numero_nf || null,
           observacoes: payload.observacoes || null,
-          status: "a_pagar",
+          status,
+          requer_aprovacao: requerAprovacao,
           saldo: payload.valor_original,
         })
         .select()
         .single();
       if (error) throw new Error(error.message);
-      return data;
+      return { data, requerAprovacao };
+    },
+    onSuccess: ({ requerAprovacao }) => {
+      queryClient.invalidateQueries({ queryKey: ["financeiro"] });
+      if (requerAprovacao) {
+        showSuccess("Conta criada — aguardando aprovação (valor acima de R$ 500)");
+      } else {
+        showSuccess("Conta a pagar criada com sucesso");
+      }
+      setShowCreateDialog(false);
+    },
+    onError: (err: Error) => showError(err.message),
+  });
+
+  const aprovarMutation = useMutation({
+    mutationFn: async (id: string) => {
+      const { data: { user } } = await supabase.auth.getUser();
+      const { error } = await supabase
+        .from("contas_pagar")
+        .update({
+          status: "a_pagar" as ContaPagarStatus,
+          aprovado_por: user?.id ?? null,
+          aprovado_em: new Date().toISOString(),
+          motivo_rejeicao: null,
+        })
+        .eq("id", id);
+      if (error) throw new Error(error.message);
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["financeiro"] });
-      showSuccess("Conta a pagar criada com sucesso");
-      setShowCreateDialog(false);
+      showSuccess("Conta aprovada — movida para A Pagar");
+    },
+    onError: (err: Error) => showError(err.message),
+  });
+
+  const rejeitarMutation = useMutation({
+    mutationFn: async ({ id, motivo }: { id: string; motivo: string }) => {
+      const { error } = await supabase
+        .from("contas_pagar")
+        .update({
+          status: "rejeitado" as ContaPagarStatus,
+          motivo_rejeicao: motivo || "Sem motivo informado",
+        })
+        .eq("id", id);
+      if (error) throw new Error(error.message);
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["financeiro"] });
+      showSuccess("Conta rejeitada");
+      setRejeicaoTarget(null);
+      setMotivoRejeicao("");
     },
     onError: (err: Error) => showError(err.message),
   });
@@ -1229,7 +1303,7 @@ function TabContasPagar() {
       } else if (c.status === "vencido") {
         vencido += val - pgto;
         totalPagar += val - pgto;
-      } else if (c.status !== "cancelado") {
+      } else if (c.status !== "cancelado" && c.status !== "pendente_aprovacao" && c.status !== "rejeitado") {
         totalPagar += val - pgto;
       }
     }
@@ -1277,14 +1351,23 @@ function TabContasPagar() {
           ))}
         </div>
       ) : (
-        <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
+        <div className="grid grid-cols-2 sm:grid-cols-4 gap-4">
           <KpiCard
             label="Total a Pagar"
             value={brl(stats.totalPagar)}
             icon={CreditCard}
             iconBg="bg-blue-50"
             iconColor="text-blue-600"
-            sub={`${contas.filter((c) => !["pago", "cancelado"].includes(c.status)).length} titulos`}
+            sub={`${contas.filter((c) => !["pago", "cancelado", "pendente_aprovacao", "rejeitado"].includes(c.status)).length} titulos`}
+          />
+          <KpiCard
+            label="Aguard. Aprovação"
+            value={String(contas.filter((c) => c.status === "pendente_aprovacao").length)}
+            icon={AlertTriangle}
+            iconBg="bg-amber-50"
+            iconColor="text-amber-600"
+            sub={podeAprovar ? "Clique para revisar" : "Sem permissão de aprovar"}
+            subColor={contas.filter((c) => c.status === "pendente_aprovacao").length > 0 ? "text-amber-600" : "text-slate-400"}
           />
           <KpiCard
             label="Vencido"
@@ -1312,6 +1395,7 @@ function TabContasPagar() {
         <div className="flex items-center gap-2 flex-wrap">
           {[
             { key: "todos", label: "Todos" },
+            { key: "pendente_aprovacao", label: "Aguard. Aprovação", badge: contas.filter((c) => c.status === "pendente_aprovacao").length },
             { key: "a_pagar", label: "A pagar" },
             { key: "vencido", label: "Vencido" },
             { key: "parcial", label: "Parcial" },
@@ -1320,13 +1404,20 @@ function TabContasPagar() {
             <button
               key={f.key}
               onClick={() => setStatusFilter(f.key)}
-              className={`text-xs font-semibold px-4 py-2 rounded-xl border transition-all ${
+              className={`relative text-xs font-semibold px-4 py-2 rounded-xl border transition-all ${
                 statusFilter === f.key
                   ? "bg-blue-600 text-white border-blue-600 shadow-sm"
                   : "bg-white text-slate-500 border-slate-200 hover:border-slate-300"
               }`}
             >
               {f.label}
+              {'badge' in f && (f as { badge: number }).badge > 0 && (
+                <span className={`ml-1.5 inline-flex items-center justify-center w-4 h-4 text-[10px] font-bold rounded-full ${
+                  statusFilter === f.key ? "bg-white/30 text-white" : "bg-amber-500 text-white"
+                }`}>
+                  {(f as { badge: number }).badge}
+                </span>
+              )}
             </button>
           ))}
         </div>
@@ -1439,14 +1530,39 @@ function TabContasPagar() {
                         </Badge>
                       </td>
                       <td className="px-6 py-4 text-right">
-                        {conta.status !== "pago" &&
-                        conta.status !== "cancelado" ? (
+                        {conta.status === "pendente_aprovacao" ? (
+                          podeAprovar ? (
+                            <div className="flex items-center justify-end gap-2">
+                              <Button
+                                size="sm"
+                                variant="outline"
+                                onClick={() => aprovarMutation.mutate(conta.id)}
+                                disabled={aprovarMutation.isPending}
+                                className="h-8 text-xs rounded-xl border-emerald-200 text-emerald-700 hover:bg-emerald-50 gap-1"
+                              >
+                                <ShieldCheck size={13} />
+                                Aprovar
+                              </Button>
+                              <Button
+                                size="sm"
+                                variant="outline"
+                                onClick={() => { setRejeicaoTarget(conta); setMotivoRejeicao(""); }}
+                                className="h-8 text-xs rounded-xl border-red-200 text-red-600 hover:bg-red-50 gap-1"
+                              >
+                                <ShieldX size={13} />
+                                Rejeitar
+                              </Button>
+                            </div>
+                          ) : (
+                            <span className="text-xs text-amber-500 font-medium">Aguardando aprovação</span>
+                          )
+                        ) : conta.status === "rejeitado" ? (
+                          <span className="text-xs text-red-400" title={conta.motivo_rejeicao ?? ""}>Rejeitado</span>
+                        ) : conta.status !== "pago" && conta.status !== "cancelado" ? (
                           <Button
                             size="sm"
                             variant="outline"
-                            onClick={() =>
-                              pagarMutation.mutate({ id: conta.id })
-                            }
+                            onClick={() => pagarMutation.mutate({ id: conta.id })}
                             disabled={pagarMutation.isPending}
                             className="h-8 text-xs rounded-xl border-emerald-200 text-emerald-700 hover:bg-emerald-50 hover:border-emerald-300"
                           >
@@ -1563,6 +1679,67 @@ function TabContasPagar() {
               className="bg-blue-600 hover:bg-blue-700 rounded-xl"
             >
               {createMutation.isPending ? <><Loader2 size={16} className="animate-spin mr-2" />Criando...</> : "Criar Conta"}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {/* Rejeição Dialog */}
+      <Dialog
+        open={rejeicaoTarget !== null}
+        onOpenChange={(open) => {
+          if (!open) { setRejeicaoTarget(null); setMotivoRejeicao(""); }
+        }}
+      >
+        <DialogContent className="sm:max-w-md">
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2">
+              <ShieldX size={18} className="text-red-600" />
+              Rejeitar Conta a Pagar
+            </DialogTitle>
+          </DialogHeader>
+          {rejeicaoTarget && (
+            <div className="space-y-4 py-2">
+              <div className="bg-slate-50 rounded-xl p-4 space-y-1.5">
+                <div className="flex justify-between text-sm">
+                  <span className="text-slate-500">Fornecedor / Categoria</span>
+                  <span className="font-semibold text-slate-800">{getFornecedorName(rejeicaoTarget)}</span>
+                </div>
+                <div className="flex justify-between text-sm">
+                  <span className="text-slate-500">Valor</span>
+                  <span className="font-mono font-bold text-slate-800">{brl(Number(rejeicaoTarget.valor_original))}</span>
+                </div>
+              </div>
+              <div className="space-y-2">
+                <Label>Motivo da rejeição *</Label>
+                <Textarea
+                  placeholder="Descreva o motivo da rejeição..."
+                  value={motivoRejeicao}
+                  onChange={(e) => setMotivoRejeicao(e.target.value)}
+                  className="rounded-xl resize-none"
+                  rows={3}
+                />
+              </div>
+            </div>
+          )}
+          <DialogFooter>
+            <Button
+              variant="outline"
+              onClick={() => { setRejeicaoTarget(null); setMotivoRejeicao(""); }}
+              className="rounded-xl"
+            >
+              Cancelar
+            </Button>
+            <Button
+              onClick={() => {
+                if (!rejeicaoTarget) return;
+                if (!motivoRejeicao.trim()) { showError("Informe o motivo da rejeição"); return; }
+                rejeitarMutation.mutate({ id: rejeicaoTarget.id, motivo: motivoRejeicao });
+              }}
+              disabled={rejeitarMutation.isPending}
+              className="bg-red-600 hover:bg-red-700 rounded-xl"
+            >
+              {rejeitarMutation.isPending ? <><Loader2 size={16} className="animate-spin mr-2" />Rejeitando...</> : "Confirmar Rejeição"}
             </Button>
           </DialogFooter>
         </DialogContent>
@@ -1856,6 +2033,19 @@ function TabDRE() {
 // ─── Main Page ──────────────────────────────────────────────────────────────
 
 export default function FinanceiroPage() {
+  const { data: pendentesCount = 0 } = useQuery({
+    queryKey: ["financeiro", "pendentes_aprovacao_count"],
+    queryFn: async () => {
+      const { count } = await supabase
+        .from("contas_pagar")
+        .select("*", { count: "exact", head: true })
+        .eq("status", "pendente_aprovacao")
+        .is("excluido_em", null);
+      return count ?? 0;
+    },
+    staleTime: 1000 * 30,
+  });
+
   return (
     <div className="space-y-6 animate-in fade-in duration-500">
       {/* Page Header */}
@@ -1876,20 +2066,32 @@ export default function FinanceiroPage() {
       {/* Tabs */}
       <Tabs defaultValue="receber" className="space-y-6">
         <TabsList className="bg-white shadow-sm rounded-2xl p-1.5 border border-slate-100 h-auto flex gap-1 w-full md:w-auto">
-          {[
-            { value: "receber", label: "A Receber", icon: ArrowDownLeft },
-            { value: "pagar", label: "A Pagar", icon: ArrowUpRight },
-            { value: "dre", label: "DRE", icon: BarChart3 },
-          ].map(({ value, label, icon: Icon }) => (
-            <TabsTrigger
-              key={value}
-              value={value}
-              className="flex-1 md:flex-none flex items-center gap-2 px-4 py-2.5 rounded-xl text-sm font-semibold data-[state=active]:bg-blue-600 data-[state=active]:text-white data-[state=active]:shadow-sm text-slate-500 transition-all"
-            >
-              <Icon size={16} className="hidden sm:block" />
-              {label}
-            </TabsTrigger>
-          ))}
+          <TabsTrigger
+            value="receber"
+            className="flex-1 md:flex-none flex items-center gap-2 px-4 py-2.5 rounded-xl text-sm font-semibold data-[state=active]:bg-blue-600 data-[state=active]:text-white data-[state=active]:shadow-sm text-slate-500 transition-all"
+          >
+            <ArrowDownLeft size={16} className="hidden sm:block" />
+            A Receber
+          </TabsTrigger>
+          <TabsTrigger
+            value="pagar"
+            className="flex-1 md:flex-none flex items-center gap-2 px-4 py-2.5 rounded-xl text-sm font-semibold data-[state=active]:bg-blue-600 data-[state=active]:text-white data-[state=active]:shadow-sm text-slate-500 transition-all"
+          >
+            <ArrowUpRight size={16} className="hidden sm:block" />
+            A Pagar
+            {pendentesCount > 0 && (
+              <span className="inline-flex items-center justify-center w-5 h-5 text-[10px] font-bold rounded-full bg-amber-500 text-white">
+                {pendentesCount}
+              </span>
+            )}
+          </TabsTrigger>
+          <TabsTrigger
+            value="dre"
+            className="flex-1 md:flex-none flex items-center gap-2 px-4 py-2.5 rounded-xl text-sm font-semibold data-[state=active]:bg-blue-600 data-[state=active]:text-white data-[state=active]:shadow-sm text-slate-500 transition-all"
+          >
+            <BarChart3 size={16} className="hidden sm:block" />
+            DRE
+          </TabsTrigger>
         </TabsList>
 
         <TabsContent value="receber">

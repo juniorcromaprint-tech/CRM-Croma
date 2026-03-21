@@ -4,6 +4,7 @@
 // ============================================================================
 
 import { useState, useEffect } from "react";
+import { Link } from "react-router-dom";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import { showSuccess, showError } from "@/utils/toast";
@@ -35,6 +36,8 @@ import {
   CheckCircle2,
   Brain,
   Receipt,
+  Webhook,
+  ArrowRight,
 } from "lucide-react";
 
 // ----------------------------------------------------------------------------
@@ -609,6 +612,23 @@ function TabMarkupCategoria() {
 function TabSobre() {
   return (
     <div className="space-y-4">
+      {/* Quick links to other admin sections */}
+      <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+        <Link
+          to="/admin/webhooks"
+          className="flex items-center gap-3 bg-white rounded-xl border border-slate-200 p-4 hover:border-blue-300 hover:shadow-sm transition-all group"
+        >
+          <div className="w-9 h-9 rounded-lg bg-blue-50 flex items-center justify-center flex-shrink-0">
+            <Webhook size={18} className="text-blue-600" />
+          </div>
+          <div className="flex-1 min-w-0">
+            <p className="font-semibold text-slate-800 text-sm">Webhooks</p>
+            <p className="text-xs text-slate-400 mt-0.5">Integrações externas via HTTP</p>
+          </div>
+          <ArrowRight size={15} className="text-slate-300 group-hover:text-blue-400 transition-colors flex-shrink-0" />
+        </Link>
+      </div>
+
       <Card className="rounded-2xl border-none shadow-sm">
         <CardHeader>
           <div className="flex items-center gap-2">
