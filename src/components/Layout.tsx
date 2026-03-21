@@ -15,6 +15,7 @@ import CommandPalette from "@/shared/components/CommandPalette";
 import Breadcrumbs from "@/shared/components/Breadcrumbs";
 import { NotificationBadge } from "@/components/NotificationBadge";
 import AIAlertsBadge from '@/domains/ai/components/AIAlertsBadge';
+import EstoqueAlertaBadge from '@/domains/admin/components/EstoqueAlertaBadge';
 import { useEmpresaPrincipal } from "@/shared/hooks/useEmpresaPrincipal";
 
 // ---------------------------------------------------------------------------
@@ -28,7 +29,7 @@ import {
   SlidersHorizontal, Key, BookOpen, LogOut, Calculator, Cog, Database,
   PanelLeftClose, PanelLeftOpen, Search, Truck,
   Calendar, Megaphone, Package2, ArrowLeftRight, Building, Layers, BarChart2, GanttChart,
-  TrendingUp, FileInput, Bot, Clock,
+  TrendingUp, FileInput, Bot, Clock, RefreshCw,
   ChevronDown, ChevronRight,
   type LucideIcon,
 } from "lucide-react";
@@ -40,7 +41,7 @@ const ICON_MAP: Record<string, LucideIcon> = {
   Users, Settings, Shield, Receipt, FileCheck, List,
   SlidersHorizontal, Key, BookOpen, Calculator, Cog, Database, Truck,
   Calendar, Megaphone, Package2, ArrowLeftRight, Building, Layers, BarChart2, Gantt: GanttChart,
-  TrendingUp, FileInput, Bot, Clock,
+  TrendingUp, FileInput, Bot, Clock, RefreshCw,
 };
 
 // ---------------------------------------------------------------------------
@@ -109,6 +110,7 @@ function SidebarNavLink({ item, isActive }: SidebarNavLinkProps) {
         {item.path === '/orcamentos' && <NotificationBadge />}
       </span>
       <span className="font-medium text-sm">{item.name}</span>
+      {item.path === '/estoque' && <EstoqueAlertaBadge />}
     </Link>
   );
 }
@@ -121,13 +123,14 @@ function SidebarNavLinkCollapsed({ item, isActive }: SidebarNavLinkProps) {
       <TooltipTrigger asChild>
         <Link
           to={item.path}
-          className={`flex items-center justify-center w-10 h-10 rounded-2xl transition-all duration-200 mx-auto ${
+          className={`relative flex items-center justify-center w-10 h-10 rounded-2xl transition-all duration-200 mx-auto ${
             isActive
               ? "bg-blue-600 text-white shadow-md"
               : "text-slate-500 hover:bg-blue-50 hover:text-blue-600"
           }`}
         >
           <Icon size={20} />
+          {item.path === '/estoque' && <EstoqueAlertaBadge collapsed />}
         </Link>
       </TooltipTrigger>
       <TooltipContent side="right" className="ml-1">
