@@ -38,6 +38,12 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
+import {
+  Sheet,
+  SheetContent,
+  SheetHeader,
+  SheetTitle,
+} from "@/components/ui/sheet";
 
 import {
   Factory,
@@ -405,6 +411,25 @@ export default function ProducaoPage() {
   const dragCounterRef = useRef<Record<string, number>>({});
   const isDragDropUpdate = useRef(false);
 
+  // --- Designar instalador dialog ---
+  const [designarInstaladorDialog, setDesignarInstaladorDialog] = useState<{
+    open: boolean;
+    opId: string | null;
+  }>({ open: false, opId: null });
+  const [selectedInstalador, setSelectedInstalador] = useState('');
+  const [dataAgendada, setDataAgendada] = useState('');
+  const [horaPrevista, setHoraPrevista] = useState('');
+  const [instrucoes, setInstrucoes] = useState('');
+
+  useEffect(() => {
+    if (designarInstaladorDialog.open) {
+      setSelectedInstalador('');
+      setDataAgendada('');
+      setHoraPrevista('');
+      setInstrucoes('');
+    }
+  }, [designarInstaladorDialog.open]);
+
   useEffect(() => {
     setPage(0);
   }, [searchTerm, statusFilter, prioridadeFilter]);
@@ -486,9 +511,58 @@ export default function ProducaoPage() {
     staleTime: 5 * 60 * 1000,
   });
 
+  // --- Instaladores para designação ---
+  const { data: instaladores = [] } = useQuery({
+    queryKey: ['instaladores-campo'],
+    queryFn: async () => {
+      const { data } = await (supabase as any)
+        .from('profiles')
+        .select('id, first_name, last_name')
+        .eq('role', 'instalador')
+        .order('first_name');
+      return data ?? [];
+    },
+  });
+
   // =========================================================================
   // MUTATIONS
   // =========================================================================
+
+  const designarMutation = useMutation({
+    mutationFn: async ({ opId, equipeId, dataAgendadaVal, horaPrevistaVal, instrucoesVal }: {
+      opId: string;
+      equipeId: string;
+      dataAgendadaVal: string;
+      horaPrevistaVal?: string;
+      instrucoesVal?: string;
+    }) => {
+      await criarOrdemInstalacao(opId, {
+        equipeId,
+        dataAgendada: dataAgendadaVal,
+        horaPrevista: horaPrevistaVal,
+        instrucoes: instrucoesVal,
+      });
+    },
+    onSuccess: () => {
+      showSuccess('Ordem de instalação criada e instalador designado!');
+      setDesignarInstaladorDialog({ open: false, opId: null });
+      queryClient.invalidateQueries({ queryKey: ['producao'] });
+      queryClient.invalidateQueries({ queryKey: ['ordens-instalacao-erp'] });
+    },
+    onError: (err: Error) => showError(err.message),
+  });
+
+  const criarSemDesignarMutation = useMutation({
+    mutationFn: async (opId: string) => {
+      await criarOrdemInstalacao(opId);
+    },
+    onSuccess: () => {
+      showSuccess('Ordem de instalação criada — aguardando agendamento');
+      setDesignarInstaladorDialog({ open: false, opId: null });
+      queryClient.invalidateQueries({ queryKey: ['producao'] });
+    },
+    onError: (err: Error) => showError(err.message),
+  });
 
   const createMutation = useMutation({
     mutationFn: async () => {
@@ -648,7 +722,8 @@ export default function ProducaoPage() {
               .update({ status: "produzido" })
               .eq("id", op.pedido_id);
           }
-          await criarOrdemInstalacao(opId);
+          // Open designar dialog instead of creating OS silently
+          setDesignarInstaladorDialog({ open: true, opId });
         }
       }
     },
@@ -1977,6 +2052,83 @@ export default function ProducaoPage() {
           </DialogContent>
         )}
       </Dialog>
+
+      {/* Sheet: Designar Instalador */}
+      <Sheet
+        open={designarInstaladorDialog.open}
+        onOpenChange={(open) => {
+          if (!open) setDesignarInstaladorDialog({ open: false, opId: null });
+        }}
+      >
+        <SheetContent className="sm:max-w-md">
+          <SheetHeader>
+            <SheetTitle>Designar Instalador</SheetTitle>
+            <p className="text-sm text-slate-500">
+              A produção foi concluída. Designe um instalador para enviar ao App de Campo.
+            </p>
+          </SheetHeader>
+          <div className="space-y-4 mt-6">
+            <div>
+              <Label>Instalador *</Label>
+              <Select value={selectedInstalador} onValueChange={setSelectedInstalador}>
+                <SelectTrigger><SelectValue placeholder="Selecione o instalador" /></SelectTrigger>
+                <SelectContent>
+                  {instaladores.map((inst: any) => (
+                    <SelectItem key={inst.id} value={inst.id}>
+                      {inst.first_name} {inst.last_name}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
+            <div>
+              <Label>Data agendada *</Label>
+              <Input type="date" value={dataAgendada} onChange={(e) => setDataAgendada(e.target.value)} />
+            </div>
+            <div>
+              <Label>Hora prevista</Label>
+              <Input type="time" value={horaPrevista} onChange={(e) => setHoraPrevista(e.target.value)} />
+            </div>
+            <div>
+              <Label>Instruções para o instalador</Label>
+              <Textarea
+                placeholder="Ex: Levar escada, material já está na loja..."
+                value={instrucoes}
+                onChange={(e) => setInstrucoes(e.target.value)}
+              />
+            </div>
+            <Button
+              className="w-full bg-blue-600 hover:bg-blue-700"
+              disabled={!selectedInstalador || !dataAgendada || designarMutation.isPending}
+              onClick={() => {
+                if (designarInstaladorDialog.opId && selectedInstalador && dataAgendada) {
+                  designarMutation.mutate({
+                    opId: designarInstaladorDialog.opId,
+                    equipeId: selectedInstalador,
+                    dataAgendadaVal: dataAgendada,
+                    horaPrevistaVal: horaPrevista || undefined,
+                    instrucoesVal: instrucoes || undefined,
+                  });
+                }
+              }}
+            >
+              {designarMutation.isPending ? <Loader2 className="animate-spin mr-2" size={16} /> : null}
+              Confirmar e Enviar ao Campo
+            </Button>
+            <button
+              type="button"
+              className="w-full text-sm text-slate-500 hover:text-slate-700 py-2"
+              onClick={() => {
+                if (designarInstaladorDialog.opId) {
+                  criarSemDesignarMutation.mutate(designarInstaladorDialog.opId);
+                }
+              }}
+            >
+              {criarSemDesignarMutation.isPending ? 'Criando...' : 'Criar sem designar agora'}
+            </button>
+          </div>
+        </SheetContent>
+      </Sheet>
     </div>
   );
 }

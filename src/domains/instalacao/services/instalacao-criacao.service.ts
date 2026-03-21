@@ -1,5 +1,12 @@
 import { supabase } from '@/integrations/supabase/client';
 
+export interface AgendamentoData {
+  equipeId: string;
+  dataAgendada: string;
+  horaPrevista?: string;
+  instrucoes?: string;
+}
+
 async function generateOsNumero(): Promise<string> {
   const year = new Date().getFullYear();
   const { data: ultimo } = await supabase
@@ -19,9 +26,13 @@ async function generateOsNumero(): Promise<string> {
 
 /**
  * Cria uma Ordem de Serviço de Instalação a partir de uma Ordem de Produção liberada.
- * Chamado automaticamente quando todas as etapas de produção são concluídas.
+ * Se agendamento for fornecido, já designa instalador e agenda (status = 'agendada').
+ * Caso contrário, cria com status 'aguardando_agendamento'.
  */
-export async function criarOrdemInstalacao(opId: string): Promise<void> {
+export async function criarOrdemInstalacao(
+  opId: string,
+  agendamento?: AgendamentoData
+): Promise<void> {
   // Fetch OP with pedido and cliente info
   const { data: op, error: opError } = await supabase
     .from('ordens_producao')
@@ -39,13 +50,21 @@ export async function criarOrdemInstalacao(opId: string): Promise<void> {
 
   if (pedidoError || !pedido) throw new Error(`Pedido não encontrado: ${pedidoError?.message}`);
 
-  const { error: osError } = await supabase.from('ordens_instalacao').insert({
+  const insertData: Record<string, unknown> = {
     numero: await generateOsNumero(),
     pedido_id: pedido.id,
     pedido_item_id: op.pedido_item_id ?? null,
     cliente_id: pedido.cliente_id,
-    status: 'aguardando_agendamento',
-  });
+    status: agendamento ? 'agendada' : 'aguardando_agendamento',
+  };
 
+  if (agendamento) {
+    insertData.equipe_id = agendamento.equipeId;
+    insertData.data_agendada = agendamento.dataAgendada;
+    insertData.hora_prevista = agendamento.horaPrevista || null;
+    insertData.instrucoes = agendamento.instrucoes || null;
+  }
+
+  const { error: osError } = await supabase.from('ordens_instalacao').insert(insertData);
   if (osError) throw new Error(`Erro ao criar OS: ${osError.message}`);
 }
