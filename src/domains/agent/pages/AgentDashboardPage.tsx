@@ -184,13 +184,13 @@ export default function AgentDashboardPage() {
           loading={statsLoading}
         />
         <KpiCard
-          title="Aguardando Aprovação"
-          value={stats?.aguardando ?? 0}
+          title="Fila de Aprovação"
+          value={stats?.mensagensPendentes ?? 0}
           icon={<Clock size={22} />}
           color="amber"
           loading={statsLoading}
           onClick={() => navigate('/agente/aprovacao')}
-          subtitle="Clique para revisar"
+          subtitle="Mensagens aguardando revisão"
         />
         <KpiCard
           title="Taxa de Resposta"

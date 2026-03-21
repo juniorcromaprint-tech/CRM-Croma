@@ -28,6 +28,7 @@ export interface AgentStats {
   total: number;
   ativas: number;
   aguardando: number;
+  mensagensPendentes: number;
   convertidas: number;
   encerradas: number;
   totalEnviadas: number;
@@ -89,17 +90,22 @@ export function useAgentStats() {
     queryKey: AGENT_STATS_KEY,
     staleTime: 60 * 1000,
     queryFn: async (): Promise<AgentStats> => {
-      const { data, error } = await supabase
-        .from('agent_conversations')
-        .select(
-          'status, mensagens_enviadas, mensagens_recebidas, score_engajamento'
-        );
+      // Busca conversas e conta mensagens pendentes em paralelo
+      const [convsResult, msgResult] = await Promise.all([
+        supabase
+          .from('agent_conversations')
+          .select('status, mensagens_enviadas, mensagens_recebidas, score_engajamento'),
+        supabase
+          .from('agent_messages')
+          .select('id', { count: 'exact', head: true })
+          .eq('status', 'pendente_aprovacao'),
+      ]);
 
-      if (error) {
-        throw new Error(`Erro ao buscar estatísticas do agente: ${error.message}`);
+      if (convsResult.error) {
+        throw new Error(`Erro ao buscar estatísticas do agente: ${convsResult.error.message}`);
       }
 
-      const rows = (data ?? []) as Pick<
+      const rows = (convsResult.data ?? []) as Pick<
         AgentConversation,
         'status' | 'mensagens_enviadas' | 'mensagens_recebidas' | 'score_engajamento'
       >[];
@@ -107,6 +113,7 @@ export function useAgentStats() {
       const total = rows.length;
       const ativas = rows.filter((r) => r.status === 'ativa').length;
       const aguardando = rows.filter((r) => r.status === 'aguardando_aprovacao').length;
+      const mensagensPendentes = msgResult.count ?? 0;
       const convertidas = rows.filter((r) => r.status === 'convertida').length;
       const encerradas = rows.filter((r) => r.status === 'encerrada').length;
 
@@ -127,6 +134,7 @@ export function useAgentStats() {
         total,
         ativas,
         aguardando,
+        mensagensPendentes,
         convertidas,
         encerradas,
         totalEnviadas,

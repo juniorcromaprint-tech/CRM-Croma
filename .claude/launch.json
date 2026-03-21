@@ -42,6 +42,13 @@
       "runtimeArgs": ["/c", "C:\\Users\\Caldera\\Claude\\CRM-Croma\\.claude\\worktrees\\cranky-booth\\start-dev.cmd"],
       "port": 8087,
       "autoPort": true
+    },
+    {
+      "name": "trusting-chatelet (Vite dev)",
+      "runtimeExecutable": "cmd",
+      "runtimeArgs": ["/c", "C:\\Users\\Caldera\\Claude\\CRM-Croma\\.claude\\worktrees\\trusting-chatelet\\start-dev.cmd"],
+      "port": 8088,
+      "autoPort": true
     }
   ]
 }
