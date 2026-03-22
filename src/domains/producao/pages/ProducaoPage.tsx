@@ -1,6 +1,7 @@
 import React, { useState, useMemo, useCallback, useRef, useEffect, type DragEvent } from "react";
 import { cn } from "@/lib/utils";
 import { useNavigate } from "react-router-dom";
+import { CnhBadge, getCnhStatus } from "@/shared/components/CnhBadge";
 import { ilikeTerm } from "@/shared/utils/searchUtils";
 import { supabase } from "@/integrations/supabase/client";
 import { criarOrdemInstalacao } from "@/domains/instalacao/services/instalacao-criacao.service";
@@ -517,7 +518,7 @@ export default function ProducaoPage() {
     queryFn: async () => {
       const { data } = await (supabase as any)
         .from('profiles')
-        .select('id, first_name, last_name')
+        .select('id, first_name, last_name, cnh_validade, cnh_categoria')
         .eq('role', 'instalador')
         .order('first_name');
       return data ?? [];
@@ -2070,16 +2071,48 @@ export default function ProducaoPage() {
           <div className="space-y-4 mt-6">
             <div>
               <Label>Instalador *</Label>
-              <Select value={selectedInstalador} onValueChange={setSelectedInstalador}>
+              <Select
+                value={selectedInstalador}
+                onValueChange={(val) => {
+                  const inst = instaladores.find((i: any) => i.id === val);
+                  const { status } = getCnhStatus(inst?.cnh_validade);
+                  if (status === 'vencida') return; // bloqueia seleção
+                  setSelectedInstalador(val);
+                }}
+              >
                 <SelectTrigger><SelectValue placeholder="Selecione o instalador" /></SelectTrigger>
                 <SelectContent>
-                  {instaladores.map((inst: any) => (
-                    <SelectItem key={inst.id} value={inst.id}>
-                      {inst.first_name} {inst.last_name}
-                    </SelectItem>
-                  ))}
+                  {instaladores.map((inst: any) => {
+                    const { status } = getCnhStatus(inst.cnh_validade);
+                    const bloqueado = status === 'vencida';
+                    return (
+                      <SelectItem
+                        key={inst.id}
+                        value={inst.id}
+                        disabled={bloqueado}
+                        className={bloqueado ? "opacity-50 cursor-not-allowed" : ""}
+                      >
+                        <span className="flex items-center gap-2 flex-wrap">
+                          <span>{inst.first_name} {inst.last_name}</span>
+                          <CnhBadge cnhValidade={inst.cnh_validade} cnhCategoria={inst.cnh_categoria} />
+                        </span>
+                      </SelectItem>
+                    );
+                  })}
                 </SelectContent>
               </Select>
+              {selectedInstalador && (() => {
+                const inst = instaladores.find((i: any) => i.id === selectedInstalador);
+                const { status } = getCnhStatus(inst?.cnh_validade);
+                if (status === 'vence_em_breve') {
+                  return (
+                    <p className="text-xs text-yellow-700 bg-yellow-50 border border-yellow-200 rounded-lg px-3 py-2 mt-2">
+                      Atenção: A CNH deste instalador vence em breve. Verifique antes de agendar instalações futuras.
+                    </p>
+                  );
+                }
+                return null;
+              })()}
             </div>
             <div>
               <Label>Data agendada *</Label>

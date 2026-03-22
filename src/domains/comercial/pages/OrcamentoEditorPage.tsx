@@ -19,6 +19,7 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Separator } from "@/components/ui/separator";
 import { Badge } from "@/components/ui/badge";
+import { Switch } from "@/components/ui/switch";
 import {
   useOrcamento,
   useCriarOrcamento,
@@ -39,6 +40,7 @@ import AcabamentoSelector from "../components/AcabamentoSelector";
 import ServicoSelector from "../components/ServicoSelector";
 import TemplateSelector from "../components/TemplateSelector";
 import ItemStep3Revisao from "../components/ItemStep3Revisao";
+import UnirItensDialog from "../components/UnirItensDialog";
 import ClienteCombobox from "@/shared/components/ClienteCombobox";
 import type { OrcamentoServicoItem } from "../components/ServicoSelector";
 import type { OrcamentoTemplate } from "../components/TemplateSelector";
@@ -55,7 +57,8 @@ import AISidebar from '@/domains/ai/components/AISidebar';
 import { useAISidebar } from '@/domains/ai/hooks/useAISidebar';
 import { useAnalisarOrcamento } from '@/domains/ai/hooks/useAnalisarOrcamento';
 import { useComposicaoProduto } from '@/domains/ai/hooks/useComposicaoProduto';
-import { useQueryClient } from '@tanstack/react-query';
+import { useQueryClient, useQuery } from '@tanstack/react-query';
+import { supabase } from "@/integrations/supabase/client";
 import type { AIResponse } from '@/domains/ai/types/ai.types';
 
 import type { ItemEditorState } from "../hooks/useItemEditor";
@@ -195,6 +198,9 @@ export default function OrcamentoEditorPage() {
   // ─── Template modal ─────────────────────────────────────────────────────
   const [showTemplateModal, setShowTemplateModal] = useState(false);
 
+  // ─── Unir itens dialog ──────────────────────────────────────────────────
+  const [showUnirDialog, setShowUnirDialog] = useState(false);
+
   // ─── Inline price edit ──────────────────────────────────────────────────
   const [inlineEditId, setInlineEditId] = useState<string | null>(null);
   const [inlinePrice, setInlinePrice] = useState("");
@@ -220,6 +226,26 @@ export default function OrcamentoEditorPage() {
     prazo_dias: [],
   });
 
+  // ─── Comissão externa ────────────────────────────────────────────────────
+  const [comissionadoExternoId, setComissionadoExternoId] = useState<string>("");
+  const [comissaoExternaPct, setComissaoExternaPct] = useState<number>(0);
+  const [absorverComissao, setAbsorverComissao] = useState<boolean>(false);
+  const [showComissaoExterna, setShowComissaoExterna] = useState(false);
+
+  // ─── Profiles para comissionado externo ─────────────────────────────────
+  const { data: profiles = [] } = useQuery({
+    queryKey: ["profiles-comissionado"],
+    queryFn: async () => {
+      const { data } = await supabase
+        .from("profiles")
+        .select("id, full_name, email, role")
+        .eq("ativo", true)
+        .order("full_name");
+      return data ?? [];
+    },
+    staleTime: 5 * 60 * 1000,
+  });
+
   // ─── Pre-fill form when editing ─────────────────────────────────────────
   useEffect(() => {
     if (orcamento) {
@@ -235,6 +261,12 @@ export default function OrcamentoEditorPage() {
         entrada_percentual: (orcamento as any).entrada_percentual || 0,
         prazo_dias: (orcamento as any).prazo_dias || [],
       });
+
+      // Load comissão externa
+      setComissionadoExternoId((orcamento as any).comissionado_externo_id || "");
+      setComissaoExternaPct((orcamento as any).comissao_externa_pct || 0);
+      setAbsorverComissao((orcamento as any).absorver_comissao || false);
+      if ((orcamento as any).comissionado_externo_id) setShowComissaoExterna(true);
 
       // Load existing servicos
       if (orcamento.servicos && orcamento.servicos.length > 0) {
@@ -342,6 +374,9 @@ export default function OrcamentoEditorPage() {
           parcelas_count: paymentConditions.parcelas_count,
           entrada_percentual: paymentConditions.entrada_percentual,
           prazo_dias: paymentConditions.prazo_dias,
+          comissionado_externo_id: comissionadoExternoId || null,
+          comissao_externa_pct: comissaoExternaPct > 0 ? comissaoExternaPct : null,
+          absorver_comissao: absorverComissao,
         } as any,
         version: (orcamento as any)?.version,
       });
@@ -489,6 +524,17 @@ export default function OrcamentoEditorPage() {
     if (!id) return;
     await removerItem.mutateAsync({ itemId, propostaId: id });
     await orcamentoService.recalcularTotais(id);
+  };
+
+  const handleDesagruparGrupo = async (grupoUniao: string) => {
+    if (!id) return;
+    try {
+      await orcamentoService.desagruparItens(grupoUniao);
+      queryClient.invalidateQueries({ queryKey: [ORCAMENTOS_QUERY_KEY, id] });
+      showSuccess("Itens desagrupados com sucesso!");
+    } catch (err: any) {
+      showError(err?.message || "Erro ao desagrupar itens");
+    }
   };
 
   const handleEditItem = (item: any) => {
@@ -809,18 +855,41 @@ export default function OrcamentoEditorPage() {
                   ({orcamentoItens.length} {orcamentoItens.length === 1 ? "item" : "itens"})
                 </span>
               )}
+              {/* Badge de grupos ativos */}
+              {(() => {
+                const gruposAtivos = new Set(
+                  orcamentoItens.filter((i: any) => i.grupo_uniao).map((i: any) => i.grupo_uniao)
+                ).size;
+                return gruposAtivos > 0 ? (
+                  <Badge className="ml-2 text-xs bg-violet-50 text-violet-700 border-violet-200">
+                    {gruposAtivos} grupo{gruposAtivos !== 1 ? "s" : ""}
+                  </Badge>
+                ) : null;
+              })()}
             </CardTitle>
-            <Button
-              variant="outline"
-              size="sm"
-              className="rounded-xl h-9 gap-2"
-              onClick={() => {
-                setShowItemForm((s) => !s);
-                editor.reset();
-              }}
-            >
-              <Plus size={15} /> Adicionar Item
-            </Button>
+            <div className="flex items-center gap-2">
+              {orcamentoItens.length >= 2 && (
+                <Button
+                  variant="outline"
+                  size="sm"
+                  className="rounded-xl h-9 gap-2 text-violet-700 border-violet-200 hover:bg-violet-50"
+                  onClick={() => setShowUnirDialog(true)}
+                >
+                  <Layers size={14} /> Agrupar Itens
+                </Button>
+              )}
+              <Button
+                variant="outline"
+                size="sm"
+                className="rounded-xl h-9 gap-2"
+                onClick={() => {
+                  setShowItemForm((s) => !s);
+                  editor.reset();
+                }}
+              >
+                <Plus size={15} /> Adicionar Item
+              </Button>
+            </div>
           </CardHeader>
           <CardContent className="space-y-4">
             {/* ──── Existing items table ──── */}
@@ -844,6 +913,15 @@ export default function OrcamentoEditorPage() {
                           {item.especificacao && <p className="text-xs text-slate-400 mt-0.5">{item.especificacao}</p>}
                           {item.largura_cm && item.altura_cm && (
                             <p className="text-xs text-slate-400 mt-0.5">{item.largura_cm}x{item.altura_cm}cm</p>
+                          )}
+                          {/* Grupo badge */}
+                          {(item as any).grupo_uniao && (item as any).nome_exibicao && (
+                            <div className="flex items-center gap-1 mt-1">
+                              <Badge variant="secondary" className="text-xs h-5 bg-violet-50 text-violet-700 border-violet-200">
+                                <Layers size={10} className="mr-1" />
+                                {(item as any).item_visivel ? `Grupo: ${(item as any).nome_exibicao}` : "Oculto no portal"}
+                              </Badge>
+                            </div>
                           )}
                           {/* Material/acabamento badges */}
                           {(item.materiais?.length || item.acabamentos?.length) ? (
@@ -894,6 +972,16 @@ export default function OrcamentoEditorPage() {
                         <td className="py-3 px-3 text-right font-semibold text-slate-800 tabular-nums">{brl(item.valor_total)}</td>
                         <td className="py-3 px-3">
                           <div className="flex items-center gap-1">
+                            {(item as any).grupo_uniao && (item as any).item_visivel && (
+                              <Button
+                                variant="ghost" size="icon"
+                                className="h-7 w-7 rounded-lg text-slate-300 hover:text-violet-600 hover:bg-violet-50 opacity-0 group-hover:opacity-100 transition-opacity"
+                                onClick={() => handleDesagruparGrupo((item as any).grupo_uniao)}
+                                title="Desagrupar itens"
+                              >
+                                <Layers size={14} />
+                              </Button>
+                            )}
                             <Button
                               variant="ghost" size="icon"
                               className="h-7 w-7 rounded-lg text-slate-300 hover:text-blue-600 hover:bg-blue-50 opacity-0 group-hover:opacity-100 transition-opacity"
@@ -1256,6 +1344,95 @@ export default function OrcamentoEditorPage() {
         valorTotal={orcamento?.total ?? 0}
       />
 
+      {/* ══════════ COMISSÃO EXTERNA ══════════ */}
+      {!isNew && (
+        <Card className="border border-slate-200 rounded-2xl shadow-sm">
+          <CardHeader className="pb-3">
+            <div className="flex items-center justify-between">
+              <CardTitle className="text-sm font-semibold text-slate-700 flex items-center gap-2">
+                <span className="w-7 h-7 rounded-lg bg-purple-50 flex items-center justify-center">
+                  <span className="text-purple-600 text-xs font-bold">%</span>
+                </span>
+                Comissão Externa
+              </CardTitle>
+              <Switch
+                checked={showComissaoExterna}
+                onCheckedChange={(v) => {
+                  setShowComissaoExterna(v);
+                  if (!v) {
+                    setComissionadoExternoId("");
+                    setComissaoExternaPct(0);
+                    setAbsorverComissao(false);
+                  }
+                }}
+              />
+            </div>
+            {!showComissaoExterna && (
+              <p className="text-xs text-slate-400 mt-1">
+                Ative para vincular um comissionado externo a este orçamento.
+              </p>
+            )}
+          </CardHeader>
+          {showComissaoExterna && (
+            <CardContent className="space-y-4 pt-0">
+              <div>
+                <Label className="text-xs font-semibold text-slate-600">Comissionado Externo</Label>
+                <Select value={comissionadoExternoId || "none"} onValueChange={(v) => setComissionadoExternoId(v === "none" ? "" : v)}>
+                  <SelectTrigger className="mt-1 rounded-xl">
+                    <SelectValue placeholder="Selecione a pessoa..." />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="none">— Nenhum —</SelectItem>
+                    {(profiles as any[]).map((p) => (
+                      <SelectItem key={p.id} value={p.id}>
+                        {p.full_name || p.email}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
+
+              <div>
+                <Label className="text-xs font-semibold text-slate-600">Percentual de Comissão (%)</Label>
+                <Input
+                  type="number"
+                  min={0}
+                  max={100}
+                  step={0.5}
+                  value={comissaoExternaPct}
+                  onChange={(e) => setComissaoExternaPct(Number(e.target.value))}
+                  className="mt-1 rounded-xl"
+                  placeholder="Ex: 5"
+                />
+                {comissaoExternaPct > 0 && (orcamento?.total ?? 0) > 0 && (
+                  <p className="text-xs text-slate-500 mt-1">
+                    Valor da comissão: {brl((orcamento!.total * comissaoExternaPct) / 100)}
+                  </p>
+                )}
+              </div>
+
+              <div className="flex items-start gap-3 bg-orange-50 border border-orange-200 rounded-xl p-3">
+                <Switch
+                  checked={absorverComissao}
+                  onCheckedChange={setAbsorverComissao}
+                  id="absorver-switch"
+                />
+                <div>
+                  <label htmlFor="absorver-switch" className="text-sm font-medium text-slate-700 cursor-pointer">
+                    Absorver comissão
+                  </label>
+                  <p className="text-xs text-slate-500 mt-0.5">
+                    {absorverComissao
+                      ? "A empresa absorve o custo — a comissão NÃO é adicionada ao preço do orçamento."
+                      : "A comissão será adicionada ao valor total do orçamento."}
+                  </p>
+                </div>
+              </div>
+            </CardContent>
+          )}
+        </Card>
+      )}
+
       {/* ══════════ AI RESULTS ══════════ */}
 
       {composicaoResult && (
@@ -1273,6 +1450,19 @@ export default function OrcamentoEditorPage() {
         onClose={() => setShowTemplateModal(false)}
         onSelect={handleTemplateSelect}
       />
+
+      {/* Unir itens dialog */}
+      {id && !isNew && (
+        <UnirItensDialog
+          open={showUnirDialog}
+          onOpenChange={setShowUnirDialog}
+          propostaId={id}
+          itens={orcamentoItens as any}
+          onSuccess={() => {
+            queryClient.invalidateQueries({ queryKey: [ORCAMENTOS_QUERY_KEY, id] });
+          }}
+        />
+      )}
 
       <AISidebar
         isOpen={aiSidebar.isOpen}

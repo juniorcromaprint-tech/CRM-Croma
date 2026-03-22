@@ -39,6 +39,8 @@ interface Comissao {
   status: "gerada" | "aprovada" | "paga" | "cancelada";
   data_pagamento: string | null;
   created_at: string;
+  tipo_comissionado: "interno" | "externo" | null;
+  absorver_comissao: boolean | null;
   profiles: { full_name: string | null; email: string | null } | null;
   pedidos: {
     numero: string | null;
@@ -467,6 +469,7 @@ function TabDetalhamento({
   isLoading: boolean;
 }) {
   const [statusFilter, setStatusFilter] = useState<string>("all");
+  const [tipoFilter, setTipoFilter] = useState<string>("all");
   const [vendedorFilter, setVendedorFilter] = useState<string>("all");
   const [search, setSearch] = useState("");
 
@@ -485,6 +488,10 @@ function TabDetalhamento({
     if (statusFilter !== "all" && c.status !== statusFilter) return false;
     if (vendedorFilter !== "all" && c.vendedor_id !== vendedorFilter)
       return false;
+    if (tipoFilter !== "all") {
+      const tipo = c.tipo_comissionado ?? "interno";
+      if (tipo !== tipoFilter) return false;
+    }
     if (search) {
       const q = search.toLowerCase();
       const nome = (c.profiles?.full_name || "").toLowerCase();
@@ -563,6 +570,16 @@ function TabDetalhamento({
             <SelectItem value="cancelada">Cancelada</SelectItem>
           </SelectContent>
         </Select>
+        <Select value={tipoFilter} onValueChange={setTipoFilter}>
+          <SelectTrigger className="w-36 rounded-xl border-slate-200 bg-white shadow-sm h-10">
+            <SelectValue placeholder="Tipo" />
+          </SelectTrigger>
+          <SelectContent>
+            <SelectItem value="all">Todos tipos</SelectItem>
+            <SelectItem value="interno">Interno</SelectItem>
+            <SelectItem value="externo">Externo</SelectItem>
+          </SelectContent>
+        </Select>
         <Select value={vendedorFilter} onValueChange={setVendedorFilter}>
           <SelectTrigger className="w-48 rounded-xl border-slate-200 bg-white shadow-sm h-10">
             <SelectValue placeholder="Vendedor" />
@@ -598,6 +615,9 @@ function TabDetalhamento({
                   <th className="text-left px-6 py-3 text-xs font-bold text-slate-500 uppercase tracking-wide">
                     Vendedor
                   </th>
+                  <th className="text-center px-3 py-3 text-xs font-bold text-slate-500 uppercase tracking-wide hidden md:table-cell">
+                    Tipo
+                  </th>
                   <th className="text-left px-4 py-3 text-xs font-bold text-slate-500 uppercase tracking-wide hidden md:table-cell">
                     Pedido
                   </th>
@@ -632,9 +652,27 @@ function TabDetalhamento({
                       className="hover:bg-slate-50/60 transition-colors"
                     >
                       <td className="px-6 py-4">
-                        <p className="font-semibold text-slate-800 truncate max-w-[180px]">
-                          {c.profiles?.full_name || "Vendedor"}
-                        </p>
+                        <div className="flex flex-col gap-1">
+                          <p className="font-semibold text-slate-800 truncate max-w-[180px]">
+                            {c.profiles?.full_name || "Vendedor"}
+                          </p>
+                          {c.absorver_comissao && (
+                            <span className="inline-flex w-fit items-center text-xs font-semibold px-2 py-0.5 rounded-full bg-orange-100 text-orange-700 border border-orange-200">
+                              Absorvida
+                            </span>
+                          )}
+                        </div>
+                      </td>
+                      <td className="px-3 py-4 text-center hidden md:table-cell">
+                        {(c.tipo_comissionado ?? "interno") === "externo" ? (
+                          <span className="inline-flex items-center text-xs font-semibold px-2.5 py-1 rounded-full bg-purple-50 text-purple-700 border border-purple-200">
+                            Externo
+                          </span>
+                        ) : (
+                          <span className="inline-flex items-center text-xs font-semibold px-2.5 py-1 rounded-full bg-blue-50 text-blue-700 border border-blue-200">
+                            Interno
+                          </span>
+                        )}
                       </td>
                       <td className="px-4 py-4 hidden md:table-cell">
                         <span className="font-mono text-xs text-slate-400 bg-slate-50 px-2 py-1 rounded-lg">

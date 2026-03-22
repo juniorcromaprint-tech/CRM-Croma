@@ -1,5 +1,6 @@
 import React, { useState, useEffect } from "react";
 import { Save, Loader2, ClipboardList, Calendar, Store, FileText, Hash, User, Check, ChevronsUpDown, Search } from "lucide-react";
+import { getCnhStatus } from "@/shared/components/CnhBadge";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Sheet, SheetContent, SheetHeader, SheetTitle, SheetDescription } from "@/components/ui/sheet";
@@ -53,7 +54,7 @@ export default function JobFormSheet({ isOpen, onClose, jobToEdit, initialStoreI
     queryFn: async () => {
       const { data, error } = await supabase
         .from('profiles')
-        .select('id, first_name, last_name')
+        .select('id, first_name, last_name, cnh_validade, cnh_categoria')
         .eq('role', 'instalador')
         .order('first_name');
       if (error) throw error;
@@ -319,20 +320,58 @@ export default function JobFormSheet({ isOpen, onClose, jobToEdit, initialStoreI
                 <select
                   name="assigned_to"
                   value={formData.assigned_to}
-                  onChange={handleChange}
+                  onChange={(e) => {
+                    const installerId = e.target.value;
+                    if (installerId) {
+                      const installer = installers?.find((i: any) => i.id === installerId);
+                      const { status } = getCnhStatus((installer as any)?.cnh_validade);
+                      if (status === 'vencida') {
+                        showError('Este instalador está com CNH vencida e não pode ser designado.');
+                        return;
+                      }
+                    }
+                    handleChange(e);
+                  }}
                   className="w-full h-11 pl-3 pr-10 rounded-xl border border-slate-200 bg-slate-50 shadow-sm text-sm focus:ring-2 focus:ring-blue-600 focus:border-transparent appearance-none outline-none text-slate-700"
                 >
                   <option value="">Não atribuído</option>
-                  {installers?.map(installer => (
-                    <option key={installer.id} value={installer.id}>
-                      {installer.first_name} {installer.last_name}
-                    </option>
-                  ))}
+                  {installers?.map((installer: any) => {
+                    const { status } = getCnhStatus(installer.cnh_validade);
+                    const bloqueado = status === 'vencida';
+                    const cnhLabel =
+                      status === 'vencida' ? ' ⛔ CNH Vencida' :
+                      status === 'vence_em_breve' ? ' ⚠️ CNH vence em breve' :
+                      status === 'nao_cadastrada' ? ' · CNH não cadastrada' : '';
+                    return (
+                      <option key={installer.id} value={installer.id} disabled={bloqueado}>
+                        {installer.first_name} {installer.last_name}{cnhLabel}
+                      </option>
+                    );
+                  })}
                 </select>
                 <div className="absolute right-3 top-1/2 -translate-y-1/2 pointer-events-none text-slate-400">
                   <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="m6 9 6 6 6-6"/></svg>
                 </div>
               </div>
+              {formData.assigned_to && (() => {
+                const inst = installers?.find((i: any) => i.id === formData.assigned_to);
+                const { status } = getCnhStatus((inst as any)?.cnh_validade);
+                if (status === 'vence_em_breve') {
+                  return (
+                    <p className="text-xs text-yellow-700 bg-yellow-50 border border-yellow-200 rounded-lg px-3 py-2 mt-2">
+                      Atenção: CNH deste instalador vence em breve.
+                    </p>
+                  );
+                }
+                if (status === 'nao_cadastrada') {
+                  return (
+                    <p className="text-xs text-slate-500 bg-slate-50 border border-slate-200 rounded-lg px-3 py-2 mt-2">
+                      CNH não cadastrada para este instalador.
+                    </p>
+                  );
+                }
+                return null;
+              })()}
             </div>
           </div>
 

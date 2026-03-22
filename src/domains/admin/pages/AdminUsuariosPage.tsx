@@ -241,6 +241,9 @@ function TabUsuarios() {
     role: "",
     departamento: "",
     ativo: true,
+    cnh_numero: "",
+    cnh_validade: "",
+    cnh_categoria: "",
   });
 
   // ─── Fetch Users ────────────────────────────────────────────────────────
@@ -350,6 +353,9 @@ function TabUsuarios() {
       role: user.role,
       departamento: user.departamento || "",
       ativo: user.ativo,
+      cnh_numero: (user as any).cnh_numero || "",
+      cnh_validade: (user as any).cnh_validade || "",
+      cnh_categoria: (user as any).cnh_categoria || "",
     });
   };
 
@@ -361,7 +367,10 @@ function TabUsuarios() {
         role: editForm.role,
         departamento: editForm.departamento || null,
         ativo: editForm.ativo,
-      },
+        cnh_numero: editForm.cnh_numero || null,
+        cnh_validade: editForm.cnh_validade || null,
+        cnh_categoria: editForm.cnh_categoria || null,
+      } as any,
     });
   };
 
@@ -661,6 +670,66 @@ function TabUsuarios() {
                   }
                 />
               </div>
+
+              {/* CNH — apenas para instaladores */}
+              {editForm.role === "instalador" && (
+                <div className="space-y-3 pt-2 border-t border-slate-100">
+                  <p className="text-xs font-bold text-slate-500 uppercase tracking-wide">
+                    Habilitação (CNH)
+                  </p>
+                  <div className="grid grid-cols-2 gap-3">
+                    <div>
+                      <Label className="text-xs">Número da CNH</Label>
+                      <Input
+                        value={editForm.cnh_numero}
+                        onChange={(e) => setEditForm({ ...editForm, cnh_numero: e.target.value })}
+                        placeholder="00000000000"
+                        className="rounded-xl mt-1"
+                      />
+                    </div>
+                    <div>
+                      <Label className="text-xs">Categoria</Label>
+                      <Select
+                        value={editForm.cnh_categoria || "none"}
+                        onValueChange={(v) => setEditForm({ ...editForm, cnh_categoria: v === "none" ? "" : v })}
+                      >
+                        <SelectTrigger className="rounded-xl mt-1">
+                          <SelectValue placeholder="Categoria" />
+                        </SelectTrigger>
+                        <SelectContent>
+                          <SelectItem value="none">—</SelectItem>
+                          {["A", "B", "AB", "C", "D", "E"].map((cat) => (
+                            <SelectItem key={cat} value={cat}>{cat}</SelectItem>
+                          ))}
+                        </SelectContent>
+                      </Select>
+                    </div>
+                  </div>
+                  <div>
+                    <Label className="text-xs">Validade da CNH</Label>
+                    <Input
+                      type="date"
+                      value={editForm.cnh_validade}
+                      onChange={(e) => setEditForm({ ...editForm, cnh_validade: e.target.value })}
+                      className="rounded-xl mt-1"
+                    />
+                    {editForm.cnh_validade && (() => {
+                      const hoje = new Date();
+                      hoje.setHours(0, 0, 0, 0);
+                      const val = new Date(editForm.cnh_validade);
+                      val.setHours(0, 0, 0, 0);
+                      const dias = Math.ceil((val.getTime() - hoje.getTime()) / 86400000);
+                      if (dias < 0) {
+                        return <p className="text-xs text-red-600 mt-1">CNH vencida há {Math.abs(dias)} dias.</p>;
+                      }
+                      if (dias <= 30) {
+                        return <p className="text-xs text-yellow-600 mt-1">CNH vence em {dias} dia{dias !== 1 ? "s" : ""}.</p>;
+                      }
+                      return <p className="text-xs text-emerald-600 mt-1">CNH válida por {dias} dias.</p>;
+                    })()}
+                  </div>
+                </div>
+              )}
             </div>
           )}
           <DialogFooter>
