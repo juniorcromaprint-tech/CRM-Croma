@@ -20,6 +20,7 @@ const DadosHubPage = lazy(() => import("@/domains/dados/pages/DadosHubPage"));
 const ImportHistoricoPage = lazy(() => import("@/domains/dados/pages/ImportHistoricoPage"));
 const CatalogoProdutosPage = lazy(() => import("@/domains/admin/pages/CatalogoProdutosPage"));
 const WebhooksPage = lazy(() => import("@/domains/admin/pages/WebhooksPage"));
+const AdminAvisosPage = lazy(() => import("@/domains/admin/pages/AdminAvisosPage"));
 
 export const adminRoutes = (
   <>
@@ -96,6 +97,11 @@ export const adminRoutes = (
     <Route path="admin/webhooks" element={
       <PermissionGuard module="admin" action="ver">
         <LazyPage><WebhooksPage /></LazyPage>
+      </PermissionGuard>
+    } />
+    <Route path="admin/avisos" element={
+      <PermissionGuard module="admin" action="ver">
+        <LazyPage><AdminAvisosPage /></LazyPage>
       </PermissionGuard>
     } />
     <Route path="relatorios" element={<PermissionGuard module="admin" action="ver"><LazyPage><RelatoriosPage /></LazyPage></PermissionGuard>} />

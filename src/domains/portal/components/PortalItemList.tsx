@@ -1,19 +1,103 @@
 // src/domains/portal/components/PortalItemList.tsx
 import { brl } from '@/shared/utils/format';
-import { Package, ChevronRight } from 'lucide-react';
+import { Package, ChevronRight, Layers } from 'lucide-react';
 import type { PortalProposta } from '../services/portal.service';
 import { EscalaPrecos } from '@/domains/comercial/components/EscalaPrecos';
+
+// ─── Types ───────────────────────────────────────────────────────────────────
+
+interface PortalItem {
+  id: string;
+  descricao: string;
+  especificacao: string;
+  quantidade: number;
+  valor_unitario: number;
+  valor_total: number;
+  // União de itens (migration 094) — may be absent on older records
+  grupo_uniao?: string | null;
+  nome_exibicao?: string | null;
+  item_visivel?: boolean | null;
+}
 
 interface Props {
   itens: PortalProposta['itens'];
   onItemClick?: (itemId: string) => void;
 }
 
+// ─── Grouping helpers ─────────────────────────────────────────────────────────
+
+interface DisplayItem {
+  // ID of the "display" item within the group (or the item itself when ungrouped)
+  id: string;
+  descricao: string;
+  especificacao: string;
+  quantidade: number;
+  valor_unitario: number;
+  valor_total: number;
+  isGroup: boolean;
+  // When grouped: the summed total of ALL items in the group
+  grupoTotal?: number;
+  grupoNome?: string;
+  grupoItemCount?: number;
+}
+
+function buildDisplayItems(itens: PortalItem[]): DisplayItem[] {
+  const display: DisplayItem[] = [];
+  const visitedGroups = new Set<string>();
+
+  for (const item of itens) {
+    // Items with item_visivel === false are completely hidden (only shown as part of their group)
+    if (item.item_visivel === false) continue;
+
+    if (item.grupo_uniao) {
+      // Already processed this group — skip
+      if (visitedGroups.has(item.grupo_uniao)) continue;
+      visitedGroups.add(item.grupo_uniao);
+
+      // Sum total of ALL items in this group (including hidden ones)
+      const grupoItens = itens.filter((i) => i.grupo_uniao === item.grupo_uniao);
+      const grupoTotal = grupoItens.reduce((sum, i) => sum + i.valor_total, 0);
+
+      display.push({
+        id: item.id,
+        descricao: item.nome_exibicao ?? item.descricao,
+        especificacao: item.especificacao,
+        quantidade: item.quantidade,
+        valor_unitario: item.valor_unitario,
+        valor_total: item.valor_total,
+        isGroup: true,
+        grupoTotal,
+        grupoNome: item.nome_exibicao ?? undefined,
+        grupoItemCount: grupoItens.length,
+      });
+    } else {
+      // Regular ungrouped item
+      display.push({
+        id: item.id,
+        descricao: item.descricao,
+        especificacao: item.especificacao,
+        quantidade: item.quantidade,
+        valor_unitario: item.valor_unitario,
+        valor_total: item.valor_total,
+        isGroup: false,
+      });
+    }
+  }
+
+  return display;
+}
+
+// ─── Component ───────────────────────────────────────────────────────────────
+
 export function PortalItemList({ itens, onItemClick }: Props) {
   if (!itens?.length) return null;
 
-  // Mostrar escala se há mais de um item (incentivo para aumentar volume)
-  const mostrarEscala = itens.length > 1;
+  const displayItems = buildDisplayItems(itens as PortalItem[]);
+
+  if (!displayItems.length) return null;
+
+  // Mostrar escala se há mais de um item de exibição (incentivo para aumentar volume)
+  const mostrarEscala = displayItems.length > 1;
 
   return (
     <div className="space-y-4">
@@ -21,12 +105,12 @@ export function PortalItemList({ itens, onItemClick }: Props) {
         <Package size={20} className="text-blue-600" />
         <h3 className="text-lg font-semibold text-slate-800">Itens da Proposta</h3>
         <span className="ml-auto text-xs font-medium text-slate-400 bg-slate-100 rounded-full px-2.5 py-1">
-          {itens.length} {itens.length === 1 ? 'item' : 'itens'}
+          {displayItems.length} {displayItems.length === 1 ? 'item' : 'itens'}
         </span>
       </div>
 
       <div className="space-y-3">
-        {itens.map((item, index) => (
+        {displayItems.map((item, index) => (
           <div
             key={item.id}
             className="group bg-white rounded-2xl border border-slate-200 overflow-hidden hover:border-blue-300 hover:shadow-md transition-all duration-200"
@@ -37,8 +121,12 @@ export function PortalItemList({ itens, onItemClick }: Props) {
             >
               <div className="flex items-start gap-4">
                 {/* Number badge */}
-                <div className="flex-shrink-0 w-8 h-8 rounded-lg bg-blue-50 text-blue-600 flex items-center justify-center text-sm font-bold">
-                  {index + 1}
+                <div className={`flex-shrink-0 w-8 h-8 rounded-lg flex items-center justify-center text-sm font-bold ${
+                  item.isGroup
+                    ? 'bg-violet-50 text-violet-600'
+                    : 'bg-blue-50 text-blue-600'
+                }`}>
+                  {item.isGroup ? <Layers size={16} /> : index + 1}
                 </div>
 
                 {/* Content */}
@@ -48,7 +136,13 @@ export function PortalItemList({ itens, onItemClick }: Props) {
                       <p className="font-semibold text-slate-800 group-hover:text-blue-700 transition-colors">
                         {item.descricao}
                       </p>
-                      {item.especificacao && (
+                      {item.isGroup && item.grupoItemCount && item.grupoItemCount > 1 && (
+                        <p className="text-xs text-violet-500 mt-0.5 flex items-center gap-1">
+                          <Layers size={11} />
+                          {item.grupoItemCount} componentes incluídos
+                        </p>
+                      )}
+                      {!item.isGroup && item.especificacao && (
                         <p className="text-sm text-slate-500 mt-1 line-clamp-2">{item.especificacao}</p>
                       )}
                     </div>
@@ -57,18 +151,29 @@ export function PortalItemList({ itens, onItemClick }: Props) {
 
                   {/* Price row */}
                   <div className="flex items-center justify-between mt-3 pt-3 border-t border-slate-100">
-                    <div className="flex items-center gap-4 text-xs text-slate-400">
-                      <span className="bg-slate-50 rounded-md px-2 py-1">Qtd: {item.quantidade}</span>
-                      <span className="bg-slate-50 rounded-md px-2 py-1">Unit: {brl(item.valor_unitario)}</span>
-                    </div>
-                    <p className="text-lg font-bold text-slate-900">{brl(item.valor_total)}</p>
+                    {item.isGroup ? (
+                      // Grouped items: show total of the whole group, no unit price
+                      <div className="flex items-center gap-2 text-xs text-slate-400">
+                        <span className="bg-violet-50 text-violet-600 rounded-md px-2 py-1 font-medium">
+                          Conjunto completo
+                        </span>
+                      </div>
+                    ) : (
+                      <div className="flex items-center gap-4 text-xs text-slate-400">
+                        <span className="bg-slate-50 rounded-md px-2 py-1">Qtd: {item.quantidade}</span>
+                        <span className="bg-slate-50 rounded-md px-2 py-1">Unit: {brl(item.valor_unitario)}</span>
+                      </div>
+                    )}
+                    <p className="text-lg font-bold text-slate-900">
+                      {brl(item.isGroup && item.grupoTotal != null ? item.grupoTotal : item.valor_total)}
+                    </p>
                   </div>
                 </div>
               </div>
             </div>
 
-            {/* Tabela de escala — visível quando há múltiplos itens */}
-            {mostrarEscala && item.valor_unitario > 0 && (
+            {/* Tabela de escala — visível para itens não-agrupados com preço */}
+            {mostrarEscala && !item.isGroup && item.valor_unitario > 0 && (
               <div className="px-5 pb-4">
                 <EscalaPrecos
                   precoUnitarioBase={item.valor_unitario}

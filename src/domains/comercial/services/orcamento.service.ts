@@ -107,6 +107,10 @@ export interface OrcamentoItem {
   valor_total: number;
   prazo_producao_dias: number | null;
   ordem: number;
+  // União de itens (migration 094)
+  grupo_uniao: string | null;
+  nome_exibicao: string | null;
+  item_visivel: boolean;
 }
 
 export interface OrcamentoItemMaterial {
@@ -699,6 +703,43 @@ export const orcamentoService = {
 
     await orcamentoService.recalcularTotais(novaProposta.id);
     return novaProposta;
+  },
+
+  // ─── Agrupar itens sob um nome de exibição único ─────────────────────────
+  // Todos os itemIds recebem o mesmo grupo_uniao (UUID) e nome_exibicao.
+  // Apenas o primeiro item do grupo fica visível; os demais ficam ocultos.
+  async agruparItens(itemIds: string[], nomeExibicao: string): Promise<void> {
+    if (itemIds.length < 2) {
+      throw new Error("Selecione pelo menos 2 itens para agrupar");
+    }
+
+    const grupoUniao = crypto.randomUUID();
+
+    // Primeiro item = item de exibição (item_visivel = true)
+    const [primeiroId, ...restIds] = itemIds;
+
+    const { error: e1 } = await supabase
+      .from("proposta_itens")
+      .update({ grupo_uniao: grupoUniao, nome_exibicao: nomeExibicao, item_visivel: true })
+      .eq("id", primeiroId);
+    if (e1) throw new Error(`Falha ao agrupar item principal: ${e1.message}`);
+
+    if (restIds.length > 0) {
+      const { error: e2 } = await supabase
+        .from("proposta_itens")
+        .update({ grupo_uniao: grupoUniao, nome_exibicao: nomeExibicao, item_visivel: false })
+        .in("id", restIds);
+      if (e2) throw new Error(`Falha ao agrupar itens secundários: ${e2.message}`);
+    }
+  },
+
+  // ─── Desagrupar itens (restaura item_visivel e limpa campos de grupo) ─────
+  async desagruparItens(grupoUniao: string): Promise<void> {
+    const { error } = await supabase
+      .from("proposta_itens")
+      .update({ grupo_uniao: null, nome_exibicao: null, item_visivel: true })
+      .eq("grupo_uniao", grupoUniao);
+    if (error) throw new Error(`Falha ao desagrupar itens: ${error.message}`);
   },
 
   // ─── Converter para pedido ───────────────────────────────────────────────

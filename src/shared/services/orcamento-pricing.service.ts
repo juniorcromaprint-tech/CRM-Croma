@@ -45,6 +45,17 @@ export interface OrcamentoMaquina {
   custo_hora: number;
   custo_m2: number;
   tempo_minutos?: number;
+  /** Depreciação mensal da máquina (gerada pela migration) */
+  depreciacao_mensal?: number | null;
+}
+
+export interface OrcamentoUsinagem {
+  /** Tempo por metro linear em minutos */
+  tempo_metro_linear_min: number;
+  /** Custo por hora da operação CNC */
+  custo_hora_operacao: number;
+  /** Metros lineares a usinar neste item */
+  metros_lineares: number;
 }
 
 export interface OrcamentoItemInput {
@@ -57,6 +68,8 @@ export interface OrcamentoItemInput {
   processos: OrcamentoProcesso[];
   markup_percentual: number;
   maquinas?: OrcamentoMaquina[];
+  /** Dados de usinagem CNC para este item (opcional) */
+  usinagem?: OrcamentoUsinagem[];
 }
 
 export interface OrcamentoItemPricingResult {
@@ -64,6 +77,8 @@ export interface OrcamentoItemPricingResult {
   custosAcabamentos: number;
   custoMO: number;
   custoMaquinas: number;
+  custoDepreciacao: number;
+  custoUsinagem: number;
   custoTotal: number;
   precoUnitario: number;
   precoTotal: number;
@@ -143,16 +158,39 @@ export function calcOrcamentoItem(
     tempoMinutos: p.tempo_minutos + ((p.tempo_setup_min ?? 0) / qtdSafe),
   }));
 
-  // Calcular custo de máquinas
+  // Calcular custo operacional de máquinas (hora + área)
   let custoMaquinasTotal = 0;
+  // Calcular custo de depreciação alocado por item
+  // A depreciação mensal é dividida pelo faturamento médio para obter a taxa por unidade monetária produzida,
+  // depois aplicada proporcionalmente ao custo do item.
+  // Simplificado: somamos a depreciação_mensal de todas as máquinas usadas e aplicamos
+  // uma proporção baseada no tempo de uso desta máquina sobre o total de horas/mês (176h).
+  let custoDepreciacaoTotal = 0;
+
   if (item.maquinas && item.maquinas.length > 0) {
     for (const maq of item.maquinas) {
       // Custo por tempo (custo_hora * tempo em horas)
       const custoTempo = maq.custo_hora * ((maq.tempo_minutos ?? 0) / 60);
       // Custo por área (custo_m2 * área do item)
       const custoArea = maq.custo_m2 * (areaM2 ?? 0);
-      // Usa o maior dos dois (ou a soma se ambos são relevantes)
       custoMaquinasTotal += custoTempo + custoArea;
+
+      // Depreciação: aloca proporcionalmente ao tempo de uso / horas mês (176h = 10560 min)
+      if (maq.depreciacao_mensal && maq.depreciacao_mensal > 0 && (maq.tempo_minutos ?? 0) > 0) {
+        const horasUso = (maq.tempo_minutos ?? 0) / 60;
+        const proporcaoHorasMes = horasUso / 176; // 176h = mês padrão
+        custoDepreciacaoTotal += maq.depreciacao_mensal * proporcaoHorasMes;
+      }
+    }
+  }
+
+  // Calcular custo de usinagem CNC
+  // custo = (tempo_por_metro × metros_lineares / 60) × custo_hora
+  let custoUsinagemTotal = 0;
+  if (item.usinagem && item.usinagem.length > 0) {
+    for (const op of item.usinagem) {
+      const tempHoras = (op.tempo_metro_linear_min * op.metros_lineares) / 60;
+      custoUsinagemTotal += tempHoras * op.custo_hora_operacao;
     }
   }
 
@@ -163,6 +201,8 @@ export function calcOrcamentoItem(
       processos,
       markupPercentual: item.markup_percentual,
       custoMaquinas: custoMaquinasTotal,
+      custoDepreciacao: custoDepreciacaoTotal,
+      custoUsinagem: custoUsinagemTotal,
     },
     config,
   );
@@ -177,6 +217,8 @@ export function calcOrcamentoItem(
     custosAcabamentos: custoAcabamentosInfo,
     custoMO: pricingResult.custoMO,
     custoMaquinas: pricingResult.custoMaquinas,
+    custoDepreciacao: pricingResult.custoDepreciacao,
+    custoUsinagem: pricingResult.custoUsinagem,
     custoTotal: custoTotalUnitario,
     precoUnitario,
     precoTotal,

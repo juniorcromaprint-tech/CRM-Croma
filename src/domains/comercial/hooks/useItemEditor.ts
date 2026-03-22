@@ -105,7 +105,7 @@ export function useItemEditor() {
     return (regraCategoria as any)?.preco_m2_minimo ?? null;
   }, [regraCategoria]);
 
-  // Alerts
+  // Alerts (inclui verificação de emenda de impressão via dimensões do item)
   const alerts = useOrcamentoAlerts({
     materiais: newItem.materiais,
     acabamentos: newItem.acabamentos,
@@ -114,6 +114,8 @@ export function useItemEditor() {
     resultado: pricingResult,
     config,
     precoM2Minimo,
+    larguraCm: newItem.largura_cm,
+    alturaCm: newItem.altura_cm,
   });
 
   // Has blocking alerts (severity === "error" that should block save)

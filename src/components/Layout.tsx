@@ -13,6 +13,7 @@ import {
 } from "@/shared/constants/navigation";
 import CommandPalette from "@/shared/components/CommandPalette";
 import Breadcrumbs from "@/shared/components/Breadcrumbs";
+import AvisosBanner from "@/shared/components/AvisosBanner";
 import { NotificationBadge } from "@/components/NotificationBadge";
 import AIAlertsBadge from '@/domains/ai/components/AIAlertsBadge';
 import EstoqueAlertaBadge from '@/domains/admin/components/EstoqueAlertaBadge';
@@ -522,6 +523,7 @@ export default function Layout() {
       <main className="flex-1 overflow-y-auto print:overflow-visible p-4 md:p-8 pb-24 md:pb-8 print:p-0 relative print:block print:h-auto">
         <div className="max-w-6xl mx-auto print:max-w-none h-full print:h-auto print:block">
           <Breadcrumbs />
+          <AvisosBanner />
           <Outlet />
         </div>
       </main>

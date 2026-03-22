@@ -56,6 +56,10 @@ export interface PricingInput {
   markupPercentual: number;
   /** Custo total de máquinas para este item (já calculado externamente) */
   custoMaquinas?: number;
+  /** Custo adicional de depreciação de máquinas alocado a este item */
+  custoDepreciacao?: number;
+  /** Custo adicional de usinagem CNC para este item */
+  custoUsinagem?: number;
 }
 
 export interface PricingResult {
@@ -96,10 +100,18 @@ export interface PricingResult {
   // Custo de máquinas
   custoMaquinas: number;
 
+  // Custo de depreciação alocado
+  custoDepreciacao: number;
+
+  // Custo de usinagem CNC
+  custoUsinagem: number;
+
   // Breakdown percentual (sobre o preço de venda)
   percMP: number;
   percMO: number;
   percMaquinas: number;
+  percDepreciacao: number;
+  percUsinagem: number;
   percFixo: number;
   percImpostos: number;
   percComissao: number;
@@ -229,18 +241,24 @@ export function calcPricing(
   const percentualVendas = calcPercentualVendas(config);
 
   // =========================================================================
-  // PASSO 5.5: Custo de Máquinas
-  // Passado externamente (calculado por orcamento-pricing.service)
+  // PASSO 5.5: Custo de Máquinas + Depreciação + Usinagem CNC
+  // Passados externamente (calculados por orcamento-pricing.service)
+  //
+  // - custoMaquinas: custo operacional (hora + m²) das máquinas
+  // - custoDepreciacao: parcela da depreciação mensal alocada ao item
+  // - custoUsinagem: custo CNC (tempo × taxa) por metro linear
   // =========================================================================
   const custoMaquinas = input.custoMaquinas ?? 0;
+  const custoDepreciacao = input.custoDepreciacao ?? 0;
+  const custoUsinagem = input.custoUsinagem ?? 0;
 
   // =========================================================================
   // PASSO 6: Custo Base (Vb)
-  // Vb = (Vmp + MO + Máquinas) × (1 + P/100)
+  // Vb = (Vmp + MO + Máquinas + Depreciação + Usinagem) × (1 + P/100)
   //
   // Aplica o percentual de custos fixos sobre os custos diretos
   // =========================================================================
-  const custoBase = (custoMP + custoMO + custoMaquinas) * (1 + percentualFixo / 100);
+  const custoBase = (custoMP + custoMO + custoMaquinas + custoDepreciacao + custoUsinagem) * (1 + percentualFixo / 100);
 
   // =========================================================================
   // PASSO 7: Valor Antes do Markup (Vam)
@@ -289,16 +307,29 @@ export function calcPricing(
   const percMP = (custoMP / pv) * 100;
   const percMO = (custoMO / pv) * 100;
   const percMaquinas = (custoMaquinas / pv) * 100;
+  const percDepreciacao = (custoDepreciacao / pv) * 100;
+  const percUsinagem = (custoUsinagem / pv) * 100;
 
   // Custo fixo rateado no produto
-  const custoFixoNoProduto = (custoMP + custoMO + custoMaquinas) * (percentualFixo / 100);
+  const custoFixoNoProduto =
+    (custoMP + custoMO + custoMaquinas + custoDepreciacao + custoUsinagem) * (percentualFixo / 100);
   const percFixo = (custoFixoNoProduto / pv) * 100;
 
   const percImpostos = config.percentualImpostos;
   const percComissao = config.percentualComissao;
 
   // Margem líquida efetiva
-  const percMargem = 100 - percMP - percMO - percMaquinas - percFixo - percImpostos - percComissao - config.percentualJuros;
+  const percMargem =
+    100 -
+    percMP -
+    percMO -
+    percMaquinas -
+    percDepreciacao -
+    percUsinagem -
+    percFixo -
+    percImpostos -
+    percComissao -
+    config.percentualJuros;
 
   return {
     custoMP,
@@ -315,9 +346,13 @@ export function calcPricing(
     custoTotal,
     lucroEstimado,
     custoMaquinas,
+    custoDepreciacao,
+    custoUsinagem,
     percMP,
     percMO,
     percMaquinas,
+    percDepreciacao,
+    percUsinagem,
     percFixo,
     percImpostos,
     percComissao,

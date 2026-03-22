@@ -5,6 +5,7 @@ import type { OrcamentoMaterial, OrcamentoAcabamento } from "@/shared/services/o
 import type { OrcamentoItemPricingResult } from "@/shared/services/orcamento-pricing.service";
 import type { PricingConfig } from "@/shared/services/pricing-engine";
 import { DEFAULT_PRICING_CONFIG } from "@/shared/services/pricing-engine";
+import { useEmendaAlert } from "./useEmendaAlert";
 
 export type AlertSeverity = "error" | "warning" | "info";
 
@@ -27,6 +28,10 @@ interface UseOrcamentoAlertsParams {
   resultado: OrcamentoItemPricingResult | null;
   config: PricingConfig;
   precoM2Minimo?: number | null;
+  /** Largura do item em cm (para alerta de emenda) */
+  larguraCm?: number | null;
+  /** Altura do item em cm (para alerta de emenda) */
+  alturaCm?: number | null;
 }
 
 export function useOrcamentoAlerts({
@@ -37,7 +42,12 @@ export function useOrcamentoAlerts({
   resultado,
   config,
   precoM2Minimo,
+  larguraCm,
+  alturaCm,
 }: UseOrcamentoAlertsParams): OrcamentoAlert[] {
+  // Alerta de emenda (async, via query — não bloqueia o useMemo)
+  const emenda = useEmendaAlert(larguraCm, alturaCm);
+
   return useMemo(() => {
     const alerts: OrcamentoAlert[] = [];
 
@@ -108,6 +118,31 @@ export function useOrcamentoAlerts({
       });
     }
 
+    // 7. Alerta de emenda de impressão
+    if (emenda.hasEmenda && emenda.maquinaNome) {
+      const areaUtilCm = emenda.areaUtilM != null
+        ? ` (área útil: ${(emenda.areaUtilM * 100).toFixed(0)} cm)`
+        : "";
+      alerts.push({
+        id: "emenda-impressao",
+        severity: "warning",
+        title: "Atenção: emenda na impressão",
+        message: `Este item excede a área útil da máquina ${emenda.maquinaNome}${areaUtilCm}. Haverá emenda na impressão — verifique a viabilidade com a produção.`,
+      });
+    }
+
     return alerts;
-  }, [materiais, acabamentos, markup, markupMinimo, resultado, config, precoM2Minimo]);
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [
+    materiais,
+    acabamentos,
+    markup,
+    markupMinimo,
+    resultado,
+    config,
+    precoM2Minimo,
+    emenda.hasEmenda,
+    emenda.maquinaNome,
+    emenda.areaUtilM,
+  ]);
 }

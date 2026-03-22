@@ -40,6 +40,81 @@ function calcSubtotalItens(
   return itens.reduce((sum, item) => sum + item.valor_total, 0);
 }
 
+// ─── Grouping for PDF ────────────────────────────────────────────────────────
+// Mirrors the same logic as PortalItemList/buildDisplayItems but returns
+// flat rows suitable for the PDF table.
+
+interface PDFItemRow {
+  id: string;
+  descricao: string;
+  especificacao: string | null;
+  quantidade: number;
+  valor_unitario: number;
+  valor_total: number;
+  largura_cm: number | null;
+  altura_cm: number | null;
+  area_m2: number | null | undefined;
+  materiais?: OrcamentoPDFProps["orcamento"]["itens"][number]["materiais"];
+  acabamentos?: OrcamentoPDFProps["orcamento"]["itens"][number]["acabamentos"];
+  isGroup: boolean;
+  grupoTotal?: number;
+  grupoItemCount?: number;
+}
+
+function buildPDFRows(itens: OrcamentoPDFProps["orcamento"]["itens"]): PDFItemRow[] {
+  const rows: PDFItemRow[] = [];
+  const visitedGroups = new Set<string>();
+
+  for (const item of itens) {
+    // Hidden items are folded into their group — not rendered individually
+    if ((item as any).item_visivel === false) continue;
+
+    const grupoUniao: string | null = (item as any).grupo_uniao ?? null;
+    const nomeExibicao: string | null = (item as any).nome_exibicao ?? null;
+
+    if (grupoUniao) {
+      if (visitedGroups.has(grupoUniao)) continue;
+      visitedGroups.add(grupoUniao);
+
+      // Sum total of ALL items in this group
+      const grupoItens = itens.filter((i) => (i as any).grupo_uniao === grupoUniao);
+      const grupoTotal = grupoItens.reduce((sum, i) => sum + i.valor_total, 0);
+
+      rows.push({
+        id: item.id,
+        descricao: nomeExibicao ?? item.descricao,
+        especificacao: null,
+        quantidade: item.quantidade,
+        valor_unitario: item.valor_unitario,
+        valor_total: item.valor_total,
+        largura_cm: item.largura_cm,
+        altura_cm: item.altura_cm,
+        area_m2: item.area_m2,
+        isGroup: true,
+        grupoTotal,
+        grupoItemCount: grupoItens.length,
+      });
+    } else {
+      rows.push({
+        id: item.id,
+        descricao: item.descricao,
+        especificacao: item.especificacao,
+        quantidade: item.quantidade,
+        valor_unitario: item.valor_unitario,
+        valor_total: item.valor_total,
+        largura_cm: item.largura_cm,
+        altura_cm: item.altura_cm,
+        area_m2: item.area_m2,
+        materiais: item.materiais,
+        acabamentos: item.acabamentos,
+        isGroup: false,
+      });
+    }
+  }
+
+  return rows;
+}
+
 function calcSubtotalServicos(servicos: OrcamentoServico[]): number {
   return servicos.reduce((sum, s) => sum + s.valor_total, 0);
 }
@@ -69,6 +144,7 @@ export default function OrcamentoPDF({ orcamento, nomeEmpresa = 'Croma Print Com
     cliente?.nome_fantasia || cliente?.razao_social || cliente_nome_snapshot || "---";
   const clienteCnpj = cliente_cnpj_snapshot || null;
 
+  const pdfRows = buildPDFRows(itens);
   const subtotalItens = calcSubtotalItens(itens);
   const subtotalServicos = calcSubtotalServicos(servicos);
   const hasServicos = servicos.length > 0;
@@ -350,9 +426,9 @@ export default function OrcamentoPDF({ orcamento, nomeEmpresa = 'Croma Print Com
             </tr>
           </thead>
           <tbody>
-            {itens.map((item, idx) => (
+            {pdfRows.map((row, idx) => (
               <tr
-                key={item.id}
+                key={row.id}
                 style={{
                   borderBottom: "1px solid #e2e8f0",
                 }}
@@ -368,26 +444,40 @@ export default function OrcamentoPDF({ orcamento, nomeEmpresa = 'Croma Print Com
                   {idx + 1}
                 </td>
                 <td style={{ padding: "8px", verticalAlign: "top" }}>
-                  <div style={{ fontWeight: 600, color: "#1e293b" }}>
-                    {item.descricao}
+                  <div style={{ fontWeight: 600, color: "#1e293b", display: "flex", alignItems: "center", gap: "4px" }}>
+                    {row.descricao}
+                    {row.isGroup && (
+                      <span style={{
+                        fontSize: "8px",
+                        color: "#7c3aed",
+                        backgroundColor: "#f5f3ff",
+                        border: "1px solid #ddd6fe",
+                        borderRadius: "4px",
+                        padding: "1px 5px",
+                        fontWeight: 600,
+                        marginLeft: "4px",
+                      }}>
+                        {row.grupoItemCount} componentes
+                      </span>
+                    )}
                   </div>
-                  {item.especificacao && (
+                  {!row.isGroup && row.especificacao && (
                     <div style={{ fontSize: "9px", color: "#64748b", marginTop: "1px" }}>
-                      {item.especificacao}
+                      {row.especificacao}
                     </div>
                   )}
-                  {item.largura_cm != null && item.altura_cm != null && (
+                  {!row.isGroup && row.largura_cm != null && row.altura_cm != null && (
                     <div style={{ fontSize: "9px", color: "#94a3b8", marginTop: "1px" }}>
-                      {item.largura_cm} x {item.altura_cm} cm
-                      {item.area_m2 != null && item.area_m2 > 0
-                        ? ` \u00B7 ${item.area_m2.toFixed(2)} m\u00B2`
+                      {row.largura_cm} x {row.altura_cm} cm
+                      {row.area_m2 != null && row.area_m2 > 0
+                        ? ` \u00B7 ${row.area_m2.toFixed(2)} m\u00B2`
                         : ""}
                     </div>
                   )}
-                  {/* Materiais */}
-                  {item.materiais && item.materiais.length > 0 && (
+                  {/* Materiais — apenas itens não agrupados */}
+                  {!row.isGroup && row.materiais && row.materiais.length > 0 && (
                     <div style={{ marginTop: "4px" }}>
-                      {item.materiais.map((mat) => (
+                      {row.materiais.map((mat) => (
                         <div
                           key={mat.id}
                           style={{
@@ -408,10 +498,10 @@ export default function OrcamentoPDF({ orcamento, nomeEmpresa = 'Croma Print Com
                       ))}
                     </div>
                   )}
-                  {/* Acabamentos */}
-                  {item.acabamentos && item.acabamentos.length > 0 && (
+                  {/* Acabamentos — apenas itens não agrupados */}
+                  {!row.isGroup && row.acabamentos && row.acabamentos.length > 0 && (
                     <div style={{ marginTop: "3px" }}>
-                      {item.acabamentos.map((acab) => (
+                      {row.acabamentos.map((acab) => (
                         <div
                           key={acab.id}
                           style={{
@@ -433,6 +523,7 @@ export default function OrcamentoPDF({ orcamento, nomeEmpresa = 'Croma Print Com
                     </div>
                   )}
                 </td>
+                {/* Quantidade e unitário ficam em branco para grupos (preço é o total do conjunto) */}
                 <td
                   style={{
                     padding: "8px",
@@ -442,7 +533,7 @@ export default function OrcamentoPDF({ orcamento, nomeEmpresa = 'Croma Print Com
                     fontVariantNumeric: "tabular-nums",
                   }}
                 >
-                  {item.quantidade}
+                  {row.isGroup ? "—" : row.quantidade}
                 </td>
                 <td
                   style={{
@@ -453,7 +544,7 @@ export default function OrcamentoPDF({ orcamento, nomeEmpresa = 'Croma Print Com
                     fontVariantNumeric: "tabular-nums",
                   }}
                 >
-                  {brl(item.valor_unitario)}
+                  {row.isGroup ? "—" : brl(row.valor_unitario)}
                 </td>
                 <td
                   style={{
@@ -465,11 +556,11 @@ export default function OrcamentoPDF({ orcamento, nomeEmpresa = 'Croma Print Com
                     fontVariantNumeric: "tabular-nums",
                   }}
                 >
-                  {brl(item.valor_total)}
+                  {brl(row.isGroup && row.grupoTotal != null ? row.grupoTotal : row.valor_total)}
                 </td>
               </tr>
             ))}
-            {itens.length === 0 && (
+            {pdfRows.length === 0 && (
               <tr>
                 <td
                   colSpan={5}
