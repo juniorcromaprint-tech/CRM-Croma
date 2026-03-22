@@ -146,26 +146,6 @@ export default function MovimentacoesPage() {
 
   return (
     <div className="space-y-6">
-      {/* Header */}
-      <div className="flex items-start justify-between gap-4">
-        <div>
-          <h1 className="text-2xl font-bold text-slate-800">Movimentações</h1>
-          <p className="text-sm text-slate-400 mt-0.5">
-            Histórico de entradas, saídas e ajustes de estoque
-          </p>
-        </div>
-        <Button
-          variant="outline"
-          size="sm"
-          className="rounded-xl gap-2 shrink-0"
-          onClick={exportarCSV}
-          disabled={movimentacoes.length === 0}
-        >
-          <Download size={14} />
-          Exportar CSV
-        </Button>
-      </div>
-
       {/* Filtros */}
       <div className="flex flex-col sm:flex-row gap-3 flex-wrap">
         {/* Busca por material */}
@@ -252,6 +232,12 @@ export default function MovimentacoesPage() {
             Tabela
           </button>
         </div>
+
+        <Button variant="outline" size="sm" className="rounded-xl gap-2 shrink-0 self-start sm:self-auto"
+          onClick={exportarCSV} disabled={movimentacoes.length === 0}>
+          <Download size={14} />
+          Exportar CSV
+        </Button>
       </div>
 
       {/* Contagem de resultados */}

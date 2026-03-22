@@ -40,3 +40,24 @@ export function useAlertasEstoqueMinimo() {
     refetchInterval: 5 * 60 * 1000,
   });
 }
+
+export function useEstoqueSemaforoPaginado(filtros?: {
+  busca?: string;
+  semaforo?: string;
+  pagina?: number;
+  porPagina?: number;
+}) {
+  return useQuery({
+    queryKey: ["estoque-semaforo-pag", filtros],
+    queryFn: () => estoqueService.listarSemaforoPaginado(filtros),
+    placeholderData: (prev) => prev,
+  });
+}
+
+export function useEstoqueKPIs() {
+  return useQuery({
+    queryKey: ["estoque-kpis"],
+    queryFn: () => estoqueService.buscarKPIs(),
+    staleTime: 30_000,
+  });
+}

@@ -7,8 +7,6 @@ const FornecedoresPage = lazy(() => import("@/domains/compras/pages/Fornecedores
 const PedidosCompraPage = lazy(() => import("@/domains/compras/pages/PedidosCompraPage"));
 const PedidoCompraDetailPage = lazy(() => import("@/domains/compras/pages/PedidoCompraDetailPage"));
 const EstoqueDashboardPage = lazy(() => import("@/domains/estoque/pages/EstoqueDashboardPage"));
-const MovimentacoesPage = lazy(() => import("@/domains/estoque/pages/MovimentacoesPage"));
-const InventarioPage = lazy(() => import("@/domains/estoque/pages/InventarioPage"));
 
 export const suprimentosRoutes = (
   <>
@@ -17,7 +15,7 @@ export const suprimentosRoutes = (
     <Route path="compras/pedidos" element={<PermissionGuard module="compras" action="ver"><LazyPage><PedidosCompraPage /></LazyPage></PermissionGuard>} />
     <Route path="compras/pedidos/:id" element={<PermissionGuard module="compras" action="ver"><LazyPage><PedidoCompraDetailPage /></LazyPage></PermissionGuard>} />
     <Route path="estoque" element={<PermissionGuard module="estoque" action="ver"><LazyPage><EstoqueDashboardPage /></LazyPage></PermissionGuard>} />
-    <Route path="estoque/movimentacoes" element={<PermissionGuard module="estoque" action="ver"><LazyPage><MovimentacoesPage /></LazyPage></PermissionGuard>} />
-    <Route path="estoque/inventario" element={<PermissionGuard module="estoque" action="ver"><LazyPage><InventarioPage /></LazyPage></PermissionGuard>} />
+    <Route path="estoque/movimentacoes" element={<Navigate to="/estoque?tab=movimentacoes" replace />} />
+    <Route path="estoque/inventario" element={<Navigate to="/estoque?tab=inventario" replace />} />
   </>
 );

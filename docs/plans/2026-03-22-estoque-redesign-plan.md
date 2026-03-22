@@ -1,3 +1,179 @@
+# Estoque Redesign — Implementation Plan
+
+> **For Claude:** REQUIRED SUB-SKILL: Use superpowers:executing-plans to implement this plan task-by-task.
+
+**Goal:** Redesign the /estoque page from a card grid (496 cards) to a tabbed DataTable with server-side pagination, KPIs via RPC, and integrated sub-pages.
+
+**Architecture:** Single-page with Tabs (Saldos | Movimentações | Inventário), DataTable with server-side pagination via Supabase `.range()`, KPIs via SQL RPC, Combobox for material selection, collapsible alerts sidebar via Sheet.
+
+**Tech Stack:** React 19, shadcn/ui (Tabs, DataTable, Sheet, Command/Combobox), TanStack Query v5, Supabase RPC, Vitest
+
+---
+
+## Phase 1: Backend (RPC + Paginação)
+
+### Task 1: Migration — RPC `rpc_estoque_kpis`
+
+**Files:**
+- Create: `supabase/migrations/093_estoque_kpis_rpc.sql`
+
+**Step 1: Write the migration SQL**
+
+```sql
+-- 093_estoque_kpis_rpc.sql
+-- RPC para KPIs do estoque — elimina fetch de 500 movimentações no client
+
+CREATE OR REPLACE FUNCTION rpc_estoque_kpis()
+RETURNS JSON
+LANGUAGE sql
+STABLE
+AS $$
+  SELECT json_build_object(
+    'total_materiais', (SELECT COUNT(*) FROM v_estoque_semaforo),
+    'critico', (SELECT COUNT(*) FROM v_estoque_semaforo WHERE semaforo = 'vermelho'),
+    'atencao', (SELECT COUNT(*) FROM v_estoque_semaforo WHERE semaforo = 'amarelo'),
+    'normal', (SELECT COUNT(*) FROM v_estoque_semaforo WHERE semaforo = 'verde'),
+    'entradas_mes', (
+      SELECT COALESCE(SUM(quantidade), 0)
+      FROM estoque_movimentacoes
+      WHERE tipo = 'entrada'
+        AND created_at >= date_trunc('month', now())
+    ),
+    'saidas_mes', (
+      SELECT COALESCE(SUM(quantidade), 0)
+      FROM estoque_movimentacoes
+      WHERE tipo = 'saida'
+        AND created_at >= date_trunc('month', now())
+    )
+  );
+$$;
+```
+
+**Step 2: Apply migration**
+
+Run in Supabase SQL Editor at `supabase.com/dashboard/project/djwjmfgplnqyffdcgdaw/sql`
+
+**Step 3: Test the RPC**
+
+```sql
+SELECT rpc_estoque_kpis();
+```
+
+Expected: JSON object with all 6 fields populated.
+
+**Step 4: Commit**
+
+```bash
+git add supabase/migrations/093_estoque_kpis_rpc.sql
+git commit -m "feat(estoque): RPC rpc_estoque_kpis — server-side KPIs"
+```
+
+---
+
+### Task 2: Paginação server-side no service + hook
+
+**Files:**
+- Modify: `src/domains/estoque/services/estoqueService.ts`
+- Modify: `src/domains/estoque/hooks/useEstoqueSaldos.ts`
+
+**Step 1: Add paginated semaforo + KPIs to estoqueService.ts**
+
+Add these methods after the existing `listarSemaforo`:
+
+```typescript
+// Add to estoqueService object:
+
+async listarSemaforoPaginado(filtros?: {
+  busca?: string;
+  semaforo?: string;
+  pagina?: number;
+  porPagina?: number;
+}) {
+  const pagina = filtros?.pagina ?? 1;
+  const porPagina = filtros?.porPagina ?? 25;
+  const from = (pagina - 1) * porPagina;
+  const to = from + porPagina - 1;
+
+  let q = db.from("v_estoque_semaforo").select("*", { count: "exact" }).order("nome");
+  if (filtros?.busca) q = q.ilike("nome", `%${filtros.busca}%`);
+  if (filtros?.semaforo) q = q.eq("semaforo", filtros.semaforo);
+  q = q.range(from, to);
+
+  const { data, error, count } = await q;
+  if (error) throw error;
+  return { data: data ?? [], total: count ?? 0 };
+},
+
+async buscarKPIs() {
+  const { data, error } = await db.rpc("rpc_estoque_kpis");
+  if (error) throw error;
+  return data as {
+    total_materiais: number;
+    critico: number;
+    atencao: number;
+    normal: number;
+    entradas_mes: number;
+    saidas_mes: number;
+  };
+},
+```
+
+**Step 2: Add paginated hook to useEstoqueSaldos.ts**
+
+Add after existing hooks:
+
+```typescript
+export function useEstoqueSemaforoPaginado(filtros?: {
+  busca?: string;
+  semaforo?: string;
+  pagina?: number;
+  porPagina?: number;
+}) {
+  return useQuery({
+    queryKey: ["estoque-semaforo-pag", filtros],
+    queryFn: () => estoqueService.listarSemaforoPaginado(filtros),
+    placeholderData: (prev) => prev, // keepPreviousData equivalent in v5
+  });
+}
+
+export function useEstoqueKPIs() {
+  return useQuery({
+    queryKey: ["estoque-kpis"],
+    queryFn: () => estoqueService.buscarKPIs(),
+    staleTime: 30_000, // 30s
+  });
+}
+```
+
+**Step 3: Run build to check types**
+
+```bash
+cd C:/Users/Caldera/Claude/CRM-Croma/.claude/worktrees/condescending-bassi && npx vite build 2>&1 | head -30
+```
+
+Expected: No errors related to estoque.
+
+**Step 4: Commit**
+
+```bash
+git add src/domains/estoque/services/estoqueService.ts src/domains/estoque/hooks/useEstoqueSaldos.ts
+git commit -m "feat(estoque): paginated semaforo + KPIs hook via RPC"
+```
+
+---
+
+## Phase 2: UI — Tabs + DataTable
+
+### Task 3: Rewrite EstoqueDashboardPage with Tabs + DataTable
+
+**Files:**
+- Modify: `src/domains/estoque/pages/EstoqueDashboardPage.tsx` (full rewrite)
+
+**Step 1: Rewrite the page**
+
+Replace entire content of `EstoqueDashboardPage.tsx` with:
+
+```tsx
 // src/domains/estoque/pages/EstoqueDashboardPage.tsx
 
 import { useState, useMemo, lazy, Suspense } from "react";
@@ -8,6 +184,7 @@ import {
 import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
+import { Badge } from "@/components/ui/badge";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import {
@@ -99,14 +276,14 @@ export default function EstoqueDashboardPage() {
   });
 
   // Debounce busca 300ms
-  const [debounceTimer, setDebounceTimer] = useState<ReturnType<typeof setTimeout> | null>(null);
+  const debounceRef = useState<ReturnType<typeof setTimeout> | null>(null);
   function handleBusca(value: string) {
     setBusca(value);
-    if (debounceTimer) clearTimeout(debounceTimer);
-    setDebounceTimer(setTimeout(() => {
+    if (debounceRef[0]) clearTimeout(debounceRef[0]);
+    debounceRef[0] = setTimeout(() => {
       setBuscaDebounced(value);
       setPagina(1);
-    }, 300));
+    }, 300);
   }
 
   // Data
@@ -247,7 +424,7 @@ export default function EstoqueDashboardPage() {
           </TabsTrigger>
         </TabsList>
 
-        {/* TAB: SALDOS */}
+        {/* ── TAB: SALDOS ── */}
         <TabsContent value="saldos" className="mt-4 space-y-4">
           {/* Search + Semáforo filters */}
           <div className="flex flex-col sm:flex-row items-start sm:items-center gap-3">
@@ -376,14 +553,14 @@ export default function EstoqueDashboardPage() {
           )}
         </TabsContent>
 
-        {/* TAB: MOVIMENTAÇÕES */}
+        {/* ── TAB: MOVIMENTAÇÕES ── */}
         <TabsContent value="movimentacoes" className="mt-4">
           <Suspense fallback={<div className="flex items-center justify-center p-12 text-slate-400"><Loader2 size={20} className="animate-spin mr-2" />Carregando...</div>}>
             <MovimentacoesPage />
           </Suspense>
         </TabsContent>
 
-        {/* TAB: INVENTÁRIO */}
+        {/* ── TAB: INVENTÁRIO ── */}
         <TabsContent value="inventario" className="mt-4">
           <Suspense fallback={<div className="flex items-center justify-center p-12 text-slate-400"><Loader2 size={20} className="animate-spin mr-2" />Carregando...</div>}>
             <InventarioPage />
@@ -470,3 +647,186 @@ export default function EstoqueDashboardPage() {
     </div>
   );
 }
+```
+
+**Step 2: Run build**
+
+```bash
+cd C:/Users/Caldera/Claude/CRM-Croma/.claude/worktrees/condescending-bassi && npx vite build 2>&1 | tail -20
+```
+
+Expected: Build succeeds.
+
+**Step 3: Commit**
+
+```bash
+git add src/domains/estoque/pages/EstoqueDashboardPage.tsx
+git commit -m "feat(estoque): tabs + DataTable + Combobox + collapsible alerts"
+```
+
+---
+
+### Task 4: Route redirects for sub-pages
+
+**Files:**
+- Modify: `src/routes/suprimentosRoutes.tsx`
+
+**Step 1: Add redirects for deep links**
+
+Replace the estoque route definitions:
+
+```tsx
+// Replace lines 19-21 with:
+<Route path="estoque" element={<PermissionGuard module="estoque" action="ver"><LazyPage><EstoqueDashboardPage /></LazyPage></PermissionGuard>} />
+<Route path="estoque/movimentacoes" element={<Navigate to="/estoque?tab=movimentacoes" replace />} />
+<Route path="estoque/inventario" element={<Navigate to="/estoque?tab=inventario" replace />} />
+```
+
+Add `Navigate` import at top:
+
+```tsx
+import { Route, Navigate } from "react-router-dom";
+```
+
+**Step 2: Commit**
+
+```bash
+git add src/routes/suprimentosRoutes.tsx
+git commit -m "fix(estoque): redirect sub-routes to tabs"
+```
+
+---
+
+### Task 5: Remove duplicate headers from sub-pages
+
+**Files:**
+- Modify: `src/domains/estoque/pages/MovimentacoesPage.tsx`
+- Modify: `src/domains/estoque/pages/InventarioPage.tsx`
+
+When rendered as tabs inside EstoqueDashboardPage, the sub-pages show duplicate headers. Remove the top `<div>` header with h1/subtitle from each, since the parent already has it.
+
+**Step 1: MovimentacoesPage — remove header div (lines 150-167)**
+
+Remove the block:
+```tsx
+{/* Header */}
+<div className="flex items-start justify-between gap-4">
+  <div>
+    <h1 className="text-2xl font-bold text-slate-800">Movimentações</h1>
+    ...
+  </div>
+  ...
+</div>
+```
+
+Keep the Export CSV button, move it to the filter row.
+
+**Step 2: InventarioPage — remove header div (lines 151-166)**
+
+Remove the block:
+```tsx
+{/* Header */}
+<div className="flex items-center justify-between">
+  <div>
+    <h1 className="text-2xl font-bold text-slate-800">Inventários</h1>
+    ...
+  </div>
+  ...
+</div>
+```
+
+Move the "Novo Inventário" button to be inline with the content.
+
+**Step 3: Build and commit**
+
+```bash
+npx vite build 2>&1 | tail -10
+git add src/domains/estoque/pages/MovimentacoesPage.tsx src/domains/estoque/pages/InventarioPage.tsx
+git commit -m "fix(estoque): remove duplicate headers from sub-pages in tab mode"
+```
+
+---
+
+## Phase 3: Polishing
+
+### Task 6: Ensure shadcn components are installed
+
+**Step 1: Check and install required components**
+
+```bash
+cd C:/Users/Caldera/Claude/CRM-Croma/.claude/worktrees/condescending-bassi
+npx shadcn@latest add tabs sheet command popover --yes 2>&1
+```
+
+If components already exist, the CLI will skip them.
+
+**Step 2: Commit any new components**
+
+```bash
+git add src/components/ui/
+git commit -m "chore: add shadcn tabs, sheet, command, popover components"
+```
+
+---
+
+### Task 7: Sidebar menu — sub-items under Estoque
+
+**Files:**
+- Find and modify the sidebar navigation component
+
+**Step 1: Find sidebar file**
+
+```bash
+grep -r "Estoque" src/shared/components/ --include="*.tsx" -l
+```
+
+**Step 2: Remove sub-items for Movimentações/Inventário**
+
+Since these are now tabs, the sidebar should only show "Estoque" as a single link (not expandable). Update accordingly.
+
+**Step 3: Commit**
+
+```bash
+git add <sidebar-file>
+git commit -m "fix(sidebar): estoque is single link, sub-pages are tabs"
+```
+
+---
+
+### Task 8: Final build verification + tests
+
+**Step 1: Full build**
+
+```bash
+cd C:/Users/Caldera/Claude/CRM-Croma/.claude/worktrees/condescending-bassi
+npx vite build
+```
+
+**Step 2: Run existing tests**
+
+```bash
+npx vitest run --reporter=verbose 2>&1 | tail -30
+```
+
+**Step 3: Final commit with all remaining changes**
+
+```bash
+git add -A
+git commit -m "feat(estoque): redesign completo — DataTable, tabs, KPIs RPC, paginação server-side"
+```
+
+---
+
+## Summary
+
+| Task | Description | Est. |
+|------|-------------|------|
+| 1 | Migration RPC `rpc_estoque_kpis` | 10min |
+| 2 | Service + hooks paginação | 15min |
+| 3 | Rewrite dashboard (tabs + DataTable + Combobox + Sheet) | 45min |
+| 4 | Route redirects | 5min |
+| 5 | Remove duplicate headers from sub-pages | 15min |
+| 6 | Install shadcn components | 5min |
+| 7 | Sidebar cleanup | 10min |
+| 8 | Build verification + tests | 10min |
+| **Total** | | **~2h** |

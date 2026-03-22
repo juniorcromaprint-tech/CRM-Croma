@@ -148,18 +148,8 @@ export default function InventarioPage() {
 
   return (
     <div className="space-y-6">
-      {/* Header */}
-      <div className="flex items-center justify-between">
-        <div>
-          <h1 className="text-2xl font-bold text-slate-800">Inventários</h1>
-          <p className="text-sm text-slate-400 mt-0.5">
-            Contagem física e conferência de estoque
-          </p>
-        </div>
-        <Button
-          onClick={() => setNovoOpen(true)}
-          className="bg-blue-600 hover:bg-blue-700 rounded-xl"
-        >
+      <div className="flex justify-end">
+        <Button onClick={() => setNovoOpen(true)} className="bg-blue-600 hover:bg-blue-700 rounded-xl">
           <Plus size={16} className="mr-2" />
           Novo Inventário
         </Button>

@@ -148,4 +148,38 @@ export const estoqueService = {
     if (error) throw error;
     return data ?? [];
   },
+
+  async listarSemaforoPaginado(filtros?: {
+    busca?: string;
+    semaforo?: string;
+    pagina?: number;
+    porPagina?: number;
+  }) {
+    const pagina = filtros?.pagina ?? 1;
+    const porPagina = filtros?.porPagina ?? 25;
+    const from = (pagina - 1) * porPagina;
+    const to = from + porPagina - 1;
+
+    let q = db.from("v_estoque_semaforo").select("*", { count: "exact" }).order("nome");
+    if (filtros?.busca) q = q.ilike("nome", `%${filtros.busca}%`);
+    if (filtros?.semaforo) q = q.eq("semaforo", filtros.semaforo);
+    q = q.range(from, to);
+
+    const { data, error, count } = await q;
+    if (error) throw error;
+    return { data: data ?? [], total: count ?? 0 };
+  },
+
+  async buscarKPIs() {
+    const { data, error } = await db.rpc("rpc_estoque_kpis");
+    if (error) throw error;
+    return data as {
+      total_materiais: number;
+      critico: number;
+      atencao: number;
+      normal: number;
+      entradas_mes: number;
+      saidas_mes: number;
+    };
+  },
 };
