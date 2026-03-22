@@ -1061,6 +1061,36 @@ function TabProdutos() {
     },
   });
 
+  const deleteProdutoMut = useMutation({
+    mutationFn: async (id: string) => {
+      // Verificar vínculos antes de deletar
+      const db = supabase as unknown as any;
+      const { count: propostaCount } = await db
+        .from("proposta_itens")
+        .select("id", { count: "exact", head: true })
+        .eq("produto_id", id);
+      const { count: pedidoCount } = await db
+        .from("pedido_itens")
+        .select("id", { count: "exact", head: true })
+        .eq("produto_id", id);
+
+      if ((propostaCount ?? 0) > 0 || (pedidoCount ?? 0) > 0) {
+        throw new Error(
+          `Produto vinculado a ${propostaCount ?? 0} proposta(s) e ${pedidoCount ?? 0} pedido(s). Desative em vez de excluir.`
+        );
+      }
+
+      const { error } = await db.from("produtos").delete().eq("id", id);
+      if (error) throw error;
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["admin-produtos"] });
+      queryClient.invalidateQueries({ queryKey: ["produtos"] });
+      showSuccess("Produto excluído permanentemente!");
+    },
+    onError: (error: Error) => showError(error.message),
+  });
+
   const filtered = produtos.filter((p) => {
     const q = search.toLowerCase().trim();
     if (!q) return true;
@@ -1210,6 +1240,24 @@ function TabProdutos() {
                             title={produto.ativo ? "Desativar" : "Ativar"}
                           >
                             <PowerOff className="h-3.5 w-3.5" />
+                          </Button>
+                          <Button
+                            size="sm"
+                            variant="ghost"
+                            className="h-7 w-7 p-0 text-slate-300 hover:text-red-600 hover:bg-red-50"
+                            onClick={() => {
+                              if (
+                                window.confirm(
+                                  `Excluir "${produto.nome}" permanentemente?\n\nIsso apagará todos os modelos, materiais e processos vinculados.\n\nSe o produto estiver em propostas/pedidos, será necessário desativá-lo em vez de excluir.`
+                                )
+                              ) {
+                                deleteProdutoMut.mutate(produto.id);
+                              }
+                            }}
+                            disabled={deleteProdutoMut.isPending}
+                            title="Excluir permanentemente"
+                          >
+                            <Trash2 className="h-3.5 w-3.5" />
                           </Button>
                         </div>
                       </td>

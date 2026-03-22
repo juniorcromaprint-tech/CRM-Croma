@@ -18,6 +18,7 @@ import {
   createProduto,
   updateProduto,
   toggleProdutoAtivo,
+  deleteProduto,
   createModelo,
   updateModelo,
   upsertModeloMaterial,
@@ -189,6 +190,23 @@ export function useToggleProdutoAtivo() {
     mutationFn: ({ id, ativo }: { id: string; ativo: boolean }) => toggleProdutoAtivo(id, ativo),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['catalogo', 'produtos'] });
+    },
+    onError: (error: Error) => showError(error.message),
+  });
+}
+
+/**
+ * Exclui um produto permanentemente.
+ * Verifica vínculos com propostas/pedidos antes de deletar.
+ */
+export function useDeleteProduto() {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: (id: string) => deleteProduto(id),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['catalogo', 'produtos'] });
+      queryClient.invalidateQueries({ queryKey: CATALOGO_KEYS.custoCompleto() });
+      showSuccess('Produto excluído permanentemente!');
     },
     onError: (error: Error) => showError(error.message),
   });

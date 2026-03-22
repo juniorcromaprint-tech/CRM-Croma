@@ -145,6 +145,37 @@ export async function toggleProdutoAtivo(id: string, ativo: boolean): Promise<vo
   if (error) throw error;
 }
 
+/**
+ * Exclui um produto e seus modelos (CASCADE).
+ * Verifica se está vinculado a propostas/pedidos antes de deletar.
+ * Se estiver vinculado, lança erro orientando a desativar.
+ */
+export async function deleteProduto(id: string): Promise<void> {
+  // 1. Verificar se tem propostas/pedidos vinculados
+  const { count: propostaCount } = await db
+    .from('proposta_itens')
+    .select('id', { count: 'exact', head: true })
+    .eq('produto_id', id);
+
+  const { count: pedidoCount } = await db
+    .from('pedido_itens')
+    .select('id', { count: 'exact', head: true })
+    .eq('produto_id', id);
+
+  if ((propostaCount ?? 0) > 0 || (pedidoCount ?? 0) > 0) {
+    throw new Error(
+      `Produto vinculado a ${propostaCount ?? 0} proposta(s) e ${pedidoCount ?? 0} pedido(s). Desative o produto em vez de excluir.`
+    );
+  }
+
+  // 2. Deletar (CASCADE remove modelos, modelo_materiais, modelo_processos)
+  const { error } = await db
+    .from('produtos')
+    .delete()
+    .eq('id', id);
+  if (error) throw error;
+}
+
 // ---------------------------------------------------------------------------
 // Modelos
 // ---------------------------------------------------------------------------
