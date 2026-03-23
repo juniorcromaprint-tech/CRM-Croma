@@ -7,6 +7,7 @@ import AISidebar from '@/domains/ai/components/AISidebar';
 import { useAISidebar } from '@/domains/ai/hooks/useAISidebar';
 import { useDetectarProblemas } from '@/domains/ai/hooks/useDetectarProblemas';
 import { ProgressTracker } from "@/shared/components/ProgressTracker";
+import InsightsDiarios from "@/shared/components/InsightsDiarios";
 import {
   Building2, UserPlus, TrendingUp, FileText, Package, Factory,
   Truck, Wallet, DollarSign, AlertTriangle, Wrench,
@@ -325,6 +326,9 @@ export default function DashboardDiretor() {
           </p>
         </div>
       )}
+
+      {/* ─── Insights Diários IA ─── */}
+      <InsightsDiarios />
 
       {/* ─── Hero KPIs — 4 big cards ─── */}
       <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
