@@ -168,6 +168,35 @@ export function useEmitirNFe() {
   });
 }
 
+// ─── AI Validation before emission ──────────────────────────────────────────
+
+export interface NFeValidationItem {
+  campo: string;
+  valor_atual: string | null;
+  valor_sugerido: string | null;
+  motivo: string;
+}
+
+export interface NFeValidationResult {
+  valido: boolean;
+  erros: NFeValidationItem[];
+  avisos: NFeValidationItem[];
+  sugestoes: NFeValidationItem[];
+}
+
+export function useValidarNFe() {
+  return useMutation({
+    mutationFn: async (params: { pedido_id?: string; documento_id?: string }): Promise<NFeValidationResult> => {
+      const { data, error } = await supabase.functions.invoke('ai-validar-nfe', {
+        body: params,
+      });
+      if (error) throw error;
+      return data as NFeValidationResult;
+    },
+    onError: (err: any) => showError(err.message ?? 'Erro na validação'),
+  });
+}
+
 export function useCancelarNFe() {
   const qc = useQueryClient();
   return useMutation({
