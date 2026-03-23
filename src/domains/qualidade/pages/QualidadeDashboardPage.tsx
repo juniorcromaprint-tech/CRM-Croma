@@ -6,10 +6,12 @@ import { useOcorrencias } from "../hooks/useOcorrencias";
 import { QualidadeCharts } from "../components/QualidadeCharts";
 import { formatDate } from "@/shared/utils/format";
 
+import { lazy, Suspense } from "react";
 import { Card, CardContent } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Button } from "@/components/ui/button";
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import {
   AlertTriangle,
   CheckCircle2,
@@ -17,7 +19,10 @@ import {
   Activity,
   ChevronRight,
   Loader2,
+  SmilePlus,
 } from "lucide-react";
+
+const NPSDashboard = lazy(() => import("../components/NPSDashboard"));
 
 // ─── Status badge config ──────────────────────────────────────────────────────
 
@@ -100,6 +105,25 @@ export default function QualidadeDashboardPage() {
         </Button>
       </div>
 
+      {/* Tabs: Ocorrências vs NPS */}
+      <Tabs defaultValue="ocorrencias">
+        <TabsList className="rounded-xl bg-slate-100 p-1">
+          <TabsTrigger value="ocorrencias" className="rounded-lg text-sm data-[state=active]:bg-white data-[state=active]:shadow-sm">
+            Ocorrências
+          </TabsTrigger>
+          <TabsTrigger value="nps" className="rounded-lg text-sm data-[state=active]:bg-white data-[state=active]:shadow-sm gap-1.5">
+            <SmilePlus size={14} />
+            NPS
+          </TabsTrigger>
+        </TabsList>
+
+        <TabsContent value="nps" className="mt-4">
+          <Suspense fallback={<div className="flex items-center justify-center p-12 text-slate-400"><Loader2 size={20} className="animate-spin mr-2" />Carregando...</div>}>
+            <NPSDashboard />
+          </Suspense>
+        </TabsContent>
+
+        <TabsContent value="ocorrencias" className="mt-4 space-y-6">
       {/* KPI Cards */}
       {isLoading ? (
         <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
@@ -217,6 +241,8 @@ export default function QualidadeDashboardPage() {
           </div>
         )}
       </div>
+        </TabsContent>
+      </Tabs>
     </div>
   );
 }
