@@ -61,6 +61,7 @@ const DEFAULT_CONFIG: AgentConfig = {
   modelo_fallback: 'openai/gpt-4.1-mini',
   email_remetente: 'comercial@cromaprint.com.br',
   nome_remetente: 'Croma Print',
+  auto_aprovacao_leads_frios: false,
 };
 
 const CANAIS: { value: AgentCanal; label: string }[] = [
@@ -331,6 +332,28 @@ function TabGeralConfig() {
                   </div>
                 );
               })}
+            </div>
+          </CardContent>
+        </Card>
+
+        {/* Auto-aprovação */}
+        <Card className="rounded-2xl border-none shadow-sm">
+          <CardHeader className="pb-3">
+            <CardTitle className="text-slate-800 text-base">Auto-aprovação</CardTitle>
+            <CardDescription>Enviar mensagens automaticamente sem aprovação manual</CardDescription>
+          </CardHeader>
+          <CardContent>
+            <div className="flex items-center justify-between">
+              <div className="space-y-1">
+                <Label className="text-slate-700 font-medium">Leads frios (score &lt; 50)</Label>
+                <p className="text-xs text-slate-400">
+                  Mensagens para leads com baixo engajamento serão enviadas automaticamente pelo loop do agente
+                </p>
+              </div>
+              <Switch
+                checked={config.auto_aprovacao_leads_frios ?? false}
+                onCheckedChange={(checked) => setConfig((p) => ({ ...p, auto_aprovacao_leads_frios: checked }))}
+              />
             </div>
           </CardContent>
         </Card>

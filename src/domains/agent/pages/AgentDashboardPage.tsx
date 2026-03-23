@@ -21,6 +21,7 @@ import { useAgentConversations, useAgentStats } from '../hooks/useAgentConversat
 import { useRunOrchestrator } from '../hooks/useAgentActions';
 import { useDeleteConversation } from '../hooks/useAgentMessages';
 import LeadDiscoveryDialog from '../components/LeadDiscoveryDialog';
+import WhatsAppStatusCard from '../components/WhatsAppStatusCard';
 import type { AgentConversation, AgentCanal, AgentConversationStatus, AgentEtapa } from '../types/agent.types';
 
 // ─── Badge helpers ───────────────────────────────────────────────────────────
@@ -220,6 +221,9 @@ export default function AgentDashboardPage() {
           loading={statsLoading}
         />
       </div>
+
+      {/* ── WhatsApp Status ──────────────────────────────────────────────── */}
+      <WhatsAppStatusCard />
 
       {/* ── Conversations table ──────────────────────────────────────────── */}
       <div className="bg-white rounded-2xl border border-slate-200 overflow-hidden">

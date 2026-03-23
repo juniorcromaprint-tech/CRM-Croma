@@ -79,6 +79,7 @@ export interface AgentConfig {
   modelo_fallback: string;
   email_remetente: string;
   nome_remetente: string;
+  auto_aprovacao_leads_frios?: boolean;
 }
 
 export interface AgentQualification {
