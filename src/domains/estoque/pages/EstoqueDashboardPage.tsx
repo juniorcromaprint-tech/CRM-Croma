@@ -38,6 +38,7 @@ import type { EstoqueSemaforo, SemaforoStatus } from "../types/estoque.types";
 
 const MovimentacoesPage = lazy(() => import("./MovimentacoesPage"));
 const InventarioPage = lazy(() => import("./InventarioPage"));
+const PrevisaoDemandaPanel = lazy(() => import("../components/PrevisaoDemandaPanel"));
 
 const TIPOS_MOV = [
   { value: "entrada", label: "Entrada" },
@@ -245,6 +246,9 @@ export default function EstoqueDashboardPage() {
           <TabsTrigger value="inventario" className="rounded-lg text-sm data-[state=active]:bg-white data-[state=active]:shadow-sm">
             Inventário
           </TabsTrigger>
+          <TabsTrigger value="previsao" className="rounded-lg text-sm data-[state=active]:bg-white data-[state=active]:shadow-sm">
+            Previsão IA
+          </TabsTrigger>
         </TabsList>
 
         {/* TAB: SALDOS */}
@@ -387,6 +391,13 @@ export default function EstoqueDashboardPage() {
         <TabsContent value="inventario" className="mt-4">
           <Suspense fallback={<div className="flex items-center justify-center p-12 text-slate-400"><Loader2 size={20} className="animate-spin mr-2" />Carregando...</div>}>
             <InventarioPage />
+          </Suspense>
+        </TabsContent>
+
+        {/* TAB: PREVISÃO IA */}
+        <TabsContent value="previsao" className="mt-4">
+          <Suspense fallback={<div className="flex items-center justify-center p-12 text-slate-400"><Loader2 size={20} className="animate-spin mr-2" />Carregando...</div>}>
+            <PrevisaoDemandaPanel />
           </Suspense>
         </TabsContent>
       </Tabs>
