@@ -1,7 +1,7 @@
 import React, { useEffect, useRef } from "react";
 import { useAuth } from "@/contexts/AuthContext";
 import { useAlertasEstoque } from "@/domains/admin/hooks/useAlertasEstoque";
-import { toast } from "sonner";
+import { showWarning } from "@/utils/toast";
 
 // Role-specific dashboards (lazy import for code splitting)
 const DashboardDiretor = React.lazy(() => import("./DashboardDiretor"));
@@ -38,7 +38,7 @@ export default function DashboardPage() {
     if (alertadoRef.current) return;
     if (alertasEstoque.length === 0) return;
     alertadoRef.current = true;
-    toast.warning(
+    showWarning(
       `${alertasEstoque.length} ${alertasEstoque.length === 1 ? 'material abaixo' : 'materiais abaixo'} do estoque mínimo — verificar em Estoque`,
       { duration: 6000 },
     );

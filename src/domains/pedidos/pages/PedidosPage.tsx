@@ -1,8 +1,14 @@
 import React, { useState, useMemo } from "react";
 import { useNavigate } from "react-router-dom";
-import { supabase } from "@/integrations/supabase/client";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { showSuccess, showError } from "@/utils/toast";
+import {
+  fetchPedidos,
+  fetchClientesForSelect,
+  createPedido as createPedidoService,
+  updatePedidoStatus,
+  softDeletePedido,
+} from "@/domains/pedidos/services/pedidoService";
 import { brl, formatDate } from "@/shared/utils/format";
 import {
   PEDIDO_STATUS,
@@ -98,12 +104,6 @@ interface PedidoRow {
     razao_social: string;
   } | null;
   pedido_itens: { count: number }[];
-}
-
-interface ClienteOption {
-  id: string;
-  nome_fantasia: string | null;
-  razao_social: string;
 }
 
 // ---------------------------------------------------------------------------
@@ -245,32 +245,13 @@ export default function PedidosPage() {
   } = useQuery({
     queryKey: ["pedidos"],
     staleTime: 2 * 60 * 1000,
-    queryFn: async () => {
-      const { data, error } = await supabase
-        .from("pedidos")
-        .select("*, status_fiscal, clientes(nome_fantasia, razao_social), pedido_itens(count)")
-        .is("excluido_em", null)
-        .order("created_at", { ascending: false });
-
-      if (error) throw error;
-      return (data ?? []) as unknown as PedidoRow[];
-    },
+    queryFn: fetchPedidos,
   });
 
   const { data: clientes = [] } = useQuery({
     queryKey: ["clientes-select"],
     staleTime: 5 * 60 * 1000,
-    queryFn: async () => {
-      const { data, error } = await supabase
-        .from("clientes")
-        .select("id, nome_fantasia, razao_social")
-        .is("excluido_em", null)
-        .eq("ativo", true)
-        .order("nome_fantasia", { ascending: true });
-
-      if (error) throw error;
-      return (data ?? []) as ClienteOption[];
-    },
+    queryFn: fetchClientesForSelect,
   });
 
   // =========================================================================
@@ -280,24 +261,17 @@ export default function PedidosPage() {
   const createMutation = useMutation({
     mutationFn: async () => {
       const numero = generateNumero();
-      const { data, error } = await supabase
-        .from("pedidos")
-        .insert({
-          numero,
-          cliente_id: formClienteId,
-          status: "rascunho" as PedidoStatus,
-          prioridade: formPrioridade,
-          data_prometida: formDataPrometida || null,
-          observacoes: formObservacoes || null,
-          valor_total: 0,
-          custo_total: 0,
-          margem_real: 0,
-        })
-        .select()
-        .single();
-
-      if (error) throw error;
-      return data;
+      return createPedidoService({
+        numero,
+        cliente_id: formClienteId,
+        status: "rascunho" as PedidoStatus,
+        prioridade: formPrioridade,
+        data_prometida: formDataPrometida || null,
+        observacoes: formObservacoes || null,
+        valor_total: 0,
+        custo_total: 0,
+        margem_real: 0,
+      });
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["pedidos"] });
@@ -318,17 +292,7 @@ export default function PedidosPage() {
       id: string;
       newStatus: PedidoStatus;
     }) => {
-      const updates: Record<string, unknown> = { status: newStatus };
-      if (newStatus === "concluido") {
-        updates.data_conclusao = new Date().toISOString();
-      }
-
-      const { error } = await supabase
-        .from("pedidos")
-        .update(updates)
-        .eq("id", id);
-
-      if (error) throw error;
+      await updatePedidoStatus(id, newStatus);
     },
     onSuccess: (_data, variables) => {
       queryClient.invalidateQueries({ queryKey: ["pedidos"] });
@@ -344,11 +308,7 @@ export default function PedidosPage() {
 
   const deleteMutation = useMutation({
     mutationFn: async (id: string) => {
-      const { error } = await supabase
-        .from("pedidos")
-        .update({ excluido_em: new Date().toISOString(), excluido_por: profile?.id ?? null })
-        .eq("id", id);
-      if (error) throw error;
+      await softDeletePedido(id, profile?.id ?? null);
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["pedidos"] });

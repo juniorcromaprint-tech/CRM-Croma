@@ -64,7 +64,7 @@ export default function OrdemServicoOPPage() {
       root.unmount();
       document.body.removeChild(container);
     } catch (err) {
-      console.error('[PDF OP]', err);
+      // PDF generation failed — loading state handles UX
     } finally {
       setPdfLoading(false);
     }

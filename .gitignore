@@ -43,3 +43,13 @@ Arquivo_ uteis_ para_croma_CRM/
 
 # PWA generated
 dev-dist/
+
+# Junk / temp files
+*.log
+*.csv
+!public/modelo-importacao-leads.csv
+*.xlsx
+*.py
+*.bak
+*.cmd
+!start-dev.cmd

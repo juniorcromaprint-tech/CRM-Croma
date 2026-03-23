@@ -2,7 +2,16 @@ import React, { useState, useMemo } from "react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import { showError, showSuccess } from "@/utils/toast";
-import { gerarContasReceber, gerarParcelas } from "@/domains/financeiro/services/financeiro-automation.service";
+import { gerarContasReceber, gerarParcelas, gerarComissao } from "@/domains/financeiro/services/financeiro-automation.service";
+import {
+  AlertDialog,
+  AlertDialogContent,
+  AlertDialogHeader,
+  AlertDialogTitle,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogCancel,
+} from "@/components/ui/alert-dialog";
 
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
@@ -678,6 +687,10 @@ export default function InstalacaoPage() {
   // Agendamento dialog state
   const [agendamentoDialog, setAgendamentoDialog] = useState<{ open: boolean; ordemId: string | null }>({ open: false, ordemId: null });
 
+  // NF-e verification state
+  const [showConcluirSemNfeDialog, setShowConcluirSemNfeDialog] = useState(false);
+  const [pendingConcluirOs, setPendingConcluirOs] = useState<(typeof ordensErp)[0] | null>(null);
+
   // Realtime global — invalida queries automaticamente
   useCampoRealtimeGlobal();
 
@@ -744,18 +757,37 @@ export default function InstalacaoPage() {
     staleTime: 30_000,
   });
 
+  const executeConcluirInstalacao = async (os: (typeof ordensErp)[0]) => {
+    const { error } = await supabase
+      .from("ordens_instalacao")
+      .update({ status: "concluida" })
+      .eq("id", os.id);
+    if (error) throw error;
+    if (os.pedido_id && os.pedidos?.status === "em_instalacao") {
+      await supabase.from("pedidos").update({ status: "concluido" }).eq("id", os.pedido_id);
+      await gerarContasReceber(os.pedido_id);
+      await gerarParcelas(os.pedido_id);
+      await gerarComissao(os.pedido_id);
+    }
+  };
+
   const concluirInstalacao = useMutation({
     mutationFn: async (os: (typeof ordensErp)[0]) => {
-      const { error } = await supabase
-        .from("ordens_instalacao")
-        .update({ status: "concluida" })
-        .eq("id", os.id);
-      if (error) throw error;
+      // Verify NF-e before completing if there's a linked order
       if (os.pedido_id && os.pedidos?.status === "em_instalacao") {
-        await supabase.from("pedidos").update({ status: "concluido" }).eq("id", os.pedido_id);
-        await gerarContasReceber(os.pedido_id);
-        await gerarParcelas(os.pedido_id);
+        const { data: nfes } = await supabase
+          .from("fiscal_documentos")
+          .select("id")
+          .eq("pedido_id", os.pedido_id)
+          .limit(1);
+
+        if (!nfes || nfes.length === 0) {
+          setPendingConcluirOs(os);
+          setShowConcluirSemNfeDialog(true);
+          return;
+        }
       }
+      await executeConcluirInstalacao(os);
     },
     onSuccess: () => {
       showSuccess("Instalação concluída com sucesso");
@@ -1209,6 +1241,44 @@ export default function InstalacaoPage() {
         onClose={() => setAgendamentoDialog({ open: false, ordemId: null })}
         onConfirm={(data) => agendarMutation.mutate(data)}
       />
+
+      {/* AlertDialog concluir sem NF-e */}
+      <AlertDialog open={showConcluirSemNfeDialog} onOpenChange={setShowConcluirSemNfeDialog}>
+        <AlertDialogContent className="rounded-2xl border-slate-200">
+          <AlertDialogHeader>
+            <AlertDialogTitle className="text-slate-800">
+              Concluir sem Nota Fiscal?
+            </AlertDialogTitle>
+            <AlertDialogDescription className="text-slate-500">
+              Este pedido não possui Nota Fiscal emitida. Deseja concluir a instalação mesmo assim?
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel className="rounded-xl" onClick={() => setPendingConcluirOs(null)}>
+              Cancelar
+            </AlertDialogCancel>
+            <Button
+              onClick={async () => {
+                setShowConcluirSemNfeDialog(false);
+                if (pendingConcluirOs) {
+                  try {
+                    await executeConcluirInstalacao(pendingConcluirOs);
+                    showSuccess("Instalação concluída com sucesso");
+                    queryClient.invalidateQueries({ queryKey: ["ordens-instalacao-erp"] });
+                  } catch {
+                    showError("Erro ao concluir instalação");
+                  } finally {
+                    setPendingConcluirOs(null);
+                  }
+                }
+              }}
+              className="rounded-xl bg-blue-600 hover:bg-blue-700 text-white"
+            >
+              Concluir mesmo assim
+            </Button>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </div>
   );
 }

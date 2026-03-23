@@ -116,7 +116,7 @@ export async function gerarRemessa(
     .insert(items);
 
   if (itemsError) {
-    console.error('Erro ao salvar itens da remessa:', itemsError);
+    throw new Error(`Erro ao salvar itens da remessa: ${itemsError.message}`);
   }
 
   // 8. Atualiza boletos para "remetido"

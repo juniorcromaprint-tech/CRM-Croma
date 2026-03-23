@@ -120,7 +120,7 @@ export default function Settings() {
     queryKey: ['audit-logs'],
     queryFn: async () => {
       const { data, error } = await supabase
-        .from('audit_logs')
+        .from('registros_auditoria')
         .select('*, profiles:user_id(first_name, last_name)')
         .order('created_at', { ascending: false })
         .limit(50);
@@ -256,7 +256,7 @@ export default function Settings() {
             setSyncSuccess(successCount);
           }
         } catch (err) {
-          console.error(`Erro ao sincronizar loja ${store.id}`, err);
+          // silenced — individual store sync failure is non-critical
         }
 
         // Aguarda 1.5 segundos antes da próxima para não ser bloqueado pela API do mapa
@@ -268,7 +268,6 @@ export default function Settings() {
       queryClient.invalidateQueries({ queryKey: ['pending-sync-stores'] });
       queryClient.invalidateQueries({ queryKey: ['stores-map'] });
     } catch (error) {
-      console.error(error);
       showError("Ocorreu um erro ao iniciar a sincronização.");
     } finally {
       setIsSyncing(false);

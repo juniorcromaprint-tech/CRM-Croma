@@ -215,6 +215,17 @@ export interface OrcamentoServicoCreateInput {
   valor_total: number;
 }
 
+// ─── Status Transition Guards ────────────────────────────────────────────────
+
+const PROPOSTA_VALID_TRANSITIONS: Record<string, string[]> = {
+  'rascunho': ['enviada'],
+  'enviada': ['em_revisao', 'aprovada', 'recusada', 'expirada'],
+  'em_revisao': ['enviada', 'aprovada', 'recusada'],
+  'aprovada': [],  // terminal (converts to order)
+  'recusada': ['rascunho'],  // can reopen as draft
+  'expirada': ['rascunho'],  // can reopen as draft
+};
+
 // ─── Service Functions ───────────────────────────────────────────────────────
 
 export const orcamentoService = {
@@ -347,6 +358,28 @@ export const orcamentoService = {
       const statusBloqueados: OrcamentoStatus[] = ["aprovada", "recusada", "expirada"];
       if (statusBloqueados.includes(propostaAtual?.status as OrcamentoStatus)) {
         throw new Error(`Orçamento ${propostaAtual?.status} não pode ser editado`);
+      }
+    }
+
+    // Validate status transition
+    if (estaAlterandoStatus) {
+      const { data: propostaAtual, error: fetchError } = await supabase
+        .from("propostas")
+        .select("status")
+        .eq("id", id)
+        .single();
+
+      if (fetchError) {
+        throw new Error(`Erro ao verificar status atual: ${fetchError.message}`);
+      }
+
+      const currentStatus = propostaAtual?.status as string;
+      const allowed = PROPOSTA_VALID_TRANSITIONS[currentStatus];
+      if (allowed && !allowed.includes(updates.status!)) {
+        throw new Error(
+          `Transição de status inválida: "${currentStatus}" → "${updates.status}". ` +
+          `Transições permitidas: ${allowed.length > 0 ? allowed.join(", ") : "nenhuma (status terminal)"}`
+        );
       }
     }
 

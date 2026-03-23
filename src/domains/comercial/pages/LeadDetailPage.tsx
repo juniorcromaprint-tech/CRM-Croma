@@ -173,7 +173,6 @@ export default function LeadDetailPage() {
 
       await doConvert(cnpjLimpo);
     } catch (err: any) {
-      console.error("[handleConverter] Erro:", err);
       showError(err?.message || "Erro ao converter lead em cliente.");
     }
   };
@@ -196,7 +195,6 @@ export default function LeadDetailPage() {
       showSuccess("Lead convertido! Complete o endereço e IE para emitir NF-e.");
       navigate(`/clientes/${novoCliente.id}`);
     } catch (err: any) {
-      console.error("[handleConverter] Erro:", err);
       showError(err?.message || "Erro ao converter lead em cliente.");
     }
   };

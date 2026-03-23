@@ -30,7 +30,7 @@ export class EstoqueInsuficienteError extends Error {
 /**
  * Reserva materiais para uma Ordem de Produção.
  *
- * 1. Verifica saldo disponível via vw_estoque_disponivel para cada material.
+ * 1. Verifica saldo disponível via estoque_saldos para cada material.
  * 2. Se qualquer material estiver insuficiente, lança EstoqueInsuficienteError
  *    com a lista completa de faltantes — nenhuma reserva é criada.
  * 3. Caso contrário, insere registros em estoque_reservas_op e registra
@@ -44,11 +44,11 @@ export async function reservarMateriais(
 
   const materialIds = materiais.map((m) => m.material_id);
 
-  // Buscar saldo disponível e flag estoque_controlado em paralelo
+  // Buscar saldo disponível (saldo_atual - reservado) e flag estoque_controlado
   const [{ data: saldos, error: saldosErr }, { data: mats }] = await Promise.all([
     (supabase as any)
-      .from('vw_estoque_disponivel')
-      .select('material_id, nome, unidade, disponivel')
+      .from('estoque_saldos')
+      .select('material_id, materiais!inner(nome, unidade), saldo_atual, reservado')
       .in('material_id', materialIds),
     (supabase as any)
       .from('materiais')
@@ -66,10 +66,11 @@ export async function reservarMateriais(
 
   const saldoMap: Record<string, { nome: string; disponivel: number; unidade: string }> = {};
   for (const s of saldos ?? []) {
+    const mat = s.materiais as { nome: string; unidade: string } | null;
     saldoMap[s.material_id] = {
-      nome: s.nome,
-      disponivel: Number(s.disponivel),
-      unidade: s.unidade,
+      nome: mat?.nome ?? '',
+      disponivel: Number(s.saldo_atual ?? 0) - Number(s.reservado ?? 0),
+      unidade: mat?.unidade ?? '',
     };
   }
 

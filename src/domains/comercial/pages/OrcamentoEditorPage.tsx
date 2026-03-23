@@ -48,7 +48,6 @@ import type { RegraPrecificacao } from "@/shared/services/orcamento-pricing.serv
 import { validarDesconto } from "@/shared/services/orcamento-pricing.service";
 import { brl } from "@/shared/utils/format";
 import { showError, showSuccess } from "@/utils/toast";
-import { toast } from "sonner";
 import { orcamentoService } from "../services/orcamento.service";
 import { CondicoesPagamento, type PaymentConditions } from "../components/CondicoesPagamento";
 import AIButton from '@/domains/ai/components/AIButton';
@@ -515,7 +514,6 @@ export default function OrcamentoEditorPage() {
       setShowItemForm(false);
       showSuccess(isEditing ? "Item atualizado!" : "Item adicionado com sucesso!");
     } catch (err: any) {
-      console.error("[handleSaveItem] Falha:", err);
       showError(err?.message || "Erro ao salvar item");
     }
   };

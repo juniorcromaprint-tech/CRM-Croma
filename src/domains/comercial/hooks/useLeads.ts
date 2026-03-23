@@ -83,6 +83,18 @@ export interface LeadStats {
   valorTotal: number;
 }
 
+// ─── Status Transition Guards ────────────────────────────────────────────────
+
+const LEAD_VALID_TRANSITIONS: Record<string, string[]> = {
+  'novo': ['contatado', 'qualificado', 'perdido'],
+  'contatado': ['qualificado', 'proposta_enviada', 'perdido'],
+  'qualificado': ['proposta_enviada', 'negociando', 'perdido'],
+  'proposta_enviada': ['negociando', 'convertido', 'perdido'],
+  'negociando': ['convertido', 'perdido'],
+  'convertido': [],  // terminal
+  'perdido': ['novo'],  // can reopen
+};
+
 // ─── Query Keys ─────────────────────────────────────────────────────────────
 
 const LEADS_KEY = ['comercial', 'leads'] as const;
@@ -218,6 +230,28 @@ export function useUpdateLead() {
 
   return useMutation({
     mutationFn: async ({ id, ...payload }: LeadUpdate): Promise<Lead> => {
+      // Validate status transition if status is being changed
+      if (payload.status) {
+        const { data: current, error: fetchError } = await supabase
+          .from('leads')
+          .select('status')
+          .eq('id', id)
+          .single();
+
+        if (fetchError) {
+          throw new Error(`Erro ao verificar status atual: ${fetchError.message}`);
+        }
+
+        const currentStatus = current?.status as string;
+        const allowed = LEAD_VALID_TRANSITIONS[currentStatus];
+        if (allowed && !allowed.includes(payload.status)) {
+          throw new Error(
+            `Transição de status inválida: "${currentStatus}" → "${payload.status}". ` +
+            `Transições permitidas: ${allowed.length > 0 ? allowed.join(', ') : 'nenhuma (status terminal)'}`
+          );
+        }
+      }
+
       const { data, error } = await supabase
         .from('leads')
         .update(payload)

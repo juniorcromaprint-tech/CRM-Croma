@@ -166,6 +166,5 @@ export async function gerarComissao(pedidoId: string): Promise<void> {
     status: 'gerada',
   });
 
-  if (insErr) console.error('[gerarComissao] Erro:', insErr.message);
   // Não lança erro — comissão é side-effect, não bloqueia o fluxo
 }

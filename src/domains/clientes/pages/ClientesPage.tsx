@@ -1,9 +1,8 @@
 import { useState } from "react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
-import { supabase } from "@/integrations/supabase/client";
 import { showSuccess, showError } from "@/utils/toast";
+import { fetchClientes, createCliente as createClienteService, fetchClienteStats } from "@/domains/clientes/services/clienteService";
 import { formatCNPJ, formatPhone, maskPhone, isValidEmail } from "@/shared/utils/format";
-import { ilikeTerm } from "@/shared/utils/searchUtils";
 import { Link } from "react-router-dom";
 import {
   Building2, Search, Plus, Phone, Mail, MapPin,
@@ -80,25 +79,13 @@ export default function ClientesPage() {
   const { data: clientesResult, isLoading, isError, refetch } = useQuery({
     queryKey: ["clientes", search, segFilter, classFilter, page],
     staleTime: 2 * 60 * 1000,
-    queryFn: async () => {
-      const from = (page - 1) * PAGE_SIZE;
-      const to = from + PAGE_SIZE - 1;
-
-      let query = supabase
-        .from("clientes")
-        .select("*", { count: "exact" })
-        .eq("ativo", true)
-        .order("nome_fantasia", { ascending: true })
-        .range(from, to);
-
-      if (segFilter && segFilter !== "all") query = query.eq("segmento", segFilter);
-      if (classFilter && classFilter !== "all") query = query.eq("classificacao", classFilter);
-      if (search) { const t = ilikeTerm(search); query = query.or(`razao_social.ilike.${t},nome_fantasia.ilike.${t},cnpj.ilike.${t}`); }
-
-      const { data, count, error } = await query;
-      if (error) throw error;
-      return { data: data ?? [], total: count ?? 0 };
-    },
+    queryFn: () => fetchClientes({
+      search,
+      segmento: segFilter,
+      classificacao: classFilter,
+      page,
+      pageSize: PAGE_SIZE,
+    }),
   });
 
   const clientes = clientesResult?.data ?? [];
@@ -118,13 +105,12 @@ export default function ClientesPage() {
   const createCliente = useMutation({
     mutationFn: async (newCliente: typeof form) => {
       const { endereco_cidade, endereco_estado, website, ...rest } = newCliente;
-      const { error } = await supabase.from("clientes").insert({
+      await createClienteService({
         ...rest,
         site: website || null,
         cidade: endereco_cidade,
         estado: endereco_estado,
       });
-      if (error) throw error;
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["clientes"] });
@@ -139,12 +125,7 @@ export default function ClientesPage() {
   const { data: stats } = useQuery({
     queryKey: ["clientes", "stats"],
     staleTime: 2 * 60 * 1000,
-    queryFn: async () => {
-      const { data } = await supabase.from("clientes").select("classificacao, segmento").eq("ativo", true);
-      const byClass: Record<string, number> = {};
-      data?.forEach(c => { byClass[c.classificacao] = (byClass[c.classificacao] || 0) + 1; });
-      return { total: data?.length || 0, byClass };
-    },
+    queryFn: fetchClienteStats,
   });
 
   if (isError) {

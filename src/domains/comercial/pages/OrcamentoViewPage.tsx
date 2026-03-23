@@ -161,7 +161,7 @@ export default function OrcamentoViewPage() {
       root.unmount();
       document.body.removeChild(container);
     } catch (err) {
-      console.error("[PDF]", err);
+      // PDF generation failed — loading state handles UX
     } finally {
       setPdfLoading(false);
     }

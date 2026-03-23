@@ -639,7 +639,6 @@ export default function RelatoriosPage() {
       const { rows } = await gerarRelatorio(relatorio.id, de, ate);
       setPreviewData(buildChartData(relatorio.id, rows));
     } catch (err) {
-      console.error(err);
       showError("Erro ao carregar pré-visualização.");
       setPreviewReport(null);
     } finally {
@@ -671,7 +670,6 @@ export default function RelatoriosPage() {
 
       showSuccess(`Relatório "${relatorio.label}" exportado!`);
     } catch (err) {
-      console.error(err);
       showError("Erro ao gerar relatório. Tente novamente.");
     } finally {
       setLoading((prev) => {

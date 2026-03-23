@@ -22,13 +22,13 @@ export const operacionalRoutes = (
     <Route path="pedidos/:id" element={<PermissionGuard module="pedidos" action="ver"><LazyPage><PedidoDetailPage /></LazyPage></PermissionGuard>} />
     <Route path="os/:pedidoId" element={<PermissionGuard module="pedidos" action="ver"><LazyPage><OrdemServicoPage /></LazyPage></PermissionGuard>} />
     <Route path="os/op/:opId" element={<PermissionGuard module="pedidos" action="ver"><LazyPage><OrdemServicoOPPage /></LazyPage></PermissionGuard>} />
-    <Route path="producao" element={<PermissionGuard module="pedidos" action="ver"><LazyPage><ProducaoPage /></LazyPage></PermissionGuard>} />
-    <Route path="expedicao" element={<PermissionGuard module="pedidos" action="ver"><LazyPage><ExpedicaoPage /></LazyPage></PermissionGuard>} />
-    <Route path="instalacoes" element={<PermissionGuard module="pedidos" action="ver"><LazyPage><InstalacaoPage /></LazyPage></PermissionGuard>} />
-    <Route path="almoxarife" element={<PermissionGuard module="pedidos" action="ver"><LazyPage><AlmoxarifePage /></LazyPage></PermissionGuard>} />
-    <Route path="producao/diario-bordo" element={<PermissionGuard module="pedidos" action="ver"><LazyPage><DiarioBordoPage /></LazyPage></PermissionGuard>} />
-    <Route path="producao/pcp" element={<PermissionGuard module="pedidos" action="ver"><LazyPage><PCPDashboardPage /></LazyPage></PermissionGuard>} />
-    <Route path="producao/setor/:sectorId" element={<PermissionGuard module="pedidos" action="ver"><LazyPage><SectorQueuePage /></LazyPage></PermissionGuard>} />
+    <Route path="producao" element={<PermissionGuard module="producao" action="ver"><LazyPage><ProducaoPage /></LazyPage></PermissionGuard>} />
+    <Route path="expedicao" element={<PermissionGuard module="producao" action="ver"><LazyPage><ExpedicaoPage /></LazyPage></PermissionGuard>} />
+    <Route path="instalacoes" element={<PermissionGuard module="instalacao" action="ver"><LazyPage><InstalacaoPage /></LazyPage></PermissionGuard>} />
+    <Route path="almoxarife" element={<PermissionGuard module="producao" action="ver"><LazyPage><AlmoxarifePage /></LazyPage></PermissionGuard>} />
+    <Route path="producao/diario-bordo" element={<PermissionGuard module="producao" action="ver"><LazyPage><DiarioBordoPage /></LazyPage></PermissionGuard>} />
+    <Route path="producao/pcp" element={<PermissionGuard module="producao" action="ver"><LazyPage><PCPDashboardPage /></LazyPage></PermissionGuard>} />
+    <Route path="producao/setor/:sectorId" element={<PermissionGuard module="producao" action="ver"><LazyPage><SectorQueuePage /></LazyPage></PermissionGuard>} />
     <Route path="produtos" element={<PermissionGuard module="producao" action="ver"><LazyPage><Produtos /></LazyPage></PermissionGuard>} />
   </>
 );

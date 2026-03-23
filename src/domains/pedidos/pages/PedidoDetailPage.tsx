@@ -28,8 +28,8 @@ import { criarOrdemProducao, EstoqueInsuficienteError } from '@/domains/producao
 import { criarNFeFromPedido } from '@/domains/fiscal/services/nfe-creation.service'
 import { gerarContasReceber, gerarParcelas, gerarComissao } from '@/domains/financeiro/services/financeiro-automation.service'
 import { showError, showSuccess } from '@/utils/toast'
-import { supabase } from '@/integrations/supabase/client'
 import { updateWithLock, OptimisticLockError } from '@/shared/utils/optimistic-lock'
+import { fetchOrdensProducao, hasNFeEmitida, createNpsResposta } from '@/domains/pedidos/services/pedidoService'
 
 // Mapa de transições válidas — rejeita saltos de status
 const VALID_TRANSITIONS: Record<string, string[]> = {
@@ -182,18 +182,13 @@ export default function PedidoDetailPage() {
       // 2. Atualizar status com optimistic lock
       await updateWithLock('pedidos', id, { status: 'concluido' }, pedido.version)
       // 3. Criar registro NPS (fire-and-forget)
-      supabase.from('nps_respostas').insert({
-        pedido_id: id,
-        cliente_id: pedido.cliente_id,
-      }).then(() => {
-      });
+      createNpsResposta(id, pedido.cliente_id);
       // 4. Invalidar cache para refletir no UI
       queryClient.invalidateQueries({ queryKey: ['pedidos'] })
       queryClient.invalidateQueries({ queryKey: ['dashboard'] })
       showSuccess('Pedido concluído com sucesso!')
       refetch()
     } catch (err: any) {
-      console.error('[concluirPedido]', err)
       if (err instanceof OptimisticLockError) {
         showError(err.message)
         refetch()
@@ -223,12 +218,9 @@ export default function PedidoDetailPage() {
 
     // Guard: "Em Produção → Produzido" — verificar se todas as OPs estão concluídas
     if (pedido.status === 'em_producao') {
-      const { data: ops } = await supabase
-        .from('ordens_producao')
-        .select('id, status')
-        .eq('pedido_id', id)
+      const ops = await fetchOrdensProducao(id)
 
-      if (!ops || ops.length === 0) {
+      if (ops.length === 0) {
         showError('Nenhuma Ordem de Produção encontrada. Crie as OPs antes de marcar como produzido.')
         return
       }
@@ -242,13 +234,9 @@ export default function PedidoDetailPage() {
 
     // Guard: "Em Instalação → Concluído" — verificar NF-e + gerar contas
     if (action.next === 'concluido') {
-      const { data: nfes } = await supabase
-        .from('fiscal_documentos')
-        .select('id')
-        .eq('pedido_id', id)
-        .limit(1)
+      const temNfe = await hasNFeEmitida(id)
 
-      if (!nfes || nfes.length === 0) {
+      if (!temNfe) {
         setShowConcluirSemNfeDialog(true)
         return
       }

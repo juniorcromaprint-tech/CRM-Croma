@@ -51,7 +51,7 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
           setProfile(data as Profile);
         }
       } catch (error) {
-        console.error('Erro ao buscar perfil:', error);
+        // profile fetch failed — user will see unauthenticated state
       } finally {
         setIsLoading(false);
       }

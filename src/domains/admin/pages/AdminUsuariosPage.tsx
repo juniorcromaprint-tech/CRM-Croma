@@ -794,7 +794,7 @@ function TabPerfis() {
     queryKey: ["admin-role-permissions"],
     queryFn: async () => {
       const { data, error } = await supabase
-        .from("role_permissions")
+        .from("permissoes_perfil")
         .select("*");
       if (error) throw error;
       return data as RolePermission[];
@@ -847,12 +847,12 @@ function TabPerfis() {
     }) => {
       if (grant) {
         const { error } = await supabase
-          .from("role_permissions")
+          .from("permissoes_perfil")
           .insert({ role_id: roleId, permission_id: permissionId });
         if (error) throw error;
       } else {
         const { error } = await supabase
-          .from("role_permissions")
+          .from("permissoes_perfil")
           .delete()
           .eq("role_id", roleId)
           .eq("permission_id", permissionId);

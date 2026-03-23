@@ -40,9 +40,9 @@ async function validateSignature(req: Request, rawBody: string): Promise<boolean
     appSecret = data?.valor ?? null;
   }
   if (!appSecret) {
-    // If secret not configured, skip validation (dev mode)
-    console.warn('whatsapp-webhook: WHATSAPP_APP_SECRET not set — skipping signature check');
-    return true;
+    // If secret not configured, reject all requests — configure WHATSAPP_APP_SECRET to enable webhook
+    console.warn('whatsapp-webhook: WHATSAPP_APP_SECRET not set — rejecting request (configure secret to enable webhook)');
+    return false;
   }
 
   const signature = req.headers.get('x-hub-signature-256');

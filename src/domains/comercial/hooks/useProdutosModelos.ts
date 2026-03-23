@@ -194,8 +194,8 @@ export function useCriarProduto() {
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["produtos"] });
     },
-    onError: (err: Error) => {
-      console.error("Erro ao criar produto:", err);
+    onError: (_err: Error) => {
+      // TanStack Query surfaces this to callers via mutation.error
     },
   });
 }

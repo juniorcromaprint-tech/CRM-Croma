@@ -4,7 +4,7 @@ export async function checklistApplier(action: AIAction, ctx: ApplierContext): P
   const suggested = action.valor_sugerido as { item: string; pedido_id?: string };
 
   const { data, error } = await ctx.supabase
-    .from('checklist_producao')
+    .from('producao_checklist')
     .insert({
       pedido_id: suggested.pedido_id ?? ctx.entityId,
       item: suggested.item,
@@ -20,7 +20,7 @@ export async function checklistApplier(action: AIAction, ctx: ApplierContext): P
     success: true,
     message: `Item de checklist "${suggested.item}" criado`,
     rollback: async () => {
-      if (data?.id) await ctx.supabase.from('checklist_producao').delete().eq('id', data.id);
+      if (data?.id) await ctx.supabase.from('producao_checklist').delete().eq('id', data.id);
     },
   };
 }

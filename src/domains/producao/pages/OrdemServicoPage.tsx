@@ -69,7 +69,7 @@ export default function OrdemServicoPage() {
       root.unmount();
       document.body.removeChild(container);
     } catch (err) {
-      console.error('[PDF OS]', err);
+      // PDF generation failed — loading state handles UX
     } finally {
       setPdfLoading(false);
     }
