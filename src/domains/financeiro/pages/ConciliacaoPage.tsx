@@ -3,7 +3,7 @@
 // Comparação extrato bancário (CSV) vs lançamentos do sistema
 // ============================================================================
 
-import { useState, useEffect, useMemo, useRef, useCallback } from "react";
+import { useState, useEffect, useMemo, useRef, useCallback, lazy, Suspense } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import { showError } from "@/utils/toast";
@@ -11,6 +11,7 @@ import { brl, formatDate } from "@/shared/utils/format";
 
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 
 import {
   ArrowLeftRight,
@@ -19,7 +20,11 @@ import {
   CheckCircle2,
   XCircle,
   Minus,
+  Loader2,
+  Zap,
 } from "lucide-react";
+
+const ConciliacaoIA = lazy(() => import("../components/ConciliacaoIA"));
 
 // ─── Types ───────────────────────────────────────────────────────────────────
 
@@ -434,6 +439,25 @@ export default function ConciliacaoPage() {
         </div>
       </div>
 
+      {/* ─── Tabs: Manual vs IA ────────────────────────────────────────── */}
+      <Tabs defaultValue="ia" className="space-y-4">
+        <TabsList className="rounded-xl bg-slate-100 p-1">
+          <TabsTrigger value="ia" className="rounded-lg text-sm data-[state=active]:bg-white data-[state=active]:shadow-sm gap-1.5">
+            <Zap size={14} />
+            Conciliação IA
+          </TabsTrigger>
+          <TabsTrigger value="manual" className="rounded-lg text-sm data-[state=active]:bg-white data-[state=active]:shadow-sm">
+            Manual (CSV)
+          </TabsTrigger>
+        </TabsList>
+
+        <TabsContent value="ia">
+          <Suspense fallback={<div className="flex items-center justify-center p-12 text-slate-400"><Loader2 size={20} className="animate-spin mr-2" />Carregando...</div>}>
+            <ConciliacaoIA />
+          </Suspense>
+        </TabsContent>
+
+        <TabsContent value="manual" className="space-y-6">
       {/* ─── Summary Cards ───────────────────────────────────────────────── */}
       <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
         <SummaryCard
@@ -584,6 +608,8 @@ export default function ConciliacaoPage() {
           )}
         </div>
       </div>
+        </TabsContent>
+      </Tabs>
     </div>
   );
 }
