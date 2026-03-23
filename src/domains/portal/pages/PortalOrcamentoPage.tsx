@@ -13,6 +13,7 @@ import { PortalConfirmation } from '../components/PortalConfirmation';
 import { PortalFooter } from '../components/PortalFooter';
 import { CondicoesPagamentoView } from '@/domains/comercial/components/CondicoesPagamentoView';
 import PortalPixInfo from '../components/PortalPixInfo';
+import PortalChat from '../components/PortalChat';
 
 export default function PortalOrcamentoPage() {
   const { token } = useParams<{ token: string }>();
@@ -162,6 +163,9 @@ export default function PortalOrcamentoPage() {
       </main>
 
       <PortalFooter />
+
+      {/* Chat IA flutuante */}
+      {token && <PortalChat shareToken={token} />}
     </div>
   );
 }
