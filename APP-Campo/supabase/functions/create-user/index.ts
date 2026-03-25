@@ -52,10 +52,15 @@ serve(async (req) => {
 
     if (createError) throw createError
 
-    // Atualiza o cargo se for admin (a trigger do banco já cria o perfil como 'instalador' por padrão)
-    if (role === 'admin') {
-      await supabaseAdmin.from('profiles').update({ role: 'admin' }).eq('id', newUser.user.id)
-    }
+    // Upsert do perfil com nome + cargo (trigger pode não copiar user_metadata corretamente)
+    const fullName = `${firstName} ${lastName || ''}`.trim()
+    await supabaseAdmin.from('profiles').upsert({
+      id: newUser.user.id,
+      first_name: firstName,
+      last_name: lastName || null,
+      full_name: fullName,
+      role: role === 'admin' ? 'admin' : 'instalador',
+    })
 
     console.log("[create-user] User created successfully", { userId: newUser.user.id })
 

@@ -17,6 +17,7 @@ serve(async (req) => {
       return new Response('Unauthorized', { status: 401, headers: corsHeaders })
     }
 
+    // Verifica se quem está fazendo a requisição é um admin
     const supabaseClient = createClient(
       Deno.env.get('SUPABASE_URL') ?? '',
       Deno.env.get('SUPABASE_ANON_KEY') ?? '',
@@ -32,6 +33,7 @@ serve(async (req) => {
     const { jobId } = await req.json()
     if (!jobId) throw new Error('jobId é obrigatório')
 
+    // Admin client para contornar RLS
     const supabaseAdmin = createClient(
       Deno.env.get('SUPABASE_URL') ?? '',
       Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') ?? ''
@@ -39,6 +41,7 @@ serve(async (req) => {
 
     const extractFileName = (url: string) => url.split('/').pop() || ''
 
+    // Busca arquivos vinculados para limpar o storage
     const [photosResult, videosResult] = await Promise.all([
       supabaseAdmin.from('job_photos').select('photo_url').eq('job_id', jobId),
       supabaseAdmin.from('job_videos').select('video_url').eq('job_id', jobId),
@@ -49,12 +52,14 @@ serve(async (req) => {
         photosResult.data.map(p => extractFileName(p.photo_url))
       )
     }
+
     if (videosResult.data && videosResult.data.length > 0) {
       await supabaseAdmin.storage.from('job_videos').remove(
         videosResult.data.map(v => extractFileName(v.video_url))
       )
     }
 
+    // Deleta a OS (cascade remove job_photos, job_videos, etc.)
     const { error } = await supabaseAdmin.from('jobs').delete().eq('id', jobId)
     if (error) throw error
 
