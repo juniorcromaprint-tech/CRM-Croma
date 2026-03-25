@@ -1,4 +1,5 @@
 import React, { useState, useMemo } from "react";
+import { Link } from "react-router-dom";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import { showError, showSuccess } from "@/utils/toast";
@@ -503,10 +504,18 @@ function DetalhesSheet({
     <Sheet open={open} onOpenChange={(v) => !v && onClose()}>
       <SheetContent className="w-full sm:max-w-lg overflow-y-auto">
         <SheetHeader className="mb-6">
-          <SheetTitle className="flex items-center gap-2">
-            <Wrench size={20} className="text-orange-600" />
-            {job.os_number}
-          </SheetTitle>
+          <div className="flex items-center justify-between gap-2">
+            <SheetTitle className="flex items-center gap-2">
+              <Wrench size={20} className="text-orange-600" />
+              {job.os_number}
+            </SheetTitle>
+            <Link
+              to={`/instalacoes/${job.job_id}`}
+              className="text-xs text-blue-600 hover:text-blue-700 hover:underline shrink-0"
+            >
+              Abrir página completa →
+            </Link>
+          </div>
           <div className="flex items-center gap-2 flex-wrap">
             <StatusBadge status={job.status_campo} />
             <span className="text-xs text-slate-400 uppercase tracking-wide">

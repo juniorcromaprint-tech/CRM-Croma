@@ -7,6 +7,7 @@ const PedidosPage = lazy(() => import("@/domains/pedidos/pages/PedidosPage"));
 const PedidoDetailPage = lazy(() => import("@/domains/pedidos/pages/PedidoDetailPage"));
 const ProducaoPage = lazy(() => import("@/domains/producao/pages/ProducaoPage"));
 const InstalacaoPage = lazy(() => import("@/domains/instalacao/pages/InstalacaoPage"));
+const InstalacaoDetailPage = lazy(() => import("@/domains/instalacao/pages/InstalacaoDetailPage"));
 const AlmoxarifePage = lazy(() => import("@/domains/producao/pages/AlmoxarifePage"));
 const DiarioBordoPage = lazy(() => import("@/domains/producao/pages/DiarioBordoPage"));
 const Produtos = lazy(() => import("@/pages/Produtos"));
@@ -25,6 +26,7 @@ export const operacionalRoutes = (
     <Route path="producao" element={<PermissionGuard module="producao" action="ver"><LazyPage><ProducaoPage /></LazyPage></PermissionGuard>} />
     <Route path="expedicao" element={<PermissionGuard module="producao" action="ver"><LazyPage><ExpedicaoPage /></LazyPage></PermissionGuard>} />
     <Route path="instalacoes" element={<PermissionGuard module="instalacao" action="ver"><LazyPage><InstalacaoPage /></LazyPage></PermissionGuard>} />
+    <Route path="instalacoes/:jobId" element={<PermissionGuard module="instalacao" action="ver"><LazyPage><InstalacaoDetailPage /></LazyPage></PermissionGuard>} />
     <Route path="almoxarife" element={<PermissionGuard module="producao" action="ver"><LazyPage><AlmoxarifePage /></LazyPage></PermissionGuard>} />
     <Route path="producao/diario-bordo" element={<PermissionGuard module="producao" action="ver"><LazyPage><DiarioBordoPage /></LazyPage></PermissionGuard>} />
     <Route path="producao/pcp" element={<PermissionGuard module="producao" action="ver"><LazyPage><PCPDashboardPage /></LazyPage></PermissionGuard>} />

@@ -18,6 +18,7 @@ const Settings = lazy(() => import("@/pages/Settings"));
 const AdminMaquinasPage = lazy(() => import("@/domains/admin/pages/AdminMaquinasPage"));
 const DadosHubPage = lazy(() => import("@/domains/dados/pages/DadosHubPage"));
 const ImportHistoricoPage = lazy(() => import("@/domains/dados/pages/ImportHistoricoPage"));
+const ImportEntityPage = lazy(() => import("@/domains/dados/pages/ImportEntityPage"));
 const CatalogoProdutosPage = lazy(() => import("@/domains/admin/pages/CatalogoProdutosPage"));
 const WebhooksPage = lazy(() => import("@/domains/admin/pages/WebhooksPage"));
 const AdminAvisosPage = lazy(() => import("@/domains/admin/pages/AdminAvisosPage"));
@@ -87,6 +88,11 @@ export const adminRoutes = (
     <Route path="admin/dados/historico" element={
       <PermissionGuard module="admin" action="ver">
         <LazyPage><ImportHistoricoPage /></LazyPage>
+      </PermissionGuard>
+    } />
+    <Route path="admin/dados/importar/:entityKey" element={
+      <PermissionGuard module="admin" action="ver">
+        <LazyPage><ImportEntityPage /></LazyPage>
       </PermissionGuard>
     } />
     <Route path="admin/catalogo" element={

@@ -16,6 +16,18 @@
 
 **IMPORTANTE**: O projeto roda em `C:\Users\Caldera\Claude\CRM-Croma`. Não usar caminhos antigos (`dyad-apps\instalações`).
 
+### Dev Server Local (preview_start)
+
+O script `start-dev.cmd` na raiz do repo:
+- Faz `cd` automático para seu próprio diretório (funciona em main repo e worktrees)
+- Cria `.env` automaticamente se não existir
+- Usa o `vite` do `node_modules` do repo principal
+
+**Ao criar um novo worktree**, atualizar `.claude/launch.json` do worktree para apontar para o `start-dev.cmd` do próprio worktree:
+```json
+"runtimeArgs": ["/c", "C:\\Users\\Caldera\\Claude\\CRM-Croma\\.claude\\worktrees\\<NOME-DO-WORKTREE>\\start-dev.cmd"]
+```
+
 ---
 
 ## EMPRESA
@@ -24,9 +36,88 @@
 |---|---|
 | **Nome** | Croma Print Comunicação Visual |
 | **Segmento** | Comunicação visual profissional para varejo e indústria |
-| **Localização** | Brasil |
+| **Localização** | Rio Grande do Sul, Brasil |
 | **Especialização** | Redes de lojas, franquias, fabricantes de calçados, grandes varejistas |
 | **Diferenciais** | Produção própria, atendimento nacional, padronização de redes |
+| **Faturamento médio** | R$ 110.000/mês |
+| **Custo operacional** | R$ 36.800/mês |
+| **Equipe de produção** | 6 funcionários |
+
+### Produtos fabricados
+- Fachadas em ACM (Alumínio Composto)
+- Banners e impressão digital grande formato
+- Material PDV (Ponto de Venda)
+- Envelopamento veicular
+- Letreiros e sinalização
+- Placas e totens
+
+### Clientes de referência
+Redes de lojas, franquias e grandes varejistas: **Beira Rio, Renner, Paquetá**, entre outros.
+
+### Dono / Contato Principal
+| Campo | Detalhe |
+|---|---|
+| **Nome** | Junior |
+| **Email** | junior.cromaprint@gmail.com |
+| **Telegram** | @Jucabio |
+| **Telegram chat_id** | 1065519625 |
+
+---
+
+## ERP-CROMA — VISÃO GERAL DO SISTEMA
+
+### Módulos disponíveis (16 no total)
+`Comercial` · `Clientes` · `Pedidos` · `Produção` · `Estoque` · `Financeiro` · `Fiscal` · `Contabilidade` · `Compras` · `Instalação` · `Qualidade` · `Admin` · `Portal` · `Dados` · `AI` · `Agent`
+
+### Funcionalidades IA
+- **12 Edge Functions de IA** via OpenRouter
+- **AI Sidebar** com 20+ appliers de contexto
+- **Agente de Vendas** multicanal com conversas e follow-ups automáticos
+- **Motor Mubisys** — precificação em 9 passos (materiais, máquinas, encargos, markup)
+- **AI Orçamento** — agente detecta intenção, gera proposta completa, humano aprova
+
+### App de Campo (PWA)
+- URL: `campo-croma.vercel.app`
+- Para técnicos e instaladores — mobile-first
+- Integrado ao ERP via bridge Supabase
+
+---
+
+## CONTEXTO TELEGRAM — INSTRUÇÕES PARA ACESSO VIA CHAT
+
+Quando acessado via Telegram Channel (Claude Code integrado ao Telegram do Junior):
+
+### Comportamento esperado
+- **Sempre responder em português brasileiro**
+- **Ser direto e objetivo** — é celular, tela pequena, sem enrolação
+- **Nunca pedir confirmação** para consultas (leitura de dados)
+- **Sempre pedir confirmação** antes de ações que alteram dados (criar, editar, deletar)
+- Usar formatação simples — evitar tabelas grandes, preferir listas curtas
+
+### O que o Junior pode pedir via Telegram
+| Tipo | Exemplos |
+|---|---|
+| **Consultas** | "status do pedido X", "orçamentos pendentes", "faturamento do mês", "estoque de banner" |
+| **Clientes** | "dados do cliente Renner", "últimos clientes cadastrados", "leads do dia" |
+| **Produção** | "OPs em andamento", "o que está no corte hoje", "expedição de amanhã" |
+| **Financeiro** | "contas a receber esta semana", "boletos vencendo hoje", "faturamento do mês" |
+| **Ações** | "cadastrar lead X", "criar orçamento para Y", "atualizar status do pedido Z" |
+
+### Acesso ao Supabase (para consultas)
+- **URL**: `https://djwjmfgplnqyffdcgdaw.supabase.co`
+- **Anon Key**: ver seção SUPABASE abaixo
+- Tabelas principais: `clientes`, `pedidos`, `propostas`, `leads`, `contas_receber`, `ordens_producao`, `estoque_movimentos`
+
+---
+
+## VISÃO — EMPRESA GERIDA POR IA
+
+A Croma Print está em processo de se tornar a **primeira empresa de comunicação visual gerida quase exclusivamente por IA**:
+
+- **Claude (via Telegram/Channels)** é o "cérebro" central — gerencia operações, consultas, decisões
+- **OpenRouter** é o provider de IA padrão (não usar Anthropic API direta)
+- **Documentação do plano**: `C:\Users\Caldera\Documents\Croma_Print_Plano_IA`
+- O objetivo é que o Junior gerencie a empresa inteiramente pelo celular via Telegram
 
 ---
 
