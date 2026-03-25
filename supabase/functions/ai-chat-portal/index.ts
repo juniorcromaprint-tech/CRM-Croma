@@ -128,12 +128,17 @@ Deno.serve(async (req) => {
       )
       .join('\n');
 
+    // RPC retorna 'validade' (dias) e não 'data_validade'
+    const validadeStr = proposta.validade
+      ? `${proposta.validade} dias`
+      : (proposta.data_validade ?? 'Não definida');
+
     const contexto = `PROPOSTA #${proposta.numero ?? '—'}
 - Cliente: ${proposta.cliente?.nome_fantasia ?? proposta.cliente?.contato_nome ?? '—'}
 - Status: ${proposta.status}
 - Valor total: R$ ${Number(proposta.valor_total ?? 0).toFixed(2)}
 - Forma de pagamento: ${proposta.forma_pagamento ?? 'A definir'}
-- Validade: ${proposta.data_validade ?? 'Não definida'}
+- Validade: ${validadeStr}
 - Criada em: ${proposta.created_at?.slice(0, 10) ?? '—'}
 
 ITENS:
@@ -194,15 +199,16 @@ ${itensStr || 'Nenhum item'}${pedidoInfo}`;
       : 'info';
 
     // ── 5. Log usage ─────────────────────────────────────────────────
-    await supabase.from('ai_logs').insert({
-      funcao: 'chat-portal',
-      tokens_usados: aiData.usage?.total_tokens ?? 0,
-      custo: 0,
-      metadata: {
-        share_token: share_token.slice(0, 8) + '...',
-        tipo,
-        modelo: 'gpt-4.1-mini',
-      },
+    // Portal chat usa share_token (sem user_id): loga em ai_alertas como evento informativo
+    // A tabela ai_logs exige user_id NOT NULL, então usamos um canal de log alternativo
+    await supabase.from('ai_alertas').insert({
+      tipo: 'portal_chat',
+      severidade: tipo === 'acao_necessaria' ? 'media' : 'baixa',
+      titulo: 'Chat portal: mensagem processada',
+      descricao: `Token: ${share_token.slice(0, 8)}... | Tokens: ${aiData.usage?.total_tokens ?? 0} | Modelo: gpt-4.1-mini`,
+      entity_type: 'proposta',
+      entity_id: proposta.id,
+      resolvido: tipo !== 'acao_necessaria',
     }).catch(() => {});
 
     return new Response(
