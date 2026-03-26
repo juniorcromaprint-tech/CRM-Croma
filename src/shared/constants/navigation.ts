@@ -22,6 +22,7 @@ export const NAV_GROUPS: NavGroup[] = [
     items: [
       { name: 'Dashboard', path: '/', icon: 'LayoutDashboard', module: 'dashboard' },
       { name: 'Dashboard Executivo', path: '/executivo', icon: 'Crown', module: 'admin' },
+      { name: 'Hub de IA', path: '/ia', icon: 'Brain', module: 'dashboard' },
     ],
   },
   {
