@@ -38,7 +38,7 @@ const server = new McpServer({
 // ─── Registra todas as ferramentas ──────────────────────────────────────────
 
 registerCrmTools(server);         // 6 ferramentas: clientes e leads
-registerPropostasTools(server);   // 4 ferramentas: propostas/orçamentos
+registerPropostasTools(server);   // 5 ferramentas: propostas/orçamentos (+ enviar email)
 registerPedidosTools(server);     // 4 ferramentas: pedidos e produção
 registerCampoTools(server);       // 2 ferramentas: instalações
 registerFinanceiroTools(server);  // 2 ferramentas: financeiro
@@ -46,7 +46,7 @@ registerEstoqueTools(server);     // 2 ferramentas: estoque
 registerBiTools(server);          // 3 ferramentas: BI e relatórios
 registerSistemaTools(server);     // 2 ferramentas: sistema
 
-// Total: 25 ferramentas
+// Total: 26 ferramentas
 
 // ─── Validação de credenciais ───────────────────────────────────────────────
 
@@ -86,7 +86,7 @@ async function main(): Promise<void> {
   await server.connect(transport);
 
   process.stderr.write("[croma-mcp] 🚀 Servidor iniciado — aguardando conexões via stdio\n");
-  process.stderr.write("[croma-mcp] 📊 25 ferramentas disponíveis\n");
+  process.stderr.write("[croma-mcp] 📊 26 ferramentas disponíveis\n");
 }
 
 main().catch((error: unknown) => {

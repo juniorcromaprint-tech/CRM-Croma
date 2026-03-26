@@ -5,7 +5,7 @@
 
 import type { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
 import { z } from "zod";
-import { getAdminClient, getUserClient } from "../supabase-client.js";
+import { getAdminClient, getUserClient, SUPABASE_URL } from "../supabase-client.js";
 import { ResponseFormat } from "../types.js";
 import { errorResult } from "../utils/errors.js";
 import { buildPaginatedResponse, truncateIfNeeded } from "../utils/pagination.js";
@@ -410,6 +410,145 @@ Args:
             type: "text" as const,
             text: `✅ Proposta **${atual.numero}** atualizada: ${formatStatus(atual.status)} → **${formatStatus(params.status)}**${params.motivo ? `\nMotivo: ${params.motivo}` : ""}`,
           }],
+        };
+      } catch (error) {
+        return errorResult(error);
+      }
+    }
+  );
+
+  // ─── croma_enviar_proposta ────────────────────────────────────────────────
+
+  server.registerTool(
+    "croma_enviar_proposta",
+    {
+      title: "Enviar Proposta por Email",
+      description: `Envia proposta/orçamento por email para o cliente via sistema Croma.
+
+Use para "envia o orçamento da Ótica Gyan por email", "manda a proposta PROP-2026-0007 para o junior@cromaprint.com.br".
+
+Args:
+  - proposta_id (string, opcional): UUID da proposta
+  - proposta_numero (string, opcional): Número da proposta (ex: PROP-2026-0007) — alternativa ao ID
+  - destinatario_email (string, opcional): Email do destinatário. Se omitido, usa o email cadastrado no cliente
+  - destinatario_nome (string, opcional): Nome para personalizar o email
+
+Obs: Informe proposta_id OU proposta_numero. A proposta é marcada como "enviada" automaticamente.`,
+      inputSchema: z.object({
+        proposta_id: z.string().uuid().optional().describe("UUID da proposta (alternativa ao numero)"),
+        proposta_numero: z.string().optional().describe("Número da proposta ex: PROP-2026-0007"),
+        destinatario_email: z.string().email().optional().describe("Email do destinatário (usa email do cliente se omitido)"),
+        destinatario_nome: z.string().optional().describe("Nome para personalizar o email"),
+      }).strict(),
+      annotations: { readOnlyHint: false, destructiveHint: false, idempotentHint: false, openWorldHint: true },
+    },
+    async (params) => {
+      try {
+        if (!params.proposta_id && !params.proposta_numero) {
+          return {
+            content: [{ type: "text" as const, text: "❌ Informe proposta_id (UUID) ou proposta_numero (ex: PROP-2026-0007)." }],
+          };
+        }
+
+        const sb = getAdminClient();
+
+        // Buscar proposta com dados do cliente
+        let query = sb
+          .from("propostas")
+          .select("id, numero, status, share_token, clientes(nome_fantasia, razao_social, email, contato_nome)");
+
+        if (params.proposta_id) {
+          query = query.eq("id", params.proposta_id);
+        } else {
+          query = query.eq("numero", params.proposta_numero!);
+        }
+
+        const { data: proposta, error } = await query.single();
+        if (error || !proposta) {
+          const ref = params.proposta_numero ?? params.proposta_id;
+          return { content: [{ type: "text" as const, text: `❌ Proposta não encontrada: ${ref}` }] };
+        }
+
+        // Resolver email do destinatário
+        const cliente = (proposta.clientes as unknown as {
+          nome_fantasia?: string;
+          razao_social: string;
+          email?: string;
+          contato_nome?: string;
+        } | null);
+
+        const emailDestino = params.destinatario_email ?? cliente?.email;
+        if (!emailDestino) {
+          return {
+            content: [{
+              type: "text" as const,
+              text: `❌ Cliente sem email cadastrado. Informe destinatario_email explicitamente.\n` +
+                    `Cliente: ${cliente?.nome_fantasia ?? cliente?.razao_social ?? "desconhecido"}`,
+            }],
+          };
+        }
+
+        // Obter JWT do usuário autenticado (necessário para a Edge Function)
+        const userSb = getUserClient();
+        const { data: { session } } = await userSb.auth.getSession();
+        const jwt = session?.access_token;
+
+        if (!jwt) {
+          return {
+            content: [{
+              type: "text" as const,
+              text: "❌ MCP sem sessão de usuário autenticado.\n" +
+                    "Configure SUPABASE_USER_PASSWORD no ambiente do MCP server e reinicie.",
+            }],
+          };
+        }
+
+        // Chamar Edge Function enviar-email-proposta
+        const edgeFnUrl = `${SUPABASE_URL}/functions/v1/enviar-email-proposta`;
+        const res = await fetch(edgeFnUrl, {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json",
+            Authorization: `Bearer ${jwt}`,
+          },
+          body: JSON.stringify({
+            proposta_id: proposta.id,
+            destinatario_email: emailDestino,
+            destinatario_nome: params.destinatario_nome ?? cliente?.contato_nome,
+          }),
+        });
+
+        if (!res.ok) {
+          const errData = await res.json().catch(() => ({ error: `HTTP ${res.status}` })) as Record<string, string>;
+          return {
+            content: [{
+              type: "text" as const,
+              text: `❌ Erro ao enviar email: ${errData["error"] ?? errData["message"] ?? `HTTP ${res.status}`}`,
+            }],
+          };
+        }
+
+        const nomeCliente = cliente?.nome_fantasia ?? cliente?.razao_social ?? "Cliente";
+        const portalUrl = `https://crm-croma.vercel.app/p/${proposta.share_token}`;
+
+        return {
+          content: [{
+            type: "text" as const,
+            text: [
+              `✅ Email enviado com sucesso!`,
+              ``,
+              `- **Proposta**: ${proposta.numero}`,
+              `- **Cliente**: ${nomeCliente}`,
+              `- **Destinatário**: ${emailDestino}`,
+              `- **Link do portal**: ${portalUrl}`,
+            ].join("\n"),
+          }],
+          structuredContent: {
+            proposta_id: proposta.id,
+            numero: proposta.numero,
+            destinatario_email: emailDestino,
+            portal_url: portalUrl,
+          },
         };
       } catch (error) {
         return errorResult(error);
