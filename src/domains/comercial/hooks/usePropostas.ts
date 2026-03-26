@@ -54,7 +54,7 @@ export function usePropostas(filtros?: PropostaFilters) {
     queryFn: async (): Promise<Proposta[]> => {
       let q = supabase
         .from('propostas')
-        .select('*, clientes(nome_fantasia, razao_social), profiles(full_name)')
+        .select('*, clientes(nome_fantasia, razao_social), profiles!vendedor_id(full_name)')
         .is('excluido_em', null)
         .order('created_at', { ascending: false })
 
