@@ -5,7 +5,7 @@
 
 import type { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
 import { z } from "zod";
-import { getSupabaseClient } from "../supabase-client.js";
+import { getAdminClient, getUserClient } from "../supabase-client.js";
 import { ResponseFormat } from "../types.js";
 import { errorResult } from "../utils/errors.js";
 import { buildPaginatedResponse, truncateIfNeeded } from "../utils/pagination.js";
@@ -49,7 +49,7 @@ Args:
     },
     async (params) => {
       try {
-        const sb = getSupabaseClient();
+        const sb = getAdminClient();
 
         let query = sb
           .from("propostas")
@@ -142,7 +142,7 @@ Args:
     },
     async (params) => {
       try {
-        const sb = getSupabaseClient();
+        const sb = getAdminClient();
 
         const [propostaResult, itensResult] = await Promise.all([
           sb
@@ -267,7 +267,7 @@ Args:
     },
     async (params) => {
       try {
-        const sb = getSupabaseClient();
+        const sb = getUserClient();
 
         // Calcula totais
         const subtotal = params.itens.reduce(
@@ -364,7 +364,7 @@ Args:
     },
     async (params) => {
       try {
-        const sb = getSupabaseClient();
+        const sb = getUserClient();
 
         // Verifica estado atual
         const { data: atual, error: fetchError } = await sb

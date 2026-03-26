@@ -5,7 +5,7 @@
 
 import type { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
 import { z } from "zod";
-import { getSupabaseClient } from "../supabase-client.js";
+import { getAdminClient, getUserClient } from "../supabase-client.js";
 import { ResponseFormat } from "../types.js";
 import { errorResult } from "../utils/errors.js";
 import { buildPaginatedResponse, truncateIfNeeded } from "../utils/pagination.js";
@@ -45,7 +45,7 @@ Args:
     },
     async (params) => {
       try {
-        const sb = getSupabaseClient();
+        const sb = getAdminClient();
 
         let query = sb
           .from("ordens_instalacao")
@@ -150,7 +150,7 @@ Args:
     },
     async (params) => {
       try {
-        const sb = getSupabaseClient();
+        const sb = getUserClient();
 
         // Verifica se pedido existe
         const { data: pedido, error: pedidoError } = await sb

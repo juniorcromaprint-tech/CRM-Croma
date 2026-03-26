@@ -7,15 +7,18 @@
  * financeiro, estoque e BI.
  *
  * Transport: stdio (local, roda no computador do Junior)
- * Auth: SUPABASE_SERVICE_ROLE_KEY (bypass total do RLS)
+ * Auth: dual-client — service_role para reads, usuário real para writes
  *
- * Para iniciar:
+ * Para iniciar (modo completo com user auth):
+ *   SUPABASE_SERVICE_ROLE_KEY=xxx SUPABASE_USER_PASSWORD=yyy node dist/index.js
+ *
+ * Para iniciar (modo degradado — writes usam service_role):
  *   SUPABASE_SERVICE_ROLE_KEY=xxx node dist/index.js
  */
 
 import { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
 import { StdioServerTransport } from "@modelcontextprotocol/sdk/server/stdio.js";
-import { getSupabaseClient } from "./supabase-client.js";
+import { getAdminClient, initUserAuth } from "./supabase-client.js";
 import { registerCrmTools } from "./tools/crm.js";
 import { registerPropostasTools } from "./tools/propostas.js";
 import { registerPedidosTools } from "./tools/pedidos.js";
@@ -62,9 +65,12 @@ function validateCredentials(): void {
 async function main(): Promise<void> {
   validateCredentials();
 
+  // Autentica como usuário real (Junior) para que writes respeitem RLS e triggers
+  await initUserAuth();
+
   // Testa conectividade ao Supabase na inicialização
   try {
-    const sb = getSupabaseClient();
+    const sb = getAdminClient();
     const { error } = await sb.from("profiles").select("id", { head: true, count: "exact" });
     if (error) {
       process.stderr.write(`[croma-mcp] Aviso: Falha ao conectar ao Supabase: ${error.message}\n`);

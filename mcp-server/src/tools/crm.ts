@@ -5,7 +5,7 @@
 
 import type { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
 import { z } from "zod";
-import { getSupabaseClient } from "../supabase-client.js";
+import { getAdminClient, getUserClient } from "../supabase-client.js";
 import { ResponseFormat } from "../types.js";
 import { errorResult } from "../utils/errors.js";
 import { buildPaginatedResponse, truncateIfNeeded } from "../utils/pagination.js";
@@ -60,7 +60,7 @@ cidade, estado, classificacao, segmento, vendedor_id, limite_credito, ativo`,
     },
     async (params) => {
       try {
-        const sb = getSupabaseClient();
+        const sb = getAdminClient();
 
         let query = sb
           .from("clientes")
@@ -158,7 +158,7 @@ Args:
     },
     async (params) => {
       try {
-        const sb = getSupabaseClient();
+        const sb = getAdminClient();
 
         const [clienteResult, contatosResult, unidadesResult, propostasResult, pedidosResult] =
           await Promise.all([
@@ -322,7 +322,7 @@ Retorna: dados do cliente criado com ID gerado`,
     },
     async (params) => {
       try {
-        const sb = getSupabaseClient();
+        const sb = getUserClient();
         const { data, error } = await sb
           .from("clientes")
           .insert({ ...params, ativo: true })
@@ -393,7 +393,7 @@ Args:
           return { content: [{ type: "text" as const, text: "Nenhum campo para atualizar foi informado." }] };
         }
 
-        const sb = getSupabaseClient();
+        const sb = getUserClient();
         const { data, error } = await sb
           .from("clientes")
           .update(updates)
@@ -455,7 +455,7 @@ Args:
     },
     async (params) => {
       try {
-        const sb = getSupabaseClient();
+        const sb = getAdminClient();
         let query = sb
           .from("leads")
           .select("id, empresa, contato_nome, telefone, email, status, score, segmento, origem_id, vendedor_id, created_at", { count: "exact" });
@@ -554,7 +554,7 @@ Args:
     },
     async (params) => {
       try {
-        const sb = getSupabaseClient();
+        const sb = getUserClient();
         const { data, error } = await sb
           .from("leads")
           .insert({ ...params, status: "novo" })

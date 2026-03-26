@@ -5,7 +5,7 @@
 
 import type { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
 import { z } from "zod";
-import { getSupabaseClient } from "../supabase-client.js";
+import { getAdminClient, getUserClient } from "../supabase-client.js";
 import { ResponseFormat } from "../types.js";
 import { errorResult } from "../utils/errors.js";
 import { buildPaginatedResponse, truncateIfNeeded } from "../utils/pagination.js";
@@ -49,7 +49,7 @@ Args:
     },
     async (params) => {
       try {
-        const sb = getSupabaseClient();
+        const sb = getAdminClient();
 
         let query = sb
           .from("pedidos")
@@ -140,7 +140,7 @@ Args:
     },
     async (params) => {
       try {
-        const sb = getSupabaseClient();
+        const sb = getAdminClient();
 
         const [pedidoResult, itensResult, opsResult] = await Promise.all([
           sb.from("pedidos").select(`*, clientes(id, razao_social, nome_fantasia, telefone)`).eq("id", params.id).single(),
@@ -245,7 +245,7 @@ Args:
     },
     async (params) => {
       try {
-        const sb = getSupabaseClient();
+        const sb = getAdminClient();
 
         let query = sb
           .from("ordens_producao")
@@ -341,7 +341,7 @@ Args:
     },
     async (params) => {
       try {
-        const sb = getSupabaseClient();
+        const sb = getUserClient();
 
         const { data: atual, error: fetchError } = await sb
           .from("ordens_producao")
