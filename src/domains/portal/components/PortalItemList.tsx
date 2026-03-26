@@ -2,7 +2,6 @@
 import { brl } from '@/shared/utils/format';
 import { Package, ChevronRight, Layers } from 'lucide-react';
 import type { PortalProposta } from '../services/portal.service';
-import { EscalaPrecos } from '@/domains/comercial/components/EscalaPrecos';
 
 // ─── Types ───────────────────────────────────────────────────────────────────
 
@@ -96,9 +95,6 @@ export function PortalItemList({ itens, onItemClick }: Props) {
 
   if (!displayItems.length) return null;
 
-  // Mostrar escala se há mais de um item de exibição (incentivo para aumentar volume)
-  const mostrarEscala = displayItems.length > 1;
-
   return (
     <div className="space-y-4">
       <div className="flex items-center gap-2">
@@ -172,16 +168,6 @@ export function PortalItemList({ itens, onItemClick }: Props) {
               </div>
             </div>
 
-            {/* Tabela de escala — visível para itens não-agrupados com preço */}
-            {mostrarEscala && !item.isGroup && item.valor_unitario > 0 && (
-              <div className="px-5 pb-4">
-                <EscalaPrecos
-                  precoUnitarioBase={item.valor_unitario}
-                  quantidadeAtual={item.quantidade}
-                  titulo="Ver preços por volume"
-                />
-              </div>
-            )}
           </div>
         ))}
       </div>
