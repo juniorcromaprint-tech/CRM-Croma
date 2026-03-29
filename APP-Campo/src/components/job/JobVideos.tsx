@@ -9,9 +9,28 @@ import {
   AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle,
 } from "@/components/ui/alert-dialog";
 
-// Limite de 50MB para vídeos (Supabase free tier = 50MB per file)
+// Limites de vídeo
 const MAX_VIDEO_SIZE_MB = 50;
 const MAX_VIDEO_SIZE_BYTES = MAX_VIDEO_SIZE_MB * 1024 * 1024;
+const MAX_VIDEO_DURATION_SECONDS = 60;
+
+/** Carrega o vídeo num <video> temporário para ler a duração */
+function getVideoDuration(file: File): Promise<number> {
+  return new Promise((resolve, reject) => {
+    const video = document.createElement("video");
+    video.preload = "metadata";
+    const url = URL.createObjectURL(file);
+    video.onloadedmetadata = () => {
+      URL.revokeObjectURL(url);
+      resolve(video.duration);
+    };
+    video.onerror = () => {
+      URL.revokeObjectURL(url);
+      reject(new Error("Não foi possível ler o vídeo."));
+    };
+    video.src = url;
+  });
+}
 
 interface JobVideosProps {
   jobId: string;
@@ -48,6 +67,20 @@ export default function JobVideos({ jobId, isOffline }: JobVideosProps) {
 
     if (file.size > MAX_VIDEO_SIZE_BYTES) {
       return showError(`Vídeo muito grande (${(file.size / 1024 / 1024).toFixed(1)}MB). Máximo: ${MAX_VIDEO_SIZE_MB}MB. Tente gravar um vídeo mais curto.`);
+    }
+
+    // Validar duração do vídeo (máximo 60 segundos)
+    try {
+      setUploadProgress("Verificando duração...");
+      setIsUploadingVideo(true);
+      const duration = await getVideoDuration(file);
+      if (duration > MAX_VIDEO_DURATION_SECONDS) {
+        setIsUploadingVideo(false);
+        setUploadProgress("");
+        return showError(`Vídeo muito longo (${Math.round(duration)}s). Máximo: ${MAX_VIDEO_DURATION_SECONDS} segundos.`);
+      }
+    } catch {
+      // Se não conseguir ler metadata, prossegue com upload (melhor que bloquear)
     }
 
     setIsUploadingVideo(true);
