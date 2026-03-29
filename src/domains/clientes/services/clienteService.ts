@@ -93,8 +93,9 @@ export async function fetchClientes(params: ClienteListParams): Promise<ClienteL
  * Create a new cliente record.
  */
 export async function createCliente(input: ClienteCreateInput): Promise<void> {
-  const { error } = await supabase.from("clientes").insert(input);
+  const { data, error } = await supabase.from("clientes").insert(input).select("id").single();
   if (error) throw error;
+  if (!data) throw new Error("Falha ao criar cliente — verifique suas permissões.");
 }
 
 /**

@@ -1,6 +1,44 @@
 # CROMA PRINT — CRM/ERP SISTEMA
 
-> **Versão**: 4.0 | **Atualizado**: 2026-03-14 | **Status**: Operacional em Produção — 4 Sprints concluídos
+> **Versão**: 5.2 | **Atualizado**: 2026-03-28 | **Status**: Operacional em Produção — 4 Sprints + 5 bugs E2E corrigidos + GSD ativo
+
+---
+
+## PAPEL DO CLAUDE — REGRA #1
+
+**Claude é o cérebro administrativo da Croma Print.** Gerencia TODOS os departamentos digitais: Comercial, Clientes, Financeiro, Fiscal, Estoque, Compras, Produção (planejamento), Qualidade, Admin, AI/Agent, Dados.
+
+**Junior cuida do operacional físico**: instalação em campo, impressão/produção nas máquinas, relacionamento presencial.
+
+**Divisão completa**: ver `.planning/IDENTITY.md`
+
+### Regra de ferramentas — MCP Server Croma PRIMEIRO
+Para operações de dados (leads, clientes, orçamentos, pedidos, financeiro, estoque):
+
+1. **PREFERÊNCIA: MCP Server Croma** — ferramenta principal para operações do dia-a-dia
+   - **Localização**: `mcp-server/` na raiz do projeto (26 ferramentas dedicadas)
+   - **No Claude Code**: ferramentas `croma_*` (ex: `croma_listar_leads`, `croma_cadastrar_cliente`)
+   - **No Cowork**: `mcp__d972dcbc-...__execute_sql` ou via Composio/RUBE (`RUBE_MULTI_EXECUTE_TOOL` → `SUPABASE_RUN_READ_ONLY_QUERY` / `SUPABASE_BETA_RUN_SQL_QUERY`)
+   - **Ref do projeto**: `djwjmfgplnqyffdcgdaw`
+   - Usar para TUDO que envolve dados: leads, clientes, orçamentos, pedidos, financeiro, estoque, produção
+2. **Consultas (leitura)**: executar direto, sem pedir permissão
+3. **Alterações (escrita)**: confirmar com Junior antes de executar
+4. **Frontend/Código React**: usar APENAS para bugs de UI, features visuais, melhorias de componentes
+5. **Supabase Dashboard/apply_migration**: apenas para infraestrutura técnica (DDL, RLS, schema, Edge Functions)
+
+**Nunca** manipular dados do negócio editando código React. Se o Junior pedir algo sobre leads, clientes, pedidos, orçamentos, financeiro ou estoque → MCP Server Croma direto.
+
+### Ferramentas MCP Server Croma (26 total)
+| Módulo | Ferramentas |
+|---|---|
+| **CRM** | `croma_listar_clientes`, `croma_detalhe_cliente`, `croma_cadastrar_cliente`, `croma_atualizar_cliente`, `croma_listar_leads`, `croma_cadastrar_lead` |
+| **Orçamentos** | `croma_listar_propostas`, `croma_detalhe_proposta`, `croma_criar_proposta`, `croma_atualizar_status_proposta`, + enviar email |
+| **Pedidos** | `croma_listar_pedidos`, `croma_detalhe_pedido`, `croma_listar_ordens_producao`, `croma_atualizar_status_producao` |
+| **Campo** | `croma_listar_instalacoes`, `croma_agendar_instalacao` |
+| **Financeiro** | `croma_listar_contas_receber`, `croma_listar_contas_pagar` |
+| **Estoque** | `croma_consultar_estoque`, `croma_listar_materiais` |
+| **BI** | `croma_dashboard_executivo`, `croma_alertas_ativos`, `croma_pipeline_comercial` |
+| **Sistema** | `croma_executar_sql` (SELECT only), `croma_health_check` |
 
 ---
 
@@ -153,7 +191,7 @@ Lead → Orçamento → Pedido → Produção → Instalação → Faturamento
 
 ---
 
-## ESTADO ATUAL DO BANCO (2026-03-14)
+## ESTADO ATUAL DO BANCO (2026-03-26)
 
 | Migration | Status | Conteúdo |
 |---|---|---|
@@ -225,6 +263,24 @@ Auditoria identificou 66 problemas. 4 sprints executados para resolver todos:
 ### Bugs da auditoria original (PR #5)
 19 bugs corrigidos. Ver `docs/qa-reports/2026-03-14-RELATORIO-DEV.md`.
 
+### Correções E2E (2026-03-26)
+5 bugs críticos do teste E2E corrigidos:
+- **Bug #1 — Criação de Lead**: Insert sem `.select().single()` não detectava bloqueio RLS. Corrigido em `LeadsPage.tsx`.
+- **Bug #2 — Conversão Lead→Cliente**: `AlertDialogAction` do Radix UI fechava o dialog antes da async function terminar, matando o fluxo. Corrigido com `e.preventDefault()` + loading state em `LeadDetailPage.tsx`.
+- **Bug #3 — Proposta sem vínculo cliente**: Já estava corrigido — `ClienteCombobox` implementado em `PropostasPage.tsx` e `OrcamentoEditorPage.tsx`.
+- **Bug #4 — Aprovação mostra R$ 0,00**: Campo `total` podia ser 0 quando `subtotal` tinha valor (recálculo não executado). Adicionado fallback `orc.total || orc.subtotal || 0` em `OrcamentoViewPage.tsx`.
+- **Bug #5 — Aprovação não executa**: Mesmo padrão do Bug #2 — `AlertDialogAction` fechando antes da mutation executar. Corrigido com `e.preventDefault()` + `onSettled` para fechar o dialog em `OrcamentoViewPage.tsx`.
+
+**Padrão aprendido — REGRA NOVA**: Toda mutation dentro de `AlertDialogAction` DEVE usar `e.preventDefault()` para impedir o close automático. O dialog deve ser fechado manualmente via `onSettled` ou `onSuccess`.
+
+**Padrão aprendido — REGRA NOVA**: Todo `.insert()` e `.update()` no Supabase DEVE usar `.select().single()` para detectar bloqueio por RLS (que retorna 0 rows sem erro explícito).
+
+### Auditorias pendentes (2026-03-21)
+Ver `docs/qa-reports/2026-03-21-MASTER-AUDIT-REPORT.md` para issues restantes:
+- 5 bugs críticos restantes (status faturado, NCM null, pagamento desconectado, comissões, dimensões)
+- 7 gaps funcionais (financeiro cego, boleto manual, sem reserva estoque, Gantt decorativo, alertas, funil, proposta→pedido)
+- 10 gaps de produto (contratos recorrentes, NPS, PIX, RFQ, approval workflow, etc.)
+
 Ver spec completa: `docs/superpowers/specs/2026-03-14-plano-acao-erp-design.md`
 Ver planos: `docs/superpowers/plans/`
 
@@ -240,6 +296,9 @@ Ver planos: `docs/superpowers/plans/`
 - **Toasts**: `showSuccess()` / `showError()` de `@/utils/toast.ts`
 - **Formatação**: `brl()`, `formatDate()` de `@/shared/utils/format.ts`
 - **Supabase client**: `@/integrations/supabase/client.ts`
+- **Supabase mutations**: TODO insert/update DEVE usar `.select().single()` para detectar RLS silencioso
+- **AlertDialogAction async**: SEMPRE usar `e.preventDefault()` dentro do onClick e fechar o dialog manualmente via `onSettled`
+- **Auth**: `ProtectedRoute` obrigatório (DemoRoute foi removido). Login exigido em todas as rotas exceto `/p/:token` e `/nps/:token`
 
 ### Estrutura de domínios
 ```
@@ -258,6 +317,40 @@ src/domains/{dominio}/
   <h3 className="font-semibold text-slate-600">Título</h3>
   <p className="text-sm text-slate-400 mt-1">Ação sugerida</p>
 </div>
+```
+
+---
+
+## GSD (GET SHIT DONE) — CONTEXTO ESTRUTURADO
+
+O projeto usa o sistema GSD para manter contexto entre sessões. **SEMPRE leia estes arquivos no início de qualquer tarefa:**
+
+| Arquivo | Propósito | Quando ler |
+|---|---|---|
+| `.planning/IDENTITY.md` | Papel do Claude, divisão de responsabilidades, regras | **SEMPRE — primeiro arquivo** |
+| `.planning/STATE.md` | Onde estamos agora, última atividade, blockers | **SEMPRE — segundo arquivo** |
+| `.planning/PROJECT.md` | Visão do projeto, requirements, constraints, decisões | Quando precisar de contexto completo |
+| `.planning/REQUIREMENTS.md` | Requirements checkáveis com IDs (BUG-01, GAP-01, etc.) | Quando planejar ou executar tasks |
+
+### Regras GSD no Cowork
+1. **Ler IDENTITY.md + STATE.md** antes de qualquer tarefa não-trivial
+2. **Atualizar STATE.md** após completar qualquer work significativo (mudar "Last activity", "Current Position", etc.)
+3. **Marcar requirements** como [x] no REQUIREMENTS.md quando completados
+4. **Logar decisões** na tabela Key Decisions do PROJECT.md
+5. **Criar .planning/summaries/YYYY-MM-DD-resumo.md** ao final de sessões produtivas
+
+### Diretório .planning/
+```
+.planning/
+  IDENTITY.md         — papel do Claude, divisão de responsabilidades, regras de operação
+  PROJECT.md          — visão, requirements, constraints, decisões
+  STATE.md            — estado atual, posição, continuidade
+  REQUIREMENTS.md     — requirements checkáveis com IDs
+  codebase/           — mapas do codebase (quando gerados)
+  phases/             — planos de execução por fase
+  summaries/          — resumos de sessão
+  todos/pending/      — ideias e tasks pendentes
+  todos/completed/    — tasks completadas
 ```
 
 ---

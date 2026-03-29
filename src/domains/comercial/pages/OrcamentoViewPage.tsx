@@ -79,7 +79,8 @@ export default function OrcamentoViewPage() {
       showError("Orçamento precisa de pelo menos 1 item para ser enviado.");
       return;
     }
-    if ((orc.valor_total ?? 0) <= 0) {
+    const valorEfetivo = orc.total || orc.subtotal || 0;
+    if (valorEfetivo <= 0) {
       showError("Orçamento precisa ter valor maior que R$ 0,00.");
       return;
     }
@@ -91,13 +92,19 @@ export default function OrcamentoViewPage() {
     const itens = (orc as any).itens ?? [];
     if (itens.length === 0) {
       showError("Orçamento precisa de pelo menos 1 item para ser aprovado.");
+      setApproveOpen(false);
       return;
     }
-    if ((orc.valor_total ?? 0) <= 0) {
+    const valorEfetivo = orc.total || orc.subtotal || 0;
+    if (valorEfetivo <= 0) {
       showError("Orçamento precisa ter valor maior que R$ 0,00 para ser aprovado.");
+      setApproveOpen(false);
       return;
     }
-    atualizar.mutate({ id, updates: { status: "aprovada", aprovado_em: new Date().toISOString() } });
+    atualizar.mutate(
+      { id, updates: { status: "aprovada", aprovado_em: new Date().toISOString() } },
+      { onSettled: () => setApproveOpen(false) }
+    );
   };
 
   const handleRecusar = () => {
@@ -112,7 +119,8 @@ export default function OrcamentoViewPage() {
       showError("Orçamento precisa de itens para gerar pedido.");
       return;
     }
-    if ((orc.valor_total ?? 0) <= 0) {
+    const valorEfetivo = orc.total || orc.subtotal || 0;
+    if (valorEfetivo <= 0) {
       showError("Orçamento com valor R$ 0,00 não pode gerar pedido.");
       return;
     }
@@ -283,16 +291,24 @@ export default function OrcamentoViewPage() {
                     <AlertDialogTitle>Confirmar aprovação</AlertDialogTitle>
                     <AlertDialogDescription>
                       Deseja aprovar o orçamento <strong>{orc.numero}</strong> no valor de{" "}
-                      <strong>{brl(orc.valor_total ?? 0)}</strong>? Esta ação não pode ser desfeita.
+                      <strong>{brl(orc.total || orc.subtotal || 0)}</strong>? Esta ação não pode ser desfeita.
                     </AlertDialogDescription>
                   </AlertDialogHeader>
                   <AlertDialogFooter>
                     <AlertDialogCancel>Cancelar</AlertDialogCancel>
                     <AlertDialogAction
                       className="bg-emerald-600 hover:bg-emerald-700"
-                      onClick={handleAprovar}
+                      disabled={atualizar.isPending}
+                      onClick={(e) => {
+                        e.preventDefault();
+                        handleAprovar();
+                      }}
                     >
-                      Aprovar
+                      {atualizar.isPending ? (
+                        <><Loader2 size={14} className="animate-spin mr-1.5" /> Aprovando...</>
+                      ) : (
+                        "Aprovar"
+                      )}
                     </AlertDialogAction>
                   </AlertDialogFooter>
                 </AlertDialogContent>
@@ -547,7 +563,7 @@ export default function OrcamentoViewPage() {
             <Separator />
             <div className="flex justify-between">
               <span className="font-bold text-slate-800 text-base">Total</span>
-              <span className="font-bold text-blue-700 text-base tabular-nums">{brl(orc.total)}</span>
+              <span className="font-bold text-blue-700 text-base tabular-nums">{brl(orc.total || orc.subtotal || 0)}</span>
             </div>
           </div>
         </div>

@@ -131,7 +131,7 @@ export default function TabContasPagar() {
   const aprovarMutation = useMutation({
     mutationFn: async (id: string) => {
       const { data: { user } } = await supabase.auth.getUser();
-      const { error } = await supabase
+      const { data, error } = await supabase
         .from("contas_pagar")
         .update({
           status: "a_pagar" as ContaPagarStatus,
@@ -139,8 +139,11 @@ export default function TabContasPagar() {
           aprovado_em: new Date().toISOString(),
           motivo_rejeicao: null,
         })
-        .eq("id", id);
+        .eq("id", id)
+        .select("id")
+        .single();
       if (error) throw new Error(error.message);
+      if (!data) throw new Error("Falha ao aprovar conta — verifique suas permissões.");
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["financeiro"] });
@@ -151,14 +154,17 @@ export default function TabContasPagar() {
 
   const rejeitarMutation = useMutation({
     mutationFn: async ({ id, motivo }: { id: string; motivo: string }) => {
-      const { error } = await supabase
+      const { data, error } = await supabase
         .from("contas_pagar")
         .update({
           status: "rejeitado" as ContaPagarStatus,
           motivo_rejeicao: motivo || "Sem motivo informado",
         })
-        .eq("id", id);
+        .eq("id", id)
+        .select("id")
+        .single();
       if (error) throw new Error(error.message);
+      if (!data) throw new Error("Falha ao rejeitar conta — verifique suas permissões.");
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["financeiro"] });

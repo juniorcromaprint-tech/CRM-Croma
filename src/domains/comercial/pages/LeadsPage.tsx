@@ -150,12 +150,14 @@ export default function LeadsPage() {
 
   const createLead = useMutation({
     mutationFn: async (newLead: typeof form) => {
-      const { error } = await supabase.from("leads").insert({
+      const { data, error } = await supabase.from("leads").insert({
         ...newLead,
         valor_estimado: newLead.valor_estimado ? Math.max(0, Number(newLead.valor_estimado)) : null,
         proximo_contato: newLead.proximo_contato || null,
-      });
+      }).select().single();
       if (error) throw error;
+      if (!data) throw new Error("Falha ao criar lead — verifique suas permissões.");
+      return data;
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["leads"] });
@@ -175,14 +177,17 @@ export default function LeadsPage() {
 
   const deleteLead = useMutation({
     mutationFn: async (leadId: string) => {
-      const { error } = await supabase
+      const { data, error } = await supabase
         .from("leads")
         .update({
           excluido_em: new Date().toISOString(),
           excluido_por: profile?.id ?? null,
         })
-        .eq("id", leadId);
+        .eq("id", leadId)
+        .select("id")
+        .single();
       if (error) throw error;
+      if (!data) throw new Error("Falha ao excluir lead — verifique suas permissões.");
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["leads"] });
@@ -213,7 +218,8 @@ export default function LeadsPage() {
     setLeadsDuplicados([]);
     setForm({
       empresa: "", contato_nome: "", contato_email: "", contato_telefone: "",
-      segmento: "", status: "novo", temperatura: "frio", valor_estimado: "", observacoes: "",
+      segmento: "", status: "novo", temperatura: "frio", valor_estimado: "",
+      proximo_contato: "", observacoes: "",
     });
   };
 

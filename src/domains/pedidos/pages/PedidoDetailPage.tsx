@@ -37,7 +37,7 @@ const VALID_TRANSITIONS: Record<string, string[]> = {
   aguardando_aprovacao:  ['aprovado', 'cancelado'],
   aprovado:              ['em_producao', 'cancelado'],
   em_producao:           ['produzido', 'parcialmente_concluido', 'cancelado'],
-  parcialmente_concluido: ['em_producao', 'produzido', 'cancelado'],
+  parcialmente_concluido: ['em_producao', 'concluido'],
   produzido:             ['aguardando_instalacao', 'concluido', 'cancelado'],
   aguardando_instalacao: ['em_instalacao', 'cancelado'],
   em_instalacao:         ['concluido', 'cancelado'],

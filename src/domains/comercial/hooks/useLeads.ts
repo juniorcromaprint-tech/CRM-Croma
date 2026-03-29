@@ -86,9 +86,9 @@ export interface LeadStats {
 // ─── Status Transition Guards ────────────────────────────────────────────────
 
 const LEAD_VALID_TRANSITIONS: Record<string, string[]> = {
-  'novo': ['contatado', 'qualificado', 'perdido'],
-  'contatado': ['qualificado', 'proposta_enviada', 'perdido'],
-  'qualificado': ['proposta_enviada', 'negociando', 'perdido'],
+  'novo': ['contatado', 'qualificado', 'convertido', 'perdido'],
+  'contatado': ['qualificado', 'proposta_enviada', 'convertido', 'perdido'],
+  'qualificado': ['proposta_enviada', 'negociando', 'convertido', 'perdido'],
   'proposta_enviada': ['negociando', 'convertido', 'perdido'],
   'negociando': ['convertido', 'perdido'],
   'convertido': [],  // terminal

@@ -8,6 +8,7 @@ import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
 import { Textarea } from '@/components/ui/textarea'
+import ClienteCombobox from '@/shared/components/ClienteCombobox'
 import {
   Select, SelectContent, SelectItem, SelectTrigger, SelectValue,
 } from '@/components/ui/select'
@@ -53,7 +54,7 @@ export default function PropostasPage() {
   // Dialog state
   const [isCreateOpen, setIsCreateOpen] = useState(false)
   const [formTitulo, setFormTitulo] = useState('')
-  const [formCliente, setFormCliente] = useState('')
+  const [formClienteId, setFormClienteId] = useState('')
   const [formValor, setFormValor] = useState('')
   const [formProb, setFormProb] = useState('50')
   const [formDesc, setFormDesc] = useState('')
@@ -111,7 +112,7 @@ export default function PropostasPage() {
 
   function resetForm() {
     setFormTitulo('')
-    setFormCliente('')
+    setFormClienteId('')
     setFormValor('')
     setFormProb('50')
     setFormDesc('')
@@ -122,7 +123,7 @@ export default function PropostasPage() {
     criar.mutate(
       {
         titulo: formTitulo.trim(),
-        cliente_id: formCliente.trim() || undefined,
+        cliente_id: formClienteId.trim() || undefined,
         valor_estimado: formValor ? parseFloat(formValor) : undefined,
         probabilidade: formProb ? parseInt(formProb, 10) : undefined,
         descricao: formDesc.trim() || undefined,
@@ -396,13 +397,11 @@ export default function PropostasPage() {
               />
             </div>
             <div className="space-y-1.5">
-              <Label htmlFor="cliente">Cliente</Label>
-              <Input
-                id="cliente"
-                placeholder="Nome do cliente (opcional)"
-                value={formCliente}
-                onChange={(e) => setFormCliente(e.target.value)}
-                className="rounded-xl"
+              <Label>Cliente</Label>
+              <ClienteCombobox
+                value={formClienteId}
+                onValueChange={setFormClienteId}
+                placeholder="Selecionar cliente (opcional)"
               />
             </div>
             <div className="grid grid-cols-2 gap-3">

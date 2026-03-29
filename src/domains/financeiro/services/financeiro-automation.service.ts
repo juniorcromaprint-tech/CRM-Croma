@@ -42,7 +42,7 @@ export async function gerarContasReceber(pedidoId: string): Promise<void> {
   const vencimento = new Date();
   vencimento.setDate(vencimento.getDate() + diasVencimento);
 
-  const { error: crError } = await supabase.from('contas_receber').insert({
+  const { data: crData, error: crError } = await supabase.from('contas_receber').insert({
     pedido_id: pedido.id,
     cliente_id: pedido.cliente_id,
     valor_original: pedido.valor_total ?? 0,
@@ -52,9 +52,10 @@ export async function gerarContasReceber(pedidoId: string): Promise<void> {
     status: 'a_vencer',
     forma_pagamento: formaPagamento,
     observacoes: `Pedido ${pedido.numero}`,
-  });
+  }).select().single();
 
   if (crError) throw new Error(`Erro ao gerar conta a receber: ${crError.message}`);
+  if (!crData) throw new Error('Falha ao criar conta a receber — verifique suas permissões.');
 }
 
 /**
@@ -121,8 +122,9 @@ export async function gerarParcelas(pedidoId: string): Promise<void> {
 
   if (parcelas.length === 0) return;
 
-  const { error: pErr } = await supabase.from('parcelas_receber' as any).insert(parcelas);
+  const { data: pData, error: pErr } = await supabase.from('parcelas_receber' as any).insert(parcelas).select();
   if (pErr) throw new Error(`Erro ao gerar parcelas: ${pErr.message}`);
+  if (!pData || pData.length === 0) throw new Error('Falha ao criar parcelas — verifique suas permissões.');
 }
 
 /**
@@ -157,14 +159,15 @@ export async function gerarComissao(pedidoId: string): Promise<void> {
 
   if (valorComissao <= 0) return;
 
-  const { error: insErr } = await supabase.from('comissoes' as any).insert({
+  const { data: comData, error: insErr } = await supabase.from('comissoes' as any).insert({
     pedido_id: pedido.id,
     vendedor_id: vendedorId,
     percentual,
     valor_base: valorBase,
     valor_comissao: valorComissao,
     status: 'gerada',
-  });
+  }).select().single();
 
   // Não lança erro — comissão é side-effect, não bloqueia o fluxo
+  if (insErr) console.warn('Falha ao gerar comissão:', insErr.message);
 }

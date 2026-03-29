@@ -94,12 +94,15 @@ async function transitionStatus(
     );
   }
 
-  const { error } = await supabase
+  const { data: updated, error } = await supabase
     .from('bank_slips')
     .update({ status: to, ...extra })
-    .eq('id', id);
+    .eq('id', id)
+    .select('id')
+    .single();
 
   if (error) throw new Error(error.message);
+  if (!updated) throw new Error('Falha ao atualizar status do boleto — verifique suas permissões.');
 }
 
 /** rascunho → emitido */
@@ -124,10 +127,11 @@ export async function marcarProntoRemessa(ids: string[]): Promise<void> {
     );
   }
 
-  const { error: updateError } = await supabase
+  const { data: updated, error: updateError } = await supabase
     .from('bank_slips')
     .update({ status: 'pronto_remessa' })
-    .in('id', ids);
+    .in('id', ids)
+    .select('id');
 
   if (updateError) throw new Error(updateError.message);
 }
@@ -145,10 +149,11 @@ export async function cancelBoleto(id: string): Promise<void> {
 export async function marcarRemetidos(
   ids: string[],
 ): Promise<void> {
-  const { error } = await supabase
+  const { data: updated, error } = await supabase
     .from('bank_slips')
     .update({ status: 'remetido' })
-    .in('id', ids);
+    .in('id', ids)
+    .select('id');
 
   if (error) throw new Error(error.message);
 }

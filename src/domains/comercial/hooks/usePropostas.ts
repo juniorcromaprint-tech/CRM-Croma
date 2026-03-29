@@ -177,14 +177,17 @@ export function useExcluirProposta() {
   const qc = useQueryClient()
   return useMutation({
     mutationFn: async ({ id, userId }: { id: string; userId?: string }) => {
-      const { error } = await supabase
+      const { data, error } = await supabase
         .from('propostas')
         .update({
           excluido_em: new Date().toISOString(),
           excluido_por: userId ?? null,
         })
         .eq('id', id)
+        .select('id')
+        .single()
       if (error) throw new Error(error.message)
+      if (!data) throw new Error('Falha ao excluir proposta — verifique suas permissões.')
     },
     onSuccess: () => {
       qc.invalidateQueries({ queryKey: [KEY] })

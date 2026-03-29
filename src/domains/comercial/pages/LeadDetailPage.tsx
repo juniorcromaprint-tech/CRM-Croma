@@ -44,14 +44,17 @@ export default function LeadDetailPage() {
 
   const deleteLead = useMutation({
     mutationFn: async (leadId: string) => {
-      const { error } = await supabase
+      const { data, error } = await supabase
         .from("leads")
         .update({
           excluido_em: new Date().toISOString(),
           excluido_por: profile?.id ?? null,
         })
-        .eq("id", leadId);
+        .eq("id", leadId)
+        .select("id")
+        .single();
       if (error) throw error;
+      if (!data) throw new Error("Falha ao excluir lead — verifique suas permissões.");
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["leads"] });
@@ -495,9 +498,17 @@ export default function LeadDetailPage() {
             <AlertDialogCancel>Cancelar</AlertDialogCancel>
             <AlertDialogAction
               className="bg-emerald-600 hover:bg-emerald-700"
-              onClick={handleConverter}
+              onClick={(e) => {
+                e.preventDefault();
+                handleConverter();
+              }}
+              disabled={createCliente.isPending || updateLead.isPending}
             >
-              <UserCheck size={14} className="mr-1.5" /> Converter
+              {(createCliente.isPending || updateLead.isPending) ? (
+                <><Loader2 size={14} className="animate-spin mr-1.5" /> Convertendo...</>
+              ) : (
+                <><UserCheck size={14} className="mr-1.5" /> Converter</>
+              )}
             </AlertDialogAction>
           </AlertDialogFooter>
         </AlertDialogContent>

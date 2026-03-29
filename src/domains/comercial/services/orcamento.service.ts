@@ -452,7 +452,7 @@ export const orcamentoService = {
     // 2. Inserir materiais (se existirem e tabela disponível)
     if (materiais && materiais.length > 0) {
       try {
-        await supabase.from("proposta_item_materiais").insert(
+        const { data: matData, error: matErr } = await supabase.from("proposta_item_materiais").insert(
           materiais.map((m) => ({
             proposta_item_id: itemResult.id,
             material_id: m.material_id ?? null,
@@ -462,7 +462,8 @@ export const orcamentoService = {
             custo_unitario: m.custo_unitario,
             custo_total: m.custo_total,
           })),
-        );
+        ).select();
+        if (matErr) throw matErr;
       } catch (err) {
         throw new Error(`Falha ao salvar materiais do item: ${err instanceof Error ? err.message : 'erro desconhecido'}`);
       }
@@ -471,7 +472,7 @@ export const orcamentoService = {
     // 3. Inserir acabamentos (se existirem e tabela disponível)
     if (acabamentos && acabamentos.length > 0) {
       try {
-        await supabase.from("proposta_item_acabamentos").insert(
+        const { data: acabData, error: acabErr } = await supabase.from("proposta_item_acabamentos").insert(
           acabamentos.map((a) => ({
             proposta_item_id: itemResult.id,
             acabamento_id: a.acabamento_id ?? null,
@@ -480,7 +481,8 @@ export const orcamentoService = {
             custo_unitario: a.custo_unitario,
             custo_total: a.custo_total,
           })),
-        );
+        ).select();
+        if (acabErr) throw acabErr;
       } catch (err) {
         throw new Error(`Falha ao salvar acabamentos do item: ${err instanceof Error ? err.message : 'erro desconhecido'}`);
       }
@@ -489,14 +491,15 @@ export const orcamentoService = {
     // 4. Inserir processos (se existirem e tabela disponível — migration 018)
     if (processos && processos.length > 0) {
       try {
-        await supabase.from("proposta_item_processos").insert(
+        const { data: procData, error: procErr } = await supabase.from("proposta_item_processos").insert(
           processos.map((p, idx) => ({
             proposta_item_id: itemResult.id,
             etapa: p.etapa,
             tempo_minutos: p.tempo_minutos,
             ordem: p.ordem ?? idx,
           })),
-        );
+        ).select();
+        if (procErr) throw procErr;
       } catch (err) {
         throw new Error(`Falha ao salvar processos do item: ${err instanceof Error ? err.message : 'erro desconhecido'}`);
       }
@@ -542,7 +545,7 @@ export const orcamentoService = {
     if (servicos.length > 0) {
       const { error: insertError } = await supabase.from("proposta_servicos").insert(
         servicos.map((s) => ({ ...s, proposta_id: propostaId })),
-      );
+      ).select();
       if (insertError) throw new Error(`Falha ao salvar serviços: ${insertError.message}`);
     }
   },
@@ -587,7 +590,7 @@ export const orcamentoService = {
         .eq("proposta_item_id", itemId);
 
       if (materiais && materiais.length > 0) {
-        await supabase.from("proposta_item_materiais").insert(
+        const { error: matErr } = await supabase.from("proposta_item_materiais").insert(
           materiais.map((m) => ({
             proposta_item_id: itemId,
             material_id: m.material_id ?? null,
@@ -597,7 +600,8 @@ export const orcamentoService = {
             custo_unitario: m.custo_unitario,
             custo_total: m.custo_total,
           })),
-        );
+        ).select();
+        if (matErr) throw matErr;
       }
     } catch (err) {
       throw new Error(`Falha ao atualizar materiais do item: ${err instanceof Error ? err.message : 'erro desconhecido'}`);
@@ -611,7 +615,7 @@ export const orcamentoService = {
         .eq("proposta_item_id", itemId);
 
       if (acabamentos && acabamentos.length > 0) {
-        await supabase.from("proposta_item_acabamentos").insert(
+        const { error: acabErr } = await supabase.from("proposta_item_acabamentos").insert(
           acabamentos.map((a) => ({
             proposta_item_id: itemId,
             acabamento_id: a.acabamento_id ?? null,
@@ -620,7 +624,8 @@ export const orcamentoService = {
             custo_unitario: a.custo_unitario,
             custo_total: a.custo_total,
           })),
-        );
+        ).select();
+        if (acabErr) throw acabErr;
       }
     } catch (err) {
       throw new Error(`Falha ao atualizar acabamentos do item: ${err instanceof Error ? err.message : 'erro desconhecido'}`);
@@ -634,14 +639,15 @@ export const orcamentoService = {
         .eq("proposta_item_id", itemId);
 
       if (processos && processos.length > 0) {
-        await supabase.from("proposta_item_processos").insert(
+        const { error: procErr } = await supabase.from("proposta_item_processos").insert(
           processos.map((p, idx) => ({
             proposta_item_id: itemId,
             etapa: p.etapa,
             tempo_minutos: p.tempo_minutos,
             ordem: p.ordem ?? idx,
           })),
-        );
+        ).select();
+        if (procErr) throw procErr;
       }
     } catch (err) {
       throw new Error(`Falha ao atualizar processos do item: ${err instanceof Error ? err.message : 'erro desconhecido'}`);
