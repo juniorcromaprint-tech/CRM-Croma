@@ -61,6 +61,7 @@ export default function OrcamentoViewPage() {
 
   const [expandedItems, setExpandedItems] = useState<Set<string>>(new Set());
   const [approveOpen, setApproveOpen] = useState(false);
+  const [convertOpen, setConvertOpen] = useState(false);
   const [shareOpen, setShareOpen] = useState(false);
 
   const toggleItem = (itemId: string) => {
@@ -117,15 +118,22 @@ export default function OrcamentoViewPage() {
     const itens = (orc as any).itens ?? [];
     if (itens.length === 0) {
       showError("Orçamento precisa de itens para gerar pedido.");
+      setConvertOpen(false);
       return;
     }
     const valorEfetivo = orc.total || orc.subtotal || 0;
     if (valorEfetivo <= 0) {
       showError("Orçamento com valor R$ 0,00 não pode gerar pedido.");
+      setConvertOpen(false);
       return;
     }
-    await converter.mutateAsync(id);
-    navigate("/pedidos");
+    try {
+      const result = await converter.mutateAsync(id);
+      setConvertOpen(false);
+      navigate(`/pedidos/${result.pedido_id}`);
+    } catch {
+      setConvertOpen(false);
+    }
   };
 
   const handleDuplicar = async () => {
@@ -325,15 +333,44 @@ export default function OrcamentoViewPage() {
             </>
           )}
           {orc.status === "aprovada" && (
-            <Button
-              size="sm"
-              className="rounded-xl bg-purple-600 text-white hover:bg-purple-700 gap-1.5"
-              onClick={handleConverterParaPedido}
-              disabled={converter.isPending}
-            >
-              {converter.isPending ? <Loader2 className="animate-spin" size={14} /> : <CheckCircle size={14} />}
-              Gerar Pedido
-            </Button>
+            <AlertDialog open={convertOpen} onOpenChange={setConvertOpen}>
+              <AlertDialogTrigger asChild>
+                <Button
+                  size="sm"
+                  className="rounded-xl bg-purple-600 text-white hover:bg-purple-700 gap-1.5"
+                  disabled={converter.isPending}
+                >
+                  <Package size={14} /> Gerar Pedido
+                </Button>
+              </AlertDialogTrigger>
+              <AlertDialogContent>
+                <AlertDialogHeader>
+                  <AlertDialogTitle>Converter em pedido</AlertDialogTitle>
+                  <AlertDialogDescription>
+                    Será criado um pedido a partir do orçamento <strong>{orc.numero}</strong> no valor de{" "}
+                    <strong>{brl(orc.total || orc.subtotal || 0)}</strong> com{" "}
+                    {((orc as any).itens ?? []).length} iten(s). Todos os itens, materiais e custos serão copiados para o pedido.
+                  </AlertDialogDescription>
+                </AlertDialogHeader>
+                <AlertDialogFooter>
+                  <AlertDialogCancel>Cancelar</AlertDialogCancel>
+                  <AlertDialogAction
+                    className="bg-purple-600 hover:bg-purple-700"
+                    disabled={converter.isPending}
+                    onClick={(e) => {
+                      e.preventDefault();
+                      handleConverterParaPedido();
+                    }}
+                  >
+                    {converter.isPending ? (
+                      <><Loader2 size={14} className="animate-spin mr-1.5" /> Gerando pedido...</>
+                    ) : (
+                      "Gerar Pedido"
+                    )}
+                  </AlertDialogAction>
+                </AlertDialogFooter>
+              </AlertDialogContent>
+            </AlertDialog>
           )}
         </div>
       </div>
