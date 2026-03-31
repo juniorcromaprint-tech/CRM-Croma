@@ -33,9 +33,9 @@ logs/
 # Vercel
 .vercel/
 
-# Lock files (unused package managers)
+# Lock files (pnpm only — unused managers)
+package-lock.json
 yarn.lock
-pnpm-lock.yaml
 
 # Business documents (should not be in repo)
 Arquivo_uteis_para_croma_CRM/
