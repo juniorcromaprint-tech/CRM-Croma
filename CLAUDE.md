@@ -1,6 +1,6 @@
 # CROMA PRINT — CRM/ERP SISTEMA
 
-> **Versão**: 5.2 | **Atualizado**: 2026-03-28 | **Status**: Operacional em Produção — 4 Sprints + 5 bugs E2E corrigidos + GSD ativo
+> **Versão**: 5.3 | **Atualizado**: 2026-03-30 | **Status**: Operacional em Produção — 4 Sprints + 5 bugs E2E corrigidos + GSD ativo + WhatsApp IA ativo
 
 ---
 
@@ -12,21 +12,41 @@
 
 **Divisão completa**: ver `.planning/IDENTITY.md`
 
-### Regra de ferramentas — MCP Server Croma PRIMEIRO
-Para operações de dados (leads, clientes, orçamentos, pedidos, financeiro, estoque):
+### REGRA ABSOLUTA — MCP Server Croma é O SISTEMA
 
-1. **PREFERÊNCIA: MCP Server Croma** — ferramenta principal para operações do dia-a-dia
+**O MCP Server Croma é a interface principal para TODA operação do sistema.** Claude opera a Croma Print ATRAVÉS do MCP, como um funcionário usa o ERP. Não existe atalho — é o caminho oficial.
+
+**Hierarquia de ferramentas (SEM EXCEÇÕES):**
+
+1. **MCP Server Croma — OBRIGATÓRIO PARA TUDO que envolve dados do negócio**
    - **Localização**: `mcp-server/` na raiz do projeto (26 ferramentas dedicadas)
    - **No Claude Code**: ferramentas `croma_*` (ex: `croma_listar_leads`, `croma_cadastrar_cliente`)
-   - **No Cowork**: `mcp__d972dcbc-...__execute_sql` ou via Composio/RUBE (`RUBE_MULTI_EXECUTE_TOOL` → `SUPABASE_RUN_READ_ONLY_QUERY` / `SUPABASE_BETA_RUN_SQL_QUERY`)
-   - **Ref do projeto**: `djwjmfgplnqyffdcgdaw`
-   - Usar para TUDO que envolve dados: leads, clientes, orçamentos, pedidos, financeiro, estoque, produção
+   - **No Cowork**: `mcp__d972dcbc-...__execute_sql` (Supabase MCP) como bridge — mas seguindo a mesma lógica do MCP Server
+   - **Via Composio/RUBE**: `RUBE_MULTI_EXECUTE_TOOL` → `SUPABASE_RUN_READ_ONLY_QUERY` / `SUPABASE_BETA_RUN_SQL_QUERY`
+   - **Ref do projeto Supabase**: `djwjmfgplnqyffdcgdaw`
+   - **Usar para**: leads, clientes, orçamentos, propostas, pedidos, produção, financeiro, estoque, materiais, preços, instalações, BI, dashboards — TUDO
+
 2. **Consultas (leitura)**: executar direto, sem pedir permissão
 3. **Alterações (escrita)**: confirmar com Junior antes de executar
 4. **Frontend/Código React**: usar APENAS para bugs de UI, features visuais, melhorias de componentes
 5. **Supabase Dashboard/apply_migration**: apenas para infraestrutura técnica (DDL, RLS, schema, Edge Functions)
 
-**Nunca** manipular dados do negócio editando código React. Se o Junior pedir algo sobre leads, clientes, pedidos, orçamentos, financeiro ou estoque → MCP Server Croma direto.
+**PROIBIDO:**
+- ❌ Inventar preços — SEMPRE consultar `materiais` + `produto_modelos` + `regras_precificacao` via MCP
+- ❌ Inventar dados de clientes — SEMPRE buscar no banco via MCP
+- ❌ Manipular dados editando código React
+- ❌ Prometer ações (enviar email, criar proposta) sem executar de verdade via MCP/Edge Functions
+- ❌ Usar SQL direto no Supabase quando a ferramenta MCP Croma existe para aquela operação
+- ❌ Estimar/chutar qualquer valor que existe no banco — CONSULTAR SEMPRE
+
+**OBRIGATÓRIO:**
+- ✅ Consultar preço real no banco antes de cotar qualquer produto
+- ✅ Criar propostas/orçamentos reais no sistema quando o cliente pedir
+- ✅ Enviar emails reais via Edge Functions quando prometer ao cliente
+- ✅ Operar como um vendedor real usando o ERP, não como chatbot
+- ✅ Usar o motor Mubisys (materiais + markup + regras) para precificação
+
+**Quando o MCP Server Croma (`croma_*`) não estiver disponível (ex: no Cowork), usar `execute_sql` seguindo a MESMA lógica — consultar as mesmas tabelas, respeitar as mesmas regras de negócio.**
 
 ### Ferramentas MCP Server Croma (26 total)
 | Módulo | Ferramentas |
@@ -152,10 +172,11 @@ Quando acessado via Telegram Channel (Claude Code integrado ao Telegram do Junio
 
 A Croma Print está em processo de se tornar a **primeira empresa de comunicação visual gerida quase exclusivamente por IA**:
 
-- **Claude (via Telegram/Channels)** é o "cérebro" central — gerencia operações, consultas, decisões
-- **OpenRouter** é o provider de IA padrão (não usar Anthropic API direta)
-- **Documentação do plano**: `C:\Users\Caldera\Documents\Croma_Print_Plano_IA`
-- O objetivo é que o Junior gerencie a empresa inteiramente pelo celular via Telegram
+- **Claude (via Cowork/Channels/WhatsApp)** é o "cérebro" central — gerencia operações, consultas, decisões
+- **MCP Server Croma** é a interface oficial para TODAS operações de dados (REGRA ABSOLUTA)
+- **OpenRouter** para Edge Functions de IA no ERP; **Claude API direta** para WhatsApp/Agentes
+- **Documentação do plano**: `.planning/` e `docs/plano-ia/`
+- O objetivo é que o Junior gerencie a empresa inteiramente pelo celular
 
 ---
 
