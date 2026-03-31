@@ -128,6 +128,34 @@ Deno.serve(async (req) => {
         continue;
       }
 
+      // ── 4a.1 Intent detection: check if lead wants a quote ──────────────
+      // When lead has replied (compor_resposta), detect purchase intent first
+      if (acao.acao === 'compor_resposta') {
+        try {
+          const { data: intentResult } = await supabase.functions.invoke(
+            'ai-detectar-intencao-orcamento',
+            {
+              body: {
+                conversation_id: acao.conversation_id,
+                auto_gerar: true, // auto-generate quote if confidence >= 0.7
+              },
+            }
+          );
+
+          if (intentResult?.orcamento_auto && intentResult?.orcamento_resultado?.status === 'proposta_criada') {
+            results.push({
+              conversation_id: acao.conversation_id,
+              acao: 'gerar_orcamento_auto',
+              resultado: `orcamento_gerado_${intentResult.orcamento_resultado.proposta_numero}`,
+            });
+            enviadas++;
+            continue; // Skip normal message composition — quote was sent instead
+          }
+        } catch (intentErr) {
+          console.warn('Intent detection failed, continuing with normal flow:', (intentErr as Error).message);
+        }
+      }
+
       try {
         // 4a. Get lead_id from conversation
         const { data: conv } = await supabase

@@ -56,6 +56,13 @@
       "runtimeArgs": ["/c", "C:\\Users\\Caldera\\Claude\\CRM-Croma\\.claude\\worktrees\\hopeful-burnell\\start-dev.cmd"],
       "port": 8089,
       "autoPort": true
+    },
+    {
+      "name": "elastic-neumann (Vite dev)",
+      "runtimeExecutable": "cmd",
+      "runtimeArgs": ["/c", "C:\\Users\\Caldera\\Claude\\CRM-Croma\\.claude\\worktrees\\elastic-neumann\\start-dev.cmd"],
+      "port": 8090,
+      "autoPort": true
     }
   ]
 }

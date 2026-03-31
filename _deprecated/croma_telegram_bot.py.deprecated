@@ -1,0 +1,1034 @@
+#!/usr/bin/env python3
+"""
+Croma Print — Telegram Bot ERP (v2)
+=====================================
+Controle remoto do ERP via Telegram: áudio, ações em linguagem natural, tool calling.
+
+Novidades v2:
+  - Áudio: mensagens de voz transcritas com Whisper
+  - Tool calling: Claude decide qual ação ERP executar
+  - Confirmação: ações de escrita pedem confirmação antes de executar
+  - /erp: resumo rápido do ERP
+
+Comandos:
+  /start    — Apresentação e comandos
+  /erp      — Resumo rápido (pedidos em produção, faturamento)
+  /clear    — Limpa histórico
+  /status   — Modelo + custo da sessão
+  /haiku    — Usa Haiku (padrão, mais barato)
+  /sonnet   — Usa Sonnet (mais poderoso)
+  /contexto — Carrega CLAUDE.md completo
+  /memoria  — Lista/lê arquivos de memória
+  /qa       — Lista/lê relatórios de QA
+  /agentes  — Lista agentes disponíveis
+"""
+
+import json
+import os
+import sys
+import time
+import logging
+import tempfile
+from datetime import datetime, date
+from pathlib import Path
+
+import requests
+# LLM via OpenRouter (API compatível OpenAI) — sem dependência extra além de requests
+
+# ─── Paths ────────────────────────────────────────────────────────────────────
+ROOT        = Path(__file__).parent
+CONFIG_FILE = ROOT / "telegram_bot_config.json"
+CLAUDE_MD   = ROOT / "CLAUDE.md"
+MEMORY_DIR  = Path.home() / ".claude" / "projects" / "C--Users-Caldera-Claude-CRM-Croma" / "memory"
+AGENTS_DIR  = ROOT / ".claude" / "agentes"
+QA_DIR      = ROOT / "docs" / "qa-reports"
+LOG_FILE    = ROOT / "croma_telegram_bot.log"
+
+# ─── Modelos ──────────────────────────────────────────────────────────────────
+MODELO_HAIKU  = "anthropic/claude-haiku-4-5-20251001"
+MODELO_SONNET = "anthropic/claude-sonnet-4-6"
+
+CUSTO = {
+    MODELO_HAIKU:  {"input": 0.00080, "output": 0.00400},
+    MODELO_SONNET: {"input": 0.00300, "output": 0.01500},
+}
+
+# ─── Logging ──────────────────────────────────────────────────────────────────
+logging.basicConfig(
+    level=logging.INFO,
+    format="%(asctime)s %(levelname)s %(message)s",
+    handlers=[
+        logging.StreamHandler(sys.stdout),
+        logging.FileHandler(LOG_FILE, encoding="utf-8"),
+    ],
+)
+log = logging.getLogger(__name__)
+
+
+# ─── Config ───────────────────────────────────────────────────────────────────
+def carregar_config() -> dict:
+    if not CONFIG_FILE.exists():
+        log.error(f"Config não encontrado: {CONFIG_FILE}")
+        sys.exit(1)
+    with open(CONFIG_FILE, encoding="utf-8") as f:
+        cfg = json.load(f)
+    for campo in ("telegram_token", "openrouter_api_key"):
+        if not cfg.get(campo):
+            log.error(f"Campo obrigatório ausente: {campo}")
+            sys.exit(1)
+    return cfg
+
+
+# ─── Supabase REST client ─────────────────────────────────────────────────────
+class SupabaseClient:
+    def __init__(self, url: str, key: str):
+        self.url = url.rstrip("/")
+        self.headers = {
+            "apikey": key,
+            "Authorization": f"Bearer {key}",
+            "Content-Type": "application/json",
+            "Prefer": "return=representation",
+        }
+
+    def select(self, table: str, columns: str = "*", filters: dict | None = None, limit: int = 20) -> list:
+        params: dict = {"select": columns, "limit": limit}
+        if filters:
+            params.update(filters)
+        try:
+            r = requests.get(f"{self.url}/rest/v1/{table}", headers=self.headers, params=params, timeout=15)
+            r.raise_for_status()
+            return r.json() if isinstance(r.json(), list) else []
+        except Exception as e:
+            log.error(f"Supabase select {table}: {e}")
+            return []
+
+    def insert(self, table: str, data: dict) -> dict | None:
+        try:
+            r = requests.post(f"{self.url}/rest/v1/{table}", headers=self.headers, json=data, timeout=15)
+            r.raise_for_status()
+            result = r.json()
+            return result[0] if isinstance(result, list) and result else result
+        except Exception as e:
+            log.error(f"Supabase insert {table}: {e}")
+            return None
+
+
+# ─── Telegram Bot ─────────────────────────────────────────────────────────────
+class TelegramBot:
+    def __init__(self, token: str):
+        self.token  = token
+        self.base   = f"https://api.telegram.org/bot{token}"
+        self.offset = 0
+
+    def _post(self, endpoint: str, payload: dict) -> dict:
+        try:
+            r = requests.post(f"{self.base}/{endpoint}", json=payload, timeout=15)
+            return r.json()
+        except Exception as e:
+            log.error(f"Telegram {endpoint}: {e}")
+            return {}
+
+    def get_updates(self, timeout: int = 25) -> list:
+        try:
+            r = requests.get(
+                f"{self.base}/getUpdates",
+                params={"offset": self.offset, "timeout": timeout},
+                timeout=timeout + 10,
+            )
+            return r.json().get("result", [])
+        except Exception as e:
+            log.error(f"get_updates: {e}")
+            return []
+
+    def send(self, chat_id: int, text: str, parse_mode: str = "Markdown"):
+        for i in range(0, max(len(text), 1), 4000):
+            chunk = text[i: i + 4000]
+            self._post("sendMessage", {"chat_id": chat_id, "text": chunk, "parse_mode": parse_mode})
+            if len(text) > 4000:
+                time.sleep(0.3)
+
+    def typing(self, chat_id: int):
+        self._post("sendChatAction", {"chat_id": chat_id, "action": "typing"})
+
+    def get_me(self) -> dict:
+        try:
+            r = requests.get(f"{self.base}/getMe", timeout=10)
+            return r.json().get("result", {})
+        except Exception:
+            return {}
+
+    def get_file_url(self, file_id: str) -> str:
+        try:
+            r = requests.get(f"{self.base}/getFile", params={"file_id": file_id}, timeout=10)
+            path = r.json().get("result", {}).get("file_path", "")
+            return f"https://api.telegram.org/file/bot{self.token}/{path}" if path else ""
+        except Exception:
+            return ""
+
+
+# ─── Estado por chat ──────────────────────────────────────────────────────────
+historicos:             dict[int, list] = {}
+modelos_chat:           dict[int, str]  = {}
+tokens_chat:            dict[int, dict] = {}
+pending_confirmations:  dict[int, dict] = {}
+
+
+def modelo_atual(chat_id: int) -> str:
+    return modelos_chat.get(chat_id, MODELO_HAIKU)
+
+
+def registrar_tokens(chat_id: int, inp: int, out: int):
+    t = tokens_chat.setdefault(chat_id, {"input": 0, "output": 0, "chamadas": 0})
+    t["input"] += inp
+    t["output"] += out
+    t["chamadas"] += 1
+
+
+def custo_estimado(chat_id: int) -> float:
+    modelo = modelo_atual(chat_id)
+    t = tokens_chat.get(chat_id, {"input": 0, "output": 0})
+    c = CUSTO.get(modelo, CUSTO[MODELO_HAIKU])
+    return (t["input"] * c["input"] + t["output"] * c["output"]) / 1000
+
+
+# ─── System prompt ────────────────────────────────────────────────────────────
+SYSTEM_ERP = """Você é a *Crominha*, assistente inteligente da Croma Print Comunicação Visual via Telegram.
+
+EMPRESA: Croma Print — comunicação visual profissional para varejo e indústria no Brasil.
+Especialidades: banners, adesivos, fachadas, placas, letreiros, painéis, totens, backdrops.
+Clientes: redes de lojas, franquias, fabricantes de calçados, grandes varejistas.
+
+SISTEMA ERP: https://crm-croma.vercel.app/
+APP DE CAMPO: https://campo-croma.vercel.app/
+FLUXO: Lead → Orçamento → Pedido → Produção → Instalação → Faturamento
+
+ESTADO ATUAL:
+- 307 clientes, 467 materiais, 156 modelos de produto com markup
+- Agente de vendas WhatsApp+Email ativo
+- NF-e em homologação SEFAZ
+
+CAPACIDADES (via ferramentas):
+- Consultas: clientes, orçamentos, pedidos em produção, faturamento — executa direto
+- Cadastros: novo cliente — pede confirmação
+- Orçamentos: criar rascunho — pede confirmação
+- Follow-up: acionar agente de vendas — pede confirmação
+
+REGRAS:
+1. Responda SEMPRE em português do Brasil
+2. Seja direto e objetivo — respostas curtas com Markdown
+3. Para ações que ALTERAM DADOS: o sistema pedirá confirmação automaticamente
+4. Para consultas (ler dados): execute sem confirmação
+5. Se o usuário disser "sim/confirmar", a ação pendente será executada pelo sistema
+6. Quando retornar dados do ERP, formate de forma clara com emojis e listas
+"""
+
+# ─── Ferramentas ERP (formato OpenAI / OpenRouter) ────────────────────────────
+TOOLS_ERP = [
+    {
+        "type": "function",
+        "function": {
+            "name": "buscar_clientes",
+            "description": "Busca clientes no ERP por nome, cidade ou segmento. Use para consultar clientes existentes.",
+            "parameters": {
+                "type": "object",
+                "properties": {
+                    "nome": {"type": "string", "description": "Nome ou parte do nome"},
+                    "cidade": {"type": "string"},
+                    "segmento": {"type": "string", "description": "varejo, franquia, industria, servicos"},
+                    "limite": {"type": "integer", "default": 10},
+                },
+            },
+        },
+    },
+    {
+        "type": "function",
+        "function": {
+            "name": "consultar_orcamentos",
+            "description": "Consulta orçamentos/propostas. Use para ver propostas do dia, semana, ou de um cliente.",
+            "parameters": {
+                "type": "object",
+                "properties": {
+                    "cliente_nome": {"type": "string"},
+                    "status": {"type": "string", "description": "rascunho, enviado, aprovado, recusado, expirado"},
+                    "hoje": {"type": "boolean", "description": "Se true, filtra propostas criadas hoje"},
+                    "limite": {"type": "integer", "default": 10},
+                },
+            },
+        },
+    },
+    {
+        "type": "function",
+        "function": {
+            "name": "consultar_pedidos",
+            "description": "Consulta pedidos do ERP por status ou cliente.",
+            "parameters": {
+                "type": "object",
+                "properties": {
+                    "status": {
+                        "type": "string",
+                        "description": "aguardando_aprovacao, aprovado, em_producao, concluido, cancelado, aguardando_instalacao, instalado",
+                    },
+                    "cliente_nome": {"type": "string"},
+                    "hoje": {"type": "boolean"},
+                    "limite": {"type": "integer", "default": 10},
+                },
+            },
+        },
+    },
+    {
+        "type": "function",
+        "function": {
+            "name": "faturamento_resumo",
+            "description": "Retorna resumo financeiro: faturamento do mês, contas a receber e pedidos.",
+            "parameters": {
+                "type": "object",
+                "properties": {
+                    "mes": {"type": "integer", "description": "Mês 1-12 (padrão: mês atual)"},
+                    "ano": {"type": "integer", "description": "Ano (padrão: ano atual)"},
+                },
+            },
+        },
+    },
+    {
+        "type": "function",
+        "function": {
+            "name": "cadastrar_cliente",
+            "description": "Cadastra novo cliente no ERP. REQUER CONFIRMAÇÃO antes de executar.",
+            "parameters": {
+                "type": "object",
+                "properties": {
+                    "nome": {"type": "string", "description": "Nome completo ou razão social"},
+                    "email": {"type": "string"},
+                    "telefone": {"type": "string"},
+                    "cnpj": {"type": "string"},
+                    "cidade": {"type": "string"},
+                    "estado": {"type": "string", "description": "UF 2 letras, ex: SP"},
+                    "segmento": {"type": "string", "enum": ["varejo", "franquia", "industria", "servicos", "outros"]},
+                    "observacoes": {"type": "string"},
+                },
+                "required": ["nome"],
+            },
+        },
+    },
+    {
+        "type": "function",
+        "function": {
+            "name": "criar_rascunho_orcamento",
+            "description": "Cria rascunho de orçamento no ERP. O rascunho fica disponível para completar precificação. REQUER CONFIRMAÇÃO.",
+            "parameters": {
+                "type": "object",
+                "properties": {
+                    "cliente_nome": {"type": "string", "description": "Nome do cliente"},
+                    "itens_descricao": {"type": "string", "description": "Descrição dos itens em linguagem natural"},
+                    "observacoes": {"type": "string"},
+                    "validade_dias": {"type": "integer", "default": 30},
+                },
+                "required": ["cliente_nome", "itens_descricao"],
+            },
+        },
+    },
+    {
+        "type": "function",
+        "function": {
+            "name": "acionar_followup",
+            "description": "Agenda follow-up para cliente via agente de vendas. REQUER CONFIRMAÇÃO.",
+            "parameters": {
+                "type": "object",
+                "properties": {
+                    "cliente_nome": {"type": "string"},
+                    "canal": {"type": "string", "enum": ["whatsapp", "email"], "default": "whatsapp"},
+                    "mensagem_instrucao": {"type": "string", "description": "O que comunicar ao cliente"},
+                },
+                "required": ["cliente_nome", "mensagem_instrucao"],
+            },
+        },
+    },
+]
+
+TOOLS_ESCRITA = {"cadastrar_cliente", "criar_rascunho_orcamento", "acionar_followup"}
+
+
+# ─── OpenRouter helper ────────────────────────────────────────────────────────
+def _call_openrouter(
+    openrouter_key: str,
+    model: str,
+    messages: list,
+    tools: list | None = None,
+    max_tokens: int = 4096,
+) -> dict:
+    """Chama OpenRouter (API compatível com OpenAI) via requests. Retorna o JSON bruto."""
+    payload: dict = {"model": model, "messages": messages, "max_tokens": max_tokens}
+    if tools:
+        payload["tools"] = tools
+        payload["tool_choice"] = "auto"
+    resp = requests.post(
+        "https://openrouter.ai/api/v1/chat/completions",
+        headers={
+            "Authorization": f"Bearer {openrouter_key}",
+            "Content-Type": "application/json",
+            "HTTP-Referer": "https://crm-croma.vercel.app",
+            "X-Title": "Croma AI Engine",
+        },
+        json=payload,
+        timeout=60,
+    )
+    resp.raise_for_status()
+    return resp.json()
+
+
+# ─── Execução das ferramentas ─────────────────────────────────────────────────
+def executar_tool(name: str, inputs: dict, supa: SupabaseClient | None) -> str:
+    if not supa:
+        return "⚠️ Supabase não configurado. Adicione `supabase_url` e `supabase_service_key` no config."
+    try:
+        match name:
+            case "buscar_clientes":        return _buscar_clientes(inputs, supa)
+            case "consultar_orcamentos":   return _consultar_orcamentos(inputs, supa)
+            case "consultar_pedidos":      return _consultar_pedidos(inputs, supa)
+            case "faturamento_resumo":     return _faturamento_resumo(inputs, supa)
+            case "cadastrar_cliente":      return _cadastrar_cliente(inputs, supa)
+            case "criar_rascunho_orcamento": return _criar_rascunho_orcamento(inputs, supa)
+            case "acionar_followup":       return _acionar_followup(inputs, supa)
+            case _:                        return f"Ferramenta '{name}' não reconhecida."
+    except Exception as e:
+        log.error(f"Erro em {name}: {e}", exc_info=True)
+        return f"Erro ao executar {name}: {str(e)[:200]}"
+
+
+def _buscar_clientes(inputs: dict, supa: SupabaseClient) -> str:
+    filters: dict = {}
+    if inputs.get("nome"):
+        filters["nome"] = f"ilike.*{inputs['nome']}*"
+    if inputs.get("cidade"):
+        filters["cidade"] = f"ilike.*{inputs['cidade']}*"
+    if inputs.get("segmento"):
+        filters["segmento"] = f"eq.{inputs['segmento']}"
+    limite = min(int(inputs.get("limite", 10)), 20)
+    dados = supa.select("clientes", "id,nome,email,telefone,cidade,estado,segmento", filters, limite)
+    if not dados:
+        return "Nenhum cliente encontrado."
+    linhas = [f"*{len(dados)} cliente(s):*\n"]
+    for c in dados:
+        linha = f"• *{c.get('nome', '?')}*"
+        if c.get("cidade"):
+            linha += f" — {c['cidade']}/{c.get('estado', '')}"
+        if c.get("telefone"):
+            linha += f" — {c['telefone']}"
+        if c.get("segmento"):
+            linha += f" ({c['segmento']})"
+        linhas.append(linha)
+    return "\n".join(linhas)
+
+
+def _consultar_orcamentos(inputs: dict, supa: SupabaseClient) -> str:
+    filters: dict = {}
+    if inputs.get("status"):
+        filters["status"] = f"eq.{inputs['status']}"
+    if inputs.get("hoje"):
+        filters["criado_em"] = f"gte.{date.today().isoformat()}"
+    limite = min(int(inputs.get("limite", 10)), 20)
+    dados = supa.select("propostas", "numero,titulo,status,valor_total,criado_em", filters, limite)
+    if not dados:
+        return "Nenhum orçamento encontrado."
+    emoji = {"rascunho": "📝", "enviado": "📤", "aprovado": "✅", "recusado": "❌", "expirado": "⏰"}
+    linhas = [f"*{len(dados)} orçamento(s):*\n"]
+    total = 0.0
+    for p in dados:
+        v = float(p.get("valor_total") or 0)
+        total += v
+        dt = (p.get("criado_em") or "")[:10]
+        ic = emoji.get(p.get("status", ""), "•")
+        titulo = p.get("titulo") or p.get("numero", "?")
+        linhas.append(f"{ic} {titulo} — R$ {v:,.2f} ({p.get('status','?')}) [{dt}]")
+    linhas.append(f"\n*Total: R$ {total:,.2f}*")
+    return "\n".join(linhas)
+
+
+def _consultar_pedidos(inputs: dict, supa: SupabaseClient) -> str:
+    filters: dict = {}
+    if inputs.get("status"):
+        filters["status"] = f"eq.{inputs['status']}"
+    if inputs.get("hoje"):
+        filters["criado_em"] = f"gte.{date.today().isoformat()}"
+    limite = min(int(inputs.get("limite", 10)), 20)
+    dados = supa.select("pedidos", "numero,titulo,status,valor_total,prazo_entrega", filters, limite)
+    if not dados:
+        return "Nenhum pedido encontrado."
+    emoji = {
+        "aguardando_aprovacao": "⏳", "aprovado": "✅", "em_producao": "🏭",
+        "concluido": "📦", "cancelado": "❌", "aguardando_instalacao": "🔧", "instalado": "🏁",
+    }
+    linhas = [f"*{len(dados)} pedido(s):*\n"]
+    for p in dados:
+        v = float(p.get("valor_total") or 0)
+        prazo = (p.get("prazo_entrega") or "?")[:10]
+        ic = emoji.get(p.get("status", ""), "•")
+        titulo = p.get("titulo") or p.get("numero", "?")
+        linhas.append(f"{ic} {titulo} — R$ {v:,.2f} | Prazo: {prazo}")
+    return "\n".join(linhas)
+
+
+def _faturamento_resumo(inputs: dict, supa: SupabaseClient) -> str:
+    agora = datetime.now()
+    mes = int(inputs.get("mes") or agora.month)
+    ano = int(inputs.get("ano") or agora.year)
+    inicio = f"{ano}-{mes:02d}-01"
+
+    contas = supa.select("contas_receber", "valor,status,data_vencimento", {"data_vencimento": f"gte.{inicio}"}, 200)
+    contas_mes = [c for c in contas if (c.get("data_vencimento") or "")[:7] == f"{ano}-{mes:02d}"]
+    total_cr = sum(float(c.get("valor", 0)) for c in contas_mes)
+    recebido = sum(float(c.get("valor", 0)) for c in contas_mes if c.get("status") == "pago")
+
+    pedidos = supa.select("pedidos", "valor_total,status,criado_em", {"criado_em": f"gte.{inicio}", "status": "neq.cancelado"}, 200)
+    pedidos_mes = [p for p in pedidos if (p.get("criado_em") or "")[:7] == f"{ano}-{mes:02d}"]
+    total_ped = sum(float(p.get("valor_total") or 0) for p in pedidos_mes)
+    em_prod = sum(1 for p in pedidos_mes if p.get("status") == "em_producao")
+
+    nomes_mes = ["Jan","Fev","Mar","Abr","Mai","Jun","Jul","Ago","Set","Out","Nov","Dez"]
+    return (
+        f"*Resumo Financeiro — {nomes_mes[mes-1]}/{ano}*\n\n"
+        f"📋 *Pedidos*\n"
+        f"• Total em carteira: R$ {total_ped:,.2f}\n"
+        f"• Em produção: {em_prod} pedido(s)\n\n"
+        f"💰 *Contas a Receber*\n"
+        f"• Total: R$ {total_cr:,.2f}\n"
+        f"• Recebido: R$ {recebido:,.2f}\n"
+        f"• Pendente: R$ {total_cr - recebido:,.2f}"
+    )
+
+
+def _cadastrar_cliente(inputs: dict, supa: SupabaseClient) -> str:
+    nome = inputs.get("nome", "").strip()
+    if not nome:
+        return "Nome do cliente é obrigatório."
+    existentes = supa.select("clientes", "id,nome", {"nome": f"ilike.{nome}"}, 3)
+    if existentes:
+        return f"⚠️ Cliente '{existentes[0]['nome']}' já existe no ERP."
+    data = {k: v for k, v in inputs.items() if v not in (None, "")}
+    resultado = supa.insert("clientes", data)
+    if resultado:
+        cid = str(resultado.get("id", ""))[:8]
+        return f"✅ Cliente *{nome}* cadastrado!\nID: {cid}...\nVer: https://crm-croma.vercel.app/clientes"
+    return "❌ Erro ao cadastrar cliente."
+
+
+def _criar_rascunho_orcamento(inputs: dict, supa: SupabaseClient) -> str:
+    cliente_nome = inputs.get("cliente_nome", "")
+    clientes = supa.select("clientes", "id,nome", {"nome": f"ilike.*{cliente_nome}*"}, 3)
+    cliente_id = clientes[0]["id"] if clientes else None
+    nome_real   = clientes[0]["nome"] if clientes else cliente_nome
+
+    data: dict = {
+        "titulo": f"Rascunho Telegram — {inputs.get('itens_descricao', '')[:60]}",
+        "status": "rascunho",
+        "observacoes_internas": f"Criado via bot Telegram.\n\n{inputs.get('observacoes', '')}",
+        "validade_dias": inputs.get("validade_dias", 30),
+    }
+    if cliente_id:
+        data["cliente_id"] = cliente_id
+
+    resultado = supa.insert("propostas", data)
+    if resultado:
+        pid = str(resultado.get("id", ""))
+        return (
+            f"✅ Rascunho criado!\n"
+            f"• Cliente: {nome_real}\n"
+            f"• Itens: {inputs.get('itens_descricao', '')[:80]}\n"
+            f"Completar: https://crm-croma.vercel.app/orcamentos/{pid}"
+        )
+    return "❌ Erro ao criar rascunho."
+
+
+def _acionar_followup(inputs: dict, supa: SupabaseClient) -> str:
+    cliente_nome = inputs.get("cliente_nome", "")
+    clientes = supa.select("clientes", "id,nome,telefone", {"nome": f"ilike.*{cliente_nome}*"}, 3)
+    if not clientes:
+        return f"Cliente '{cliente_nome}' não encontrado no ERP."
+    cliente = clientes[0]
+    data = {
+        "tipo": "nota",
+        "descricao": f"[BOT TELEGRAM] Follow-up: {inputs.get('mensagem_instrucao', '')}",
+        "cliente_id": cliente["id"],
+    }
+    supa.insert("atividades_comerciais", data)
+    return (
+        f"✅ Follow-up agendado para *{cliente['nome']}*!\n"
+        f"• Canal: {inputs.get('canal', 'whatsapp')}\n"
+        f"• Instrução: {inputs.get('mensagem_instrucao', '')}\n"
+        f"Acompanhar: https://crm-croma.vercel.app/agente"
+    )
+
+
+# ─── Transcrição de áudio via Groq (Whisper gratuito) ────────────────────────
+def transcrever_audio(bot: TelegramBot, file_id: str, groq_key: str) -> str:
+    url = bot.get_file_url(file_id)
+    if not url:
+        return ""
+    try:
+        audio_resp = requests.get(url, timeout=30)
+        audio_resp.raise_for_status()
+        ext = url.split(".")[-1].split("?")[0] or "ogg"
+        with tempfile.NamedTemporaryFile(suffix=f".{ext}", delete=False) as tmp:
+            tmp.write(audio_resp.content)
+            tmp_path = tmp.name
+        try:
+            with open(tmp_path, "rb") as af:
+                resp = requests.post(
+                    "https://api.groq.com/openai/v1/audio/transcriptions",
+                    headers={"Authorization": f"Bearer {groq_key}"},
+                    files={"file": (f"audio.{ext}", af, "audio/ogg")},
+                    data={"model": "whisper-large-v3", "language": "pt"},
+                    timeout=60,
+                )
+                resp.raise_for_status()
+                return resp.json().get("text", "")
+        finally:
+            os.unlink(tmp_path)
+    except Exception as e:
+        log.error(f"Groq Whisper transcription: {e}")
+        return ""
+
+
+# ─── Descrição amigável da ação pendente ─────────────────────────────────────
+def descrever_tool(name: str, inputs: dict) -> str:
+    if name == "cadastrar_cliente":
+        campos = [f"• *Nome:* {inputs.get('nome', '?')}"]
+        for f, label in [("email","Email"),("telefone","Telefone"),("cnpj","CNPJ"),("cidade","Cidade"),("segmento","Segmento")]:
+            if inputs.get(f):
+                campos.append(f"• *{label}:* {inputs[f]}")
+        return "*Cadastrar cliente:*\n" + "\n".join(campos)
+    if name == "criar_rascunho_orcamento":
+        return (
+            f"*Criar rascunho de orçamento:*\n"
+            f"• *Cliente:* {inputs.get('cliente_nome','?')}\n"
+            f"• *Itens:* {inputs.get('itens_descricao','?')[:100]}"
+        )
+    if name == "acionar_followup":
+        return (
+            f"*Acionar follow-up:*\n"
+            f"• *Cliente:* {inputs.get('cliente_nome','?')}\n"
+            f"• *Canal:* {inputs.get('canal','whatsapp')}\n"
+            f"• *Mensagem:* {inputs.get('mensagem_instrucao','?')}"
+        )
+    return f"*Executar {name}:*\n```\n{json.dumps(inputs, ensure_ascii=False, indent=2)}\n```"
+
+
+# ─── Tool calling via OpenRouter ─────────────────────────────────────────────
+def processar_com_tools(
+    openrouter_key: str,
+    cfg: dict,
+    chat_id: int,
+    user_msg: str,
+    supa: SupabaseClient | None,
+) -> str | None:
+    """
+    Processa mensagem com tool calling via OpenRouter.
+    Retorna resposta final ou None se ação ficou pendente de confirmação.
+    """
+    hist = historicos.setdefault(chat_id, [])
+    hist.append({"role": "user", "content": user_msg})
+    max_h = cfg.get("max_historico", 20)
+    if len(hist) > max_h:
+        historicos[chat_id] = hist[-max_h:]
+
+    modelo = modelo_atual(chat_id)
+    messages = [{"role": "system", "content": SYSTEM_ERP}] + historicos[chat_id]
+
+    try:
+        data = _call_openrouter(openrouter_key, modelo, messages, TOOLS_ERP, max_tokens=4096)
+        usage = data.get("usage", {})
+        registrar_tokens(chat_id, usage.get("prompt_tokens", 0), usage.get("completion_tokens", 0))
+
+        choice = data["choices"][0]
+        msg = choice["message"]
+        finish_reason = choice.get("finish_reason", "")
+        tool_calls = msg.get("tool_calls") or []
+
+        # Sem tool use — resposta direta
+        if finish_reason != "tool_calls" or not tool_calls:
+            texto = msg.get("content") or ""
+            hist.append({"role": "assistant", "content": texto})
+            return texto
+
+        # Armazena mensagem do assistente com tool_calls no histórico
+        assistant_msg: dict = {
+            "role": "assistant",
+            "content": msg.get("content"),
+            "tool_calls": [
+                {
+                    "id": tc["id"],
+                    "type": "function",
+                    "function": {"name": tc["function"]["name"], "arguments": tc["function"]["arguments"]},
+                }
+                for tc in tool_calls
+            ],
+        }
+        hist.append(assistant_msg)
+
+        # Alguma ferramenta de escrita? → pede confirmação
+        write_tools = [tc for tc in tool_calls if tc["function"]["name"] in TOOLS_ESCRITA]
+        if write_tools:
+            tc0 = write_tools[0]
+            inputs0 = json.loads(tc0["function"]["arguments"])
+            descricao = descrever_tool(tc0["function"]["name"], inputs0)
+            pending_confirmations[chat_id] = {"tool_calls": tool_calls}
+            return f"{descricao}\n\nConfirma? Responda *sim* ou *não*."
+
+        # Ferramentas de leitura — executa direto e busca resposta final
+        for tc in tool_calls:
+            inputs = json.loads(tc["function"]["arguments"])
+            result = executar_tool(tc["function"]["name"], inputs, supa)
+            hist.append({"role": "tool", "tool_call_id": tc["id"], "content": result})
+
+        messages2 = [{"role": "system", "content": SYSTEM_ERP}] + historicos[chat_id]
+        data2 = _call_openrouter(openrouter_key, modelo, messages2, TOOLS_ERP, max_tokens=2048)
+        usage2 = data2.get("usage", {})
+        registrar_tokens(chat_id, usage2.get("prompt_tokens", 0), usage2.get("completion_tokens", 0))
+        msg2 = data2["choices"][0]["message"]
+        texto2 = msg2.get("content") or ""
+        hist.append({"role": "assistant", "content": texto2})
+        return texto2
+
+    except Exception as e:
+        log.error(f"processar_com_tools: {e}", exc_info=True)
+        return f"Erro ao processar: {str(e)[:200]}"
+
+
+def confirmar_acao(
+    openrouter_key: str,
+    cfg: dict,
+    chat_id: int,
+    supa: SupabaseClient | None,
+    pending: dict,
+) -> str:
+    hist = historicos.setdefault(chat_id, [])
+    for tc in pending["tool_calls"]:
+        inputs = json.loads(tc["function"]["arguments"])
+        result = executar_tool(tc["function"]["name"], inputs, supa)
+        hist.append({"role": "tool", "tool_call_id": tc["id"], "content": result})
+
+    modelo = modelo_atual(chat_id)
+    messages = [{"role": "system", "content": SYSTEM_ERP}] + historicos[chat_id]
+    try:
+        data = _call_openrouter(openrouter_key, modelo, messages, TOOLS_ERP, max_tokens=2048)
+        usage = data.get("usage", {})
+        registrar_tokens(chat_id, usage.get("prompt_tokens", 0), usage.get("completion_tokens", 0))
+        msg = data["choices"][0]["message"]
+        texto = msg.get("content") or "✅ Ação executada."
+        hist.append({"role": "assistant", "content": texto})
+        return texto
+    except Exception as e:
+        log.error(f"confirmar_acao: {e}")
+        return f"✅ Ação executada. Erro ao formatar resposta: {str(e)[:100]}"
+
+
+# ─── Comandos ─────────────────────────────────────────────────────────────────
+def cmd_start(bot: TelegramBot, chat_id: int, nome: str):
+    bot.send(chat_id,
+        f"Olá, *{nome}*! Sou a *Crominha*, assistente do ERP Croma Print.\n\n"
+        "*📋 Exemplos do que posso fazer:*\n"
+        "• _\"Como estão os orçamentos de hoje?\"_\n"
+        "• _\"Quais pedidos estão em produção?\"_\n"
+        "• _\"Qual o faturamento deste mês?\"_\n"
+        "• _\"Cadastra o cliente João Silva, tel 11-99999-0000\"_\n"
+        "• _\"Faz um orçamento para a Loja X — 2 banners 3x1m\"_\n"
+        "• _\"Manda follow-up pra Maria da Modas\"_\n\n"
+        "🎤 Também aceito *mensagens de voz*!\n\n"
+        "*Comandos:*\n"
+        "• /erp — Resumo rápido do ERP\n"
+        "• /status — Modelo e custo da sessão\n"
+        "• /sonnet — Modo poderoso\n"
+        "• /haiku — Modo econômico (padrão)\n"
+        "• /clear — Limpar histórico\n"
+        "• /contexto — Carregar CLAUDE.md\n"
+        "• /memoria — Arquivos de memória\n"
+        "• /qa — Relatórios de QA"
+    )
+
+
+def cmd_erp(bot: TelegramBot, chat_id: int, openrouter_key: str, cfg: dict, supa: SupabaseClient | None):
+    bot.typing(chat_id)
+    pedidos_prod = executar_tool("consultar_pedidos", {"status": "em_producao", "limite": 5}, supa)
+    fat = executar_tool("faturamento_resumo", {}, supa)
+    bot.send(chat_id, f"*🏭 Pedidos em Produção*\n{pedidos_prod}\n\n{fat}")
+
+
+def cmd_haiku(bot: TelegramBot, chat_id: int):
+    modelos_chat[chat_id] = MODELO_HAIKU
+    bot.send(chat_id, f"Modelo: *Haiku* (econômico)\n`{MODELO_HAIKU}`")
+
+
+def cmd_sonnet(bot: TelegramBot, chat_id: int):
+    modelos_chat[chat_id] = MODELO_SONNET
+    bot.send(chat_id, f"Modelo: *Sonnet* (poderoso)\n`{MODELO_SONNET}`\nUse /haiku para voltar.")
+
+
+def cmd_clear(bot: TelegramBot, chat_id: int):
+    historicos[chat_id]   = []
+    tokens_chat[chat_id]  = {"input": 0, "output": 0, "chamadas": 0}
+    pending_confirmations.pop(chat_id, None)
+    bot.send(chat_id, "Histórico zerado. Nova conversa iniciada.")
+
+
+def cmd_status(bot: TelegramBot, chat_id: int):
+    modelo = modelo_atual(chat_id)
+    t      = tokens_chat.get(chat_id, {"input": 0, "output": 0, "chamadas": 0})
+    custo  = custo_estimado(chat_id)
+    nome_m = "Haiku (econômico)" if modelo == MODELO_HAIKU else "Sonnet (poderoso)"
+    bot.send(chat_id,
+        f"*Status — Crominha*\n\n"
+        f"*Modelo:* {nome_m}\n`{modelo}`\n\n"
+        f"*Sessão:*\n"
+        f"• Chamadas: {t['chamadas']}\n"
+        f"• Tokens entrada: {t['input']:,}\n"
+        f"• Tokens saída: {t['output']:,}\n"
+        f"• Custo estimado: ~${custo:.4f} USD\n\n"
+        f"*Histórico:* {len(historicos.get(chat_id, []))} msgs"
+    )
+
+
+def cmd_contexto(bot: TelegramBot, chat_id: int):
+    if not CLAUDE_MD.exists():
+        bot.send(chat_id, "CLAUDE.md não encontrado.")
+        return
+    texto = CLAUDE_MD.read_text(encoding="utf-8")
+    hist  = historicos.setdefault(chat_id, [])
+    hist.append({"role": "user",      "content": f"[CONTEXTO COMPLETO DO PROJETO]\n\n{texto[:6000]}"})
+    hist.append({"role": "assistant", "content": "Contexto completo do CRM-Croma carregado. Pode perguntar qualquer coisa."})
+    bot.send(chat_id,
+        f"Contexto carregado. CLAUDE.md: {len(texto):,} chars\n"
+        "_Aumenta o custo das próximas mensagens. Use /clear para resetar._"
+    )
+
+
+def cmd_memoria(bot: TelegramBot, chat_id: int, args: str):
+    if not MEMORY_DIR.exists():
+        bot.send(chat_id, f"Pasta de memória não encontrada:\n`{MEMORY_DIR}`")
+        return
+    if not args:
+        arquivos = sorted(MEMORY_DIR.glob("*.md"))
+        if not arquivos:
+            bot.send(chat_id, "Nenhum arquivo de memória encontrado.")
+            return
+        linhas = ["*Arquivos de memória:*\n"]
+        for f in arquivos:
+            linhas.append(f"• `{f.stem}` — {f.read_text(encoding='utf-8').count(chr(10))} linhas")
+        linhas.append(f"\nUse `/memoria <nome>` para ler.")
+        bot.send(chat_id, "\n".join(linhas))
+        return
+    nome = args.strip().lower().replace(".md", "")
+    candidatos = [f for f in MEMORY_DIR.glob("*.md") if nome in f.stem.lower()]
+    if not candidatos:
+        bot.send(chat_id, f"Arquivo `{nome}` não encontrado.")
+        return
+    conteudo = candidatos[0].read_text(encoding="utf-8")
+    if len(conteudo) > 3500:
+        conteudo = conteudo[:3500] + f"\n\n_...truncado ({len(conteudo):,} chars total)_"
+    bot.send(chat_id, f"*{candidatos[0].name}*\n\n{conteudo}")
+
+
+def cmd_qa(bot: TelegramBot, chat_id: int, args: str):
+    if not QA_DIR.exists():
+        bot.send(chat_id, "Nenhum relatório de QA encontrado.")
+        return
+    if not args:
+        arquivos = sorted(QA_DIR.glob("*.md"), reverse=True)[:10]
+        if not arquivos:
+            bot.send(chat_id, "Pasta de QA está vazia.")
+            return
+        linhas = ["*Relatórios de QA:*\n"]
+        for f in arquivos:
+            linhas.append(f"• `{f.stem}` ({f.stat().st_size // 1024}KB)")
+        linhas.append(f"\nUse `/qa <nome>` para ler.")
+        bot.send(chat_id, "\n".join(linhas))
+        return
+    nome = args.strip().lower().replace(".md", "")
+    candidatos = [f for f in QA_DIR.glob("*.md") if nome in f.stem.lower()]
+    if not candidatos:
+        bot.send(chat_id, f"Relatório `{nome}` não encontrado.")
+        return
+    conteudo = candidatos[0].read_text(encoding="utf-8")
+    if len(conteudo) > 3500:
+        conteudo = conteudo[:3500] + f"\n\n_...truncado ({len(conteudo):,} chars total)_"
+    bot.send(chat_id, f"*{candidatos[0].name}*\n\n{conteudo}")
+
+
+def cmd_agentes(bot: TelegramBot, chat_id: int):
+    if not AGENTS_DIR.exists():
+        bot.send(chat_id, "Pasta de agentes não encontrada.")
+        return
+    pastas = sorted([d for d in AGENTS_DIR.iterdir() if d.is_dir()])
+    if not pastas:
+        bot.send(chat_id, "Nenhum agente encontrado.")
+        return
+    linhas = ["*Agentes do CRM-Croma:*\n"]
+    for p in pastas:
+        linhas.append(f"• `{p.name}` — {len(list(p.glob('*.md')))} arquivos")
+    bot.send(chat_id, "\n".join(linhas))
+
+
+def processar_comando(bot: TelegramBot, chat_id: int, texto: str, nome: str,
+                      openrouter_key: str, cfg: dict, supa: SupabaseClient | None):
+    partes = texto.strip().split(None, 1)
+    cmd    = partes[0].lower().split("@")[0]
+    args   = partes[1] if len(partes) > 1 else ""
+    match cmd:
+        case "/start":    cmd_start(bot, chat_id, nome)
+        case "/erp":      cmd_erp(bot, chat_id, openrouter_key, cfg, supa)
+        case "/haiku":    cmd_haiku(bot, chat_id)
+        case "/sonnet":   cmd_sonnet(bot, chat_id)
+        case "/clear":    cmd_clear(bot, chat_id)
+        case "/status":   cmd_status(bot, chat_id)
+        case "/contexto": cmd_contexto(bot, chat_id)
+        case "/memoria":  cmd_memoria(bot, chat_id, args)
+        case "/qa":       cmd_qa(bot, chat_id, args)
+        case "/agentes":  cmd_agentes(bot, chat_id)
+        case _:           bot.send(chat_id, f"Comando `{cmd}` não reconhecido. Use /start.")
+
+
+# ─── Main ─────────────────────────────────────────────────────────────────────
+def main():
+    log.info("=" * 50)
+    log.info("Croma Print — Telegram Bot ERP v2 iniciando...")
+    log.info("=" * 50)
+
+    cfg            = carregar_config()
+    bot            = TelegramBot(cfg["telegram_token"])
+    openrouter_key = cfg["openrouter_api_key"]
+    log.info(f"LLM: OpenRouter (anthropic/claude-haiku + sonnet)")
+
+    # Supabase (opcional — funcionalidades ERP)
+    supa_url = cfg.get("supabase_url", "")
+    supa_key = cfg.get("supabase_service_key", "")
+    supa: SupabaseClient | None = SupabaseClient(supa_url, supa_key) if supa_url and supa_key else None
+    if supa:
+        log.info(f"Supabase: {supa_url}")
+    else:
+        log.warning("Supabase não configurado — funcionalidades ERP desativadas")
+
+    # Groq Whisper (opcional — transcrição de voz gratuita)
+    groq_key: str = cfg.get("groq_api_key", "")
+    if groq_key:
+        log.info("Groq Whisper: configurado (gratuito)")
+    else:
+        log.warning("groq_api_key não configurado — áudio desativado (obter em console.groq.com)")
+
+    me = bot.get_me()
+    if not me:
+        log.error("Não foi possível conectar ao Telegram.")
+        sys.exit(1)
+    log.info(f"Conectado como @{me.get('username','?')} ({me.get('first_name','?')})")
+
+    autorizados: list[int] = cfg.get("authorized_chat_ids", [])
+    log.info(f"Modo: {'restrito: ' + str(len(autorizados)) + ' chat(s)' if autorizados else 'aberto'}")
+
+    for cid in autorizados:
+        try:
+            funcionalidades = []
+            if supa:     funcionalidades.append("ERP ✅")
+            if groq_key: funcionalidades.append("Áudio ✅")
+            status = " | ".join(funcionalidades) if funcionalidades else "modo básico"
+            bot.send(cid, f"🟢 *Crominha v2 online!* {status}\nUse /start para ver os comandos.")
+        except Exception:
+            pass
+
+    log.info("Aguardando mensagens...\n")
+
+    while True:
+        try:
+            updates = bot.get_updates()
+
+            for upd in updates:
+                bot.offset = upd["update_id"] + 1
+                msg = upd.get("message", {})
+
+                text  = msg.get("text", "").strip()
+                voice = msg.get("voice") or msg.get("audio")
+
+                if not text and not voice:
+                    continue
+
+                chat    = msg.get("chat", {})
+                chat_id = chat["id"]
+                user    = msg.get("from", {})
+                nome    = user.get("first_name", "usuário")
+                username = user.get("username", "")
+                log_prefix = f"[{chat_id}]{'@'+username if username else ''}"
+
+                if autorizados and chat_id not in autorizados:
+                    log.warning(f"Chat não autorizado: {chat_id}")
+                    bot.send(chat_id,
+                        f"Chat não autorizado.\nSeu chat ID: `{chat_id}`\n"
+                        "Adicione em `authorized_chat_ids` no config."
+                    )
+                    continue
+
+                # Comandos (apenas texto)
+                if text.startswith("/"):
+                    log.info(f"{log_prefix} >> {text[:80]}")
+                    processar_comando(bot, chat_id, text, nome, openrouter_key, cfg, supa)
+                    continue
+
+                # Verificar confirmação pendente
+                if chat_id in pending_confirmations:
+                    resposta_lower = text.lower().strip()
+                    if resposta_lower in ("sim", "s", "ok", "confirmar", "confirma", "yes", "pode", "pode sim"):
+                        log.info(f"{log_prefix} >> [CONFIRMAÇÃO SIM]")
+                        bot.typing(chat_id)
+                        pending = pending_confirmations.pop(chat_id)
+                        resultado = confirmar_acao(openrouter_key, cfg, chat_id, supa, pending)
+                        bot.send(chat_id, resultado)
+                        continue
+                    elif resposta_lower in ("não", "nao", "n", "cancelar", "cancela", "no", "não quero"):
+                        log.info(f"{log_prefix} >> [CONFIRMAÇÃO NÃO]")
+                        pending_confirmations.pop(chat_id)
+                        bot.send(chat_id, "❌ Ação cancelada.")
+                        continue
+                    else:
+                        # Nova mensagem limpa o pending
+                        pending_confirmations.pop(chat_id, None)
+
+                # Transcrever áudio
+                if voice:
+                    file_id = voice.get("file_id", "")
+                    log.info(f"{log_prefix} >> [ÁUDIO file_id={file_id[:20]}...]")
+                    if not groq_key:
+                        bot.send(chat_id,
+                            "🎤 Áudio recebido, mas Groq Whisper não está configurado.\n"
+                            "Adicione `groq_api_key` no config (grátis em console.groq.com)."
+                        )
+                        continue
+                    bot.typing(chat_id)
+                    bot.send(chat_id, "🎤 Transcrevendo...")
+                    text = transcrever_audio(bot, file_id, groq_key)
+                    if not text:
+                        bot.send(chat_id, "❌ Não consegui transcrever o áudio. Tente novamente.")
+                        continue
+                    log.info(f"{log_prefix} >> [TRANSCRIÇÃO] {text[:80]}")
+                    bot.send(chat_id, f"📝 _\"{text}\"_")
+
+                if not text:
+                    continue
+
+                log.info(f"{log_prefix} >> {text[:80]}")
+                bot.typing(chat_id)
+                resposta = processar_com_tools(openrouter_key, cfg, chat_id, text, supa)
+                if resposta:
+                    log.info(f"{log_prefix} << {resposta[:80]}...")
+                    bot.send(chat_id, resposta)
+
+        except KeyboardInterrupt:
+            log.info("Bot encerrado pelo usuário.")
+            for cid in autorizados:
+                try:
+                    bot.send(cid, "🔴 *Crominha offline.*")
+                except Exception:
+                    pass
+            break
+        except Exception as e:
+            log.error(f"Erro no loop: {e}", exc_info=True)
+            time.sleep(5)
+
+
+if __name__ == "__main__":
+    main()

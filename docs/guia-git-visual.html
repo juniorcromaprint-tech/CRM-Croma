@@ -1,0 +1,824 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Guia Git & Deploy — Croma Print</title>
+<style>
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+  body {
+    font-family: 'Segoe UI', system-ui, -apple-system, sans-serif;
+    background: #0f172a;
+    color: #e2e8f0;
+    line-height: 1.6;
+  }
+
+  /* Header */
+  .header {
+    background: linear-gradient(135deg, #1e3a5f 0%, #0f172a 100%);
+    border-bottom: 1px solid #334155;
+    padding: 2rem;
+    text-align: center;
+  }
+  .header h1 {
+    font-size: 2rem;
+    background: linear-gradient(90deg, #60a5fa, #a78bfa);
+    -webkit-background-clip: text;
+    -webkit-text-fill-color: transparent;
+    margin-bottom: 0.5rem;
+  }
+  .header p { color: #94a3b8; font-size: 1.1rem; }
+
+  /* Container */
+  .container { max-width: 1100px; margin: 0 auto; padding: 2rem; }
+
+  /* Section */
+  .section {
+    margin-bottom: 3rem;
+  }
+  .section-title {
+    font-size: 1.5rem;
+    font-weight: 700;
+    margin-bottom: 1.5rem;
+    display: flex;
+    align-items: center;
+    gap: 0.75rem;
+  }
+  .section-title .icon {
+    width: 40px; height: 40px;
+    border-radius: 12px;
+    display: flex; align-items: center; justify-content: center;
+    font-size: 1.3rem;
+    flex-shrink: 0;
+  }
+
+  /* Cards Grid */
+  .cards { display: grid; grid-template-columns: repeat(auto-fit, minmax(300px, 1fr)); gap: 1.25rem; }
+
+  .card {
+    background: #1e293b;
+    border: 1px solid #334155;
+    border-radius: 16px;
+    padding: 1.5rem;
+    transition: all 0.3s ease;
+    cursor: default;
+    position: relative;
+    overflow: hidden;
+  }
+  .card:hover {
+    border-color: #60a5fa;
+    transform: translateY(-2px);
+    box-shadow: 0 8px 30px rgba(96, 165, 250, 0.15);
+  }
+  .card::before {
+    content: '';
+    position: absolute;
+    top: 0; left: 0; right: 0;
+    height: 3px;
+    border-radius: 16px 16px 0 0;
+  }
+
+  .card-header {
+    display: flex;
+    align-items: center;
+    gap: 0.75rem;
+    margin-bottom: 1rem;
+  }
+  .card-emoji {
+    font-size: 2rem;
+    width: 50px; height: 50px;
+    background: #0f172a;
+    border-radius: 12px;
+    display: flex; align-items: center; justify-content: center;
+    flex-shrink: 0;
+  }
+  .card-title {
+    font-size: 1.25rem;
+    font-weight: 700;
+    color: #f1f5f9;
+  }
+  .card-subtitle {
+    font-size: 0.8rem;
+    color: #64748b;
+    font-family: 'Courier New', monospace;
+  }
+  .card-body {
+    color: #94a3b8;
+    font-size: 0.95rem;
+    margin-bottom: 1rem;
+  }
+  .card-analogy {
+    background: #0f172a;
+    border-left: 3px solid #60a5fa;
+    padding: 0.75rem 1rem;
+    border-radius: 0 8px 8px 0;
+    font-size: 0.9rem;
+    color: #93c5fd;
+  }
+  .card-analogy strong { color: #60a5fa; }
+
+  /* Color variants */
+  .card.blue::before { background: linear-gradient(90deg, #3b82f6, #60a5fa); }
+  .card.green::before { background: linear-gradient(90deg, #22c55e, #4ade80); }
+  .card.purple::before { background: linear-gradient(90deg, #8b5cf6, #a78bfa); }
+  .card.orange::before { background: linear-gradient(90deg, #f97316, #fb923c); }
+  .card.pink::before { background: linear-gradient(90deg, #ec4899, #f472b6); }
+  .card.cyan::before { background: linear-gradient(90deg, #06b6d4, #22d3ee); }
+  .card.yellow::before { background: linear-gradient(90deg, #eab308, #facc15); }
+  .card.red::before { background: linear-gradient(90deg, #ef4444, #f87171); }
+  .card.teal::before { background: linear-gradient(90deg, #14b8a6, #2dd4bf); }
+  .card.indigo::before { background: linear-gradient(90deg, #6366f1, #818cf8); }
+
+  /* Flow Diagram */
+  .flow {
+    background: #1e293b;
+    border: 1px solid #334155;
+    border-radius: 16px;
+    padding: 2rem;
+    margin-top: 1.5rem;
+  }
+  .flow-steps {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    flex-wrap: wrap;
+    gap: 0;
+  }
+  .flow-step {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    text-align: center;
+    padding: 1rem;
+    min-width: 120px;
+  }
+  .flow-step .step-circle {
+    width: 64px; height: 64px;
+    border-radius: 50%;
+    display: flex; align-items: center; justify-content: center;
+    font-size: 1.5rem;
+    margin-bottom: 0.75rem;
+    border: 3px solid;
+    transition: transform 0.3s;
+  }
+  .flow-step:hover .step-circle { transform: scale(1.15); }
+  .flow-step .step-num {
+    font-size: 0.7rem;
+    font-weight: 700;
+    color: #64748b;
+    text-transform: uppercase;
+    letter-spacing: 0.1em;
+    margin-bottom: 0.25rem;
+  }
+  .flow-step .step-label {
+    font-weight: 600;
+    font-size: 0.95rem;
+    color: #f1f5f9;
+  }
+  .flow-step .step-desc {
+    font-size: 0.8rem;
+    color: #64748b;
+    margin-top: 0.25rem;
+    max-width: 130px;
+  }
+
+  .flow-arrow {
+    font-size: 1.5rem;
+    color: #475569;
+    padding: 0 0.25rem;
+    align-self: center;
+    margin-bottom: 2rem;
+  }
+
+  /* Step colors */
+  .step-blue .step-circle { background: #1e3a5f; border-color: #3b82f6; }
+  .step-green .step-circle { background: #14532d; border-color: #22c55e; }
+  .step-purple .step-circle { background: #3b0764; border-color: #8b5cf6; }
+  .step-orange .step-circle { background: #431407; border-color: #f97316; }
+  .step-pink .step-circle { background: #500724; border-color: #ec4899; }
+  .step-cyan .step-circle { background: #083344; border-color: #06b6d4; }
+
+  /* Real Example */
+  .example {
+    background: #0f172a;
+    border: 1px solid #334155;
+    border-radius: 12px;
+    padding: 1.5rem;
+    margin-top: 1.5rem;
+  }
+  .example-title {
+    font-size: 1rem;
+    font-weight: 700;
+    color: #fbbf24;
+    margin-bottom: 1rem;
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+  }
+  .example-line {
+    display: flex;
+    align-items: flex-start;
+    gap: 0.75rem;
+    padding: 0.5rem 0;
+    border-bottom: 1px solid #1e293b;
+    font-size: 0.9rem;
+  }
+  .example-line:last-child { border-bottom: none; }
+  .example-line .el-icon {
+    flex-shrink: 0;
+    width: 28px; height: 28px;
+    border-radius: 6px;
+    display: flex; align-items: center; justify-content: center;
+    font-size: 0.85rem;
+  }
+  .example-line .el-text { color: #cbd5e1; }
+  .example-line code {
+    background: #1e293b;
+    color: #7dd3fc;
+    padding: 0.15rem 0.4rem;
+    border-radius: 4px;
+    font-size: 0.85rem;
+    font-family: 'Courier New', monospace;
+  }
+
+  .el-blue { background: #1e3a5f; }
+  .el-green { background: #14532d; }
+  .el-purple { background: #3b0764; }
+  .el-orange { background: #431407; }
+  .el-pink { background: #500724; }
+  .el-cyan { background: #083344; }
+
+  /* Comparison table */
+  .compare-table {
+    width: 100%;
+    border-collapse: separate;
+    border-spacing: 0;
+    margin-top: 1rem;
+    font-size: 0.9rem;
+  }
+  .compare-table th {
+    background: #1e293b;
+    padding: 0.75rem 1rem;
+    text-align: left;
+    font-weight: 600;
+    color: #94a3b8;
+    border-bottom: 2px solid #334155;
+  }
+  .compare-table th:first-child { border-radius: 8px 0 0 0; }
+  .compare-table th:last-child { border-radius: 0 8px 0 0; }
+  .compare-table td {
+    padding: 0.75rem 1rem;
+    border-bottom: 1px solid #1e293b;
+    color: #cbd5e1;
+  }
+  .compare-table tr:hover td { background: #1e293b; }
+  .compare-table .term {
+    font-weight: 700;
+    color: #60a5fa;
+    white-space: nowrap;
+  }
+  .compare-table .analogy {
+    color: #fbbf24;
+    font-style: italic;
+  }
+
+  /* Tabs */
+  .tabs { display: flex; gap: 0.5rem; margin-bottom: 1.5rem; flex-wrap: wrap; }
+  .tab {
+    padding: 0.5rem 1.25rem;
+    border-radius: 10px;
+    border: 1px solid #334155;
+    background: #1e293b;
+    color: #94a3b8;
+    cursor: pointer;
+    font-size: 0.9rem;
+    font-weight: 500;
+    transition: all 0.2s;
+  }
+  .tab:hover, .tab.active {
+    background: #3b82f6;
+    color: white;
+    border-color: #3b82f6;
+  }
+  .tab-content { display: none; }
+  .tab-content.active { display: block; }
+
+  /* Badge */
+  .badge {
+    display: inline-block;
+    padding: 0.2rem 0.6rem;
+    border-radius: 6px;
+    font-size: 0.75rem;
+    font-weight: 600;
+  }
+  .badge-blue { background: #1e3a5f; color: #93c5fd; }
+  .badge-green { background: #14532d; color: #86efac; }
+  .badge-purple { background: #3b0764; color: #c4b5fd; }
+  .badge-orange { background: #431407; color: #fdba74; }
+
+  /* Croma specific */
+  .croma-map {
+    background: #1e293b;
+    border: 1px solid #334155;
+    border-radius: 16px;
+    padding: 2rem;
+    margin-top: 1.5rem;
+  }
+  .croma-row {
+    display: flex;
+    align-items: center;
+    gap: 1rem;
+    padding: 0.75rem 0;
+    border-bottom: 1px solid #0f172a;
+  }
+  .croma-row:last-child { border-bottom: none; }
+  .croma-row .cr-label {
+    width: 180px;
+    font-weight: 600;
+    color: #60a5fa;
+    flex-shrink: 0;
+  }
+  .croma-row .cr-arrow { color: #475569; flex-shrink: 0; }
+  .croma-row .cr-value { color: #cbd5e1; }
+  .croma-row code {
+    background: #0f172a;
+    color: #7dd3fc;
+    padding: 0.15rem 0.5rem;
+    border-radius: 4px;
+    font-size: 0.85rem;
+  }
+
+  /* Footer */
+  .footer {
+    text-align: center;
+    padding: 2rem;
+    color: #475569;
+    font-size: 0.85rem;
+    border-top: 1px solid #1e293b;
+    margin-top: 2rem;
+  }
+
+  /* Responsive */
+  @media (max-width: 768px) {
+    .cards { grid-template-columns: 1fr; }
+    .flow-steps { flex-direction: column; }
+    .flow-arrow { transform: rotate(90deg); margin: 0; }
+    .croma-row { flex-direction: column; gap: 0.25rem; }
+    .croma-row .cr-label { width: auto; }
+    .container { padding: 1rem; }
+  }
+</style>
+</head>
+<body>
+
+<!-- Header -->
+<div class="header">
+  <h1>🚀 Guia Git & Deploy</h1>
+  <p>Tudo que você precisa saber — explicado de forma visual</p>
+</div>
+
+<div class="container">
+
+  <!-- ===== SEÇÃO 1: Glossário ===== -->
+  <div class="section">
+    <div class="section-title">
+      <span class="icon" style="background:#1e3a5f;">📖</span>
+      Glossário — Os 10 Termos Essenciais
+    </div>
+
+    <div class="cards">
+
+      <!-- Git -->
+      <div class="card blue">
+        <div class="card-header">
+          <div class="card-emoji">🗄️</div>
+          <div>
+            <div class="card-title">Git</div>
+            <div class="card-subtitle">Sistema de controle de versão</div>
+          </div>
+        </div>
+        <div class="card-body">
+          Registra <strong>cada mudança</strong> feita no código. Você pode voltar a qualquer ponto no tempo, ver quem fez o quê, e trabalhar em paralelo sem conflito.
+        </div>
+        <div class="card-analogy">
+          <strong>📎 Analogia:</strong> É como o histórico de versões do Google Docs, mas para código inteiro.
+        </div>
+      </div>
+
+      <!-- Commit -->
+      <div class="card green">
+        <div class="card-header">
+          <div class="card-emoji">💾</div>
+          <div>
+            <div class="card-title">Commit</div>
+            <div class="card-subtitle">git commit -m "mensagem"</div>
+          </div>
+        </div>
+        <div class="card-body">
+          Um <strong>ponto de salvamento</strong> com descrição. Cada commit grava exatamente o que mudou e por quê. Você pode ter centenas deles.
+        </div>
+        <div class="card-analogy">
+          <strong>📎 Analogia:</strong> É como o Ctrl+Z com nome — "adicionei a página de expedição".
+        </div>
+      </div>
+
+      <!-- Branch -->
+      <div class="card purple">
+        <div class="card-header">
+          <div class="card-emoji">🌿</div>
+          <div>
+            <div class="card-title">Branch</div>
+            <div class="card-subtitle">git branch nome-do-branch</div>
+          </div>
+        </div>
+        <div class="card-body">
+          Uma <strong>cópia paralela</strong> do código para trabalhar sem risco. Você faz as mudanças no galho (branch) sem afetar o tronco (main).
+        </div>
+        <div class="card-analogy">
+          <strong>📎 Analogia:</strong> É como uma mesa de trabalho separada — você monta o projeto ali e só leva pro salão quando está pronto.
+        </div>
+      </div>
+
+      <!-- Main -->
+      <div class="card orange">
+        <div class="card-header">
+          <div class="card-emoji">🏠</div>
+          <div>
+            <div class="card-title">Main</div>
+            <div class="card-subtitle">branch principal</div>
+          </div>
+        </div>
+        <div class="card-body">
+          O branch <strong>oficial</strong>. É o código que está <strong>no ar</strong>, rodando em <code>crm-croma.vercel.app</code>. Tudo que entra aqui vai pro site.
+        </div>
+        <div class="card-analogy">
+          <strong>📎 Analogia:</strong> É a vitrine da loja — só vai pra lá o que está pronto e aprovado.
+        </div>
+      </div>
+
+      <!-- Push -->
+      <div class="card cyan">
+        <div class="card-header">
+          <div class="card-emoji">☁️</div>
+          <div>
+            <div class="card-title">Push</div>
+            <div class="card-subtitle">git push</div>
+          </div>
+        </div>
+        <div class="card-body">
+          <strong>Enviar</strong> seus commits do computador para o GitHub (a nuvem). Sem push, as mudanças ficam só na sua máquina.
+        </div>
+        <div class="card-analogy">
+          <strong>📎 Analogia:</strong> Commit = salvar o arquivo. Push = fazer upload pro Google Drive.
+        </div>
+      </div>
+
+      <!-- Pull -->
+      <div class="card pink">
+        <div class="card-header">
+          <div class="card-emoji">⬇️</div>
+          <div>
+            <div class="card-title">Pull</div>
+            <div class="card-subtitle">git pull</div>
+          </div>
+        </div>
+        <div class="card-body">
+          <strong>Baixar</strong> as mudanças do GitHub para o computador. É o inverso do push — traz o que outras pessoas (ou outras sessões) fizeram.
+        </div>
+        <div class="card-analogy">
+          <strong>📎 Analogia:</strong> É como sincronizar o Dropbox — puxa o que está na nuvem.
+        </div>
+      </div>
+
+      <!-- Merge -->
+      <div class="card yellow">
+        <div class="card-header">
+          <div class="card-emoji">🔀</div>
+          <div>
+            <div class="card-title">Merge</div>
+            <div class="card-subtitle">git merge branch</div>
+          </div>
+        </div>
+        <div class="card-body">
+          <strong>Juntar</strong> um branch de trabalho de volta no main. É quando o galho volta pro tronco — as mudanças passam a valer oficialmente.
+        </div>
+        <div class="card-analogy">
+          <strong>📎 Analogia:</strong> É como juntar duas planilhas numa só — combina o trabalho.
+        </div>
+      </div>
+
+      <!-- PR -->
+      <div class="card indigo">
+        <div class="card-header">
+          <div class="card-emoji">📋</div>
+          <div>
+            <div class="card-title">Pull Request (PR)</div>
+            <div class="card-subtitle">GitHub → New Pull Request</div>
+          </div>
+        </div>
+        <div class="card-body">
+          Um <strong>pedido de revisão</strong> antes do merge. O GitHub mostra todas as mudanças em detalhes para você aprovar ou pedir ajustes antes de ir pro ar.
+        </div>
+        <div class="card-analogy">
+          <strong>📎 Analogia:</strong> É como enviar uma prova pra revisão antes de imprimir — você confere e aprova.
+        </div>
+      </div>
+
+      <!-- Deploy -->
+      <div class="card red">
+        <div class="card-header">
+          <div class="card-emoji">🚀</div>
+          <div>
+            <div class="card-title">Deploy</div>
+            <div class="card-subtitle">Automático pela Vercel</div>
+          </div>
+        </div>
+        <div class="card-body">
+          <strong>Publicar</strong> o código no servidor. No seu caso a Vercel faz isso sozinha: cada merge no main → site atualizado em ~1 minuto.
+        </div>
+        <div class="card-analogy">
+          <strong>📎 Analogia:</strong> É como o "Publicar" do Instagram — o conteúdo vai pro ar.
+        </div>
+      </div>
+
+      <!-- Worktree -->
+      <div class="card teal">
+        <div class="card-header">
+          <div class="card-emoji">📂</div>
+          <div>
+            <div class="card-title">Worktree</div>
+            <div class="card-subtitle">git worktree add</div>
+          </div>
+        </div>
+        <div class="card-body">
+          Uma <strong>pasta isolada</strong> para trabalhar em outro branch sem mexer na pasta principal. Duas cópias do projeto rodando lado a lado.
+        </div>
+        <div class="card-analogy">
+          <strong>📎 Analogia:</strong> É como ter duas mesas de trabalho — enquanto uma versão está na produção, você monta outra na mesa ao lado.
+        </div>
+      </div>
+
+    </div>
+  </div>
+
+  <!-- ===== SEÇÃO 2: Fluxo Visual ===== -->
+  <div class="section">
+    <div class="section-title">
+      <span class="icon" style="background:#14532d;">🔄</span>
+      O Fluxo Completo — Do Código ao Site
+    </div>
+
+    <div class="flow">
+      <div class="flow-steps">
+
+        <div class="flow-step step-blue">
+          <div class="step-num">Passo 1</div>
+          <div class="step-circle">🌿</div>
+          <div class="step-label">Branch</div>
+          <div class="step-desc">Cria um galho para trabalhar</div>
+        </div>
+        <div class="flow-arrow">→</div>
+
+        <div class="flow-step step-green">
+          <div class="step-num">Passo 2</div>
+          <div class="step-circle">💾</div>
+          <div class="step-label">Commits</div>
+          <div class="step-desc">Salva as mudanças com descrição</div>
+        </div>
+        <div class="flow-arrow">→</div>
+
+        <div class="flow-step step-purple">
+          <div class="step-num">Passo 3</div>
+          <div class="step-circle">☁️</div>
+          <div class="step-label">Push</div>
+          <div class="step-desc">Envia pro GitHub</div>
+        </div>
+        <div class="flow-arrow">→</div>
+
+        <div class="flow-step step-orange">
+          <div class="step-num">Passo 4</div>
+          <div class="step-circle">📋</div>
+          <div class="step-label">PR</div>
+          <div class="step-desc">Pedido de revisão</div>
+        </div>
+        <div class="flow-arrow">→</div>
+
+        <div class="flow-step step-pink">
+          <div class="step-num">Passo 5</div>
+          <div class="step-circle">🔀</div>
+          <div class="step-label">Merge</div>
+          <div class="step-desc">Aprova e junta no main</div>
+        </div>
+        <div class="flow-arrow">→</div>
+
+        <div class="flow-step step-cyan">
+          <div class="step-num">Passo 6</div>
+          <div class="step-circle">🚀</div>
+          <div class="step-label">Deploy</div>
+          <div class="step-desc">Vercel publica automaticamente</div>
+        </div>
+
+      </div>
+    </div>
+  </div>
+
+  <!-- ===== SEÇÃO 3: No Croma Print ===== -->
+  <div class="section">
+    <div class="section-title">
+      <span class="icon" style="background:#431407;">🏢</span>
+      Como isso funciona no Croma Print
+    </div>
+
+    <div class="croma-map">
+
+      <div class="croma-row">
+        <div class="cr-label">🏠 Main</div>
+        <div class="cr-arrow">→</div>
+        <div class="cr-value">O código que está rodando em <code>crm-croma.vercel.app</code></div>
+      </div>
+
+      <div class="croma-row">
+        <div class="cr-label">☁️ GitHub</div>
+        <div class="cr-arrow">→</div>
+        <div class="cr-value">Repositório em <code>github.com/juniorcromaprint-tech/CRM-Croma</code></div>
+      </div>
+
+      <div class="croma-row">
+        <div class="cr-label">🚀 Vercel (ERP)</div>
+        <div class="cr-arrow">→</div>
+        <div class="cr-value">Deploy automático do main em <code>crm-croma.vercel.app</code></div>
+      </div>
+
+      <div class="croma-row">
+        <div class="cr-label">📱 Vercel (Campo)</div>
+        <div class="cr-arrow">→</div>
+        <div class="cr-value">Deploy automático do main em <code>campo-croma.vercel.app</code></div>
+      </div>
+
+      <div class="croma-row">
+        <div class="cr-label">🗄️ Supabase</div>
+        <div class="cr-arrow">→</div>
+        <div class="cr-value">Banco de dados Postgres em <code>djwjmfgplnqyffdcgdaw.supabase.co</code></div>
+      </div>
+
+      <div class="croma-row">
+        <div class="cr-label">📋 PRs Entregues</div>
+        <div class="cr-arrow">→</div>
+        <div class="cr-value">PR #5 (bugs), PR #6 (fiscal), PR #7 (auditoria) — todos mergeados no main ✅</div>
+      </div>
+
+    </div>
+
+    <!-- Exemplo Real -->
+    <div class="example">
+      <div class="example-title">⚡ Exemplo real — PR #7 (Auditoria)</div>
+
+      <div class="example-line">
+        <div class="el-icon el-blue">1</div>
+        <div class="el-text">Claude criou o branch <code>claude/competent-pike</code> (isolado do main)</div>
+      </div>
+      <div class="example-line">
+        <div class="el-icon el-green">2</div>
+        <div class="el-text">Fez 31 tasks com vários commits: <code>fix: RLS fiscal</code>, <code>feat: soft delete</code>, etc.</div>
+      </div>
+      <div class="example-line">
+        <div class="el-icon el-purple">3</div>
+        <div class="el-text">Fez push do branch pro GitHub</div>
+      </div>
+      <div class="example-line">
+        <div class="el-icon el-orange">4</div>
+        <div class="el-text">Abriu o <strong>PR #7</strong> no GitHub com resumo das 38 correções</div>
+      </div>
+      <div class="example-line">
+        <div class="el-icon el-pink">5</div>
+        <div class="el-text">Você aprovou → merge no <code>main</code></div>
+      </div>
+      <div class="example-line">
+        <div class="el-icon el-cyan">6</div>
+        <div class="el-text">Vercel detectou a mudança no main → deploy automático → site atualizado 🎉</div>
+      </div>
+    </div>
+  </div>
+
+  <!-- ===== SEÇÃO 4: Tabela Resumo ===== -->
+  <div class="section">
+    <div class="section-title">
+      <span class="icon" style="background:#3b0764;">📊</span>
+      Resumo Rápido
+    </div>
+
+    <div style="overflow-x: auto;">
+      <table class="compare-table">
+        <thead>
+          <tr>
+            <th>Termo</th>
+            <th>O que faz</th>
+            <th>No dia a dia é como...</th>
+          </tr>
+        </thead>
+        <tbody>
+          <tr>
+            <td class="term">Git</td>
+            <td>Guarda todo histórico do código</td>
+            <td class="analogy">Histórico de versões do Google Docs</td>
+          </tr>
+          <tr>
+            <td class="term">Commit</td>
+            <td>Ponto de salvamento com nome</td>
+            <td class="analogy">Ctrl+Z com etiqueta</td>
+          </tr>
+          <tr>
+            <td class="term">Branch</td>
+            <td>Cópia paralela para trabalhar sem risco</td>
+            <td class="analogy">Mesa de trabalho separada</td>
+          </tr>
+          <tr>
+            <td class="term">Main</td>
+            <td>O branch que está no ar</td>
+            <td class="analogy">A vitrine da loja</td>
+          </tr>
+          <tr>
+            <td class="term">Push</td>
+            <td>Envia mudanças para o GitHub</td>
+            <td class="analogy">Upload pro Google Drive</td>
+          </tr>
+          <tr>
+            <td class="term">Pull</td>
+            <td>Baixa mudanças do GitHub</td>
+            <td class="analogy">Sincronizar o Dropbox</td>
+          </tr>
+          <tr>
+            <td class="term">Merge</td>
+            <td>Junta um branch no main</td>
+            <td class="analogy">Juntar duas planilhas</td>
+          </tr>
+          <tr>
+            <td class="term">PR</td>
+            <td>Pedido de revisão antes do merge</td>
+            <td class="analogy">Prova pra revisão antes de imprimir</td>
+          </tr>
+          <tr>
+            <td class="term">Deploy</td>
+            <td>Publica no servidor</td>
+            <td class="analogy">"Publicar" do Instagram</td>
+          </tr>
+          <tr>
+            <td class="term">Worktree</td>
+            <td>Pasta isolada para outro branch</td>
+            <td class="analogy">Duas mesas de trabalho</td>
+          </tr>
+        </tbody>
+      </table>
+    </div>
+  </div>
+
+  <!-- ===== SEÇÃO 5: Dicas ===== -->
+  <div class="section">
+    <div class="section-title">
+      <span class="icon" style="background:#083344;">💡</span>
+      Dicas Importantes
+    </div>
+
+    <div class="cards" style="grid-template-columns: repeat(auto-fit, minmax(320px, 1fr));">
+
+      <div class="card green">
+        <div class="card-header">
+          <div class="card-emoji">✅</div>
+          <div><div class="card-title">Tudo automático pra você</div></div>
+        </div>
+        <div class="card-body">
+          O Claude (eu) cuida de todo o fluxo Git — commits, branches, push e PRs. Você só precisa <strong>aprovar o PR</strong> no GitHub quando estiver satisfeito.
+        </div>
+      </div>
+
+      <div class="card blue">
+        <div class="card-header">
+          <div class="card-emoji">🔒</div>
+          <div><div class="card-title">Main é protegido</div></div>
+        </div>
+        <div class="card-body">
+          Nunca trabalho direto no main. Sempre crio um branch separado, trabalho lá, e só junto quando tudo está testado e aprovado. <strong>Zero risco pro site no ar.</strong>
+        </div>
+      </div>
+
+      <div class="card purple">
+        <div class="card-header">
+          <div class="card-emoji">⏱️</div>
+          <div><div class="card-title">Deploy em 1 minuto</div></div>
+        </div>
+        <div class="card-body">
+          Assim que um PR é mergeado no main, a Vercel detecta automaticamente e publica a nova versão. <strong>Sem precisar fazer nada</strong> — é tudo automático.
+        </div>
+      </div>
+
+    </div>
+  </div>
+
+</div>
+
+<div class="footer">
+  Croma Print — Guia Git & Deploy | Gerado por Claude para Junior
+</div>
+
+</body>
+</html>

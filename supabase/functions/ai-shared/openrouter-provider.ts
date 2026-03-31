@@ -97,7 +97,8 @@ async function fetchCompletion(
 
   try {
     // Só envia response_format para modelos que suportam — modelos gratuitos ignoram ou rejeitam
-    const supportsJsonFormat = SUPPORTS_JSON_FORMAT.has(model) && !model.endsWith(':free');
+    // text_mode: skip json_object format (used by Telegram bot and other text-based responses)
+    const supportsJsonFormat = SUPPORTS_JSON_FORMAT.has(model) && !model.endsWith(':free') && !config?.text_mode;
     const bodyPayload: Record<string, unknown> = {
       model,
       messages,

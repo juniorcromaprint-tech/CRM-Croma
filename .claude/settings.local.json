@@ -61,7 +61,9 @@
       "mcp__claude_ai_Supabase__apply_migration",
       "mcp__Claude_Preview__preview_start",
       "Bash(gh pr:*)",
-      "Bash(gh auth:*)"
+      "Bash(gh auth:*)",
+      "Skill(telegram:configure)",
+      "mcp__plugin_telegram_telegram__reply"
     ],
     "additionalDirectories": [
       "C:\\Users\\Caldera\\Claude\\AutoBid-Instagram"

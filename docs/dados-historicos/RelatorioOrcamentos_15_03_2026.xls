@@ -1,0 +1,1166 @@
+﻿<table class='table table-hover reordenar' id=''>
+							<thead>
+								<tr>
+									<th class='textalign_c'> Orçamento </th>
+									<th> Empresa </th>
+									<th> Contato </th>
+									<th style='min-width:80px'> Telefone </th>
+									<th> Trabalho </th>
+									<th> Cadastro </th>
+									<th> Validade </th>
+									<th> Status atual </th>
+									<th> Vendedor </th>
+									<th> Valor total </th>
+									<th style='min-width:70px'> </th>
+								</tr>
+							</thead>
+							<tbody>
+								<tr> 
+									<td class='textalign_c roxo pointer'> <a class='visualizarOrcamento tip' title='Visualizar orcamento' data-id='1622' data-sequencial='1498' > 1498 </a> </td>
+									<td> <a href='javascript:void(0)' class='visualizarDados' data-id='8' > CALCADOS BEIRA RIO S/A </a></td>
+									<td> Aline   </td>
+									<td> +55 (51) 3584-2200 <a href='https://web.whatsapp.com/send?phone=555135842200&text=Olá Aline' target='_blank' data-id='1622' class='tip whats ev_whatsapp' title='Enviar para WhatsApp: +55 (51) 3584-2200'> <i class='icofont icofont-brand-whatsapp verde tl12' style='font-size: 12px; margin-left: 5px;'></i></a> </td>
+									<td> SHOWROOM VZ E MD </td>
+									<td> 14/03/2026 14:21 </td>
+									<td> 0 dia  </td>
+									<td> Aprovado <span class='cinzal'>(O.S.: 1054)</span> </td>
+									<td> Viviane Penninck </td>
+									<td>  R$ 4.063,05 </td>
+									<td class='textalign_c'> <a href='javascript:void(0)' data-toggle='popover' class='tip eventos' title='Eventos' data-id='1622'> <i class='icofont icofont-tags azul tl12'></i></a>
+								<spacer style='padding-right: 10px;'></spacer>
+								<a href='javascript:void(0)' class='tip reutilizar' title='Duplicar' data-id='1622'> <i class='icofont icofont-papers text-dark tl12'></i></a>
+								<spacer style='padding-right: 10px;'></spacer>
+								<a href='index.php?modulo=NovosOrcamentos&item=1622' class='tip' title='Editar'> <i class='icofont icofont-edit-alt text-dark tl12'></i></a> </td>	
+								</tr>
+								<tr style='display:none' id='trSon_1622' class='tr_detalhes'>
+									<td colspan=11> <div class='textalign_c' id='agr_1498'></div> </td>
+								</tr>
+					<tr> 
+									<td class='textalign_c roxo pointer'> <a class='visualizarOrcamento tip' title='Visualizar orcamento' data-id='1621' data-sequencial='1497' > 1497 </a> </td>
+									<td> <a href='javascript:void(0)' class='visualizarDados' data-id='8' > CALCADOS BEIRA RIO S/A </a></td>
+									<td> Aline   </td>
+									<td> +55 (51) 3584-2200 <a href='https://web.whatsapp.com/send?phone=555135842200&text=Olá Aline' target='_blank' data-id='1621' class='tip whats ev_whatsapp' title='Enviar para WhatsApp: +55 (51) 3584-2200'> <i class='icofont icofont-brand-whatsapp verde tl12' style='font-size: 12px; margin-left: 5px;'></i></a> </td>
+									<td> EUGENIO (COD 116625-1) </td>
+									<td> 13/03/2026 15:24 </td>
+									<td> 7 dias  </td>
+									<td> <a href='javascript:void(0)' class='trocarstatus tip roxoclaro' title='' data-id='1621' > Em aberto </a>  </td>
+									<td> Viviane Penninck </td>
+									<td>  R$ 1.083,24 </td>
+									<td class='textalign_c'> <a href='javascript:void(0)' data-toggle='popover' class='tip eventos' title='Eventos' data-id='1621'> <i class='icofont icofont-tags text-dark tl12'></i></a>
+								<spacer style='padding-right: 10px;'></spacer>
+								<a href='javascript:void(0)' class='tip reutilizar' title='Duplicar' data-id='1621'> <i class='icofont icofont-papers text-dark tl12'></i></a>
+								<spacer style='padding-right: 10px;'></spacer>
+								<a href='index.php?modulo=NovosOrcamentos&item=1621' class='tip' title='Editar'> <i class='icofont icofont-edit-alt text-dark tl12'></i></a> </td>	
+								</tr>
+								<tr style='display:none' id='trSon_1621' class='tr_detalhes'>
+									<td colspan=11> <div class='textalign_c' id='agr_1497'></div> </td>
+								</tr>
+					<tr> 
+									<td class='textalign_c roxo pointer'> <a class='visualizarOrcamento tip' title='Visualizar orcamento' data-id='1620' data-sequencial='1496' > 1496 </a> </td>
+									<td> <a href='javascript:void(0)' class='visualizarDados' data-id='8' > CALCADOS BEIRA RIO S/A </a></td>
+									<td> Aline   </td>
+									<td> +55 (51) 3584-2200 <a href='https://web.whatsapp.com/send?phone=555135842200&text=Olá Aline' target='_blank' data-id='1620' class='tip whats ev_whatsapp' title='Enviar para WhatsApp: +55 (51) 3584-2200'> <i class='icofont icofont-brand-whatsapp verde tl12' style='font-size: 12px; margin-left: 5px;'></i></a> </td>
+									<td> CLOVIS LOJA 20 (COD 58096-15) </td>
+									<td> 13/03/2026 14:56 </td>
+									<td> 7 dias  </td>
+									<td> <a href='javascript:void(0)' class='trocarstatus tip roxoclaro' title='' data-id='1620' > Em aberto </a>  </td>
+									<td> Viviane Penninck </td>
+									<td>  R$ 443,70 </td>
+									<td class='textalign_c'> <a href='javascript:void(0)' data-toggle='popover' class='tip eventos' title='Eventos' data-id='1620'> <i class='icofont icofont-tags text-dark tl12'></i></a>
+								<spacer style='padding-right: 10px;'></spacer>
+								<a href='javascript:void(0)' class='tip reutilizar' title='Duplicar' data-id='1620'> <i class='icofont icofont-papers text-dark tl12'></i></a>
+								<spacer style='padding-right: 10px;'></spacer>
+								<a href='index.php?modulo=NovosOrcamentos&item=1620' class='tip' title='Editar'> <i class='icofont icofont-edit-alt text-dark tl12'></i></a> </td>	
+								</tr>
+								<tr style='display:none' id='trSon_1620' class='tr_detalhes'>
+									<td colspan=11> <div class='textalign_c' id='agr_1496'></div> </td>
+								</tr>
+					<tr> 
+									<td class='textalign_c roxo pointer'> <a class='visualizarOrcamento tip' title='Visualizar orcamento' data-id='1619' data-sequencial='1495' > 1495 </a> </td>
+									<td> <a href='javascript:void(0)' class='visualizarDados' data-id='8' > CALCADOS BEIRA RIO S/A </a></td>
+									<td> Aline   </td>
+									<td> +55 (51) 3584-2200 <a href='https://web.whatsapp.com/send?phone=555135842200&text=Olá Aline' target='_blank' data-id='1619' class='tip whats ev_whatsapp' title='Enviar para WhatsApp: +55 (51) 3584-2200'> <i class='icofont icofont-brand-whatsapp verde tl12' style='font-size: 12px; margin-left: 5px;'></i></a> </td>
+									<td> ESPAÇO SHOWROOM ANA CASTELA </td>
+									<td> 12/03/2026 16:25 </td>
+									<td> 0 dia  </td>
+									<td> Aprovado <span class='cinzal'>(O.S.: 1053)</span> </td>
+									<td> Viviane Penninck </td>
+									<td>  R$ 2.757,67 </td>
+									<td class='textalign_c'> <a href='javascript:void(0)' data-toggle='popover' class='tip eventos' title='Eventos' data-id='1619'> <i class='icofont icofont-tags text-dark tl12'></i></a>
+								<spacer style='padding-right: 10px;'></spacer>
+								<a href='javascript:void(0)' class='tip reutilizar' title='Duplicar' data-id='1619'> <i class='icofont icofont-papers text-dark tl12'></i></a>
+								<spacer style='padding-right: 10px;'></spacer>
+								<a href='index.php?modulo=NovosOrcamentos&item=1619' class='tip' title='Editar'> <i class='icofont icofont-edit-alt text-dark tl12'></i></a> </td>	
+								</tr>
+								<tr style='display:none' id='trSon_1619' class='tr_detalhes'>
+									<td colspan=11> <div class='textalign_c' id='agr_1495'></div> </td>
+								</tr>
+					<tr> 
+									<td class='textalign_c roxo pointer'> <a class='visualizarOrcamento tip' title='Visualizar orcamento' data-id='1618' data-sequencial='1494' > 1494 </a> </td>
+									<td> <a href='javascript:void(0)' class='visualizarDados' data-id='341' > RECCO LINGERIE </a></td>
+									<td> Priscila Canhola   </td>
+									<td> (44)2101-6285/(44)2101-6262 <a href='https://web.whatsapp.com/send?phone=4421016285&text=Olá Priscila Canhola' target='_blank' data-id='1618' class='tip whats ev_whatsapp' title='Enviar para WhatsApp: (44)2101-6285/(44)2101-6262'> <i class='icofont icofont-brand-whatsapp verde tl12' style='font-size: 12px; margin-left: 5px;'></i></a> </td>
+									<td> Imigrantes </td>
+									<td> 12/03/2026 13:06 </td>
+									<td> 0 dia  </td>
+									<td> <a href='javascript:void(0)' class='trocarstatus tip roxoclaro' title='' data-id='1618' > Em aberto </a>  </td>
+									<td> Viviane Penninck </td>
+									<td>  R$ 167,34 </td>
+									<td class='textalign_c'> <a href='javascript:void(0)' data-toggle='popover' class='tip eventos' title='Eventos' data-id='1618'> <i class='icofont icofont-tags text-dark tl12'></i></a>
+								<spacer style='padding-right: 10px;'></spacer>
+								<a href='javascript:void(0)' class='tip reutilizar' title='Duplicar' data-id='1618'> <i class='icofont icofont-papers text-dark tl12'></i></a>
+								<spacer style='padding-right: 10px;'></spacer>
+								<a href='index.php?modulo=NovosOrcamentos&item=1618' class='tip' title='Editar'> <i class='icofont icofont-edit-alt text-dark tl12'></i></a> </td>	
+								</tr>
+								<tr style='display:none' id='trSon_1618' class='tr_detalhes'>
+									<td colspan=11> <div class='textalign_c' id='agr_1494'></div> </td>
+								</tr>
+					<tr> 
+									<td class='textalign_c roxo pointer'> <a class='visualizarOrcamento tip' title='Visualizar orcamento' data-id='1617' data-sequencial='1493' > 1493 </a> </td>
+									<td> <a href='javascript:void(0)' class='visualizarDados' data-id='341' > RECCO LINGERIE </a></td>
+									<td> Priscila Canhola   </td>
+									<td> (44)2101-6285/(44)2101-6262 <a href='https://web.whatsapp.com/send?phone=4421016285&text=Olá Priscila Canhola' target='_blank' data-id='1617' class='tip whats ev_whatsapp' title='Enviar para WhatsApp: (44)2101-6285/(44)2101-6262'> <i class='icofont icofont-brand-whatsapp verde tl12' style='font-size: 12px; margin-left: 5px;'></i></a> </td>
+									<td> Oscar Freire </td>
+									<td> 12/03/2026 13:03 </td>
+									<td> 0 dia  </td>
+									<td> <a href='javascript:void(0)' class='trocarstatus tip roxoclaro' title='' data-id='1617' > Em aberto </a>  </td>
+									<td> Viviane Penninck </td>
+									<td>  R$ 155,00 </td>
+									<td class='textalign_c'> <a href='javascript:void(0)' data-toggle='popover' class='tip eventos' title='Eventos' data-id='1617'> <i class='icofont icofont-tags text-dark tl12'></i></a>
+								<spacer style='padding-right: 10px;'></spacer>
+								<a href='javascript:void(0)' class='tip reutilizar' title='Duplicar' data-id='1617'> <i class='icofont icofont-papers text-dark tl12'></i></a>
+								<spacer style='padding-right: 10px;'></spacer>
+								<a href='index.php?modulo=NovosOrcamentos&item=1617' class='tip' title='Editar'> <i class='icofont icofont-edit-alt text-dark tl12'></i></a> </td>	
+								</tr>
+								<tr style='display:none' id='trSon_1617' class='tr_detalhes'>
+									<td colspan=11> <div class='textalign_c' id='agr_1493'></div> </td>
+								</tr>
+					<tr> 
+									<td class='textalign_c roxo pointer'> <a class='visualizarOrcamento tip' title='Visualizar orcamento' data-id='1495' data-sequencial='1492' > 1492 </a> </td>
+									<td> <a href='javascript:void(0)' class='visualizarDados' data-id='8' > CALCADOS BEIRA RIO S/A </a></td>
+									<td> Beatriz   </td>
+									<td> +55 (51) 3584-2200 <a href='https://web.whatsapp.com/send?phone=555135842200&text=Olá Beatriz' target='_blank' data-id='1495' class='tip whats ev_whatsapp' title='Enviar para WhatsApp: +55 (51) 3584-2200'> <i class='icofont icofont-brand-whatsapp verde tl12' style='font-size: 12px; margin-left: 5px;'></i></a> </td>
+									<td> CAZAC </td>
+									<td> 11/03/2026 11:22 </td>
+									<td> 7 dias  </td>
+									<td> <a href='javascript:void(0)' class='trocarstatus tip roxoclaro' title='' data-id='1495' > Em aberto </a>  </td>
+									<td> Viviane Penninck </td>
+									<td>  R$ 7.240,00 </td>
+									<td class='textalign_c'> <a href='javascript:void(0)' data-toggle='popover' class='tip eventos' title='Eventos' data-id='1495'> <i class='icofont icofont-tags text-dark tl12'></i></a>
+								<spacer style='padding-right: 10px;'></spacer>
+								<a href='javascript:void(0)' class='tip reutilizar' title='Duplicar' data-id='1495'> <i class='icofont icofont-papers text-dark tl12'></i></a>
+								<spacer style='padding-right: 10px;'></spacer>
+								<a href='index.php?modulo=NovosOrcamentos&item=1495' class='tip' title='Editar'> <i class='icofont icofont-edit-alt text-dark tl12'></i></a> </td>	
+								</tr>
+								<tr style='display:none' id='trSon_1495' class='tr_detalhes'>
+									<td colspan=11> <div class='textalign_c' id='agr_1492'></div> </td>
+								</tr>
+					<tr> 
+									<td class='textalign_c roxo pointer'> <a class='visualizarOrcamento tip' title='Visualizar orcamento' data-id='1614' data-sequencial='1491' > 1491 </a> </td>
+									<td> <a href='javascript:void(0)' class='visualizarDados' data-id='8' > CALCADOS BEIRA RIO S/A </a></td>
+									<td> Aline   </td>
+									<td> +55 (51) 3584-2200 <a href='https://web.whatsapp.com/send?phone=555135842200&text=Olá Aline' target='_blank' data-id='1614' class='tip whats ev_whatsapp' title='Enviar para WhatsApp: +55 (51) 3584-2200'> <i class='icofont icofont-brand-whatsapp verde tl12' style='font-size: 12px; margin-left: 5px;'></i></a> </td>
+									<td> teste de aprendizado claude </td>
+									<td> 11/03/2026 11:20 </td>
+									<td> 0 dia  </td>
+									<td> <a href='javascript:void(0)' class='trocarstatus tip roxoclaro' title='' data-id='1614' > Em aberto </a>  </td>
+									<td> Viviane Penninck </td>
+									<td>  R$ 219,48 </td>
+									<td class='textalign_c'> <a href='javascript:void(0)' data-toggle='popover' class='tip eventos' title='Eventos' data-id='1614'> <i class='icofont icofont-tags text-dark tl12'></i></a>
+								<spacer style='padding-right: 10px;'></spacer>
+								<a href='javascript:void(0)' class='tip reutilizar' title='Duplicar' data-id='1614'> <i class='icofont icofont-papers text-dark tl12'></i></a>
+								<spacer style='padding-right: 10px;'></spacer>
+								<a href='index.php?modulo=NovosOrcamentos&item=1614' class='tip' title='Editar'> <i class='icofont icofont-edit-alt text-dark tl12'></i></a> </td>	
+								</tr>
+								<tr style='display:none' id='trSon_1614' class='tr_detalhes'>
+									<td colspan=11> <div class='textalign_c' id='agr_1491'></div> </td>
+								</tr>
+					<tr> 
+									<td class='textalign_c roxo pointer'> <a class='visualizarOrcamento tip' title='Visualizar orcamento' data-id='1615' data-sequencial='1490' > 1490 </a> </td>
+									<td> <a href='javascript:void(0)' class='visualizarDados' data-id='8' > CALCADOS BEIRA RIO S/A </a></td>
+									<td> Aline   </td>
+									<td> +55 (51) 3584-2200 <a href='https://web.whatsapp.com/send?phone=555135842200&text=Olá Aline' target='_blank' data-id='1615' class='tip whats ev_whatsapp' title='Enviar para WhatsApp: +55 (51) 3584-2200'> <i class='icofont icofont-brand-whatsapp verde tl12' style='font-size: 12px; margin-left: 5px;'></i></a> </td>
+									<td> teste de aprendizado do claude </td>
+									<td> 11/03/2026 11:16 </td>
+									<td> 0 dia  </td>
+									<td> <a href='javascript:void(0)' class='trocarstatus tip roxoclaro' title='' data-id='1615' > Em aberto </a>  </td>
+									<td> Viviane Penninck </td>
+									<td>  R$ 75,34 </td>
+									<td class='textalign_c'> <a href='javascript:void(0)' data-toggle='popover' class='tip eventos' title='Eventos' data-id='1615'> <i class='icofont icofont-tags text-dark tl12'></i></a>
+								<spacer style='padding-right: 10px;'></spacer>
+								<a href='javascript:void(0)' class='tip reutilizar' title='Duplicar' data-id='1615'> <i class='icofont icofont-papers text-dark tl12'></i></a>
+								<spacer style='padding-right: 10px;'></spacer>
+								<a href='index.php?modulo=NovosOrcamentos&item=1615' class='tip' title='Editar'> <i class='icofont icofont-edit-alt text-dark tl12'></i></a> </td>	
+								</tr>
+								<tr style='display:none' id='trSon_1615' class='tr_detalhes'>
+									<td colspan=11> <div class='textalign_c' id='agr_1490'></div> </td>
+								</tr>
+					<tr> 
+									<td class='textalign_c roxo pointer'> <a class='visualizarOrcamento tip' title='Visualizar orcamento' data-id='1616' data-sequencial='1489' > 1489 </a> </td>
+									<td> <a href='javascript:void(0)' class='visualizarDados' data-id='340' > TESTE ENGENHARIA REVERSA LTDA </a></td>
+									<td> João Teste   </td>
+									<td> +55 (51) 99988-7766 <a href='https://web.whatsapp.com/send?phone=5551999887766&text=Olá João Teste' target='_blank' data-id='1616' class='tip whats ev_whatsapp' title='Enviar para WhatsApp: +55 (51) 99988-7766'> <i class='icofont icofont-brand-whatsapp verde tl12' style='font-size: 12px; margin-left: 5px;'></i></a> </td>
+									<td> Banner Teste Engenharia Reversa </td>
+									<td> 11/03/2026 03:44 </td>
+									<td> 0 dia  </td>
+									<td> Aprovado <span class='cinzal'>(O.S.: 1049)</span> </td>
+									<td> Edmar Júnior </td>
+									<td>  R$ 119,18 </td>
+									<td class='textalign_c'> <a href='javascript:void(0)' data-toggle='popover' class='tip eventos' title='Eventos' data-id='1616'> <i class='icofont icofont-tags text-dark tl12'></i></a>
+								<spacer style='padding-right: 10px;'></spacer>
+								<a href='javascript:void(0)' class='tip reutilizar' title='Duplicar' data-id='1616'> <i class='icofont icofont-papers text-dark tl12'></i></a>
+								<spacer style='padding-right: 10px;'></spacer>
+								<a href='index.php?modulo=NovosOrcamentos&item=1616' class='tip' title='Editar'> <i class='icofont icofont-edit-alt text-dark tl12'></i></a> </td>	
+								</tr>
+								<tr style='display:none' id='trSon_1616' class='tr_detalhes'>
+									<td colspan=11> <div class='textalign_c' id='agr_1489'></div> </td>
+								</tr>
+					<tr> 
+									<td class='textalign_c roxo pointer'> <a class='visualizarOrcamento tip' title='Visualizar orcamento' data-id='1613' data-sequencial='1488' > 1488 </a> </td>
+									<td> <a href='javascript:void(0)' class='visualizarDados' data-id='8' > CALCADOS BEIRA RIO S/A </a></td>
+									<td> Aline   </td>
+									<td> +55 (51) 3584-2200 <a href='https://web.whatsapp.com/send?phone=555135842200&text=Olá Aline' target='_blank' data-id='1613' class='tip whats ev_whatsapp' title='Enviar para WhatsApp: +55 (51) 3584-2200'> <i class='icofont icofont-brand-whatsapp verde tl12' style='font-size: 12px; margin-left: 5px;'></i></a> </td>
+									<td> DIA DA MULHER </td>
+									<td> 04/03/2026 13:06 </td>
+									<td> 0 dia  </td>
+									<td> Aprovado <span class='cinzal'>(O.S.: 1045)</span> </td>
+									<td> Viviane Penninck </td>
+									<td>  R$ 1.537,89 </td>
+									<td class='textalign_c'> <a href='javascript:void(0)' data-toggle='popover' class='tip eventos' title='Eventos' data-id='1613'> <i class='icofont icofont-tags text-dark tl12'></i></a>
+								<spacer style='padding-right: 10px;'></spacer>
+								<a href='javascript:void(0)' class='tip reutilizar' title='Duplicar' data-id='1613'> <i class='icofont icofont-papers text-dark tl12'></i></a>
+								<spacer style='padding-right: 10px;'></spacer>
+								<a href='index.php?modulo=NovosOrcamentos&item=1613' class='tip' title='Editar'> <i class='icofont icofont-edit-alt text-dark tl12'></i></a> </td>	
+								</tr>
+								<tr style='display:none' id='trSon_1613' class='tr_detalhes'>
+									<td colspan=11> <div class='textalign_c' id='agr_1488'></div> </td>
+								</tr>
+					<tr> 
+									<td class='textalign_c roxo pointer'> <a class='visualizarOrcamento tip' title='Visualizar orcamento' data-id='1612' data-sequencial='1487' > 1487 </a> </td>
+									<td> <a href='javascript:void(0)' class='visualizarDados' data-id='338' > A&G SOLUCOES </a></td>
+									<td> GILMAR AMORIM   </td>
+									<td> (11)2216-4000/(11)4185-254 <a href='https://web.whatsapp.com/send?phone=1122164000&text=Olá GILMAR AMORIM' target='_blank' data-id='1612' class='tip whats ev_whatsapp' title='Enviar para WhatsApp: (11)2216-4000/(11)4185-254'> <i class='icofont icofont-brand-whatsapp verde tl12' style='font-size: 12px; margin-left: 5px;'></i></a> </td>
+									<td> ADESIVAGEM POSTE SEXTAVADO </td>
+									<td> 02/03/2026 13:50 </td>
+									<td> 7 dias  </td>
+									<td> <a href='javascript:void(0)' class='trocarstatus tip roxoclaro' title='' data-id='1612' > Em aberto </a>  </td>
+									<td> Viviane Penninck </td>
+									<td>  R$ 550,00 </td>
+									<td class='textalign_c'> <a href='javascript:void(0)' data-toggle='popover' class='tip eventos' title='Eventos' data-id='1612'> <i class='icofont icofont-tags text-dark tl12'></i></a>
+								<spacer style='padding-right: 10px;'></spacer>
+								<a href='javascript:void(0)' class='tip reutilizar' title='Duplicar' data-id='1612'> <i class='icofont icofont-papers text-dark tl12'></i></a>
+								<spacer style='padding-right: 10px;'></spacer>
+								<a href='index.php?modulo=NovosOrcamentos&item=1612' class='tip' title='Editar'> <i class='icofont icofont-edit-alt text-dark tl12'></i></a> </td>	
+								</tr>
+								<tr style='display:none' id='trSon_1612' class='tr_detalhes'>
+									<td colspan=11> <div class='textalign_c' id='agr_1487'></div> </td>
+								</tr>
+					<tr> 
+									<td class='textalign_c roxo pointer'> <a class='visualizarOrcamento tip' title='Visualizar orcamento' data-id='1611' data-sequencial='1486' > 1486 </a> </td>
+									<td> <a href='javascript:void(0)' class='visualizarDados' data-id='8' > CALCADOS BEIRA RIO S/A </a></td>
+									<td> Aline   </td>
+									<td> +55 (51) 3584-2200 <a href='https://web.whatsapp.com/send?phone=555135842200&text=Olá Aline' target='_blank' data-id='1611' class='tip whats ev_whatsapp' title='Enviar para WhatsApp: +55 (51) 3584-2200'> <i class='icofont icofont-brand-whatsapp verde tl12' style='font-size: 12px; margin-left: 5px;'></i></a> </td>
+									<td> SHOWRROM DIA DA MULHER </td>
+									<td> 02/03/2026 09:58 </td>
+									<td> 0 dia  </td>
+									<td> Aprovado <span class='cinzal'>(O.S.: 1044)</span> </td>
+									<td> Viviane Penninck </td>
+									<td>  R$ 280,00 </td>
+									<td class='textalign_c'> <a href='javascript:void(0)' data-toggle='popover' class='tip eventos' title='Eventos' data-id='1611'> <i class='icofont icofont-tags text-dark tl12'></i></a>
+								<spacer style='padding-right: 10px;'></spacer>
+								<a href='javascript:void(0)' class='tip reutilizar' title='Duplicar' data-id='1611'> <i class='icofont icofont-papers text-dark tl12'></i></a>
+								<spacer style='padding-right: 10px;'></spacer>
+								<a href='index.php?modulo=NovosOrcamentos&item=1611' class='tip' title='Editar'> <i class='icofont icofont-edit-alt text-dark tl12'></i></a> </td>	
+								</tr>
+								<tr style='display:none' id='trSon_1611' class='tr_detalhes'>
+									<td colspan=11> <div class='textalign_c' id='agr_1486'></div> </td>
+								</tr>
+					<tr> 
+									<td class='textalign_c roxo pointer'> <a class='visualizarOrcamento tip' title='Visualizar orcamento' data-id='1610' data-sequencial='1485' > 1485 </a> </td>
+									<td> <a href='javascript:void(0)' class='visualizarDados' data-id='8' > CALCADOS BEIRA RIO S/A </a></td>
+									<td> Aline   </td>
+									<td> +55 (51) 3584-2200 <a href='https://web.whatsapp.com/send?phone=555135842200&text=Olá Aline' target='_blank' data-id='1610' class='tip whats ev_whatsapp' title='Enviar para WhatsApp: +55 (51) 3584-2200'> <i class='icofont icofont-brand-whatsapp verde tl12' style='font-size: 12px; margin-left: 5px;'></i></a> </td>
+									<td> CRISTOVÃO (COD 153814-1) </td>
+									<td> 01/03/2026 20:17 </td>
+									<td> 7 dias  </td>
+									<td> <a href='javascript:void(0)' class='trocarstatus tip roxoclaro' title='' data-id='1610' > Em aberto </a>  </td>
+									<td> Viviane Penninck </td>
+									<td>  R$ 436,05 </td>
+									<td class='textalign_c'> <a href='javascript:void(0)' data-toggle='popover' class='tip eventos' title='Eventos' data-id='1610'> <i class='icofont icofont-tags text-dark tl12'></i></a>
+								<spacer style='padding-right: 10px;'></spacer>
+								<a href='javascript:void(0)' class='tip reutilizar' title='Duplicar' data-id='1610'> <i class='icofont icofont-papers text-dark tl12'></i></a>
+								<spacer style='padding-right: 10px;'></spacer>
+								<a href='index.php?modulo=NovosOrcamentos&item=1610' class='tip' title='Editar'> <i class='icofont icofont-edit-alt text-dark tl12'></i></a> </td>	
+								</tr>
+								<tr style='display:none' id='trSon_1610' class='tr_detalhes'>
+									<td colspan=11> <div class='textalign_c' id='agr_1485'></div> </td>
+								</tr>
+					<tr> 
+									<td class='textalign_c roxo pointer'> <a class='visualizarOrcamento tip' title='Visualizar orcamento' data-id='1609' data-sequencial='1484' > 1484 </a> </td>
+									<td> <a href='javascript:void(0)' class='visualizarDados' data-id='8' > CALCADOS BEIRA RIO S/A </a></td>
+									<td> Aline   </td>
+									<td> +55 (51) 3584-2200 <a href='https://web.whatsapp.com/send?phone=555135842200&text=Olá Aline' target='_blank' data-id='1609' class='tip whats ev_whatsapp' title='Enviar para WhatsApp: +55 (51) 3584-2200'> <i class='icofont icofont-brand-whatsapp verde tl12' style='font-size: 12px; margin-left: 5px;'></i></a> </td>
+									<td> WILSON </td>
+									<td> 01/03/2026 20:10 </td>
+									<td> 7 dias  </td>
+									<td> <a href='javascript:void(0)' class='trocarstatus tip roxoclaro' title='' data-id='1609' > Em aberto </a>  </td>
+									<td> Viviane Penninck </td>
+									<td>  R$ 1.169,27 </td>
+									<td class='textalign_c'> <a href='javascript:void(0)' data-toggle='popover' class='tip eventos' title='Eventos' data-id='1609'> <i class='icofont icofont-tags text-dark tl12'></i></a>
+								<spacer style='padding-right: 10px;'></spacer>
+								<a href='javascript:void(0)' class='tip reutilizar' title='Duplicar' data-id='1609'> <i class='icofont icofont-papers text-dark tl12'></i></a>
+								<spacer style='padding-right: 10px;'></spacer>
+								<a href='index.php?modulo=NovosOrcamentos&item=1609' class='tip' title='Editar'> <i class='icofont icofont-edit-alt text-dark tl12'></i></a> </td>	
+								</tr>
+								<tr style='display:none' id='trSon_1609' class='tr_detalhes'>
+									<td colspan=11> <div class='textalign_c' id='agr_1484'></div> </td>
+								</tr>
+					<tr> 
+									<td class='textalign_c roxo pointer'> <a class='visualizarOrcamento tip' title='Visualizar orcamento' data-id='1608' data-sequencial='1483' > 1483 </a> </td>
+									<td> <a href='javascript:void(0)' class='visualizarDados' data-id='8' > CALCADOS BEIRA RIO S/A </a></td>
+									<td> Aline   </td>
+									<td> +55 (51) 3584-2200 <a href='https://web.whatsapp.com/send?phone=555135842200&text=Olá Aline' target='_blank' data-id='1608' class='tip whats ev_whatsapp' title='Enviar para WhatsApp: +55 (51) 3584-2200'> <i class='icofont icofont-brand-whatsapp verde tl12' style='font-size: 12px; margin-left: 5px;'></i></a> </td>
+									<td> JAPONESA ( COD 155900-1) </td>
+									<td> 01/03/2026 19:51 </td>
+									<td> 0 dia  </td>
+									<td> Aprovado <span class='cinzal'>(O.S.: 1052)</span> </td>
+									<td> Viviane Penninck </td>
+									<td>  R$ 1.024,85 </td>
+									<td class='textalign_c'> <a href='javascript:void(0)' data-toggle='popover' class='tip eventos' title='Eventos' data-id='1608'> <i class='icofont icofont-tags text-dark tl12'></i></a>
+								<spacer style='padding-right: 10px;'></spacer>
+								<a href='javascript:void(0)' class='tip reutilizar' title='Duplicar' data-id='1608'> <i class='icofont icofont-papers text-dark tl12'></i></a>
+								<spacer style='padding-right: 10px;'></spacer>
+								<a href='index.php?modulo=NovosOrcamentos&item=1608' class='tip' title='Editar'> <i class='icofont icofont-edit-alt text-dark tl12'></i></a> </td>	
+								</tr>
+								<tr style='display:none' id='trSon_1608' class='tr_detalhes'>
+									<td colspan=11> <div class='textalign_c' id='agr_1483'></div> </td>
+								</tr>
+					<tr> 
+									<td class='textalign_c roxo pointer'> <a class='visualizarOrcamento tip' title='Visualizar orcamento' data-id='1607' data-sequencial='1482' > 1482 </a> </td>
+									<td> <a href='javascript:void(0)' class='visualizarDados' data-id='8' > CALCADOS BEIRA RIO S/A </a></td>
+									<td> Aline   </td>
+									<td> +55 (51) 3584-2200 <a href='https://web.whatsapp.com/send?phone=555135842200&text=Olá Aline' target='_blank' data-id='1607' class='tip whats ev_whatsapp' title='Enviar para WhatsApp: +55 (51) 3584-2200'> <i class='icofont icofont-brand-whatsapp verde tl12' style='font-size: 12px; margin-left: 5px;'></i></a> </td>
+									<td> SÃO ROQUE </td>
+									<td> 01/03/2026 19:40 </td>
+									<td> 7 dias  </td>
+									<td> <a href='javascript:void(0)' class='trocarstatus tip roxoclaro' title='' data-id='1607' > Em aberto </a>  </td>
+									<td> Viviane Penninck </td>
+									<td>  R$ 478,80 </td>
+									<td class='textalign_c'> <a href='javascript:void(0)' data-toggle='popover' class='tip eventos' title='Eventos' data-id='1607'> <i class='icofont icofont-tags text-dark tl12'></i></a>
+								<spacer style='padding-right: 10px;'></spacer>
+								<a href='javascript:void(0)' class='tip reutilizar' title='Duplicar' data-id='1607'> <i class='icofont icofont-papers text-dark tl12'></i></a>
+								<spacer style='padding-right: 10px;'></spacer>
+								<a href='index.php?modulo=NovosOrcamentos&item=1607' class='tip' title='Editar'> <i class='icofont icofont-edit-alt text-dark tl12'></i></a> </td>	
+								</tr>
+								<tr style='display:none' id='trSon_1607' class='tr_detalhes'>
+									<td colspan=11> <div class='textalign_c' id='agr_1482'></div> </td>
+								</tr>
+					<tr> 
+									<td class='textalign_c roxo pointer'> <a class='visualizarOrcamento tip' title='Visualizar orcamento' data-id='1606' data-sequencial='1481' > 1481 </a> </td>
+									<td> <a href='javascript:void(0)' class='visualizarDados' data-id='8' > CALCADOS BEIRA RIO S/A </a></td>
+									<td> Aline   </td>
+									<td> +55 (51) 3584-2200 <a href='https://web.whatsapp.com/send?phone=555135842200&text=Olá Aline' target='_blank' data-id='1606' class='tip whats ev_whatsapp' title='Enviar para WhatsApp: +55 (51) 3584-2200'> <i class='icofont icofont-brand-whatsapp verde tl12' style='font-size: 12px; margin-left: 5px;'></i></a> </td>
+									<td> TICO </td>
+									<td> 01/03/2026 19:33 </td>
+									<td> 7 dias  </td>
+									<td> <a href='javascript:void(0)' class='trocarstatus tip roxoclaro' title='' data-id='1606' > Em aberto </a>  </td>
+									<td> Viviane Penninck </td>
+									<td>  R$ 428,40 </td>
+									<td class='textalign_c'> <a href='javascript:void(0)' data-toggle='popover' class='tip eventos' title='Eventos' data-id='1606'> <i class='icofont icofont-tags text-dark tl12'></i></a>
+								<spacer style='padding-right: 10px;'></spacer>
+								<a href='javascript:void(0)' class='tip reutilizar' title='Duplicar' data-id='1606'> <i class='icofont icofont-papers text-dark tl12'></i></a>
+								<spacer style='padding-right: 10px;'></spacer>
+								<a href='index.php?modulo=NovosOrcamentos&item=1606' class='tip' title='Editar'> <i class='icofont icofont-edit-alt text-dark tl12'></i></a> </td>	
+								</tr>
+								<tr style='display:none' id='trSon_1606' class='tr_detalhes'>
+									<td colspan=11> <div class='textalign_c' id='agr_1481'></div> </td>
+								</tr>
+					<tr> 
+									<td class='textalign_c roxo pointer'> <a class='visualizarOrcamento tip' title='Visualizar orcamento' data-id='1605' data-sequencial='1480' > 1480 </a> </td>
+									<td> <a href='javascript:void(0)' class='visualizarDados' data-id='8' > CALCADOS BEIRA RIO S/A </a></td>
+									<td> Aline   </td>
+									<td> +55 (51) 3584-2200 <a href='https://web.whatsapp.com/send?phone=555135842200&text=Olá Aline' target='_blank' data-id='1605' class='tip whats ev_whatsapp' title='Enviar para WhatsApp: +55 (51) 3584-2200'> <i class='icofont icofont-brand-whatsapp verde tl12' style='font-size: 12px; margin-left: 5px;'></i></a> </td>
+									<td> FIGUEIRDO </td>
+									<td> 01/03/2026 19:15 </td>
+									<td> 7 dias  </td>
+									<td> <a href='javascript:void(0)' class='trocarstatus tip roxoclaro' title='' data-id='1605' > Em aberto </a>  </td>
+									<td> Viviane Penninck </td>
+									<td>  R$ 336,00 </td>
+									<td class='textalign_c'> <a href='javascript:void(0)' data-toggle='popover' class='tip eventos' title='Eventos' data-id='1605'> <i class='icofont icofont-tags text-dark tl12'></i></a>
+								<spacer style='padding-right: 10px;'></spacer>
+								<a href='javascript:void(0)' class='tip reutilizar' title='Duplicar' data-id='1605'> <i class='icofont icofont-papers text-dark tl12'></i></a>
+								<spacer style='padding-right: 10px;'></spacer>
+								<a href='index.php?modulo=NovosOrcamentos&item=1605' class='tip' title='Editar'> <i class='icofont icofont-edit-alt text-dark tl12'></i></a> </td>	
+								</tr>
+								<tr style='display:none' id='trSon_1605' class='tr_detalhes'>
+									<td colspan=11> <div class='textalign_c' id='agr_1480'></div> </td>
+								</tr>
+					<tr> 
+									<td class='textalign_c roxo pointer'> <a class='visualizarOrcamento tip' title='Visualizar orcamento' data-id='1604' data-sequencial='1479' > 1479 </a> </td>
+									<td> <a href='javascript:void(0)' class='visualizarDados' data-id='8' > CALCADOS BEIRA RIO S/A </a></td>
+									<td> Aline   </td>
+									<td> +55 (51) 3584-2200 <a href='https://web.whatsapp.com/send?phone=555135842200&text=Olá Aline' target='_blank' data-id='1604' class='tip whats ev_whatsapp' title='Enviar para WhatsApp: +55 (51) 3584-2200'> <i class='icofont icofont-brand-whatsapp verde tl12' style='font-size: 12px; margin-left: 5px;'></i></a> </td>
+									<td> DELU </td>
+									<td> 27/02/2026 16:45 </td>
+									<td> 7 dias  </td>
+									<td> <a href='javascript:void(0)' class='trocarstatus tip roxoclaro' title='' data-id='1604' > Em aberto </a>  </td>
+									<td> Viviane Penninck </td>
+									<td>  R$ 2.898,00 </td>
+									<td class='textalign_c'> <a href='javascript:void(0)' data-toggle='popover' class='tip eventos' title='Eventos' data-id='1604'> <i class='icofont icofont-tags azul tl12'></i></a>
+								<spacer style='padding-right: 10px;'></spacer>
+								<a href='javascript:void(0)' class='tip reutilizar' title='Duplicar' data-id='1604'> <i class='icofont icofont-papers text-dark tl12'></i></a>
+								<spacer style='padding-right: 10px;'></spacer>
+								<a href='index.php?modulo=NovosOrcamentos&item=1604' class='tip' title='Editar'> <i class='icofont icofont-edit-alt text-dark tl12'></i></a> </td>	
+								</tr>
+								<tr style='display:none' id='trSon_1604' class='tr_detalhes'>
+									<td colspan=11> <div class='textalign_c' id='agr_1479'></div> </td>
+								</tr>
+					<tr> 
+									<td class='textalign_c roxo pointer'> <a class='visualizarOrcamento tip' title='Visualizar orcamento' data-id='1603' data-sequencial='1478' > 1478 </a> </td>
+									<td> <a href='javascript:void(0)' class='visualizarDados' data-id='8' > CALCADOS BEIRA RIO S/A </a></td>
+									<td> Aline   </td>
+									<td> +55 (51) 3584-2200 <a href='https://web.whatsapp.com/send?phone=555135842200&text=Olá Aline' target='_blank' data-id='1603' class='tip whats ev_whatsapp' title='Enviar para WhatsApp: +55 (51) 3584-2200'> <i class='icofont icofont-brand-whatsapp verde tl12' style='font-size: 12px; margin-left: 5px;'></i></a> </td>
+									<td> NILL SHOES </td>
+									<td> 25/02/2026 10:21 </td>
+									<td> 7 dias  </td>
+									<td> <a href='javascript:void(0)' class='trocarstatus tip roxoclaro' title='' data-id='1603' > Em aberto </a>  </td>
+									<td> Viviane Penninck </td>
+									<td>  R$ 3.374,00 </td>
+									<td class='textalign_c'> <a href='javascript:void(0)' data-toggle='popover' class='tip eventos' title='Eventos' data-id='1603'> <i class='icofont icofont-tags azul tl12'></i></a>
+								<spacer style='padding-right: 10px;'></spacer>
+								<a href='javascript:void(0)' class='tip reutilizar' title='Duplicar' data-id='1603'> <i class='icofont icofont-papers text-dark tl12'></i></a>
+								<spacer style='padding-right: 10px;'></spacer>
+								<a href='index.php?modulo=NovosOrcamentos&item=1603' class='tip' title='Editar'> <i class='icofont icofont-edit-alt text-dark tl12'></i></a> </td>	
+								</tr>
+								<tr style='display:none' id='trSon_1603' class='tr_detalhes'>
+									<td colspan=11> <div class='textalign_c' id='agr_1478'></div> </td>
+								</tr>
+					<tr> 
+									<td class='textalign_c roxo pointer'> <a class='visualizarOrcamento tip' title='Visualizar orcamento' data-id='1602' data-sequencial='1477' > 1477 </a> </td>
+									<td> <a href='javascript:void(0)' class='visualizarDados' data-id='8' > CALCADOS BEIRA RIO S/A </a></td>
+									<td> Aline   </td>
+									<td> +55 (51) 3584-2200 <a href='https://web.whatsapp.com/send?phone=555135842200&text=Olá Aline' target='_blank' data-id='1602' class='tip whats ev_whatsapp' title='Enviar para WhatsApp: +55 (51) 3584-2200'> <i class='icofont icofont-brand-whatsapp verde tl12' style='font-size: 12px; margin-left: 5px;'></i></a> </td>
+									<td> AQUARELA </td>
+									<td> 24/02/2026 17:43 </td>
+									<td> 7 dias  </td>
+									<td> <a href='javascript:void(0)' class='trocarstatus tip roxoclaro' title='' data-id='1602' > Em aberto </a>  </td>
+									<td> Viviane Penninck </td>
+									<td>  R$ 1.890,53 </td>
+									<td class='textalign_c'> <a href='javascript:void(0)' data-toggle='popover' class='tip eventos' title='Eventos' data-id='1602'> <i class='icofont icofont-tags text-dark tl12'></i></a>
+								<spacer style='padding-right: 10px;'></spacer>
+								<a href='javascript:void(0)' class='tip reutilizar' title='Duplicar' data-id='1602'> <i class='icofont icofont-papers text-dark tl12'></i></a>
+								<spacer style='padding-right: 10px;'></spacer>
+								<a href='index.php?modulo=NovosOrcamentos&item=1602' class='tip' title='Editar'> <i class='icofont icofont-edit-alt text-dark tl12'></i></a> </td>	
+								</tr>
+								<tr style='display:none' id='trSon_1602' class='tr_detalhes'>
+									<td colspan=11> <div class='textalign_c' id='agr_1477'></div> </td>
+								</tr>
+					<tr> 
+									<td class='textalign_c roxo pointer'> <a class='visualizarOrcamento tip' title='Visualizar orcamento' data-id='1601' data-sequencial='1476' > 1476 </a> </td>
+									<td> <a href='javascript:void(0)' class='visualizarDados' data-id='8' > CALCADOS BEIRA RIO S/A </a></td>
+									<td> Aline   </td>
+									<td> +55 (51) 3584-2200 <a href='https://web.whatsapp.com/send?phone=555135842200&text=Olá Aline' target='_blank' data-id='1601' class='tip whats ev_whatsapp' title='Enviar para WhatsApp: +55 (51) 3584-2200'> <i class='icofont icofont-brand-whatsapp verde tl12' style='font-size: 12px; margin-left: 5px;'></i></a> </td>
+									<td> NASCIBEM </td>
+									<td> 24/02/2026 10:26 </td>
+									<td> 7 dias  </td>
+									<td> <a href='javascript:void(0)' class='trocarstatus tip roxoclaro' title='' data-id='1601' > Em aberto </a>  </td>
+									<td> Viviane Penninck </td>
+									<td>  R$ 1.584,00 </td>
+									<td class='textalign_c'> <a href='javascript:void(0)' data-toggle='popover' class='tip eventos' title='Eventos' data-id='1601'> <i class='icofont icofont-tags text-dark tl12'></i></a>
+								<spacer style='padding-right: 10px;'></spacer>
+								<a href='javascript:void(0)' class='tip reutilizar' title='Duplicar' data-id='1601'> <i class='icofont icofont-papers text-dark tl12'></i></a>
+								<spacer style='padding-right: 10px;'></spacer>
+								<a href='index.php?modulo=NovosOrcamentos&item=1601' class='tip' title='Editar'> <i class='icofont icofont-edit-alt text-dark tl12'></i></a> </td>	
+								</tr>
+								<tr style='display:none' id='trSon_1601' class='tr_detalhes'>
+									<td colspan=11> <div class='textalign_c' id='agr_1476'></div> </td>
+								</tr>
+					<tr> 
+									<td class='textalign_c roxo pointer'> <a class='visualizarOrcamento tip' title='Visualizar orcamento' data-id='1600' data-sequencial='1475' > 1475 </a> </td>
+									<td> <a href='javascript:void(0)' class='visualizarDados' data-id='8' > CALCADOS BEIRA RIO S/A </a></td>
+									<td> Aline   </td>
+									<td> +55 (51) 3584-2200 <a href='https://web.whatsapp.com/send?phone=555135842200&text=Olá Aline' target='_blank' data-id='1600' class='tip whats ev_whatsapp' title='Enviar para WhatsApp: +55 (51) 3584-2200'> <i class='icofont icofont-brand-whatsapp verde tl12' style='font-size: 12px; margin-left: 5px;'></i></a> </td>
+									<td> DADEBORA ( COD 57846-1) </td>
+									<td> 24/02/2026 10:19 </td>
+									<td> 7 dias  </td>
+									<td> <a href='javascript:void(0)' class='trocarstatus tip roxoclaro' title='' data-id='1600' > Em aberto </a>  </td>
+									<td> Viviane Penninck </td>
+									<td>  R$ 443,70 </td>
+									<td class='textalign_c'> <a href='javascript:void(0)' data-toggle='popover' class='tip eventos' title='Eventos' data-id='1600'> <i class='icofont icofont-tags text-dark tl12'></i></a>
+								<spacer style='padding-right: 10px;'></spacer>
+								<a href='javascript:void(0)' class='tip reutilizar' title='Duplicar' data-id='1600'> <i class='icofont icofont-papers text-dark tl12'></i></a>
+								<spacer style='padding-right: 10px;'></spacer>
+								<a href='index.php?modulo=NovosOrcamentos&item=1600' class='tip' title='Editar'> <i class='icofont icofont-edit-alt text-dark tl12'></i></a> </td>	
+								</tr>
+								<tr style='display:none' id='trSon_1600' class='tr_detalhes'>
+									<td colspan=11> <div class='textalign_c' id='agr_1475'></div> </td>
+								</tr>
+					<tr> 
+									<td class='textalign_c roxo pointer'> <a class='visualizarOrcamento tip' title='Visualizar orcamento' data-id='1599' data-sequencial='1474' > 1474 </a> </td>
+									<td> <a href='javascript:void(0)' class='visualizarDados' data-id='8' > CALCADOS BEIRA RIO S/A </a></td>
+									<td> Aline   </td>
+									<td> +55 (51) 3584-2200 <a href='https://web.whatsapp.com/send?phone=555135842200&text=Olá Aline' target='_blank' data-id='1599' class='tip whats ev_whatsapp' title='Enviar para WhatsApp: +55 (51) 3584-2200'> <i class='icofont icofont-brand-whatsapp verde tl12' style='font-size: 12px; margin-left: 5px;'></i></a> </td>
+									<td> LEGUS </td>
+									<td> 23/02/2026 17:05 </td>
+									<td> 7 dias  </td>
+									<td> <a href='javascript:void(0)' class='trocarstatus tip roxoclaro' title='' data-id='1599' > Em aberto </a>  </td>
+									<td> Viviane Penninck </td>
+									<td>  R$ 695,00 </td>
+									<td class='textalign_c'> <a href='javascript:void(0)' data-toggle='popover' class='tip eventos' title='Eventos' data-id='1599'> <i class='icofont icofont-tags text-dark tl12'></i></a>
+								<spacer style='padding-right: 10px;'></spacer>
+								<a href='javascript:void(0)' class='tip reutilizar' title='Duplicar' data-id='1599'> <i class='icofont icofont-papers text-dark tl12'></i></a>
+								<spacer style='padding-right: 10px;'></spacer>
+								<a href='index.php?modulo=NovosOrcamentos&item=1599' class='tip' title='Editar'> <i class='icofont icofont-edit-alt text-dark tl12'></i></a> </td>	
+								</tr>
+								<tr style='display:none' id='trSon_1599' class='tr_detalhes'>
+									<td colspan=11> <div class='textalign_c' id='agr_1474'></div> </td>
+								</tr>
+					<tr> 
+									<td class='textalign_c roxo pointer'> <a class='visualizarOrcamento tip' title='Visualizar orcamento' data-id='1598' data-sequencial='1473' > 1473 </a> </td>
+									<td> <a href='javascript:void(0)' class='visualizarDados' data-id='8' > CALCADOS BEIRA RIO S/A </a></td>
+									<td> Aline   </td>
+									<td> +55 (51) 3584-2200 <a href='https://web.whatsapp.com/send?phone=555135842200&text=Olá Aline' target='_blank' data-id='1598' class='tip whats ev_whatsapp' title='Enviar para WhatsApp: +55 (51) 3584-2200'> <i class='icofont icofont-brand-whatsapp verde tl12' style='font-size: 12px; margin-left: 5px;'></i></a> </td>
+									<td> MB ANDRADE </td>
+									<td> 23/02/2026 16:58 </td>
+									<td> 7 dias  </td>
+									<td> <a href='javascript:void(0)' class='trocarstatus tip roxoclaro' title='' data-id='1598' > Em aberto </a>  </td>
+									<td> Viviane Penninck </td>
+									<td>  R$ 2.447,51 </td>
+									<td class='textalign_c'> <a href='javascript:void(0)' data-toggle='popover' class='tip eventos' title='Eventos' data-id='1598'> <i class='icofont icofont-tags text-dark tl12'></i></a>
+								<spacer style='padding-right: 10px;'></spacer>
+								<a href='javascript:void(0)' class='tip reutilizar' title='Duplicar' data-id='1598'> <i class='icofont icofont-papers text-dark tl12'></i></a>
+								<spacer style='padding-right: 10px;'></spacer>
+								<a href='index.php?modulo=NovosOrcamentos&item=1598' class='tip' title='Editar'> <i class='icofont icofont-edit-alt text-dark tl12'></i></a> </td>	
+								</tr>
+								<tr style='display:none' id='trSon_1598' class='tr_detalhes'>
+									<td colspan=11> <div class='textalign_c' id='agr_1473'></div> </td>
+								</tr>
+					<tr> 
+									<td class='textalign_c roxo pointer'> <a class='visualizarOrcamento tip' title='Visualizar orcamento' data-id='1597' data-sequencial='1472' > 1472 </a> </td>
+									<td> <a href='javascript:void(0)' class='visualizarDados' data-id='8' > CALCADOS BEIRA RIO S/A </a></td>
+									<td> Aline   </td>
+									<td> +55 (51) 3584-2200 <a href='https://web.whatsapp.com/send?phone=555135842200&text=Olá Aline' target='_blank' data-id='1597' class='tip whats ev_whatsapp' title='Enviar para WhatsApp: +55 (51) 3584-2200'> <i class='icofont icofont-brand-whatsapp verde tl12' style='font-size: 12px; margin-left: 5px;'></i></a> </td>
+									<td> NOVA VILAR </td>
+									<td> 23/02/2026 16:29 </td>
+									<td> 7 dias  </td>
+									<td> <a href='javascript:void(0)' class='trocarstatus tip roxoclaro' title='' data-id='1597' > Em aberto </a>  </td>
+									<td> Viviane Penninck </td>
+									<td>  R$ 571,90 </td>
+									<td class='textalign_c'> <a href='javascript:void(0)' data-toggle='popover' class='tip eventos' title='Eventos' data-id='1597'> <i class='icofont icofont-tags text-dark tl12'></i></a>
+								<spacer style='padding-right: 10px;'></spacer>
+								<a href='javascript:void(0)' class='tip reutilizar' title='Duplicar' data-id='1597'> <i class='icofont icofont-papers text-dark tl12'></i></a>
+								<spacer style='padding-right: 10px;'></spacer>
+								<a href='index.php?modulo=NovosOrcamentos&item=1597' class='tip' title='Editar'> <i class='icofont icofont-edit-alt text-dark tl12'></i></a> </td>	
+								</tr>
+								<tr style='display:none' id='trSon_1597' class='tr_detalhes'>
+									<td colspan=11> <div class='textalign_c' id='agr_1472'></div> </td>
+								</tr>
+					<tr> 
+									<td class='textalign_c roxo pointer'> <a class='visualizarOrcamento tip' title='Visualizar orcamento' data-id='1596' data-sequencial='1471' > 1471 </a> </td>
+									<td> <a href='javascript:void(0)' class='visualizarDados' data-id='267' > ALTA MODA </a></td>
+									<td> Karol   </td>
+									<td> +55 (11) 8636-8555 <a href='https://web.whatsapp.com/send?phone=551186368555&text=Olá Karol' target='_blank' data-id='1596' class='tip whats ev_whatsapp' title='Enviar para WhatsApp: +55 (11) 8636-8555'> <i class='icofont icofont-brand-whatsapp verde tl12' style='font-size: 12px; margin-left: 5px;'></i></a> </td>
+									<td> PLACAS </td>
+									<td> 23/02/2026 16:11 </td>
+									<td> 7 dias  </td>
+									<td> <a href='javascript:void(0)' class='trocarstatus tip roxoclaro' title='' data-id='1596' > Em aberto </a>  </td>
+									<td> Viviane Penninck </td>
+									<td>  R$ 1.790,00 </td>
+									<td class='textalign_c'> <a href='javascript:void(0)' data-toggle='popover' class='tip eventos' title='Eventos' data-id='1596'> <i class='icofont icofont-tags text-dark tl12'></i></a>
+								<spacer style='padding-right: 10px;'></spacer>
+								<a href='javascript:void(0)' class='tip reutilizar' title='Duplicar' data-id='1596'> <i class='icofont icofont-papers text-dark tl12'></i></a>
+								<spacer style='padding-right: 10px;'></spacer>
+								<a href='index.php?modulo=NovosOrcamentos&item=1596' class='tip' title='Editar'> <i class='icofont icofont-edit-alt text-dark tl12'></i></a> </td>	
+								</tr>
+								<tr style='display:none' id='trSon_1596' class='tr_detalhes'>
+									<td colspan=11> <div class='textalign_c' id='agr_1471'></div> </td>
+								</tr>
+					<tr> 
+									<td class='textalign_c roxo pointer'> <a class='visualizarOrcamento tip' title='Visualizar orcamento' data-id='1595' data-sequencial='1470' > 1470 </a> </td>
+									<td> <a href='javascript:void(0)' class='visualizarDados' data-id='8' > CALCADOS BEIRA RIO S/A </a></td>
+									<td> Aline   </td>
+									<td> +55 (51) 3584-2200 <a href='https://web.whatsapp.com/send?phone=555135842200&text=Olá Aline' target='_blank' data-id='1595' class='tip whats ev_whatsapp' title='Enviar para WhatsApp: +55 (51) 3584-2200'> <i class='icofont icofont-brand-whatsapp verde tl12' style='font-size: 12px; margin-left: 5px;'></i></a> </td>
+									<td> AAM </td>
+									<td> 23/02/2026 11:53 </td>
+									<td> 7 dias  </td>
+									<td> <a href='javascript:void(0)' class='trocarstatus tip roxoclaro' title='' data-id='1595' > Em aberto </a>  </td>
+									<td> Viviane Penninck </td>
+									<td>  R$ 1.016,60 </td>
+									<td class='textalign_c'> <a href='javascript:void(0)' data-toggle='popover' class='tip eventos' title='Eventos' data-id='1595'> <i class='icofont icofont-tags text-dark tl12'></i></a>
+								<spacer style='padding-right: 10px;'></spacer>
+								<a href='javascript:void(0)' class='tip reutilizar' title='Duplicar' data-id='1595'> <i class='icofont icofont-papers text-dark tl12'></i></a>
+								<spacer style='padding-right: 10px;'></spacer>
+								<a href='index.php?modulo=NovosOrcamentos&item=1595' class='tip' title='Editar'> <i class='icofont icofont-edit-alt text-dark tl12'></i></a> </td>	
+								</tr>
+								<tr style='display:none' id='trSon_1595' class='tr_detalhes'>
+									<td colspan=11> <div class='textalign_c' id='agr_1470'></div> </td>
+								</tr>
+					<tr> 
+									<td class='textalign_c roxo pointer'> <a class='visualizarOrcamento tip' title='Visualizar orcamento' data-id='1594' data-sequencial='1469' > 1469 </a> </td>
+									<td> <a href='javascript:void(0)' class='visualizarDados' data-id='8' > CALCADOS BEIRA RIO S/A </a></td>
+									<td> Aline   </td>
+									<td> +55 (51) 3584-2200 <a href='https://web.whatsapp.com/send?phone=555135842200&text=Olá Aline' target='_blank' data-id='1594' class='tip whats ev_whatsapp' title='Enviar para WhatsApp: +55 (51) 3584-2200'> <i class='icofont icofont-brand-whatsapp verde tl12' style='font-size: 12px; margin-left: 5px;'></i></a> </td>
+									<td> ASTRAL </td>
+									<td> 23/02/2026 00:18 </td>
+									<td> 7 dias  </td>
+									<td> <a href='javascript:void(0)' class='trocarstatus tip roxoclaro' title='' data-id='1594' > Em aberto </a>  </td>
+									<td> Viviane Penninck </td>
+									<td>  R$ 1.048,78 </td>
+									<td class='textalign_c'> <a href='javascript:void(0)' data-toggle='popover' class='tip eventos' title='Eventos' data-id='1594'> <i class='icofont icofont-tags text-dark tl12'></i></a>
+								<spacer style='padding-right: 10px;'></spacer>
+								<a href='javascript:void(0)' class='tip reutilizar' title='Duplicar' data-id='1594'> <i class='icofont icofont-papers text-dark tl12'></i></a>
+								<spacer style='padding-right: 10px;'></spacer>
+								<a href='index.php?modulo=NovosOrcamentos&item=1594' class='tip' title='Editar'> <i class='icofont icofont-edit-alt text-dark tl12'></i></a> </td>	
+								</tr>
+								<tr style='display:none' id='trSon_1594' class='tr_detalhes'>
+									<td colspan=11> <div class='textalign_c' id='agr_1469'></div> </td>
+								</tr>
+					<tr> 
+									<td class='textalign_c roxo pointer'> <a class='visualizarOrcamento tip' title='Visualizar orcamento' data-id='1593' data-sequencial='1468' > 1468 </a> </td>
+									<td> <a href='javascript:void(0)' class='visualizarDados' data-id='8' > CALCADOS BEIRA RIO S/A </a></td>
+									<td> Aline   </td>
+									<td> +55 (51) 3584-2200 <a href='https://web.whatsapp.com/send?phone=555135842200&text=Olá Aline' target='_blank' data-id='1593' class='tip whats ev_whatsapp' title='Enviar para WhatsApp: +55 (51) 3584-2200'> <i class='icofont icofont-brand-whatsapp verde tl12' style='font-size: 12px; margin-left: 5px;'></i></a> </td>
+									<td> THIAGO / LVF </td>
+									<td> 23/02/2026 00:04 </td>
+									<td> 7 dias  </td>
+									<td> <a href='javascript:void(0)' class='trocarstatus tip roxoclaro' title='' data-id='1593' > Em aberto </a>  </td>
+									<td> Viviane Penninck </td>
+									<td>  R$ 1.465,75 </td>
+									<td class='textalign_c'> <a href='javascript:void(0)' data-toggle='popover' class='tip eventos' title='Eventos' data-id='1593'> <i class='icofont icofont-tags text-dark tl12'></i></a>
+								<spacer style='padding-right: 10px;'></spacer>
+								<a href='javascript:void(0)' class='tip reutilizar' title='Duplicar' data-id='1593'> <i class='icofont icofont-papers text-dark tl12'></i></a>
+								<spacer style='padding-right: 10px;'></spacer>
+								<a href='index.php?modulo=NovosOrcamentos&item=1593' class='tip' title='Editar'> <i class='icofont icofont-edit-alt text-dark tl12'></i></a> </td>	
+								</tr>
+								<tr style='display:none' id='trSon_1593' class='tr_detalhes'>
+									<td colspan=11> <div class='textalign_c' id='agr_1468'></div> </td>
+								</tr>
+					<tr> 
+									<td class='textalign_c roxo pointer'> <a class='visualizarOrcamento tip' title='Visualizar orcamento' data-id='1592' data-sequencial='1467' > 1467 </a> </td>
+									<td> <a href='javascript:void(0)' class='visualizarDados' data-id='8' > CALCADOS BEIRA RIO S/A </a></td>
+									<td> Aline   </td>
+									<td> +55 (51) 3584-2200 <a href='https://web.whatsapp.com/send?phone=555135842200&text=Olá Aline' target='_blank' data-id='1592' class='tip whats ev_whatsapp' title='Enviar para WhatsApp: +55 (51) 3584-2200'> <i class='icofont icofont-brand-whatsapp verde tl12' style='font-size: 12px; margin-left: 5px;'></i></a> </td>
+									<td> RAFAEL/ RALICIA </td>
+									<td> 22/02/2026 23:54 </td>
+									<td> 7 dias  </td>
+									<td> <a href='javascript:void(0)' class='trocarstatus tip roxoclaro' title='' data-id='1592' > Em aberto </a>  </td>
+									<td> Viviane Penninck </td>
+									<td>  R$ 1.172,50 </td>
+									<td class='textalign_c'> <a href='javascript:void(0)' data-toggle='popover' class='tip eventos' title='Eventos' data-id='1592'> <i class='icofont icofont-tags text-dark tl12'></i></a>
+								<spacer style='padding-right: 10px;'></spacer>
+								<a href='javascript:void(0)' class='tip reutilizar' title='Duplicar' data-id='1592'> <i class='icofont icofont-papers text-dark tl12'></i></a>
+								<spacer style='padding-right: 10px;'></spacer>
+								<a href='index.php?modulo=NovosOrcamentos&item=1592' class='tip' title='Editar'> <i class='icofont icofont-edit-alt text-dark tl12'></i></a> </td>	
+								</tr>
+								<tr style='display:none' id='trSon_1592' class='tr_detalhes'>
+									<td colspan=11> <div class='textalign_c' id='agr_1467'></div> </td>
+								</tr>
+					<tr> 
+									<td class='textalign_c roxo pointer'> <a class='visualizarOrcamento tip' title='Visualizar orcamento' data-id='1591' data-sequencial='1466' > 1466 </a> </td>
+									<td> <a href='javascript:void(0)' class='visualizarDados' data-id='8' > CALCADOS BEIRA RIO S/A </a></td>
+									<td> Aline   </td>
+									<td> +55 (51) 3584-2200 <a href='https://web.whatsapp.com/send?phone=555135842200&text=Olá Aline' target='_blank' data-id='1591' class='tip whats ev_whatsapp' title='Enviar para WhatsApp: +55 (51) 3584-2200'> <i class='icofont icofont-brand-whatsapp verde tl12' style='font-size: 12px; margin-left: 5px;'></i></a> </td>
+									<td> LIVIA/ RALICIA </td>
+									<td> 22/02/2026 23:39 </td>
+									<td> 7 dias  </td>
+									<td> <a href='javascript:void(0)' class='trocarstatus tip roxoclaro' title='' data-id='1591' > Em aberto </a>  </td>
+									<td> Viviane Penninck </td>
+									<td>  R$ 3.206,12 </td>
+									<td class='textalign_c'> <a href='javascript:void(0)' data-toggle='popover' class='tip eventos' title='Eventos' data-id='1591'> <i class='icofont icofont-tags text-dark tl12'></i></a>
+								<spacer style='padding-right: 10px;'></spacer>
+								<a href='javascript:void(0)' class='tip reutilizar' title='Duplicar' data-id='1591'> <i class='icofont icofont-papers text-dark tl12'></i></a>
+								<spacer style='padding-right: 10px;'></spacer>
+								<a href='index.php?modulo=NovosOrcamentos&item=1591' class='tip' title='Editar'> <i class='icofont icofont-edit-alt text-dark tl12'></i></a> </td>	
+								</tr>
+								<tr style='display:none' id='trSon_1591' class='tr_detalhes'>
+									<td colspan=11> <div class='textalign_c' id='agr_1466'></div> </td>
+								</tr>
+					<tr> 
+									<td class='textalign_c roxo pointer'> <a class='visualizarOrcamento tip' title='Visualizar orcamento' data-id='1590' data-sequencial='1465' > 1465 </a> </td>
+									<td> <a href='javascript:void(0)' class='visualizarDados' data-id='8' > CALCADOS BEIRA RIO S/A </a></td>
+									<td> Aline   </td>
+									<td> +55 (51) 3584-2200 <a href='https://web.whatsapp.com/send?phone=555135842200&text=Olá Aline' target='_blank' data-id='1590' class='tip whats ev_whatsapp' title='Enviar para WhatsApp: +55 (51) 3584-2200'> <i class='icofont icofont-brand-whatsapp verde tl12' style='font-size: 12px; margin-left: 5px;'></i></a> </td>
+									<td> GABRIEL SANTOS </td>
+									<td> 22/02/2026 23:09 </td>
+									<td> 7 dias  </td>
+									<td> <a href='javascript:void(0)' class='trocarstatus tip roxoclaro' title='' data-id='1590' > Em aberto </a>  </td>
+									<td> Viviane Penninck </td>
+									<td>  R$ 1.307,50 </td>
+									<td class='textalign_c'> <a href='javascript:void(0)' data-toggle='popover' class='tip eventos' title='Eventos' data-id='1590'> <i class='icofont icofont-tags text-dark tl12'></i></a>
+								<spacer style='padding-right: 10px;'></spacer>
+								<a href='javascript:void(0)' class='tip reutilizar' title='Duplicar' data-id='1590'> <i class='icofont icofont-papers text-dark tl12'></i></a>
+								<spacer style='padding-right: 10px;'></spacer>
+								<a href='index.php?modulo=NovosOrcamentos&item=1590' class='tip' title='Editar'> <i class='icofont icofont-edit-alt text-dark tl12'></i></a> </td>	
+								</tr>
+								<tr style='display:none' id='trSon_1590' class='tr_detalhes'>
+									<td colspan=11> <div class='textalign_c' id='agr_1465'></div> </td>
+								</tr>
+					<tr> 
+									<td class='textalign_c roxo pointer'> <a class='visualizarOrcamento tip' title='Visualizar orcamento' data-id='1589' data-sequencial='1464' > 1464 </a> </td>
+									<td> <a href='javascript:void(0)' class='visualizarDados' data-id='8' > CALCADOS BEIRA RIO S/A </a></td>
+									<td> Aline   </td>
+									<td> +55 (51) 3584-2200 <a href='https://web.whatsapp.com/send?phone=555135842200&text=Olá Aline' target='_blank' data-id='1589' class='tip whats ev_whatsapp' title='Enviar para WhatsApp: +55 (51) 3584-2200'> <i class='icofont icofont-brand-whatsapp verde tl12' style='font-size: 12px; margin-left: 5px;'></i></a> </td>
+									<td> CELINA </td>
+									<td> 22/02/2026 22:57 </td>
+									<td> 7 dias  </td>
+									<td> <a href='javascript:void(0)' class='trocarstatus tip roxoclaro' title='' data-id='1589' > Em aberto </a>  </td>
+									<td> Viviane Penninck </td>
+									<td>  R$ 2.585,05 </td>
+									<td class='textalign_c'> <a href='javascript:void(0)' data-toggle='popover' class='tip eventos' title='Eventos' data-id='1589'> <i class='icofont icofont-tags text-dark tl12'></i></a>
+								<spacer style='padding-right: 10px;'></spacer>
+								<a href='javascript:void(0)' class='tip reutilizar' title='Duplicar' data-id='1589'> <i class='icofont icofont-papers text-dark tl12'></i></a>
+								<spacer style='padding-right: 10px;'></spacer>
+								<a href='index.php?modulo=NovosOrcamentos&item=1589' class='tip' title='Editar'> <i class='icofont icofont-edit-alt text-dark tl12'></i></a> </td>	
+								</tr>
+								<tr style='display:none' id='trSon_1589' class='tr_detalhes'>
+									<td colspan=11> <div class='textalign_c' id='agr_1464'></div> </td>
+								</tr>
+					<tr> 
+									<td class='textalign_c roxo pointer'> <a class='visualizarOrcamento tip' title='Visualizar orcamento' data-id='1588' data-sequencial='1463' > 1463 </a> </td>
+									<td> <a href='javascript:void(0)' class='visualizarDados' data-id='8' > CALCADOS BEIRA RIO S/A </a></td>
+									<td> Aline   </td>
+									<td> +55 (51) 3584-2200 <a href='https://web.whatsapp.com/send?phone=555135842200&text=Olá Aline' target='_blank' data-id='1588' class='tip whats ev_whatsapp' title='Enviar para WhatsApp: +55 (51) 3584-2200'> <i class='icofont icofont-brand-whatsapp verde tl12' style='font-size: 12px; margin-left: 5px;'></i></a> </td>
+									<td> GILMAR DO CARMO </td>
+									<td> 22/02/2026 22:42 </td>
+									<td> 7 dias  </td>
+									<td> <a href='javascript:void(0)' class='trocarstatus tip roxoclaro' title='' data-id='1588' > Em aberto </a>  </td>
+									<td> Viviane Penninck </td>
+									<td>  R$ 3.475,00 </td>
+									<td class='textalign_c'> <a href='javascript:void(0)' data-toggle='popover' class='tip eventos' title='Eventos' data-id='1588'> <i class='icofont icofont-tags text-dark tl12'></i></a>
+								<spacer style='padding-right: 10px;'></spacer>
+								<a href='javascript:void(0)' class='tip reutilizar' title='Duplicar' data-id='1588'> <i class='icofont icofont-papers text-dark tl12'></i></a>
+								<spacer style='padding-right: 10px;'></spacer>
+								<a href='index.php?modulo=NovosOrcamentos&item=1588' class='tip' title='Editar'> <i class='icofont icofont-edit-alt text-dark tl12'></i></a> </td>	
+								</tr>
+								<tr style='display:none' id='trSon_1588' class='tr_detalhes'>
+									<td colspan=11> <div class='textalign_c' id='agr_1463'></div> </td>
+								</tr>
+					<tr> 
+									<td class='textalign_c roxo pointer'> <a class='visualizarOrcamento tip' title='Visualizar orcamento' data-id='1587' data-sequencial='1462' > 1462 </a> </td>
+									<td> <a href='javascript:void(0)' class='visualizarDados' data-id='8' > CALCADOS BEIRA RIO S/A </a></td>
+									<td> Aline   </td>
+									<td> +55 (51) 3584-2200 <a href='https://web.whatsapp.com/send?phone=555135842200&text=Olá Aline' target='_blank' data-id='1587' class='tip whats ev_whatsapp' title='Enviar para WhatsApp: +55 (51) 3584-2200'> <i class='icofont icofont-brand-whatsapp verde tl12' style='font-size: 12px; margin-left: 5px;'></i></a> </td>
+									<td> LUIZ PIRES/ VALENTIN CALÇADOS </td>
+									<td> 22/02/2026 22:24 </td>
+									<td> 7 dias  </td>
+									<td> <a href='javascript:void(0)' class='trocarstatus tip roxoclaro' title='' data-id='1587' > Em aberto </a>  </td>
+									<td> Viviane Penninck </td>
+									<td>  R$ 1.720,00 </td>
+									<td class='textalign_c'> <a href='javascript:void(0)' data-toggle='popover' class='tip eventos' title='Eventos' data-id='1587'> <i class='icofont icofont-tags text-dark tl12'></i></a>
+								<spacer style='padding-right: 10px;'></spacer>
+								<a href='javascript:void(0)' class='tip reutilizar' title='Duplicar' data-id='1587'> <i class='icofont icofont-papers text-dark tl12'></i></a>
+								<spacer style='padding-right: 10px;'></spacer>
+								<a href='index.php?modulo=NovosOrcamentos&item=1587' class='tip' title='Editar'> <i class='icofont icofont-edit-alt text-dark tl12'></i></a> </td>	
+								</tr>
+								<tr style='display:none' id='trSon_1587' class='tr_detalhes'>
+									<td colspan=11> <div class='textalign_c' id='agr_1462'></div> </td>
+								</tr>
+					<tr> 
+									<td class='textalign_c roxo pointer'> <a class='visualizarOrcamento tip' title='Visualizar orcamento' data-id='1586' data-sequencial='1461' > 1461 </a> </td>
+									<td> <a href='javascript:void(0)' class='visualizarDados' data-id='8' > CALCADOS BEIRA RIO S/A </a></td>
+									<td> Aline   </td>
+									<td> +55 (51) 3584-2200 <a href='https://web.whatsapp.com/send?phone=555135842200&text=Olá Aline' target='_blank' data-id='1586' class='tip whats ev_whatsapp' title='Enviar para WhatsApp: +55 (51) 3584-2200'> <i class='icofont icofont-brand-whatsapp verde tl12' style='font-size: 12px; margin-left: 5px;'></i></a> </td>
+									<td> GIAN PAVANI </td>
+									<td> 22/02/2026 21:52 </td>
+									<td> 7 dias  </td>
+									<td> <a href='javascript:void(0)' class='trocarstatus tip roxoclaro' title='' data-id='1586' > Em aberto </a>  </td>
+									<td> Viviane Penninck </td>
+									<td>  R$ 3.065,88 </td>
+									<td class='textalign_c'> <a href='javascript:void(0)' data-toggle='popover' class='tip eventos' title='Eventos' data-id='1586'> <i class='icofont icofont-tags text-dark tl12'></i></a>
+								<spacer style='padding-right: 10px;'></spacer>
+								<a href='javascript:void(0)' class='tip reutilizar' title='Duplicar' data-id='1586'> <i class='icofont icofont-papers text-dark tl12'></i></a>
+								<spacer style='padding-right: 10px;'></spacer>
+								<a href='index.php?modulo=NovosOrcamentos&item=1586' class='tip' title='Editar'> <i class='icofont icofont-edit-alt text-dark tl12'></i></a> </td>	
+								</tr>
+								<tr style='display:none' id='trSon_1586' class='tr_detalhes'>
+									<td colspan=11> <div class='textalign_c' id='agr_1461'></div> </td>
+								</tr>
+					<tr> 
+									<td class='textalign_c roxo pointer'> <a class='visualizarOrcamento tip' title='Visualizar orcamento' data-id='1585' data-sequencial='1460' > 1460 </a> </td>
+									<td> <a href='javascript:void(0)' class='visualizarDados' data-id='8' > CALCADOS BEIRA RIO S/A </a></td>
+									<td> Aline   </td>
+									<td> +55 (51) 3584-2200 <a href='https://web.whatsapp.com/send?phone=555135842200&text=Olá Aline' target='_blank' data-id='1585' class='tip whats ev_whatsapp' title='Enviar para WhatsApp: +55 (51) 3584-2200'> <i class='icofont icofont-brand-whatsapp verde tl12' style='font-size: 12px; margin-left: 5px;'></i></a> </td>
+									<td> AVACY LONA MOLECA </td>
+									<td> 22/02/2026 21:27 </td>
+									<td> 7 dias  </td>
+									<td> <a href='javascript:void(0)' class='trocarstatus tip roxoclaro' title='' data-id='1585' > Em aberto </a>  </td>
+									<td> Viviane Penninck </td>
+									<td>  R$ 2.490,02 </td>
+									<td class='textalign_c'> <a href='javascript:void(0)' data-toggle='popover' class='tip eventos' title='Eventos' data-id='1585'> <i class='icofont icofont-tags text-dark tl12'></i></a>
+								<spacer style='padding-right: 10px;'></spacer>
+								<a href='javascript:void(0)' class='tip reutilizar' title='Duplicar' data-id='1585'> <i class='icofont icofont-papers text-dark tl12'></i></a>
+								<spacer style='padding-right: 10px;'></spacer>
+								<a href='index.php?modulo=NovosOrcamentos&item=1585' class='tip' title='Editar'> <i class='icofont icofont-edit-alt text-dark tl12'></i></a> </td>	
+								</tr>
+								<tr style='display:none' id='trSon_1585' class='tr_detalhes'>
+									<td colspan=11> <div class='textalign_c' id='agr_1460'></div> </td>
+								</tr>
+					<tr> 
+									<td class='textalign_c roxo pointer'> <a class='visualizarOrcamento tip' title='Visualizar orcamento' data-id='1584' data-sequencial='1459' > 1459 </a> </td>
+									<td> <a href='javascript:void(0)' class='visualizarDados' data-id='8' > CALCADOS BEIRA RIO S/A </a></td>
+									<td> Aline   </td>
+									<td> +55 (51) 3584-2200 <a href='https://web.whatsapp.com/send?phone=555135842200&text=Olá Aline' target='_blank' data-id='1584' class='tip whats ev_whatsapp' title='Enviar para WhatsApp: +55 (51) 3584-2200'> <i class='icofont icofont-brand-whatsapp verde tl12' style='font-size: 12px; margin-left: 5px;'></i></a> </td>
+									<td> THAISLANA/ D CALÇADOS </td>
+									<td> 22/02/2026 17:22 </td>
+									<td> 7 dias  </td>
+									<td> <a href='javascript:void(0)' class='trocarstatus tip roxoclaro' title='' data-id='1584' > Em aberto </a>  </td>
+									<td> Viviane Penninck </td>
+									<td>  R$ 380,63 </td>
+									<td class='textalign_c'> <a href='javascript:void(0)' data-toggle='popover' class='tip eventos' title='Eventos' data-id='1584'> <i class='icofont icofont-tags text-dark tl12'></i></a>
+								<spacer style='padding-right: 10px;'></spacer>
+								<a href='javascript:void(0)' class='tip reutilizar' title='Duplicar' data-id='1584'> <i class='icofont icofont-papers text-dark tl12'></i></a>
+								<spacer style='padding-right: 10px;'></spacer>
+								<a href='index.php?modulo=NovosOrcamentos&item=1584' class='tip' title='Editar'> <i class='icofont icofont-edit-alt text-dark tl12'></i></a> </td>	
+								</tr>
+								<tr style='display:none' id='trSon_1584' class='tr_detalhes'>
+									<td colspan=11> <div class='textalign_c' id='agr_1459'></div> </td>
+								</tr>
+					<tr> 
+									<td class='textalign_c roxo pointer'> <a class='visualizarOrcamento tip' title='Visualizar orcamento' data-id='1583' data-sequencial='1458' > 1458 </a> </td>
+									<td> <a href='javascript:void(0)' class='visualizarDados' data-id='8' > CALCADOS BEIRA RIO S/A </a></td>
+									<td> Aline   </td>
+									<td> +55 (51) 3584-2200 <a href='https://web.whatsapp.com/send?phone=555135842200&text=Olá Aline' target='_blank' data-id='1583' class='tip whats ev_whatsapp' title='Enviar para WhatsApp: +55 (51) 3584-2200'> <i class='icofont icofont-brand-whatsapp verde tl12' style='font-size: 12px; margin-left: 5px;'></i></a> </td>
+									<td> TENCALCADOS </td>
+									<td> 22/02/2026 17:11 </td>
+									<td> 7 dias  </td>
+									<td> <a href='javascript:void(0)' class='trocarstatus tip roxoclaro' title='' data-id='1583' > Em aberto </a>  </td>
+									<td> Viviane Penninck </td>
+									<td>  R$ 1.021,05 </td>
+									<td class='textalign_c'> <a href='javascript:void(0)' data-toggle='popover' class='tip eventos' title='Eventos' data-id='1583'> <i class='icofont icofont-tags text-dark tl12'></i></a>
+								<spacer style='padding-right: 10px;'></spacer>
+								<a href='javascript:void(0)' class='tip reutilizar' title='Duplicar' data-id='1583'> <i class='icofont icofont-papers text-dark tl12'></i></a>
+								<spacer style='padding-right: 10px;'></spacer>
+								<a href='index.php?modulo=NovosOrcamentos&item=1583' class='tip' title='Editar'> <i class='icofont icofont-edit-alt text-dark tl12'></i></a> </td>	
+								</tr>
+								<tr style='display:none' id='trSon_1583' class='tr_detalhes'>
+									<td colspan=11> <div class='textalign_c' id='agr_1458'></div> </td>
+								</tr>
+					<tr> 
+									<td class='textalign_c roxo pointer'> <a class='visualizarOrcamento tip' title='Visualizar orcamento' data-id='1582' data-sequencial='1457' > 1457 </a> </td>
+									<td> <a href='javascript:void(0)' class='visualizarDados' data-id='8' > CALCADOS BEIRA RIO S/A </a></td>
+									<td> Aline   </td>
+									<td> +55 (51) 3584-2200 <a href='https://web.whatsapp.com/send?phone=555135842200&text=Olá Aline' target='_blank' data-id='1582' class='tip whats ev_whatsapp' title='Enviar para WhatsApp: +55 (51) 3584-2200'> <i class='icofont icofont-brand-whatsapp verde tl12' style='font-size: 12px; margin-left: 5px;'></i></a> </td>
+									<td> CLOVIS LOJA 09 (COD 58096-15) </td>
+									<td> 22/02/2026 16:47 </td>
+									<td> 0 dia  </td>
+									<td> Aprovado <span class='cinzal'>(O.S.: 1051)</span> </td>
+									<td> Viviane Penninck </td>
+									<td>  R$ 1.958,20 </td>
+									<td class='textalign_c'> <a href='javascript:void(0)' data-toggle='popover' class='tip eventos' title='Eventos' data-id='1582'> <i class='icofont icofont-tags text-dark tl12'></i></a>
+								<spacer style='padding-right: 10px;'></spacer>
+								<a href='javascript:void(0)' class='tip reutilizar' title='Duplicar' data-id='1582'> <i class='icofont icofont-papers text-dark tl12'></i></a>
+								<spacer style='padding-right: 10px;'></spacer>
+								<a href='index.php?modulo=NovosOrcamentos&item=1582' class='tip' title='Editar'> <i class='icofont icofont-edit-alt text-dark tl12'></i></a> </td>	
+								</tr>
+								<tr style='display:none' id='trSon_1582' class='tr_detalhes'>
+									<td colspan=11> <div class='textalign_c' id='agr_1457'></div> </td>
+								</tr>
+					<tr> 
+									<td class='textalign_c roxo pointer'> <a class='visualizarOrcamento tip' title='Visualizar orcamento' data-id='1581' data-sequencial='1456' > 1456 </a> </td>
+									<td> <a href='javascript:void(0)' class='visualizarDados' data-id='8' > CALCADOS BEIRA RIO S/A </a></td>
+									<td> Aline   </td>
+									<td> +55 (51) 3584-2200 <a href='https://web.whatsapp.com/send?phone=555135842200&text=Olá Aline' target='_blank' data-id='1581' class='tip whats ev_whatsapp' title='Enviar para WhatsApp: +55 (51) 3584-2200'> <i class='icofont icofont-brand-whatsapp verde tl12' style='font-size: 12px; margin-left: 5px;'></i></a> </td>
+									<td> CLOVIS LOJA 16 </td>
+									<td> 22/02/2026 16:37 </td>
+									<td> 7 dias  </td>
+									<td> <a href='javascript:void(0)' class='trocarstatus tip roxoclaro' title='' data-id='1581' > Em aberto </a>  </td>
+									<td> Viviane Penninck </td>
+									<td>  R$ 1.719,43 </td>
+									<td class='textalign_c'> <a href='javascript:void(0)' data-toggle='popover' class='tip eventos' title='Eventos' data-id='1581'> <i class='icofont icofont-tags text-dark tl12'></i></a>
+								<spacer style='padding-right: 10px;'></spacer>
+								<a href='javascript:void(0)' class='tip reutilizar' title='Duplicar' data-id='1581'> <i class='icofont icofont-papers text-dark tl12'></i></a>
+								<spacer style='padding-right: 10px;'></spacer>
+								<a href='index.php?modulo=NovosOrcamentos&item=1581' class='tip' title='Editar'> <i class='icofont icofont-edit-alt text-dark tl12'></i></a> </td>	
+								</tr>
+								<tr style='display:none' id='trSon_1581' class='tr_detalhes'>
+									<td colspan=11> <div class='textalign_c' id='agr_1456'></div> </td>
+								</tr>
+					<tr> 
+									<td class='textalign_c roxo pointer'> <a class='visualizarOrcamento tip' title='Visualizar orcamento' data-id='1580' data-sequencial='1455' > 1455 </a> </td>
+									<td> <a href='javascript:void(0)' class='visualizarDados' data-id='8' > CALCADOS BEIRA RIO S/A </a></td>
+									<td> Aline   </td>
+									<td> +55 (51) 3584-2200 <a href='https://web.whatsapp.com/send?phone=555135842200&text=Olá Aline' target='_blank' data-id='1580' class='tip whats ev_whatsapp' title='Enviar para WhatsApp: +55 (51) 3584-2200'> <i class='icofont icofont-brand-whatsapp verde tl12' style='font-size: 12px; margin-left: 5px;'></i></a> </td>
+									<td> CAVALCANTE </td>
+									<td> 22/02/2026 16:24 </td>
+									<td> 0 dia  </td>
+									<td> Aprovado <span class='cinzal'>(O.S.: 1050)</span> </td>
+									<td> Viviane Penninck </td>
+									<td>  R$ 1.448,60 </td>
+									<td class='textalign_c'> <a href='javascript:void(0)' data-toggle='popover' class='tip eventos' title='Eventos' data-id='1580'> <i class='icofont icofont-tags text-dark tl12'></i></a>
+								<spacer style='padding-right: 10px;'></spacer>
+								<a href='javascript:void(0)' class='tip reutilizar' title='Duplicar' data-id='1580'> <i class='icofont icofont-papers text-dark tl12'></i></a>
+								<spacer style='padding-right: 10px;'></spacer>
+								<a href='index.php?modulo=NovosOrcamentos&item=1580' class='tip' title='Editar'> <i class='icofont icofont-edit-alt text-dark tl12'></i></a> </td>	
+								</tr>
+								<tr style='display:none' id='trSon_1580' class='tr_detalhes'>
+									<td colspan=11> <div class='textalign_c' id='agr_1455'></div> </td>
+								</tr>
+					<tr> 
+									<td class='textalign_c roxo pointer'> <a class='visualizarOrcamento tip' title='Visualizar orcamento' data-id='1579' data-sequencial='1454' > 1454 </a> </td>
+									<td> <a href='javascript:void(0)' class='visualizarDados' data-id='50' > Pampili Produtos Para Meninas LTDA </a></td>
+									<td> Priscila   </td>
+									<td> +55 (18) 3643-2367 <a href='https://web.whatsapp.com/send?phone=551836432367&text=Olá Priscila' target='_blank' data-id='1579' class='tip whats ev_whatsapp' title='Enviar para WhatsApp: +55 (18) 3643-2367'> <i class='icofont icofont-brand-whatsapp verde tl12' style='font-size: 12px; margin-left: 5px;'></i></a> </td>
+									<td> LOJA TITELA/ SÃO CAETANO </td>
+									<td> 19/02/2026 11:17 </td>
+									<td> 0 dia  </td>
+									<td> Aprovado <span class='cinzal'>(O.S.: 1046)</span> </td>
+									<td> Viviane Penninck </td>
+									<td>  R$ 644,68 </td>
+									<td class='textalign_c'> <a href='javascript:void(0)' data-toggle='popover' class='tip eventos' title='Eventos' data-id='1579'> <i class='icofont icofont-tags text-dark tl12'></i></a>
+								<spacer style='padding-right: 10px;'></spacer>
+								<a href='javascript:void(0)' class='tip reutilizar' title='Duplicar' data-id='1579'> <i class='icofont icofont-papers text-dark tl12'></i></a>
+								<spacer style='padding-right: 10px;'></spacer>
+								<a href='index.php?modulo=NovosOrcamentos&item=1579' class='tip' title='Editar'> <i class='icofont icofont-edit-alt text-dark tl12'></i></a> </td>	
+								</tr>
+								<tr style='display:none' id='trSon_1579' class='tr_detalhes'>
+									<td colspan=11> <div class='textalign_c' id='agr_1454'></div> </td>
+								</tr>
+					<tr> 
+									<td class='textalign_c roxo pointer'> <a class='visualizarOrcamento tip' title='Visualizar orcamento' data-id='1578' data-sequencial='1453' > 1453 </a> </td>
+									<td> <a href='javascript:void(0)' class='visualizarDados' data-id='306' > FULL SYSTEMS </a></td>
+									<td> ROBSON   </td>
+									<td> +55 (11) 2442-8718 <a href='https://web.whatsapp.com/send?phone=551124428718&text=Olá ROBSON' target='_blank' data-id='1578' class='tip whats ev_whatsapp' title='Enviar para WhatsApp: +55 (11) 2442-8718'> <i class='icofont icofont-brand-whatsapp verde tl12' style='font-size: 12px; margin-left: 5px;'></i></a> </td>
+									<td> POSTE QUADRADO </td>
+									<td> 10/02/2026 12:11 </td>
+									<td> 0 dia  </td>
+									<td> Aprovado <span class='cinzal'>(O.S.: 1048)</span> </td>
+									<td> Viviane Penninck </td>
+									<td>  R$ 1.220,00 </td>
+									<td class='textalign_c'> <a href='javascript:void(0)' data-toggle='popover' class='tip eventos' title='Eventos' data-id='1578'> <i class='icofont icofont-tags text-dark tl12'></i></a>
+								<spacer style='padding-right: 10px;'></spacer>
+								<a href='javascript:void(0)' class='tip reutilizar' title='Duplicar' data-id='1578'> <i class='icofont icofont-papers text-dark tl12'></i></a>
+								<spacer style='padding-right: 10px;'></spacer>
+								<a href='index.php?modulo=NovosOrcamentos&item=1578' class='tip' title='Editar'> <i class='icofont icofont-edit-alt text-dark tl12'></i></a> </td>	
+								</tr>
+								<tr style='display:none' id='trSon_1578' class='tr_detalhes'>
+									<td colspan=11> <div class='textalign_c' id='agr_1453'></div> </td>
+								</tr>
+					<tr> 
+									<td class='textalign_c roxo pointer'> <a class='visualizarOrcamento tip' title='Visualizar orcamento' data-id='1577' data-sequencial='1452' > 1452 </a> </td>
+									<td> <a href='javascript:void(0)' class='visualizarDados' data-id='8' > CALCADOS BEIRA RIO S/A </a></td>
+									<td> Aline   </td>
+									<td> +55 (51) 3584-2200 <a href='https://web.whatsapp.com/send?phone=555135842200&text=Olá Aline' target='_blank' data-id='1577' class='tip whats ev_whatsapp' title='Enviar para WhatsApp: +55 (51) 3584-2200'> <i class='icofont icofont-brand-whatsapp verde tl12' style='font-size: 12px; margin-left: 5px;'></i></a> </td>
+									<td> ALEMÃO </td>
+									<td> 09/02/2026 16:12 </td>
+									<td> 0 dia  </td>
+									<td> Aprovado <span class='cinzal'>(O.S.: 1042)</span> </td>
+									<td> Viviane Penninck </td>
+									<td>  R$ 1.077,30 </td>
+									<td class='textalign_c'> <a href='javascript:void(0)' data-toggle='popover' class='tip eventos' title='Eventos' data-id='1577'> <i class='icofont icofont-tags text-dark tl12'></i></a>
+								<spacer style='padding-right: 10px;'></spacer>
+								<a href='javascript:void(0)' class='tip reutilizar' title='Duplicar' data-id='1577'> <i class='icofont icofont-papers text-dark tl12'></i></a>
+								<spacer style='padding-right: 10px;'></spacer>
+								<a href='index.php?modulo=NovosOrcamentos&item=1577' class='tip' title='Editar'> <i class='icofont icofont-edit-alt text-dark tl12'></i></a> </td>	
+								</tr>
+								<tr style='display:none' id='trSon_1577' class='tr_detalhes'>
+									<td colspan=11> <div class='textalign_c' id='agr_1452'></div> </td>
+								</tr>
+					<tr> 
+									<td class='textalign_c roxo pointer'> <a class='visualizarOrcamento tip' title='Visualizar orcamento' data-id='1576' data-sequencial='1451' > 1451 </a> </td>
+									<td> <a href='javascript:void(0)' class='visualizarDados' data-id='8' > CALCADOS BEIRA RIO S/A </a></td>
+									<td> Aline   </td>
+									<td> +55 (51) 3584-2200 <a href='https://web.whatsapp.com/send?phone=555135842200&text=Olá Aline' target='_blank' data-id='1576' class='tip whats ev_whatsapp' title='Enviar para WhatsApp: +55 (51) 3584-2200'> <i class='icofont icofont-brand-whatsapp verde tl12' style='font-size: 12px; margin-left: 5px;'></i></a> </td>
+									<td> Palmipé </td>
+									<td> 05/02/2026 13:39 </td>
+									<td> 7 dias  </td>
+									<td> <a href='javascript:void(0)' class='trocarstatus tip roxoclaro' title='' data-id='1576' > Em aberto </a>  </td>
+									<td> Viviane Penninck </td>
+									<td>  R$ 261,40 </td>
+									<td class='textalign_c'> <a href='javascript:void(0)' data-toggle='popover' class='tip eventos' title='Eventos' data-id='1576'> <i class='icofont icofont-tags text-dark tl12'></i></a>
+								<spacer style='padding-right: 10px;'></spacer>
+								<a href='javascript:void(0)' class='tip reutilizar' title='Duplicar' data-id='1576'> <i class='icofont icofont-papers text-dark tl12'></i></a>
+								<spacer style='padding-right: 10px;'></spacer>
+								<a href='index.php?modulo=NovosOrcamentos&item=1576' class='tip' title='Editar'> <i class='icofont icofont-edit-alt text-dark tl12'></i></a> </td>	
+								</tr>
+								<tr style='display:none' id='trSon_1576' class='tr_detalhes'>
+									<td colspan=11> <div class='textalign_c' id='agr_1451'></div> </td>
+								</tr>
+					<tr> 
+									<td class='textalign_c roxo pointer'> <a class='visualizarOrcamento tip' title='Visualizar orcamento' data-id='1573' data-sequencial='1450' > 1450 </a> </td>
+									<td> <a href='javascript:void(0)' class='visualizarDados' data-id='304' > GRR </a></td>
+									<td> NATALIA   </td>
+									<td> +55 (11) 8902-6506 <a href='https://web.whatsapp.com/send?phone=551189026506&text=Olá NATALIA' target='_blank' data-id='1573' class='tip whats ev_whatsapp' title='Enviar para WhatsApp: +55 (11) 8902-6506'> <i class='icofont icofont-brand-whatsapp verde tl12' style='font-size: 12px; margin-left: 5px;'></i></a> </td>
+									<td> TECIDO IMPRESSÃO </td>
+									<td> 03/02/2026 15:58 </td>
+									<td> 7 dias  </td>
+									<td> <a href='javascript:void(0)' class='trocarstatus tip roxoclaro' title='' data-id='1573' > Em aberto </a>  </td>
+									<td> Viviane Penninck </td>
+									<td>  R$ 1.820,00 </td>
+									<td class='textalign_c'> <a href='javascript:void(0)' data-toggle='popover' class='tip eventos' title='Eventos' data-id='1573'> <i class='icofont icofont-tags text-dark tl12'></i></a>
+								<spacer style='padding-right: 10px;'></spacer>
+								<a href='javascript:void(0)' class='tip reutilizar' title='Duplicar' data-id='1573'> <i class='icofont icofont-papers text-dark tl12'></i></a>
+								<spacer style='padding-right: 10px;'></spacer>
+								<a href='index.php?modulo=NovosOrcamentos&item=1573' class='tip' title='Editar'> <i class='icofont icofont-edit-alt text-dark tl12'></i></a> </td>	
+								</tr>
+								<tr style='display:none' id='trSon_1573' class='tr_detalhes'>
+									<td colspan=11> <div class='textalign_c' id='agr_1450'></div> </td>
+								</tr>
+					<tr> 
+									<td class='textalign_c roxo pointer'> <a class='visualizarOrcamento tip' title='Visualizar orcamento' data-id='1572' data-sequencial='1449' > 1449 </a> </td>
+									<td> <a href='javascript:void(0)' class='visualizarDados' data-id='268' > BLANC SERVICE </a></td>
+									<td> Leandro   </td>
+									<td> +55 (11) 3195-2894 <a href='https://web.whatsapp.com/send?phone=551131952894&text=Olá Leandro' target='_blank' data-id='1572' class='tip whats ev_whatsapp' title='Enviar para WhatsApp: +55 (11) 3195-2894'> <i class='icofont icofont-brand-whatsapp verde tl12' style='font-size: 12px; margin-left: 5px;'></i></a> </td>
+									<td> SUPORTE PARA CAMERA </td>
+									<td> 28/01/2026 13:40 </td>
+									<td> 0 dia  </td>
+									<td> Aprovado <span class='cinzal'>(O.S.: 1047)</span> </td>
+									<td> Viviane Penninck </td>
+									<td>  R$ 740,00 </td>
+									<td class='textalign_c'> <a href='javascript:void(0)' data-toggle='popover' class='tip eventos' title='Eventos' data-id='1572'> <i class='icofont icofont-tags text-dark tl12'></i></a>
+								<spacer style='padding-right: 10px;'></spacer>
+								<a href='javascript:void(0)' class='tip reutilizar' title='Duplicar' data-id='1572'> <i class='icofont icofont-papers text-dark tl12'></i></a>
+								<spacer style='padding-right: 10px;'></spacer>
+								<a href='index.php?modulo=NovosOrcamentos&item=1572' class='tip' title='Editar'> <i class='icofont icofont-edit-alt text-dark tl12'></i></a> </td>	
+								</tr>
+								<tr style='display:none' id='trSon_1572' class='tr_detalhes'>
+									<td colspan=11> <div class='textalign_c' id='agr_1449'></div> </td>
+								</tr>
+					<tr> 
+									<td class='textalign_c roxo pointer'> <a class='visualizarOrcamento tip' title='Visualizar orcamento' data-id='1571' data-sequencial='1448' > 1448 </a> </td>
+									<td> <a href='javascript:void(0)' class='visualizarDados' data-id='8' > CALCADOS BEIRA RIO S/A </a></td>
+									<td> Aline   </td>
+									<td> +55 (51) 3584-2200 <a href='https://web.whatsapp.com/send?phone=555135842200&text=Olá Aline' target='_blank' data-id='1571' class='tip whats ev_whatsapp' title='Enviar para WhatsApp: +55 (51) 3584-2200'> <i class='icofont icofont-brand-whatsapp verde tl12' style='font-size: 12px; margin-left: 5px;'></i></a> </td>
+									<td> AMARELINHA </td>
+									<td> 27/01/2026 13:44 </td>
+									<td> 0 dia  </td>
+									<td> Aprovado <span class='cinzal'>(O.S.: 1041)</span> </td>
+									<td> Viviane Penninck </td>
+									<td>  R$ 5.600,00 </td>
+									<td class='textalign_c'> <a href='javascript:void(0)' data-toggle='popover' class='tip eventos' title='Eventos' data-id='1571'> <i class='icofont icofont-tags text-dark tl12'></i></a>
+								<spacer style='padding-right: 10px;'></spacer>
+								<a href='javascript:void(0)' class='tip reutilizar' title='Duplicar' data-id='1571'> <i class='icofont icofont-papers text-dark tl12'></i></a>
+								<spacer style='padding-right: 10px;'></spacer>
+								<a href='index.php?modulo=NovosOrcamentos&item=1571' class='tip' title='Editar'> <i class='icofont icofont-edit-alt text-dark tl12'></i></a> </td>	
+								</tr>
+								<tr style='display:none' id='trSon_1571' class='tr_detalhes'>
+									<td colspan=11> <div class='textalign_c' id='agr_1448'></div> </td>
+								</tr>
+					<tr> 
+									<td class='textalign_c roxo pointer'> <a class='visualizarOrcamento tip' title='Visualizar orcamento' data-id='1570' data-sequencial='1447' > 1447 </a> </td>
+									<td> <a href='javascript:void(0)' class='visualizarDados' data-id='8' > CALCADOS BEIRA RIO S/A </a></td>
+									<td> Aline   </td>
+									<td> +55 (51) 3584-2200 <a href='https://web.whatsapp.com/send?phone=555135842200&text=Olá Aline' target='_blank' data-id='1570' class='tip whats ev_whatsapp' title='Enviar para WhatsApp: +55 (51) 3584-2200'> <i class='icofont icofont-brand-whatsapp verde tl12' style='font-size: 12px; margin-left: 5px;'></i></a> </td>
+									<td> MULTIMARCAS </td>
+									<td> 27/01/2026 11:43 </td>
+									<td> 0 dia  </td>
+									<td> Aprovado <span class='cinzal'>(O.S.: 1040)</span> </td>
+									<td> Viviane Penninck </td>
+									<td>  R$ 1.471,68 </td>
+									<td class='textalign_c'> <a href='javascript:void(0)' data-toggle='popover' class='tip eventos' title='Eventos' data-id='1570'> <i class='icofont icofont-tags text-dark tl12'></i></a>
+								<spacer style='padding-right: 10px;'></spacer>
+								<a href='javascript:void(0)' class='tip reutilizar' title='Duplicar' data-id='1570'> <i class='icofont icofont-papers text-dark tl12'></i></a>
+								<spacer style='padding-right: 10px;'></spacer>
+								<a href='index.php?modulo=NovosOrcamentos&item=1570' class='tip' title='Editar'> <i class='icofont icofont-edit-alt text-dark tl12'></i></a> </td>	
+								</tr>
+								<tr style='display:none' id='trSon_1570' class='tr_detalhes'>
+									<td colspan=11> <div class='textalign_c' id='agr_1447'></div> </td>
+								</tr>
+					<tr> 
+									<td class='textalign_c roxo pointer'> <a class='visualizarOrcamento tip' title='Visualizar orcamento' data-id='1569' data-sequencial='1446' > 1446 </a> </td>
+									<td> <a href='javascript:void(0)' class='visualizarDados' data-id='8' > CALCADOS BEIRA RIO S/A </a></td>
+									<td> Aline   </td>
+									<td> +55 (51) 3584-2200 <a href='https://web.whatsapp.com/send?phone=555135842200&text=Olá Aline' target='_blank' data-id='1569' class='tip whats ev_whatsapp' title='Enviar para WhatsApp: +55 (51) 3584-2200'> <i class='icofont icofont-brand-whatsapp verde tl12' style='font-size: 12px; margin-left: 5px;'></i></a> </td>
+									<td> SHOWROOM </td>
+									<td> 20/01/2026 22:19 </td>
+									<td> 0 dia  </td>
+									<td> Aprovado <span class='cinzal'>(O.S.: 1039)</span> </td>
+									<td> Viviane Penninck </td>
+									<td>  R$ 4.896,58 </td>
+									<td class='textalign_c'> <a href='javascript:void(0)' data-toggle='popover' class='tip eventos' title='Eventos' data-id='1569'> <i class='icofont icofont-tags text-dark tl12'></i></a>
+								<spacer style='padding-right: 10px;'></spacer>
+								<a href='javascript:void(0)' class='tip reutilizar' title='Duplicar' data-id='1569'> <i class='icofont icofont-papers text-dark tl12'></i></a>
+								<spacer style='padding-right: 10px;'></spacer>
+								<a href='index.php?modulo=NovosOrcamentos&item=1569' class='tip' title='Editar'> <i class='icofont icofont-edit-alt text-dark tl12'></i></a> </td>	
+								</tr>
+								<tr style='display:none' id='trSon_1569' class='tr_detalhes'>
+									<td colspan=11> <div class='textalign_c' id='agr_1446'></div> </td>
+								</tr>
+					<tr> 
+									<td class='textalign_c roxo pointer'> <a class='visualizarOrcamento tip' title='Visualizar orcamento' data-id='1568' data-sequencial='1445' > 1445 </a> </td>
+									<td> <a href='javascript:void(0)' class='visualizarDados' data-id='8' > CALCADOS BEIRA RIO S/A </a></td>
+									<td> Aline   </td>
+									<td> +55 (51) 3584-2200 <a href='https://web.whatsapp.com/send?phone=555135842200&text=Olá Aline' target='_blank' data-id='1568' class='tip whats ev_whatsapp' title='Enviar para WhatsApp: +55 (51) 3584-2200'> <i class='icofont icofont-brand-whatsapp verde tl12' style='font-size: 12px; margin-left: 5px;'></i></a> </td>
+									<td> JD BRASILIA </td>
+									<td> 20/01/2026 14:19 </td>
+									<td> 0 dia  </td>
+									<td> <a href='javascript:void(0)' class='trocarstatus tip roxoclaro' title='' data-id='1568' > Em aberto </a>  </td>
+									<td> Viviane Penninck </td>
+									<td>  R$ 714,40 </td>
+									<td class='textalign_c'> <a href='javascript:void(0)' data-toggle='popover' class='tip eventos' title='Eventos' data-id='1568'> <i class='icofont icofont-tags text-dark tl12'></i></a>
+								<spacer style='padding-right: 10px;'></spacer>
+								<a href='javascript:void(0)' class='tip reutilizar' title='Duplicar' data-id='1568'> <i class='icofont icofont-papers text-dark tl12'></i></a>
+								<spacer style='padding-right: 10px;'></spacer>
+								<a href='index.php?modulo=NovosOrcamentos&item=1568' class='tip' title='Editar'> <i class='icofont icofont-edit-alt text-dark tl12'></i></a> </td>	
+								</tr>
+								<tr style='display:none' id='trSon_1568' class='tr_detalhes'>
+									<td colspan=11> <div class='textalign_c' id='agr_1445'></div> </td>
+								</tr>
+					<tr> 
+									<td class='textalign_c roxo pointer'> <a class='visualizarOrcamento tip' title='Visualizar orcamento' data-id='1567' data-sequencial='1444' > 1444 </a> </td>
+									<td> <a href='javascript:void(0)' class='visualizarDados' data-id='299' > SND DISTRIBUICAO DE PRODUTOS DE INFORMATICA S/A </a></td>
+									<td> Ingrid   </td>
+									<td> (11)2187-8333/(11)2187-833 <a href='https://web.whatsapp.com/send?phone=1121878333&text=Olá Ingrid' target='_blank' data-id='1567' class='tip whats ev_whatsapp' title='Enviar para WhatsApp: (11)2187-8333/(11)2187-833'> <i class='icofont icofont-brand-whatsapp verde tl12' style='font-size: 12px; margin-left: 5px;'></i></a> </td>
+									<td> Puff personalizado </td>
+									<td> 14/01/2026 16:28 </td>
+									<td> 7 dias  </td>
+									<td> <a href='javascript:void(0)' class='trocarstatus tip roxoclaro' title='' data-id='1567' > Em aberto </a>  </td>
+									<td> Viviane Penninck </td>
+									<td>  R$ 1.870,00 </td>
+									<td class='textalign_c'> <a href='javascript:void(0)' data-toggle='popover' class='tip eventos' title='Eventos' data-id='1567'> <i class='icofont icofont-tags text-dark tl12'></i></a>
+								<spacer style='padding-right: 10px;'></spacer>
+								<a href='javascript:void(0)' class='tip reutilizar' title='Duplicar' data-id='1567'> <i class='icofont icofont-papers text-dark tl12'></i></a>
+								<spacer style='padding-right: 10px;'></spacer>
+								<a href='index.php?modulo=NovosOrcamentos&item=1567' class='tip' title='Editar'> <i class='icofont icofont-edit-alt text-dark tl12'></i></a> </td>	
+								</tr>
+								<tr style='display:none' id='trSon_1567' class='tr_detalhes'>
+									<td colspan=11> <div class='textalign_c' id='agr_1444'></div> </td>
+								</tr>
+					<tr> 
+									<td class='textalign_c roxo pointer'> <a class='visualizarOrcamento tip' title='Visualizar orcamento' data-id='1566' data-sequencial='1443' > 1443 </a> </td>
+									<td> <a href='javascript:void(0)' class='visualizarDados' data-id='8' > CALCADOS BEIRA RIO S/A </a></td>
+									<td> Aline   </td>
+									<td> +55 (51) 3584-2200 <a href='https://web.whatsapp.com/send?phone=555135842200&text=Olá Aline' target='_blank' data-id='1566' class='tip whats ev_whatsapp' title='Enviar para WhatsApp: +55 (51) 3584-2200'> <i class='icofont icofont-brand-whatsapp verde tl12' style='font-size: 12px; margin-left: 5px;'></i></a> </td>
+									<td> Quadro Homenagem </td>
+									<td> 13/01/2026 12:27 </td>
+									<td> 0 dia  </td>
+									<td> Aprovado <span class='cinzal'>(O.S.: 1038)</span> </td>
+									<td> Viviane Penninck </td>
+									<td>  R$ 730,00 </td>
+									<td class='textalign_c'> <a href='javascript:void(0)' data-toggle='popover' class='tip eventos' title='Eventos' data-id='1566'> <i class='icofont icofont-tags text-dark tl12'></i></a>
+								<spacer style='padding-right: 10px;'></spacer>
+								<a href='javascript:void(0)' class='tip reutilizar' title='Duplicar' data-id='1566'> <i class='icofont icofont-papers text-dark tl12'></i></a>
+								<spacer style='padding-right: 10px;'></spacer>
+								<a href='index.php?modulo=NovosOrcamentos&item=1566' class='tip' title='Editar'> <i class='icofont icofont-edit-alt text-dark tl12'></i></a> </td>	
+								</tr>
+								<tr style='display:none' id='trSon_1566' class='tr_detalhes'>
+									<td colspan=11> <div class='textalign_c' id='agr_1443'></div> </td>
+								</tr>
+					<tr> 
+									<td class='textalign_c roxo pointer'> <a class='visualizarOrcamento tip' title='Visualizar orcamento' data-id='1565' data-sequencial='1442' > 1442 </a> </td>
+									<td> <a href='javascript:void(0)' class='visualizarDados' data-id='8' > CALCADOS BEIRA RIO S/A </a></td>
+									<td> Aline   </td>
+									<td> +55 (51) 3584-2200 <a href='https://web.whatsapp.com/send?phone=555135842200&text=Olá Aline' target='_blank' data-id='1565' class='tip whats ev_whatsapp' title='Enviar para WhatsApp: +55 (51) 3584-2200'> <i class='icofont icofont-brand-whatsapp verde tl12' style='font-size: 12px; margin-left: 5px;'></i></a> </td>
+									<td> MALETA ESCOLAR INFANTIL </td>
+									<td> 07/01/2026 11:24 </td>
+									<td> 0 dia  </td>
+									<td> Aprovado <span class='cinzal'>(O.S.: 1037)</span> </td>
+									<td> Viviane Penninck </td>
+									<td>  R$ 5.360,00 </td>
+									<td class='textalign_c'> <a href='javascript:void(0)' data-toggle='popover' class='tip eventos' title='Eventos' data-id='1565'> <i class='icofont icofont-tags text-dark tl12'></i></a>
+								<spacer style='padding-right: 10px;'></spacer>
+								<a href='javascript:void(0)' class='tip reutilizar' title='Duplicar' data-id='1565'> <i class='icofont icofont-papers text-dark tl12'></i></a>
+								<spacer style='padding-right: 10px;'></spacer>
+								<a href='index.php?modulo=NovosOrcamentos&item=1565' class='tip' title='Editar'> <i class='icofont icofont-edit-alt text-dark tl12'></i></a> </td>	
+								</tr>
+								<tr style='display:none' id='trSon_1565' class='tr_detalhes'>
+									<td colspan=11> <div class='textalign_c' id='agr_1442'></div> </td>
+								</tr>
+					
+							</tbody>
+							<tfoot>	
+								<td colspan='9'> </td>
+								<td class=''>Total :  R$ 93.747,05</td>
+								<td> </td>
+							</tfoot>
+						</table>
+				

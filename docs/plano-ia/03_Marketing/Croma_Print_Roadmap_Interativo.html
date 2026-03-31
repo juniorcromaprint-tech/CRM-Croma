@@ -1,0 +1,1375 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Croma Print 4.0 — Roadmap de Transformação</title>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800;900&family=Space+Grotesk:wght@400;500;600;700&display=swap" rel="stylesheet">
+<script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.1/chart.umd.min.js"></script>
+<style>
+*, *::before, *::after { margin: 0; padding: 0; box-sizing: border-box; }
+
+:root {
+  --bg: #0F1419;
+  --bg-card: #1A1F2E;
+  --bg-card-hover: #222842;
+  --blue: #2E75B6;
+  --blue-light: #4A9FE5;
+  --orange: #F39C12;
+  --orange-light: #F5B041;
+  --text: #E8ECF1;
+  --text-muted: #8892A4;
+  --success: #2ECC71;
+  --gradient-blue: linear-gradient(135deg, #2E75B6, #4A9FE5);
+  --gradient-orange: linear-gradient(135deg, #F39C12, #F5B041);
+  --gradient-mix: linear-gradient(135deg, #2E75B6, #F39C12);
+}
+
+html { scroll-behavior: smooth; }
+
+body {
+  font-family: 'Inter', sans-serif;
+  background: var(--bg);
+  color: var(--text);
+  overflow-x: hidden;
+  line-height: 1.6;
+}
+
+/* ===== ANIMATED BACKGROUND ===== */
+.bg-grid {
+  position: fixed;
+  top: 0; left: 0;
+  width: 100%; height: 100%;
+  background-image:
+    linear-gradient(rgba(46,117,182,0.03) 1px, transparent 1px),
+    linear-gradient(90deg, rgba(46,117,182,0.03) 1px, transparent 1px);
+  background-size: 60px 60px;
+  z-index: 0;
+  pointer-events: none;
+}
+
+.floating-orb {
+  position: fixed;
+  border-radius: 50%;
+  filter: blur(80px);
+  opacity: 0.15;
+  z-index: 0;
+  pointer-events: none;
+  animation: orbFloat 20s ease-in-out infinite;
+}
+
+.orb-1 { width: 400px; height: 400px; background: var(--blue); top: -100px; right: -100px; }
+.orb-2 { width: 300px; height: 300px; background: var(--orange); bottom: 20%; left: -80px; animation-delay: -7s; }
+.orb-3 { width: 250px; height: 250px; background: var(--blue-light); top: 50%; right: 10%; animation-delay: -14s; }
+
+@keyframes orbFloat {
+  0%, 100% { transform: translate(0, 0) scale(1); }
+  33% { transform: translate(30px, -40px) scale(1.1); }
+  66% { transform: translate(-20px, 30px) scale(0.9); }
+}
+
+/* ===== HEADER ===== */
+header {
+  position: relative;
+  z-index: 10;
+  text-align: center;
+  padding: 80px 20px 60px;
+  overflow: hidden;
+}
+
+header::after {
+  content: '';
+  position: absolute;
+  bottom: 0; left: 50%;
+  transform: translateX(-50%);
+  width: 200px; height: 2px;
+  background: var(--gradient-mix);
+  border-radius: 2px;
+}
+
+.header-badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  background: rgba(46,117,182,0.12);
+  border: 1px solid rgba(46,117,182,0.25);
+  border-radius: 50px;
+  padding: 8px 20px;
+  font-size: 0.8rem;
+  font-weight: 500;
+  color: var(--blue-light);
+  letter-spacing: 1.5px;
+  text-transform: uppercase;
+  margin-bottom: 24px;
+  animation: fadeInDown 0.8s ease-out;
+}
+
+.badge-dot {
+  width: 8px; height: 8px;
+  background: var(--success);
+  border-radius: 50%;
+  animation: pulse 2s ease-in-out infinite;
+}
+
+@keyframes pulse {
+  0%, 100% { opacity: 1; transform: scale(1); }
+  50% { opacity: 0.5; transform: scale(0.8); }
+}
+
+header h1 {
+  font-family: 'Space Grotesk', sans-serif;
+  font-size: clamp(2rem, 5vw, 3.6rem);
+  font-weight: 800;
+  background: linear-gradient(135deg, #fff 0%, var(--blue-light) 50%, var(--orange) 100%);
+  -webkit-background-clip: text;
+  -webkit-text-fill-color: transparent;
+  background-clip: text;
+  margin-bottom: 16px;
+  animation: fadeInDown 0.8s ease-out 0.2s both;
+}
+
+header p {
+  font-size: 1.1rem;
+  color: var(--text-muted);
+  max-width: 600px;
+  margin: 0 auto;
+  animation: fadeInDown 0.8s ease-out 0.4s both;
+}
+
+.header-subtitle-highlight {
+  color: var(--orange);
+  font-weight: 600;
+}
+
+@keyframes fadeInDown {
+  from { opacity: 0; transform: translateY(-20px); }
+  to { opacity: 1; transform: translateY(0); }
+}
+
+/* ===== NAV ===== */
+.sticky-nav {
+  position: sticky;
+  top: 0;
+  z-index: 100;
+  background: rgba(15,20,25,0.85);
+  backdrop-filter: blur(20px);
+  border-bottom: 1px solid rgba(46,117,182,0.15);
+  padding: 12px 20px;
+  display: flex;
+  justify-content: center;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+
+.nav-btn {
+  background: transparent;
+  border: 1px solid rgba(255,255,255,0.08);
+  color: var(--text-muted);
+  padding: 8px 20px;
+  border-radius: 8px;
+  cursor: pointer;
+  font-family: 'Inter', sans-serif;
+  font-size: 0.85rem;
+  font-weight: 500;
+  transition: all 0.3s;
+}
+
+.nav-btn:hover, .nav-btn.active {
+  background: rgba(46,117,182,0.15);
+  border-color: var(--blue);
+  color: var(--blue-light);
+}
+
+/* ===== SECTIONS ===== */
+.section {
+  position: relative;
+  z-index: 10;
+  max-width: 1200px;
+  margin: 0 auto;
+  padding: 60px 20px;
+}
+
+.section-title {
+  font-family: 'Space Grotesk', sans-serif;
+  font-size: 1.8rem;
+  font-weight: 700;
+  margin-bottom: 8px;
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+
+.section-title .icon {
+  width: 40px; height: 40px;
+  border-radius: 10px;
+  display: flex; align-items: center; justify-content: center;
+  font-size: 1.2rem;
+  flex-shrink: 0;
+}
+
+.section-subtitle {
+  color: var(--text-muted);
+  font-size: 0.95rem;
+  margin-bottom: 40px;
+  padding-left: 52px;
+}
+
+/* ===== TIMELINE ===== */
+.timeline {
+  position: relative;
+  padding-left: 40px;
+}
+
+.timeline::before {
+  content: '';
+  position: absolute;
+  left: 15px;
+  top: 0;
+  bottom: 0;
+  width: 3px;
+  background: linear-gradient(180deg, var(--blue), var(--orange), var(--blue-light), var(--success));
+  border-radius: 3px;
+}
+
+.phase-card {
+  position: relative;
+  margin-bottom: 32px;
+  cursor: pointer;
+}
+
+.phase-dot {
+  position: absolute;
+  left: -33px;
+  top: 24px;
+  width: 20px;
+  height: 20px;
+  border-radius: 50%;
+  border: 3px solid;
+  background: var(--bg);
+  z-index: 2;
+  transition: all 0.3s;
+}
+
+.phase-card:nth-child(1) .phase-dot { border-color: var(--blue); }
+.phase-card:nth-child(2) .phase-dot { border-color: var(--orange); }
+.phase-card:nth-child(3) .phase-dot { border-color: var(--blue-light); }
+.phase-card:nth-child(4) .phase-dot { border-color: var(--success); }
+
+.phase-card.active .phase-dot {
+  transform: scale(1.3);
+  box-shadow: 0 0 20px currentColor;
+}
+
+.phase-card:nth-child(1).active .phase-dot { background: var(--blue); }
+.phase-card:nth-child(2).active .phase-dot { background: var(--orange); }
+.phase-card:nth-child(3).active .phase-dot { background: var(--blue-light); }
+.phase-card:nth-child(4).active .phase-dot { background: var(--success); }
+
+.phase-header {
+  background: var(--bg-card);
+  border: 1px solid rgba(255,255,255,0.06);
+  border-radius: 16px;
+  padding: 24px 28px;
+  transition: all 0.4s cubic-bezier(0.25, 0.46, 0.45, 0.94);
+}
+
+.phase-card:hover .phase-header {
+  background: var(--bg-card-hover);
+  border-color: rgba(46,117,182,0.3);
+  transform: translateX(8px);
+}
+
+.phase-card.active .phase-header {
+  border-color: rgba(46,117,182,0.4);
+}
+
+.phase-top {
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-start;
+  gap: 16px;
+  flex-wrap: wrap;
+}
+
+.phase-label {
+  font-size: 0.7rem;
+  font-weight: 700;
+  letter-spacing: 2px;
+  text-transform: uppercase;
+  padding: 4px 12px;
+  border-radius: 6px;
+  margin-bottom: 8px;
+  display: inline-block;
+}
+
+.phase-card:nth-child(1) .phase-label { background: rgba(46,117,182,0.2); color: var(--blue-light); }
+.phase-card:nth-child(2) .phase-label { background: rgba(243,156,18,0.2); color: var(--orange-light); }
+.phase-card:nth-child(3) .phase-label { background: rgba(74,159,229,0.2); color: #7EC8E3; }
+.phase-card:nth-child(4) .phase-label { background: rgba(46,204,113,0.2); color: var(--success); }
+
+.phase-name {
+  font-family: 'Space Grotesk', sans-serif;
+  font-size: 1.4rem;
+  font-weight: 700;
+  margin-bottom: 4px;
+}
+
+.phase-period {
+  color: var(--text-muted);
+  font-size: 0.85rem;
+}
+
+.phase-toggle {
+  font-size: 1.4rem;
+  color: var(--text-muted);
+  transition: transform 0.3s;
+  flex-shrink: 0;
+  margin-top: 8px;
+}
+
+.phase-card.active .phase-toggle {
+  transform: rotate(180deg);
+  color: var(--blue-light);
+}
+
+.phase-body {
+  max-height: 0;
+  overflow: hidden;
+  transition: max-height 0.5s cubic-bezier(0.25, 0.46, 0.45, 0.94), padding 0.3s;
+}
+
+.phase-card.active .phase-body {
+  max-height: 800px;
+}
+
+.phase-content {
+  padding: 24px 28px 28px;
+  background: rgba(26,31,46,0.6);
+  border: 1px solid rgba(255,255,255,0.04);
+  border-top: none;
+  border-radius: 0 0 16px 16px;
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 24px;
+}
+
+@media (max-width: 700px) {
+  .phase-content { grid-template-columns: 1fr; }
+}
+
+.phase-section h4 {
+  font-size: 0.75rem;
+  font-weight: 600;
+  letter-spacing: 1.5px;
+  text-transform: uppercase;
+  color: var(--text-muted);
+  margin-bottom: 12px;
+}
+
+.phase-section ul {
+  list-style: none;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.phase-section li {
+  font-size: 0.9rem;
+  padding-left: 20px;
+  position: relative;
+  color: var(--text);
+}
+
+.phase-section li::before {
+  content: '▸';
+  position: absolute;
+  left: 0;
+  color: var(--blue-light);
+  font-weight: 700;
+}
+
+.kpi-item {
+  display: flex;
+  justify-content: space-between;
+  padding: 6px 0;
+  font-size: 0.88rem;
+  border-bottom: 1px solid rgba(255,255,255,0.04);
+}
+
+.kpi-value {
+  font-weight: 600;
+  color: var(--orange);
+}
+
+.invest-badge {
+  display: inline-block;
+  background: rgba(243,156,18,0.12);
+  border: 1px solid rgba(243,156,18,0.3);
+  color: var(--orange-light);
+  padding: 6px 16px;
+  border-radius: 8px;
+  font-weight: 600;
+  font-size: 1rem;
+  margin-top: 4px;
+}
+
+/* AI Autonomy Bar */
+.autonomy-bar-container {
+  margin-top: 8px;
+}
+
+.autonomy-label {
+  display: flex;
+  justify-content: space-between;
+  font-size: 0.85rem;
+  margin-bottom: 6px;
+}
+
+.autonomy-pct {
+  font-weight: 700;
+  color: var(--blue-light);
+}
+
+.autonomy-track {
+  width: 100%;
+  height: 10px;
+  background: rgba(255,255,255,0.06);
+  border-radius: 10px;
+  overflow: hidden;
+}
+
+.autonomy-fill {
+  height: 100%;
+  border-radius: 10px;
+  width: 0;
+  transition: width 1.5s cubic-bezier(0.25, 0.46, 0.45, 0.94);
+}
+
+.phase-card:nth-child(1) .autonomy-fill { background: var(--gradient-blue); }
+.phase-card:nth-child(2) .autonomy-fill { background: var(--gradient-orange); }
+.phase-card:nth-child(3) .autonomy-fill { background: linear-gradient(135deg, #4A9FE5, #7EC8E3); }
+.phase-card:nth-child(4) .autonomy-fill { background: linear-gradient(135deg, #2ECC71, #58D68D); }
+
+/* ===== METRICS ===== */
+.metrics-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+  gap: 20px;
+}
+
+.metric-card {
+  background: var(--bg-card);
+  border: 1px solid rgba(255,255,255,0.06);
+  border-radius: 16px;
+  padding: 28px 24px;
+  text-align: center;
+  transition: all 0.4s;
+  position: relative;
+  overflow: hidden;
+}
+
+.metric-card::before {
+  content: '';
+  position: absolute;
+  top: 0; left: 0;
+  width: 100%; height: 3px;
+}
+
+.metric-card:nth-child(1)::before { background: var(--gradient-blue); }
+.metric-card:nth-child(2)::before { background: var(--gradient-orange); }
+.metric-card:nth-child(3)::before { background: linear-gradient(135deg, #2ECC71, #58D68D); }
+.metric-card:nth-child(4)::before { background: var(--gradient-mix); }
+
+.metric-card:hover {
+  transform: translateY(-6px);
+  border-color: rgba(46,117,182,0.3);
+  box-shadow: 0 20px 40px rgba(0,0,0,0.3);
+}
+
+.metric-icon {
+  font-size: 2rem;
+  margin-bottom: 12px;
+}
+
+.metric-value {
+  font-family: 'Space Grotesk', sans-serif;
+  font-size: 2.4rem;
+  font-weight: 800;
+  margin-bottom: 4px;
+}
+
+.metric-card:nth-child(1) .metric-value { color: var(--blue-light); }
+.metric-card:nth-child(2) .metric-value { color: var(--orange); }
+.metric-card:nth-child(3) .metric-value { color: var(--success); }
+.metric-card:nth-child(4) .metric-value { color: #C39BD3; }
+
+.metric-label {
+  font-size: 0.85rem;
+  color: var(--text-muted);
+  font-weight: 500;
+}
+
+.metric-sub {
+  font-size: 0.75rem;
+  color: var(--text-muted);
+  margin-top: 6px;
+  opacity: 0.7;
+}
+
+/* ===== DEPT MAP ===== */
+.dept-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(250px, 1fr));
+  gap: 16px;
+  margin-bottom: 40px;
+}
+
+.dept-card {
+  background: var(--bg-card);
+  border: 1px solid rgba(255,255,255,0.06);
+  border-radius: 14px;
+  padding: 22px;
+  transition: all 0.4s;
+  position: relative;
+  overflow: hidden;
+}
+
+.dept-card:hover {
+  transform: translateY(-4px);
+  border-color: rgba(46,117,182,0.3);
+  box-shadow: 0 12px 30px rgba(0,0,0,0.25);
+}
+
+.dept-top {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 14px;
+}
+
+.dept-name {
+  font-weight: 600;
+  font-size: 1rem;
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+.dept-name .emoji { font-size: 1.3rem; }
+
+.dept-pct {
+  font-family: 'Space Grotesk', sans-serif;
+  font-weight: 700;
+  font-size: 1.3rem;
+}
+
+.dept-bar-track {
+  width: 100%;
+  height: 8px;
+  background: rgba(255,255,255,0.06);
+  border-radius: 8px;
+  overflow: hidden;
+  margin-bottom: 8px;
+}
+
+.dept-bar-fill {
+  height: 100%;
+  border-radius: 8px;
+  width: 0;
+  transition: width 1.2s cubic-bezier(0.25, 0.46, 0.45, 0.94);
+}
+
+.dept-status {
+  font-size: 0.75rem;
+  color: var(--text-muted);
+}
+
+/* Chart container */
+.chart-container {
+  background: var(--bg-card);
+  border: 1px solid rgba(255,255,255,0.06);
+  border-radius: 16px;
+  padding: 28px;
+  margin-top: 10px;
+}
+
+.chart-container canvas {
+  max-height: 350px;
+}
+
+/* ===== BEFORE / AFTER ===== */
+.comparison-container {
+  display: grid;
+  grid-template-columns: 1fr auto 1fr;
+  gap: 0;
+  align-items: stretch;
+}
+
+@media (max-width: 800px) {
+  .comparison-container {
+    grid-template-columns: 1fr;
+  }
+  .comparison-divider { display: none; }
+}
+
+.comparison-side {
+  background: var(--bg-card);
+  border: 1px solid rgba(255,255,255,0.06);
+  border-radius: 16px;
+  padding: 32px 28px;
+  transition: all 0.4s;
+}
+
+.comparison-side:hover {
+  transform: translateY(-4px);
+  box-shadow: 0 16px 40px rgba(0,0,0,0.25);
+}
+
+.comparison-side.before {
+  border-top: 3px solid #E74C3C;
+}
+
+.comparison-side.after {
+  border-top: 3px solid var(--success);
+}
+
+.comparison-divider {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 0 20px;
+}
+
+.divider-arrow {
+  width: 50px;
+  height: 50px;
+  background: var(--gradient-mix);
+  border-radius: 50%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 1.5rem;
+  animation: arrowPulse 2s ease-in-out infinite;
+}
+
+@keyframes arrowPulse {
+  0%, 100% { transform: scale(1); box-shadow: 0 0 0 rgba(46,117,182,0); }
+  50% { transform: scale(1.1); box-shadow: 0 0 30px rgba(46,117,182,0.3); }
+}
+
+.comp-title {
+  font-family: 'Space Grotesk', sans-serif;
+  font-size: 1.2rem;
+  font-weight: 700;
+  margin-bottom: 20px;
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+.comp-title.red { color: #E74C3C; }
+.comp-title.green { color: var(--success); }
+
+.flow-step {
+  display: flex;
+  align-items: flex-start;
+  gap: 12px;
+  padding: 12px 0;
+  border-bottom: 1px solid rgba(255,255,255,0.04);
+  font-size: 0.9rem;
+}
+
+.flow-step:last-child { border-bottom: none; }
+
+.flow-icon {
+  width: 32px; height: 32px;
+  border-radius: 8px;
+  display: flex; align-items: center; justify-content: center;
+  font-size: 0.9rem;
+  flex-shrink: 0;
+}
+
+.before .flow-icon { background: rgba(231,76,60,0.15); }
+.after .flow-icon { background: rgba(46,204,113,0.15); }
+
+.flow-text strong {
+  display: block;
+  font-size: 0.85rem;
+  margin-bottom: 2px;
+}
+
+.flow-text span {
+  color: var(--text-muted);
+  font-size: 0.8rem;
+}
+
+.time-badge {
+  display: inline-block;
+  padding: 4px 10px;
+  border-radius: 6px;
+  font-size: 0.75rem;
+  font-weight: 600;
+  margin-top: 16px;
+}
+
+.before .time-badge { background: rgba(231,76,60,0.15); color: #E74C3C; }
+.after .time-badge { background: rgba(46,204,113,0.15); color: var(--success); }
+
+/* ===== FOOTER ===== */
+footer {
+  position: relative;
+  z-index: 10;
+  text-align: center;
+  padding: 60px 20px 40px;
+  border-top: 1px solid rgba(255,255,255,0.04);
+}
+
+.footer-logo {
+  font-family: 'Space Grotesk', sans-serif;
+  font-size: 1.3rem;
+  font-weight: 700;
+  background: var(--gradient-mix);
+  -webkit-background-clip: text;
+  -webkit-text-fill-color: transparent;
+  background-clip: text;
+  margin-bottom: 8px;
+}
+
+footer p {
+  color: var(--text-muted);
+  font-size: 0.8rem;
+}
+
+.powered-by {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  margin-top: 12px;
+  font-size: 0.75rem;
+  color: var(--text-muted);
+  background: rgba(46,117,182,0.08);
+  padding: 6px 14px;
+  border-radius: 20px;
+  border: 1px solid rgba(46,117,182,0.15);
+}
+
+/* ===== SCROLL ANIMATIONS ===== */
+.reveal {
+  opacity: 0;
+  transform: translateY(30px);
+  transition: opacity 0.6s ease-out, transform 0.6s ease-out;
+}
+
+.reveal.visible {
+  opacity: 1;
+  transform: translateY(0);
+}
+
+/* ===== SCROLLBAR ===== */
+::-webkit-scrollbar { width: 8px; }
+::-webkit-scrollbar-track { background: var(--bg); }
+::-webkit-scrollbar-thumb { background: rgba(46,117,182,0.3); border-radius: 4px; }
+::-webkit-scrollbar-thumb:hover { background: rgba(46,117,182,0.5); }
+</style>
+</head>
+<body>
+
+<div class="bg-grid"></div>
+<div class="floating-orb orb-1"></div>
+<div class="floating-orb orb-2"></div>
+<div class="floating-orb orb-3"></div>
+
+<!-- HEADER -->
+<header>
+  <div class="header-badge">
+    <span class="badge-dot"></span>
+    Transformação Digital em Andamento
+  </div>
+  <h1>Croma Print 4.0</h1>
+  <h1 style="font-size: clamp(1rem, 2.5vw, 1.6rem); margin-top: -8px;">Roadmap de Transformação</h1>
+  <p>A primeira empresa de comunicação visual do Brasil <span class="header-subtitle-highlight">gerida por Inteligência Artificial</span> — Claude Opus 4.6</p>
+</header>
+
+<!-- NAV -->
+<nav class="sticky-nav">
+  <button class="nav-btn active" onclick="scrollToSection('timeline')">⏱ Timeline</button>
+  <button class="nav-btn" onclick="scrollToSection('metricas')">📊 Métricas</button>
+  <button class="nav-btn" onclick="scrollToSection('departamentos')">🏢 Departamentos</button>
+  <button class="nav-btn" onclick="scrollToSection('comparacao')">🔄 Antes vs Depois</button>
+</nav>
+
+<!-- TIMELINE -->
+<section id="timeline" class="section">
+  <h2 class="section-title">
+    <span class="icon" style="background: rgba(46,117,182,0.15);">⏱</span>
+    Timeline de Implementação
+  </h2>
+  <p class="section-subtitle">Clique em cada fase para expandir os detalhes completos</p>
+
+  <div class="timeline">
+
+    <!-- FASE 1 -->
+    <div class="phase-card reveal" data-autonomy="35">
+      <div class="phase-dot"></div>
+      <div class="phase-header" onclick="togglePhase(this.parentElement)">
+        <div class="phase-top">
+          <div>
+            <span class="phase-label">Fase 1</span>
+            <div class="phase-name">Fundação</div>
+            <div class="phase-period">Q2 — Q3 2026</div>
+          </div>
+          <span class="phase-toggle">▼</span>
+        </div>
+      </div>
+      <div class="phase-body">
+        <div class="phase-content">
+          <div class="phase-section">
+            <h4>Objetivos Principais</h4>
+            <ul>
+              <li>Corrigir e estabilizar o sistema ERP atual</li>
+              <li>Ativar autenticação e segurança em todos os módulos</li>
+              <li>Implementar IA no atendimento ao cliente</li>
+              <li>Lançar chatbot inteligente multicanal</li>
+              <li>Estruturar base de dados unificada</li>
+            </ul>
+          </div>
+          <div class="phase-section">
+            <h4>KPIs Alvo</h4>
+            <div class="kpi-item"><span>Tempo de resposta</span><span class="kpi-value">< 30 seg</span></div>
+            <div class="kpi-item"><span>Atendimentos via IA</span><span class="kpi-value">60%</span></div>
+            <div class="kpi-item"><span>Uptime do ERP</span><span class="kpi-value">99.5%</span></div>
+            <div class="kpi-item"><span>Satisfação cliente</span><span class="kpi-value">NPS 70+</span></div>
+            <h4 style="margin-top:16px;">Investimento Estimado</h4>
+            <div class="invest-badge">R$ 15.000 — R$ 25.000</div>
+            <div class="autonomy-bar-container" style="margin-top:20px;">
+              <div class="autonomy-label">
+                <span>Nível de Autonomia IA</span>
+                <span class="autonomy-pct">35%</span>
+              </div>
+              <div class="autonomy-track">
+                <div class="autonomy-fill" data-width="35%"></div>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- FASE 2 -->
+    <div class="phase-card reveal" data-autonomy="60">
+      <div class="phase-dot"></div>
+      <div class="phase-header" onclick="togglePhase(this.parentElement)">
+        <div class="phase-top">
+          <div>
+            <span class="phase-label">Fase 2</span>
+            <div class="phase-name">Automação</div>
+            <div class="phase-period">Q4 2026 — Q1 2027</div>
+          </div>
+          <span class="phase-toggle">▼</span>
+        </div>
+      </div>
+      <div class="phase-body">
+        <div class="phase-content">
+          <div class="phase-section">
+            <h4>Objetivos Principais</h4>
+            <ul>
+              <li>Design generativo com IA para artes e layouts</li>
+              <li>Orçamentos 100% automáticos por IA</li>
+              <li>Produção inteligente com controle de máquinas</li>
+              <li>Dashboard de gestão em tempo real</li>
+              <li>Integração completa fornecedores-estoque</li>
+            </ul>
+          </div>
+          <div class="phase-section">
+            <h4>KPIs Alvo</h4>
+            <div class="kpi-item"><span>Orçamentos automáticos</span><span class="kpi-value">95%</span></div>
+            <div class="kpi-item"><span>Tempo criação arte</span><span class="kpi-value">-70%</span></div>
+            <div class="kpi-item"><span>Erros de produção</span><span class="kpi-value">< 2%</span></div>
+            <div class="kpi-item"><span>Economia operacional</span><span class="kpi-value">25%</span></div>
+            <h4 style="margin-top:16px;">Investimento Estimado</h4>
+            <div class="invest-badge">R$ 30.000 — R$ 50.000</div>
+            <div class="autonomy-bar-container" style="margin-top:20px;">
+              <div class="autonomy-label">
+                <span>Nível de Autonomia IA</span>
+                <span class="autonomy-pct">60%</span>
+              </div>
+              <div class="autonomy-track">
+                <div class="autonomy-fill" data-width="60%"></div>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- FASE 3 -->
+    <div class="phase-card reveal" data-autonomy="80">
+      <div class="phase-dot"></div>
+      <div class="phase-header" onclick="togglePhase(this.parentElement)">
+        <div class="phase-top">
+          <div>
+            <span class="phase-label">Fase 3</span>
+            <div class="phase-name">Autonomia</div>
+            <div class="phase-period">Q2 — Q3 2027</div>
+          </div>
+          <span class="phase-toggle">▼</span>
+        </div>
+      </div>
+      <div class="phase-body">
+        <div class="phase-content">
+          <div class="phase-section">
+            <h4>Objetivos Principais</h4>
+            <ul>
+              <li>Gestão financeira autônoma por IA</li>
+              <li>Tomada de decisões operacionais autônomas</li>
+              <li>E-commerce web-to-print completo</li>
+              <li>Precificação dinâmica inteligente</li>
+              <li>Predição de demanda e gestão de estoque IA</li>
+            </ul>
+          </div>
+          <div class="phase-section">
+            <h4>KPIs Alvo</h4>
+            <div class="kpi-item"><span>Decisões autônomas IA</span><span class="kpi-value">80%</span></div>
+            <div class="kpi-item"><span>Vendas via e-commerce</span><span class="kpi-value">30%</span></div>
+            <div class="kpi-item"><span>Margem líquida</span><span class="kpi-value">+15%</span></div>
+            <div class="kpi-item"><span>Inadimplência</span><span class="kpi-value">< 3%</span></div>
+            <h4 style="margin-top:16px;">Investimento Estimado</h4>
+            <div class="invest-badge">R$ 40.000 — R$ 70.000</div>
+            <div class="autonomy-bar-container" style="margin-top:20px;">
+              <div class="autonomy-label">
+                <span>Nível de Autonomia IA</span>
+                <span class="autonomy-pct">80%</span>
+              </div>
+              <div class="autonomy-track">
+                <div class="autonomy-fill" data-width="80%"></div>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- FASE 4 -->
+    <div class="phase-card reveal" data-autonomy="95">
+      <div class="phase-dot"></div>
+      <div class="phase-header" onclick="togglePhase(this.parentElement)">
+        <div class="phase-top">
+          <div>
+            <span class="phase-label">Fase 4</span>
+            <div class="phase-name">Escala</div>
+            <div class="phase-period">Q4 2027 — 2028+</div>
+          </div>
+          <span class="phase-toggle">▼</span>
+        </div>
+      </div>
+      <div class="phase-body">
+        <div class="phase-content">
+          <div class="phase-section">
+            <h4>Objetivos Principais</h4>
+            <ul>
+              <li>Franquia do modelo Croma Print 4.0</li>
+              <li>Plataforma SaaS para o setor gráfico</li>
+              <li>Expansão para novas cidades e estados</li>
+              <li>Licenciamento do sistema de IA</li>
+              <li>Croma Print como referência nacional</li>
+            </ul>
+          </div>
+          <div class="phase-section">
+            <h4>KPIs Alvo</h4>
+            <div class="kpi-item"><span>Unidades franqueadas</span><span class="kpi-value">5+</span></div>
+            <div class="kpi-item"><span>Receita recorrente SaaS</span><span class="kpi-value">R$ 50k/mês</span></div>
+            <div class="kpi-item"><span>Crescimento anual</span><span class="kpi-value">100%+</span></div>
+            <div class="kpi-item"><span>Autonomia total IA</span><span class="kpi-value">95%</span></div>
+            <h4 style="margin-top:16px;">Investimento Estimado</h4>
+            <div class="invest-badge">R$ 80.000 — R$ 150.000</div>
+            <div class="autonomy-bar-container" style="margin-top:20px;">
+              <div class="autonomy-label">
+                <span>Nível de Autonomia IA</span>
+                <span class="autonomy-pct">95%</span>
+              </div>
+              <div class="autonomy-track">
+                <div class="autonomy-fill" data-width="95%"></div>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+  </div>
+</section>
+
+<!-- MÉTRICAS -->
+<section id="metricas" class="section">
+  <h2 class="section-title">
+    <span class="icon" style="background: rgba(243,156,18,0.15);">📊</span>
+    Painel de Métricas
+  </h2>
+  <p class="section-subtitle">Indicadores-chave da transformação digital</p>
+
+  <div class="metrics-grid">
+    <div class="metric-card reveal">
+      <div class="metric-icon">⚡</div>
+      <div class="metric-value"><span class="counter" data-target="95">0</span>%</div>
+      <div class="metric-label">Meta de Automação</div>
+      <div class="metric-sub">Atual: 67% → Meta: 95%</div>
+    </div>
+    <div class="metric-card reveal">
+      <div class="metric-icon">💰</div>
+      <div class="metric-value"><span class="counter" data-target="40">0</span>%</div>
+      <div class="metric-label">Economia Operacional</div>
+      <div class="metric-sub">Redução de custos projetada</div>
+    </div>
+    <div class="metric-card reveal">
+      <div class="metric-icon">📈</div>
+      <div class="metric-value"><span class="counter" data-target="5">0</span>x</div>
+      <div class="metric-label">ROI em 24 meses</div>
+      <div class="metric-sub">Retorno estimado: 3-5x</div>
+    </div>
+    <div class="metric-card reveal">
+      <div class="metric-icon">👥</div>
+      <div class="metric-value"><span class="counter" data-target="307">0</span>+</div>
+      <div class="metric-label">Clientes Impactados</div>
+      <div class="metric-sub">Base ativa de clientes</div>
+    </div>
+  </div>
+</section>
+
+<!-- DEPARTAMENTOS -->
+<section id="departamentos" class="section">
+  <h2 class="section-title">
+    <span class="icon" style="background: rgba(46,204,113,0.15);">🏢</span>
+    Mapa de Automação por Departamento
+  </h2>
+  <p class="section-subtitle">Nível de integração de IA em cada área da empresa</p>
+
+  <div class="dept-grid">
+    <div class="dept-card reveal" data-dept-pct="95">
+      <div class="dept-top">
+        <div class="dept-name"><span class="emoji">🧾</span> Orçamentação</div>
+        <div class="dept-pct" style="color: var(--success);">95%</div>
+      </div>
+      <div class="dept-bar-track"><div class="dept-bar-fill" style="background: linear-gradient(90deg, var(--blue), var(--success));" data-width="95%"></div></div>
+      <div class="dept-status">Orçamentos automáticos via IA com aprovação inteligente</div>
+    </div>
+    <div class="dept-card reveal" data-dept-pct="90">
+      <div class="dept-top">
+        <div class="dept-name"><span class="emoji">🎧</span> Atendimento</div>
+        <div class="dept-pct" style="color: var(--success);">90%</div>
+      </div>
+      <div class="dept-bar-track"><div class="dept-bar-fill" style="background: linear-gradient(90deg, var(--blue), var(--success));" data-width="90%"></div></div>
+      <div class="dept-status">Chatbot + triagem inteligente + follow-up automatizado</div>
+    </div>
+    <div class="dept-card reveal" data-dept-pct="85">
+      <div class="dept-top">
+        <div class="dept-name"><span class="emoji">💵</span> Financeiro</div>
+        <div class="dept-pct" style="color: var(--blue-light);">85%</div>
+      </div>
+      <div class="dept-bar-track"><div class="dept-bar-fill" style="background: linear-gradient(90deg, var(--blue), var(--blue-light));" data-width="85%"></div></div>
+      <div class="dept-status">Cobranças, fluxo de caixa e relatórios automatizados</div>
+    </div>
+    <div class="dept-card reveal" data-dept-pct="80">
+      <div class="dept-top">
+        <div class="dept-name"><span class="emoji">📢</span> Marketing</div>
+        <div class="dept-pct" style="color: var(--blue-light);">80%</div>
+      </div>
+      <div class="dept-bar-track"><div class="dept-bar-fill" style="background: linear-gradient(90deg, var(--blue), var(--blue-light));" data-width="80%"></div></div>
+      <div class="dept-status">Campanhas, posts e análise de mercado por IA</div>
+    </div>
+    <div class="dept-card reveal" data-dept-pct="70">
+      <div class="dept-top">
+        <div class="dept-name"><span class="emoji">🎨</span> Design</div>
+        <div class="dept-pct" style="color: var(--orange);">70%</div>
+      </div>
+      <div class="dept-bar-track"><div class="dept-bar-fill" style="background: linear-gradient(90deg, var(--orange), var(--orange-light));" data-width="70%"></div></div>
+      <div class="dept-status">Geração de layouts e adaptações automáticas</div>
+    </div>
+    <div class="dept-card reveal" data-dept-pct="60">
+      <div class="dept-top">
+        <div class="dept-name"><span class="emoji">🏭</span> Produção</div>
+        <div class="dept-pct" style="color: var(--orange);">60%</div>
+      </div>
+      <div class="dept-bar-track"><div class="dept-bar-fill" style="background: linear-gradient(90deg, var(--orange), var(--orange-light));" data-width="60%"></div></div>
+      <div class="dept-status">Controle de máquinas e filas de produção inteligentes</div>
+    </div>
+    <div class="dept-card reveal" data-dept-pct="50">
+      <div class="dept-top">
+        <div class="dept-name"><span class="emoji">🚚</span> Logística</div>
+        <div class="dept-pct" style="color: #E67E22;">50%</div>
+      </div>
+      <div class="dept-bar-track"><div class="dept-bar-fill" style="background: linear-gradient(90deg, #E67E22, #F39C12);" data-width="50%"></div></div>
+      <div class="dept-status">Roteirização e rastreamento em desenvolvimento</div>
+    </div>
+  </div>
+
+  <!-- RADAR CHART -->
+  <div class="chart-container reveal">
+    <canvas id="radarChart"></canvas>
+  </div>
+</section>
+
+<!-- ANTES VS DEPOIS -->
+<section id="comparacao" class="section">
+  <h2 class="section-title">
+    <span class="icon" style="background: rgba(243,156,18,0.15);">🔄</span>
+    Antes vs Depois
+  </h2>
+  <p class="section-subtitle">Comparação do fluxo operacional com a transformação por IA</p>
+
+  <div class="comparison-container reveal">
+    <!-- ANTES -->
+    <div class="comparison-side before">
+      <div class="comp-title red">❌ Antes — Processo Manual</div>
+      <div class="flow-step">
+        <div class="flow-icon">📞</div>
+        <div class="flow-text">
+          <strong>Cliente liga ou manda WhatsApp</strong>
+          <span>Espera de 15-60 min por resposta humana</span>
+        </div>
+      </div>
+      <div class="flow-step">
+        <div class="flow-icon">📋</div>
+        <div class="flow-text">
+          <strong>Vendedor faz orçamento manualmente</strong>
+          <span>Consulta tabelas, calcula na planilha — 2-4 horas</span>
+        </div>
+      </div>
+      <div class="flow-step">
+        <div class="flow-icon">🎨</div>
+        <div class="flow-text">
+          <strong>Designer cria a arte do zero</strong>
+          <span>Ida e volta com cliente — 1-3 dias</span>
+        </div>
+      </div>
+      <div class="flow-step">
+        <div class="flow-icon">🏭</div>
+        <div class="flow-text">
+          <strong>Produção sem visibilidade</strong>
+          <span>Filas desorganizadas, retrabalho frequente</span>
+        </div>
+      </div>
+      <div class="flow-step">
+        <div class="flow-icon">💸</div>
+        <div class="flow-text">
+          <strong>Cobrança manual</strong>
+          <span>Esquecimentos, inadimplência alta</span>
+        </div>
+      </div>
+      <div class="time-badge">Ciclo completo: 5-7 dias úteis</div>
+    </div>
+
+    <!-- DIVIDER -->
+    <div class="comparison-divider">
+      <div class="divider-arrow">→</div>
+    </div>
+
+    <!-- DEPOIS -->
+    <div class="comparison-side after">
+      <div class="comp-title green">✅ Depois — Gestão por IA</div>
+      <div class="flow-step">
+        <div class="flow-icon">🤖</div>
+        <div class="flow-text">
+          <strong>IA responde instantaneamente</strong>
+          <span>Chatbot 24/7, resposta em &lt; 30 segundos</span>
+        </div>
+      </div>
+      <div class="flow-step">
+        <div class="flow-icon">⚡</div>
+        <div class="flow-text">
+          <strong>Orçamento automático por IA</strong>
+          <span>Cálculo instantâneo com precificação inteligente</span>
+        </div>
+      </div>
+      <div class="flow-step">
+        <div class="flow-icon">🎯</div>
+        <div class="flow-text">
+          <strong>Design generativo + ajuste automático</strong>
+          <span>Proposta visual em minutos, aprovação digital</span>
+        </div>
+      </div>
+      <div class="flow-step">
+        <div class="flow-icon">📊</div>
+        <div class="flow-text">
+          <strong>Produção otimizada por IA</strong>
+          <span>Filas inteligentes, zero retrabalho, rastreamento</span>
+        </div>
+      </div>
+      <div class="flow-step">
+        <div class="flow-icon">🔒</div>
+        <div class="flow-text">
+          <strong>Financeiro 100% automatizado</strong>
+          <span>Cobranças, notas fiscais e conciliação por IA</span>
+        </div>
+      </div>
+      <div class="time-badge">Ciclo completo: 1-2 dias úteis</div>
+    </div>
+  </div>
+</section>
+
+<!-- FOOTER -->
+<footer>
+  <div class="footer-logo">Croma Print 4.0</div>
+  <p>Comunicação Visual do Futuro — Gerida por Inteligência Artificial</p>
+  <div class="powered-by">
+    <span class="badge-dot"></span>
+    Powered by Claude Opus 4.6 — Anthropic
+  </div>
+</footer>
+
+<script>
+// ===== PHASE TOGGLE =====
+function togglePhase(card) {
+  const wasActive = card.classList.contains('active');
+  // Close all
+  document.querySelectorAll('.phase-card').forEach(c => c.classList.remove('active'));
+  if (!wasActive) {
+    card.classList.add('active');
+    // Animate autonomy bar
+    setTimeout(() => {
+      const fill = card.querySelector('.autonomy-fill');
+      if (fill) fill.style.width = fill.dataset.width;
+    }, 100);
+  }
+}
+
+// ===== SMOOTH SCROLL NAV =====
+function scrollToSection(id) {
+  document.getElementById(id).scrollIntoView({ behavior: 'smooth' });
+  document.querySelectorAll('.nav-btn').forEach(b => b.classList.remove('active'));
+  event.target.classList.add('active');
+}
+
+// ===== SCROLL REVEAL =====
+const revealObserver = new IntersectionObserver((entries) => {
+  entries.forEach(entry => {
+    if (entry.isIntersecting) {
+      entry.target.classList.add('visible');
+      // Animate dept bars
+      const bar = entry.target.querySelector('.dept-bar-fill');
+      if (bar) setTimeout(() => { bar.style.width = bar.dataset.width; }, 200);
+    }
+  });
+}, { threshold: 0.15 });
+
+document.querySelectorAll('.reveal').forEach(el => revealObserver.observe(el));
+
+// ===== COUNTER ANIMATION =====
+const counterObserver = new IntersectionObserver((entries) => {
+  entries.forEach(entry => {
+    if (entry.isIntersecting) {
+      const counter = entry.target;
+      const target = +counter.dataset.target;
+      const duration = 2000;
+      const start = performance.now();
+
+      function update(now) {
+        const elapsed = now - start;
+        const progress = Math.min(elapsed / duration, 1);
+        // Ease out cubic
+        const ease = 1 - Math.pow(1 - progress, 3);
+        counter.textContent = Math.round(target * ease);
+        if (progress < 1) requestAnimationFrame(update);
+      }
+      requestAnimationFrame(update);
+      counterObserver.unobserve(counter);
+    }
+  });
+}, { threshold: 0.5 });
+
+document.querySelectorAll('.counter').forEach(el => counterObserver.observe(el));
+
+// ===== ACTIVE NAV ON SCROLL =====
+const sections = ['timeline', 'metricas', 'departamentos', 'comparacao'];
+const navBtns = document.querySelectorAll('.nav-btn');
+
+const navObserver = new IntersectionObserver((entries) => {
+  entries.forEach(entry => {
+    if (entry.isIntersecting) {
+      const idx = sections.indexOf(entry.target.id);
+      navBtns.forEach(b => b.classList.remove('active'));
+      if (idx >= 0) navBtns[idx].classList.add('active');
+    }
+  });
+}, { threshold: 0.3 });
+
+sections.forEach(id => {
+  const el = document.getElementById(id);
+  if (el) navObserver.observe(el);
+});
+
+// ===== RADAR CHART =====
+const ctx = document.getElementById('radarChart').getContext('2d');
+new Chart(ctx, {
+  type: 'radar',
+  data: {
+    labels: ['Orçamentação', 'Atendimento', 'Financeiro', 'Marketing', 'Design', 'Produção', 'Logística'],
+    datasets: [
+      {
+        label: 'Automação IA Atual (%)',
+        data: [95, 90, 85, 80, 70, 60, 50],
+        backgroundColor: 'rgba(46,117,182,0.15)',
+        borderColor: '#4A9FE5',
+        borderWidth: 2,
+        pointBackgroundColor: '#4A9FE5',
+        pointBorderColor: '#fff',
+        pointBorderWidth: 1,
+        pointRadius: 5,
+      },
+      {
+        label: 'Meta 2028 (%)',
+        data: [99, 95, 95, 92, 88, 85, 80],
+        backgroundColor: 'rgba(243,156,18,0.1)',
+        borderColor: '#F39C12',
+        borderWidth: 2,
+        borderDash: [6, 4],
+        pointBackgroundColor: '#F39C12',
+        pointBorderColor: '#fff',
+        pointBorderWidth: 1,
+        pointRadius: 5,
+      }
+    ]
+  },
+  options: {
+    responsive: true,
+    maintainAspectRatio: true,
+    scales: {
+      r: {
+        beginAtZero: true,
+        max: 100,
+        ticks: {
+          stepSize: 20,
+          color: '#8892A4',
+          backdropColor: 'transparent',
+          font: { size: 11 }
+        },
+        grid: { color: 'rgba(255,255,255,0.06)' },
+        angleLines: { color: 'rgba(255,255,255,0.06)' },
+        pointLabels: {
+          color: '#E8ECF1',
+          font: { size: 12, family: 'Inter', weight: '500' }
+        }
+      }
+    },
+    plugins: {
+      legend: {
+        position: 'bottom',
+        labels: {
+          color: '#E8ECF1',
+          font: { family: 'Inter', size: 12 },
+          padding: 20,
+          usePointStyle: true,
+          pointStyle: 'circle'
+        }
+      }
+    }
+  }
+});
+
+// ===== AUTO-OPEN FIRST PHASE =====
+setTimeout(() => {
+  const first = document.querySelector('.phase-card');
+  if (first) togglePhase(first);
+}, 800);
+</script>
+</body>
+</html>

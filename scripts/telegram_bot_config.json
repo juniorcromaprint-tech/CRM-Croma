@@ -1,0 +1,20 @@
+{
+  "telegram_token": "8750164337:AAH8Diet4zGJddKHq_F2F1JobUA2djisU8s",
+  "openrouter_api_key": "",
+  "groq_api_key": "",
+  "authorized_chat_ids": [1065519625],
+  "modelo": "anthropic/claude-haiku-4-5-20251001",
+  "max_historico": 20,
+  "supabase_url": "https://djwjmfgplnqyffdcgdaw.supabase.co",
+  "supabase_service_key": "",
+  "_instrucoes": {
+    "telegram_token": "Token do @BotFather — já preenchido",
+    "openrouter_api_key": "OBRIGATÓRIO: openrouter.ai > Keys — mesma chave usada pelas Edge Functions do Supabase",
+    "groq_api_key": "Para áudio (gratuito): console.groq.com > API Keys — tier free tem Whisper ilimitado",
+    "authorized_chat_ids": "Seu chat ID: 1065519625",
+    "modelo": "Modelo padrão via OpenRouter. Opções: anthropic/claude-sonnet-4-6, anthropic/claude-haiku-4-5-20251001",
+    "max_historico": "Número máximo de mensagens mantidas por conversa",
+    "supabase_url": "URL do projeto Supabase — já preenchido para CRM-Croma",
+    "supabase_service_key": "OBRIGATÓRIO para ERP: Supabase Dashboard > Project Settings > API > service_role key"
+  }
+}

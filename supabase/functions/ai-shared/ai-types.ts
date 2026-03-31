@@ -54,6 +54,8 @@ export interface AIRequestConfig {
   temperature?: number;
   max_tokens?: number;
   timeout_ms?: number;
+  /** When true, skip response_format: json_object — useful for text/chat responses */
+  text_mode?: boolean;
 }
 
 // Role-based access per function

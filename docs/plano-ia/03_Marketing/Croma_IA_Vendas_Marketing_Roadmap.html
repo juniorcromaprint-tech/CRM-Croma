@@ -1,0 +1,1205 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Croma IA — Vendas & Marketing Digital</title>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800;900&family=Space+Grotesk:wght@400;500;600;700&display=swap" rel="stylesheet">
+<style>
+* { margin: 0; padding: 0; box-sizing: border-box; }
+
+:root {
+  --bg: #0F1419;
+  --bg2: #1A2332;
+  --bg3: #243447;
+  --blue: #2E75B6;
+  --blue-light: #4A9FE5;
+  --orange: #F39C12;
+  --orange-light: #F5B041;
+  --green: #27AE60;
+  --red: #E74C3C;
+  --text: #ECF0F1;
+  --text-dim: #8899A6;
+  --card-bg: #1C2938;
+  --border: #2C3E50;
+}
+
+body {
+  background: var(--bg);
+  color: var(--text);
+  font-family: 'Inter', sans-serif;
+  overflow-x: hidden;
+  line-height: 1.6;
+}
+
+/* ANIMATED BACKGROUND */
+.bg-particles {
+  position: fixed;
+  top: 0; left: 0;
+  width: 100%; height: 100%;
+  pointer-events: none;
+  z-index: 0;
+  overflow: hidden;
+}
+
+.particle {
+  position: absolute;
+  border-radius: 50%;
+  opacity: 0.08;
+  animation: float linear infinite;
+}
+
+@keyframes float {
+  0% { transform: translateY(100vh) rotate(0deg); opacity: 0; }
+  10% { opacity: 0.08; }
+  90% { opacity: 0.08; }
+  100% { transform: translateY(-10vh) rotate(720deg); opacity: 0; }
+}
+
+/* HEADER */
+.header {
+  position: relative;
+  z-index: 1;
+  text-align: center;
+  padding: 60px 20px 40px;
+  background: linear-gradient(180deg, rgba(46,117,182,0.15) 0%, transparent 100%);
+}
+
+.header-badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  background: rgba(46,117,182,0.15);
+  border: 1px solid rgba(46,117,182,0.3);
+  border-radius: 50px;
+  padding: 8px 20px;
+  font-size: 13px;
+  color: var(--blue-light);
+  margin-bottom: 20px;
+  animation: fadeInDown 0.6s ease;
+}
+
+.header-badge .dot {
+  width: 8px; height: 8px;
+  background: var(--green);
+  border-radius: 50%;
+  animation: pulse-dot 2s infinite;
+}
+
+@keyframes pulse-dot {
+  0%, 100% { box-shadow: 0 0 0 0 rgba(39,174,96,0.4); }
+  50% { box-shadow: 0 0 0 8px rgba(39,174,96,0); }
+}
+
+.header h1 {
+  font-family: 'Space Grotesk', sans-serif;
+  font-size: clamp(2rem, 5vw, 3.5rem);
+  font-weight: 800;
+  background: linear-gradient(135deg, var(--blue-light), var(--orange));
+  -webkit-background-clip: text;
+  -webkit-text-fill-color: transparent;
+  background-clip: text;
+  animation: fadeInUp 0.8s ease;
+  margin-bottom: 12px;
+}
+
+.header p {
+  color: var(--text-dim);
+  font-size: 1.1rem;
+  animation: fadeInUp 1s ease;
+}
+
+.header-links {
+  margin-top: 16px;
+  display: flex;
+  gap: 20px;
+  justify-content: center;
+  animation: fadeInUp 1.2s ease;
+}
+
+.header-links a {
+  color: var(--blue-light);
+  text-decoration: none;
+  font-size: 14px;
+  transition: color 0.3s;
+}
+
+.header-links a:hover { color: var(--orange); }
+
+@keyframes fadeInUp {
+  from { opacity: 0; transform: translateY(20px); }
+  to { opacity: 1; transform: translateY(0); }
+}
+
+@keyframes fadeInDown {
+  from { opacity: 0; transform: translateY(-20px); }
+  to { opacity: 1; transform: translateY(0); }
+}
+
+/* CONTAINER */
+.container {
+  max-width: 1200px;
+  margin: 0 auto;
+  padding: 0 20px;
+  position: relative;
+  z-index: 1;
+}
+
+/* SECTION TITLES */
+.section-title {
+  font-family: 'Space Grotesk', sans-serif;
+  font-size: 1.8rem;
+  font-weight: 700;
+  text-align: center;
+  margin: 60px 0 12px;
+  color: var(--text);
+}
+
+.section-subtitle {
+  text-align: center;
+  color: var(--text-dim);
+  font-size: 0.95rem;
+  margin-bottom: 40px;
+}
+
+/* AGENT CARDS */
+.agents-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(340px, 1fr));
+  gap: 24px;
+  margin-bottom: 20px;
+}
+
+.agent-card {
+  background: var(--card-bg);
+  border: 1px solid var(--border);
+  border-radius: 16px;
+  overflow: hidden;
+  transition: all 0.3s ease;
+  cursor: pointer;
+}
+
+.agent-card:hover {
+  transform: translateY(-4px);
+  border-color: var(--blue);
+  box-shadow: 0 12px 40px rgba(46,117,182,0.15);
+}
+
+.agent-card-header {
+  padding: 24px;
+  display: flex;
+  align-items: center;
+  gap: 16px;
+  border-bottom: 1px solid var(--border);
+}
+
+.agent-icon {
+  width: 56px; height: 56px;
+  border-radius: 14px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 28px;
+  flex-shrink: 0;
+}
+
+.agent-icon.vendas { background: linear-gradient(135deg, #2E75B6, #1a5a8f); }
+.agent-icon.marketing { background: linear-gradient(135deg, #F39C12, #d68910); }
+.agent-icon.reputacao { background: linear-gradient(135deg, #27AE60, #1e8449); }
+
+.agent-info { flex: 1; }
+
+.agent-info h3 {
+  font-family: 'Space Grotesk', sans-serif;
+  font-size: 1.15rem;
+  font-weight: 700;
+  margin-bottom: 4px;
+}
+
+.agent-status {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 13px;
+  color: var(--text-dim);
+}
+
+.status-bar-mini {
+  width: 80px; height: 6px;
+  background: var(--bg);
+  border-radius: 3px;
+  overflow: hidden;
+}
+
+.status-bar-mini-fill {
+  height: 100%;
+  border-radius: 3px;
+  transition: width 1.5s ease;
+}
+
+.expand-icon {
+  font-size: 20px;
+  color: var(--text-dim);
+  transition: transform 0.3s;
+}
+
+.agent-card.expanded .expand-icon { transform: rotate(180deg); }
+
+.agent-body {
+  max-height: 0;
+  overflow: hidden;
+  transition: max-height 0.5s ease;
+}
+
+.agent-card.expanded .agent-body {
+  max-height: 600px;
+}
+
+.agent-body-inner {
+  padding: 24px;
+}
+
+.feature-list {
+  list-style: none;
+}
+
+.feature-list li {
+  padding: 10px 0;
+  border-bottom: 1px solid rgba(44,62,80,0.5);
+  display: flex;
+  align-items: flex-start;
+  gap: 12px;
+  font-size: 0.92rem;
+}
+
+.feature-list li:last-child { border-bottom: none; }
+
+.feature-icon {
+  width: 28px; height: 28px;
+  border-radius: 8px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 14px;
+  flex-shrink: 0;
+  background: rgba(46,117,182,0.15);
+}
+
+.feature-desc strong { display: block; margin-bottom: 2px; }
+.feature-desc span { color: var(--text-dim); font-size: 0.85rem; }
+
+/* PROGRESS BAR */
+.progress-section {
+  margin-top: 16px;
+  padding-top: 16px;
+  border-top: 1px solid var(--border);
+}
+
+.progress-label {
+  display: flex;
+  justify-content: space-between;
+  font-size: 13px;
+  margin-bottom: 8px;
+  color: var(--text-dim);
+}
+
+.progress-bar {
+  width: 100%; height: 8px;
+  background: var(--bg);
+  border-radius: 4px;
+  overflow: hidden;
+}
+
+.progress-fill {
+  height: 100%;
+  border-radius: 4px;
+  transition: width 2s ease;
+  background: linear-gradient(90deg, var(--blue), var(--blue-light));
+}
+
+/* TIMELINE */
+.timeline-container {
+  position: relative;
+  padding: 20px 0;
+}
+
+.timeline-line {
+  position: absolute;
+  left: 50%;
+  top: 0; bottom: 0;
+  width: 3px;
+  background: linear-gradient(180deg, var(--blue), var(--orange));
+  transform: translateX(-50%);
+  border-radius: 2px;
+}
+
+.timeline-item {
+  position: relative;
+  width: 50%;
+  padding: 20px 40px;
+  cursor: pointer;
+}
+
+.timeline-item:nth-child(odd) {
+  margin-left: 0;
+  text-align: right;
+  padding-right: 60px;
+}
+
+.timeline-item:nth-child(even) {
+  margin-left: 50%;
+  padding-left: 60px;
+}
+
+.timeline-dot {
+  position: absolute;
+  width: 20px; height: 20px;
+  background: var(--blue);
+  border: 3px solid var(--bg);
+  border-radius: 50%;
+  top: 28px;
+  z-index: 2;
+  transition: all 0.3s;
+}
+
+.timeline-item:nth-child(odd) .timeline-dot { right: -10px; }
+.timeline-item:nth-child(even) .timeline-dot { left: -10px; }
+
+.timeline-item:hover .timeline-dot {
+  background: var(--orange);
+  transform: scale(1.3);
+  box-shadow: 0 0 20px rgba(243,156,18,0.4);
+}
+
+.timeline-card {
+  background: var(--card-bg);
+  border: 1px solid var(--border);
+  border-radius: 12px;
+  padding: 20px;
+  transition: all 0.3s;
+}
+
+.timeline-item:hover .timeline-card {
+  border-color: var(--orange);
+  box-shadow: 0 8px 30px rgba(243,156,18,0.1);
+}
+
+.timeline-month {
+  font-family: 'Space Grotesk', sans-serif;
+  font-weight: 700;
+  font-size: 1.1rem;
+  color: var(--orange);
+  margin-bottom: 4px;
+}
+
+.timeline-phase {
+  font-size: 0.85rem;
+  color: var(--text-dim);
+  margin-bottom: 12px;
+}
+
+.timeline-deliverables {
+  list-style: none;
+  max-height: 0;
+  overflow: hidden;
+  transition: max-height 0.4s ease;
+}
+
+.timeline-item.active .timeline-deliverables {
+  max-height: 300px;
+}
+
+.timeline-deliverables li {
+  padding: 6px 0;
+  font-size: 0.88rem;
+  color: var(--text);
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.timeline-item:nth-child(odd) .timeline-deliverables li {
+  justify-content: flex-end;
+}
+
+.timeline-deliverables li::before {
+  content: '✦';
+  color: var(--blue-light);
+  font-size: 10px;
+}
+
+.timeline-item:nth-child(odd) .timeline-deliverables li::before {
+  order: 1;
+}
+
+.timeline-click-hint {
+  font-size: 0.78rem;
+  color: var(--text-dim);
+  margin-top: 8px;
+  opacity: 0.7;
+}
+
+/* METRICS */
+.metrics-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(240px, 1fr));
+  gap: 20px;
+}
+
+.metric-card {
+  background: var(--card-bg);
+  border: 1px solid var(--border);
+  border-radius: 14px;
+  padding: 28px 24px;
+  text-align: center;
+  transition: all 0.3s;
+  position: relative;
+  overflow: hidden;
+}
+
+.metric-card:hover {
+  transform: translateY(-3px);
+  border-color: var(--blue);
+  box-shadow: 0 8px 30px rgba(46,117,182,0.12);
+}
+
+.metric-card::before {
+  content: '';
+  position: absolute;
+  top: 0; left: 0;
+  width: 100%; height: 3px;
+}
+
+.metric-card:nth-child(1)::before { background: linear-gradient(90deg, var(--blue), var(--blue-light)); }
+.metric-card:nth-child(2)::before { background: linear-gradient(90deg, var(--orange), var(--orange-light)); }
+.metric-card:nth-child(3)::before { background: linear-gradient(90deg, var(--green), #2ecc71); }
+.metric-card:nth-child(4)::before { background: linear-gradient(90deg, #9B59B6, #8E44AD); }
+
+.metric-icon-wrap {
+  width: 52px; height: 52px;
+  border-radius: 14px;
+  margin: 0 auto 16px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 24px;
+}
+
+.metric-card:nth-child(1) .metric-icon-wrap { background: rgba(46,117,182,0.15); }
+.metric-card:nth-child(2) .metric-icon-wrap { background: rgba(243,156,18,0.15); }
+.metric-card:nth-child(3) .metric-icon-wrap { background: rgba(39,174,96,0.15); }
+.metric-card:nth-child(4) .metric-icon-wrap { background: rgba(155,89,182,0.15); }
+
+.metric-value {
+  font-family: 'Space Grotesk', sans-serif;
+  font-size: 2.5rem;
+  font-weight: 800;
+  margin-bottom: 4px;
+}
+
+.metric-card:nth-child(1) .metric-value { color: var(--blue-light); }
+.metric-card:nth-child(2) .metric-value { color: var(--orange); }
+.metric-card:nth-child(3) .metric-value { color: var(--green); }
+.metric-card:nth-child(4) .metric-value { color: #9B59B6; }
+
+.metric-label {
+  font-size: 0.9rem;
+  color: var(--text-dim);
+}
+
+/* FUNNEL */
+.funnel-container {
+  max-width: 700px;
+  margin: 0 auto;
+}
+
+.funnel-step {
+  position: relative;
+  margin: 0 auto;
+  padding: 18px;
+  background: var(--card-bg);
+  border: 1px solid var(--border);
+  text-align: center;
+  transition: all 0.3s;
+  cursor: default;
+}
+
+.funnel-step:first-child { border-radius: 12px 12px 0 0; }
+.funnel-step:last-child { border-radius: 0 0 12px 12px; }
+
+.funnel-step:hover {
+  background: var(--bg2);
+  border-color: var(--blue);
+}
+
+.funnel-step-header {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 12px;
+  margin-bottom: 6px;
+}
+
+.funnel-step-name {
+  font-family: 'Space Grotesk', sans-serif;
+  font-weight: 600;
+  font-size: 1.05rem;
+}
+
+.funnel-step-rate {
+  font-size: 0.85rem;
+  color: var(--text-dim);
+}
+
+.funnel-bar-wrapper {
+  margin: 10px auto 0;
+  height: 8px;
+  border-radius: 4px;
+  background: var(--bg);
+  overflow: hidden;
+}
+
+.funnel-bar {
+  height: 100%;
+  border-radius: 4px;
+  transition: width 2s ease;
+}
+
+.funnel-arrow {
+  text-align: center;
+  color: var(--text-dim);
+  font-size: 18px;
+  line-height: 1;
+  padding: 2px 0;
+  background: var(--card-bg);
+  border-left: 1px solid var(--border);
+  border-right: 1px solid var(--border);
+}
+
+/* COMPARATIVO */
+.compare-grid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 24px;
+}
+
+.compare-card {
+  background: var(--card-bg);
+  border: 1px solid var(--border);
+  border-radius: 14px;
+  padding: 28px;
+  position: relative;
+  overflow: hidden;
+}
+
+.compare-card::before {
+  content: '';
+  position: absolute;
+  top: 0; left: 0;
+  width: 100%; height: 3px;
+}
+
+.compare-card.antes::before { background: linear-gradient(90deg, var(--red), #c0392b); }
+.compare-card.depois::before { background: linear-gradient(90deg, var(--green), #2ecc71); }
+
+.compare-badge {
+  display: inline-block;
+  padding: 4px 14px;
+  border-radius: 50px;
+  font-size: 12px;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 1px;
+  margin-bottom: 20px;
+}
+
+.antes .compare-badge { background: rgba(231,76,60,0.15); color: var(--red); }
+.depois .compare-badge { background: rgba(39,174,96,0.15); color: var(--green); }
+
+.compare-list {
+  list-style: none;
+}
+
+.compare-list li {
+  padding: 10px 0;
+  border-bottom: 1px solid rgba(44,62,80,0.4);
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  font-size: 0.9rem;
+}
+
+.compare-list li:last-child { border-bottom: none; }
+
+.compare-list li .icon {
+  font-size: 16px;
+  flex-shrink: 0;
+}
+
+/* FOOTER */
+.footer {
+  text-align: center;
+  padding: 50px 20px;
+  margin-top: 60px;
+  border-top: 1px solid var(--border);
+  color: var(--text-dim);
+  font-size: 0.85rem;
+}
+
+.footer a {
+  color: var(--blue-light);
+  text-decoration: none;
+}
+
+/* RESPONSIVE */
+@media (max-width: 768px) {
+  .agents-grid { grid-template-columns: 1fr; }
+  .compare-grid { grid-template-columns: 1fr; }
+
+  .timeline-line { left: 20px; }
+  .timeline-item,
+  .timeline-item:nth-child(odd),
+  .timeline-item:nth-child(even) {
+    width: 100%;
+    margin-left: 0;
+    padding-left: 50px;
+    padding-right: 20px;
+    text-align: left;
+  }
+  .timeline-item:nth-child(odd) .timeline-dot,
+  .timeline-item:nth-child(even) .timeline-dot {
+    left: 10px;
+    right: auto;
+  }
+  .timeline-item:nth-child(odd) .timeline-deliverables li {
+    justify-content: flex-start;
+  }
+  .timeline-item:nth-child(odd) .timeline-deliverables li::before {
+    order: 0;
+  }
+}
+
+/* SCROLL ANIMATIONS */
+.reveal {
+  opacity: 0;
+  transform: translateY(30px);
+  transition: all 0.8s ease;
+}
+
+.reveal.visible {
+  opacity: 1;
+  transform: translateY(0);
+}
+
+/* Counter animation helper */
+.counter { display: inline-block; }
+</style>
+</head>
+<body>
+
+<!-- BACKGROUND PARTICLES -->
+<div class="bg-particles" id="particles"></div>
+
+<!-- HEADER -->
+<header class="header">
+  <div class="header-badge">
+    <span class="dot"></span>
+    Roadmap Ativo — 2026
+  </div>
+  <h1>Croma IA — Vendas & Marketing</h1>
+  <p>Automação inteligente para comunicação visual</p>
+  <div class="header-links">
+    <a href="https://cromaprint.com.br" target="_blank">🌐 cromaprint.com.br</a>
+    <a href="https://instagram.com/cromaprint" target="_blank">📸 @cromaprint</a>
+  </div>
+</header>
+
+<div class="container">
+
+  <!-- AGENTES -->
+  <h2 class="section-title reveal">🤖 Agentes de IA</h2>
+  <p class="section-subtitle reveal">Clique nos cards para expandir os detalhes</p>
+
+  <div class="agents-grid">
+    <!-- AGENTE VENDAS -->
+    <div class="agent-card reveal" onclick="toggleAgent(this)">
+      <div class="agent-card-header">
+        <div class="agent-icon vendas">🎯</div>
+        <div class="agent-info">
+          <h3>Agente de Vendas</h3>
+          <div class="agent-status">
+            <div class="status-bar-mini">
+              <div class="status-bar-mini-fill" style="width:40%; background: linear-gradient(90deg, var(--blue), var(--blue-light));"></div>
+            </div>
+            <span>40% implementado</span>
+          </div>
+        </div>
+        <span class="expand-icon">▾</span>
+      </div>
+      <div class="agent-body">
+        <div class="agent-body-inner">
+          <ul class="feature-list">
+            <li>
+              <div class="feature-icon">📍</div>
+              <div class="feature-desc">
+                <strong>Prospecção Automática</strong>
+                <span>Google Maps, juntas comerciais, dados públicos</span>
+              </div>
+            </li>
+            <li>
+              <div class="feature-icon">💬</div>
+              <div class="feature-desc">
+                <strong>Abordagem Personalizada</strong>
+                <span>WhatsApp Business API, email segmentado</span>
+              </div>
+            </li>
+            <li>
+              <div class="feature-icon">🔄</div>
+              <div class="feature-desc">
+                <strong>Follow-up Inteligente</strong>
+                <span>Cadência automática com IA generativa</span>
+              </div>
+            </li>
+            <li>
+              <div class="feature-icon">📊</div>
+              <div class="feature-desc">
+                <strong>Pipeline Visual</strong>
+                <span>Kanban de oportunidades em tempo real</span>
+              </div>
+            </li>
+          </ul>
+          <div class="progress-section">
+            <div class="progress-label">
+              <span>Progresso Geral</span>
+              <span>40%</span>
+            </div>
+            <div class="progress-bar">
+              <div class="progress-fill" data-width="40"></div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- AGENTE MARKETING -->
+    <div class="agent-card reveal" onclick="toggleAgent(this)">
+      <div class="agent-card-header">
+        <div class="agent-icon marketing">📣</div>
+        <div class="agent-info">
+          <h3>Agente de Marketing</h3>
+          <div class="agent-status">
+            <div class="status-bar-mini">
+              <div class="status-bar-mini-fill" style="width:0%; background: linear-gradient(90deg, var(--orange), var(--orange-light));"></div>
+            </div>
+            <span>0% implementado</span>
+          </div>
+        </div>
+        <span class="expand-icon">▾</span>
+      </div>
+      <div class="agent-body">
+        <div class="agent-body-inner">
+          <ul class="feature-list">
+            <li>
+              <div class="feature-icon" style="background: rgba(243,156,18,0.15);">🎨</div>
+              <div class="feature-desc">
+                <strong>Criação de Posts</strong>
+                <span>Instagram, Facebook com design automático</span>
+              </div>
+            </li>
+            <li>
+              <div class="feature-icon" style="background: rgba(243,156,18,0.15);">📅</div>
+              <div class="feature-desc">
+                <strong>Calendário Editorial</strong>
+                <span>Planejamento semanal automatizado</span>
+              </div>
+            </li>
+            <li>
+              <div class="feature-icon" style="background: rgba(243,156,18,0.15);">💌</div>
+              <div class="feature-desc">
+                <strong>Gestão de Interações</strong>
+                <span>Respostas a comentários e DMs com IA</span>
+              </div>
+            </li>
+            <li>
+              <div class="feature-icon" style="background: rgba(243,156,18,0.15);">📈</div>
+              <div class="feature-desc">
+                <strong>Analytics & Relatórios</strong>
+                <span>Dashboards automáticos de performance</span>
+              </div>
+            </li>
+          </ul>
+          <div class="progress-section">
+            <div class="progress-label">
+              <span>Progresso Geral</span>
+              <span>0%</span>
+            </div>
+            <div class="progress-bar">
+              <div class="progress-fill" data-width="0"></div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- AGENTE REPUTAÇÃO -->
+    <div class="agent-card reveal" onclick="toggleAgent(this)">
+      <div class="agent-card-header">
+        <div class="agent-icon reputacao">⭐</div>
+        <div class="agent-info">
+          <h3>Agente de Reputação</h3>
+          <div class="agent-status">
+            <div class="status-bar-mini">
+              <div class="status-bar-mini-fill" style="width:0%; background: linear-gradient(90deg, var(--green), #2ecc71);"></div>
+            </div>
+            <span>0% implementado</span>
+          </div>
+        </div>
+        <span class="expand-icon">▾</span>
+      </div>
+      <div class="agent-body">
+        <div class="agent-body-inner">
+          <ul class="feature-list">
+            <li>
+              <div class="feature-icon" style="background: rgba(39,174,96,0.15);">⭐</div>
+              <div class="feature-desc">
+                <strong>Google Reviews</strong>
+                <span>Monitoramento e resposta automática</span>
+              </div>
+            </li>
+            <li>
+              <div class="feature-icon" style="background: rgba(39,174,96,0.15);">🛡️</div>
+              <div class="feature-desc">
+                <strong>Reclame Aqui</strong>
+                <span>Gestão de reclamações com IA</span>
+              </div>
+            </li>
+            <li>
+              <div class="feature-icon" style="background: rgba(39,174,96,0.15);">🔍</div>
+              <div class="feature-desc">
+                <strong>SEO & Blog Automático</strong>
+                <span>Conteúdo otimizado gerado por IA</span>
+              </div>
+            </li>
+          </ul>
+          <div class="progress-section">
+            <div class="progress-label">
+              <span>Progresso Geral</span>
+              <span>0%</span>
+            </div>
+            <div class="progress-bar">
+              <div class="progress-fill" data-width="0"></div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- TIMELINE -->
+  <h2 class="section-title reveal">📅 Timeline de Implementação</h2>
+  <p class="section-subtitle reveal">Clique em cada fase para ver as entregas</p>
+
+  <div class="timeline-container reveal">
+    <div class="timeline-line"></div>
+
+    <div class="timeline-item" onclick="toggleTimeline(this)">
+      <div class="timeline-dot"></div>
+      <div class="timeline-card">
+        <div class="timeline-month">Abril 2026</div>
+        <div class="timeline-phase">Fase 1 — Fundação de Vendas</div>
+        <div class="timeline-click-hint">Clique para detalhes ▾</div>
+        <ul class="timeline-deliverables">
+          <li>Setup do CRM e pipeline de vendas</li>
+          <li>Integração Google Maps para prospecção</li>
+          <li>Templates de mensagens para WhatsApp</li>
+          <li>Automação de first-touch email</li>
+          <li>Dashboard de leads v1</li>
+        </ul>
+      </div>
+    </div>
+
+    <div class="timeline-item" onclick="toggleTimeline(this)">
+      <div class="timeline-dot"></div>
+      <div class="timeline-card">
+        <div class="timeline-month">Maio 2026</div>
+        <div class="timeline-phase">Fase 2 — Marketing Digital</div>
+        <div class="timeline-click-hint">Clique para detalhes ▾</div>
+        <ul class="timeline-deliverables">
+          <li>Configuração do agente de marketing</li>
+          <li>Calendário editorial automático</li>
+          <li>Templates de posts para Instagram/Facebook</li>
+          <li>Bot de respostas para DMs</li>
+          <li>Integração com analytics</li>
+        </ul>
+      </div>
+    </div>
+
+    <div class="timeline-item" onclick="toggleTimeline(this)">
+      <div class="timeline-dot"></div>
+      <div class="timeline-card">
+        <div class="timeline-month">Junho 2026</div>
+        <div class="timeline-phase">Fase 3 — Reputação & SEO</div>
+        <div class="timeline-click-hint">Clique para detalhes ▾</div>
+        <ul class="timeline-deliverables">
+          <li>Monitor de Google Reviews ativo</li>
+          <li>Integração Reclame Aqui</li>
+          <li>Blog com publicação automática SEO</li>
+          <li>Sistema de solicitação de avaliações</li>
+          <li>Relatórios de reputação online</li>
+        </ul>
+      </div>
+    </div>
+
+    <div class="timeline-item" onclick="toggleTimeline(this)">
+      <div class="timeline-dot"></div>
+      <div class="timeline-card">
+        <div class="timeline-month">Julho 2026</div>
+        <div class="timeline-phase">Fase 4 — Otimização & Escala</div>
+        <div class="timeline-click-hint">Clique para detalhes ▾</div>
+        <ul class="timeline-deliverables">
+          <li>Otimização de todos os agentes com dados reais</li>
+          <li>A/B testing em abordagens de vendas</li>
+          <li>Refinamento de conteúdo por performance</li>
+          <li>Dashboard unificado de métricas</li>
+          <li>Escala da operação automatizada</li>
+        </ul>
+      </div>
+    </div>
+  </div>
+
+  <!-- MÉTRICAS -->
+  <h2 class="section-title reveal">📊 Metas de Performance</h2>
+  <p class="section-subtitle reveal">Métricas-alvo após implementação completa</p>
+
+  <div class="metrics-grid reveal">
+    <div class="metric-card">
+      <div class="metric-icon-wrap">🎯</div>
+      <div class="metric-value"><span class="counter" data-target="50">0</span></div>
+      <div class="metric-label">Leads / mês</div>
+    </div>
+    <div class="metric-card">
+      <div class="metric-icon-wrap">📝</div>
+      <div class="metric-value"><span class="counter" data-target="5">0</span></div>
+      <div class="metric-label">Posts / semana</div>
+    </div>
+    <div class="metric-card">
+      <div class="metric-icon-wrap">🤝</div>
+      <div class="metric-value"><span class="counter" data-target="10">0</span></div>
+      <div class="metric-label">Novos clientes / mês</div>
+    </div>
+    <div class="metric-card">
+      <div class="metric-icon-wrap">📈</div>
+      <div class="metric-value">+<span class="counter" data-target="500">0</span></div>
+      <div class="metric-label">Seguidores / mês</div>
+    </div>
+  </div>
+
+  <!-- FUNIL -->
+  <h2 class="section-title reveal">🔻 Funil de Vendas</h2>
+  <p class="section-subtitle reveal">Taxas de conversão estimadas por etapa</p>
+
+  <div class="funnel-container reveal">
+    <div class="funnel-step">
+      <div class="funnel-step-header">
+        <span class="funnel-step-name">📍 Prospecção</span>
+      </div>
+      <div class="funnel-step-rate">1.000 empresas mapeadas — 100%</div>
+      <div class="funnel-bar-wrapper" style="max-width: 100%;">
+        <div class="funnel-bar" data-width="100" style="background: linear-gradient(90deg, #2E75B6, #4A9FE5);"></div>
+      </div>
+    </div>
+    <div class="funnel-arrow">▼</div>
+
+    <div class="funnel-step">
+      <div class="funnel-step-header">
+        <span class="funnel-step-name">💬 Abordagem</span>
+      </div>
+      <div class="funnel-step-rate">300 contatadas — 30% de conversão</div>
+      <div class="funnel-bar-wrapper" style="max-width: 85%;">
+        <div class="funnel-bar" data-width="100" style="background: linear-gradient(90deg, #2980B9, #3498DB);"></div>
+      </div>
+    </div>
+    <div class="funnel-arrow">▼</div>
+
+    <div class="funnel-step">
+      <div class="funnel-step-header">
+        <span class="funnel-step-name">✅ Qualificação</span>
+      </div>
+      <div class="funnel-step-rate">120 qualificadas — 40% de conversão</div>
+      <div class="funnel-bar-wrapper" style="max-width: 70%;">
+        <div class="funnel-bar" data-width="100" style="background: linear-gradient(90deg, #F39C12, #F5B041);"></div>
+      </div>
+    </div>
+    <div class="funnel-arrow">▼</div>
+
+    <div class="funnel-step">
+      <div class="funnel-step-header">
+        <span class="funnel-step-name">💰 Orçamento</span>
+      </div>
+      <div class="funnel-step-rate">60 orçamentos enviados — 50% de conversão</div>
+      <div class="funnel-bar-wrapper" style="max-width: 55%;">
+        <div class="funnel-bar" data-width="100" style="background: linear-gradient(90deg, #E67E22, #F39C12);"></div>
+      </div>
+    </div>
+    <div class="funnel-arrow">▼</div>
+
+    <div class="funnel-step">
+      <div class="funnel-step-header">
+        <span class="funnel-step-name">🤝 Negociação</span>
+      </div>
+      <div class="funnel-step-rate">30 em negociação — 50% de conversão</div>
+      <div class="funnel-bar-wrapper" style="max-width: 40%;">
+        <div class="funnel-bar" data-width="100" style="background: linear-gradient(90deg, #27AE60, #2ecc71);"></div>
+      </div>
+    </div>
+    <div class="funnel-arrow">▼</div>
+
+    <div class="funnel-step">
+      <div class="funnel-step-header">
+        <span class="funnel-step-name">🏆 Fechamento</span>
+      </div>
+      <div class="funnel-step-rate">10 novos clientes/mês — 33% de conversão</div>
+      <div class="funnel-bar-wrapper" style="max-width: 28%;">
+        <div class="funnel-bar" data-width="100" style="background: linear-gradient(90deg, #1ABC9C, #16A085);"></div>
+      </div>
+    </div>
+  </div>
+
+  <!-- COMPARATIVO -->
+  <h2 class="section-title reveal">⚡ Antes vs Depois</h2>
+  <p class="section-subtitle reveal">O impacto da automação com IA</p>
+
+  <div class="compare-grid reveal">
+    <div class="compare-card antes">
+      <span class="compare-badge">❌ Antes — Manual</span>
+      <ul class="compare-list">
+        <li><span class="icon">🐌</span> Prospecção manual: ~2h/dia para 5 leads</li>
+        <li><span class="icon">😓</span> Posts criados manualmente: 1-2/semana</li>
+        <li><span class="icon">📉</span> Follow-up esquecido: 70% sem retorno</li>
+        <li><span class="icon">⏰</span> Respostas a DMs: 24-48h de atraso</li>
+        <li><span class="icon">🔇</span> Reviews ignoradas no Google</li>
+        <li><span class="icon">📋</span> Sem pipeline organizado</li>
+        <li><span class="icon">🧑</span> 1 pessoa sobrecarregada</li>
+        <li><span class="icon">💸</span> Custo alto, resultado baixo</li>
+      </ul>
+    </div>
+
+    <div class="compare-card depois">
+      <span class="compare-badge">✅ Depois — Com IA</span>
+      <ul class="compare-list">
+        <li><span class="icon">🚀</span> Prospecção 24/7: 50+ leads/mês</li>
+        <li><span class="icon">🎨</span> 5 posts/semana automáticos</li>
+        <li><span class="icon">🔄</span> Follow-up 100% automatizado</li>
+        <li><span class="icon">⚡</span> Respostas em DMs: < 5 minutos</li>
+        <li><span class="icon">⭐</span> Reviews respondidas automaticamente</li>
+        <li><span class="icon">📊</span> Pipeline visual em tempo real</li>
+        <li><span class="icon">🤖</span> 3 agentes de IA trabalhando 24/7</li>
+        <li><span class="icon">💎</span> Custo reduzido, resultado escalável</li>
+      </ul>
+    </div>
+  </div>
+
+</div>
+
+<!-- FOOTER -->
+<footer class="footer">
+  <p>Croma Print — Comunicação Visual Inteligente</p>
+  <p style="margin-top: 8px;">
+    <a href="https://cromaprint.com.br" target="_blank">cromaprint.com.br</a> &nbsp;|&nbsp;
+    <a href="https://instagram.com/cromaprint" target="_blank">@cromaprint</a>
+  </p>
+  <p style="margin-top: 16px; font-size: 0.78rem; opacity: 0.5;">Roadmap gerado com Croma IA — Março 2026</p>
+</footer>
+
+<script>
+// PARTICLES
+(function() {
+  const container = document.getElementById('particles');
+  const colors = ['#2E75B6', '#F39C12', '#27AE60', '#9B59B6'];
+  for (let i = 0; i < 30; i++) {
+    const p = document.createElement('div');
+    p.className = 'particle';
+    const size = Math.random() * 6 + 3;
+    p.style.width = size + 'px';
+    p.style.height = size + 'px';
+    p.style.left = Math.random() * 100 + '%';
+    p.style.background = colors[Math.floor(Math.random() * colors.length)];
+    p.style.animationDuration = (Math.random() * 20 + 15) + 's';
+    p.style.animationDelay = (Math.random() * 15) + 's';
+    container.appendChild(p);
+  }
+})();
+
+// TOGGLE AGENTS
+function toggleAgent(card) {
+  card.classList.toggle('expanded');
+}
+
+// TOGGLE TIMELINE
+function toggleTimeline(item) {
+  item.classList.toggle('active');
+  const hint = item.querySelector('.timeline-click-hint');
+  if (hint) {
+    hint.textContent = item.classList.contains('active') ? 'Clique para fechar ▴' : 'Clique para detalhes ▾';
+  }
+}
+
+// SCROLL REVEAL
+const reveals = document.querySelectorAll('.reveal');
+const revealObserver = new IntersectionObserver((entries) => {
+  entries.forEach(entry => {
+    if (entry.isIntersecting) {
+      entry.target.classList.add('visible');
+      revealObserver.unobserve(entry.target);
+    }
+  });
+}, { threshold: 0.1 });
+
+reveals.forEach(el => revealObserver.observe(el));
+
+// COUNTER ANIMATION
+const counters = document.querySelectorAll('.counter');
+const counterObserver = new IntersectionObserver((entries) => {
+  entries.forEach(entry => {
+    if (entry.isIntersecting) {
+      const el = entry.target;
+      const target = parseInt(el.dataset.target);
+      let current = 0;
+      const increment = target / 60;
+      const timer = setInterval(() => {
+        current += increment;
+        if (current >= target) {
+          el.textContent = target;
+          clearInterval(timer);
+        } else {
+          el.textContent = Math.floor(current);
+        }
+      }, 30);
+      counterObserver.unobserve(el);
+    }
+  });
+}, { threshold: 0.5 });
+
+counters.forEach(el => counterObserver.observe(el));
+
+// PROGRESS BARS & FUNNEL BARS ANIMATION
+const bars = document.querySelectorAll('.progress-fill, .funnel-bar');
+const barObserver = new IntersectionObserver((entries) => {
+  entries.forEach(entry => {
+    if (entry.isIntersecting) {
+      const el = entry.target;
+      const width = el.dataset.width || 100;
+      setTimeout(() => { el.style.width = width + '%'; }, 200);
+      barObserver.unobserve(el);
+    }
+  });
+}, { threshold: 0.3 });
+
+bars.forEach(el => {
+  el.style.width = '0%';
+  barObserver.observe(el);
+});
+</script>
+
+</body>
+</html>
