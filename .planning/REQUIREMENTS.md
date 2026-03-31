@@ -1,7 +1,7 @@
 # Requirements: ERP-Croma
 
 **Defined:** 2026-03-28
-**Updated:** 2026-03-29
+**Updated:** 2026-03-31
 **Core Value:** Fluxo Lead→Faturamento funcionando de ponta a ponta sem falhas
 
 ## v1 Requirements (Auditoria Crítica)
@@ -62,10 +62,13 @@
 - [x] **UX-01**: ChatERP componente (criado, não integrado — prioridade baixa)
 - [ ] **UX-02**: Cockpit Executivo com system_events e cobrança (DashboardExecutivoPage já existe, falta integrar novos dados)
 
-### Pendentes (dependem de Junior)
+### WhatsApp IA
 
-- [ ] **WA-01**: WhatsApp Business API — chip dedicado (Junior fornece)
-- [ ] **WA-02**: Configurar templates Meta Business (após chip)
+- [x] **WA-01**: WhatsApp Business API ativo com integração CRM completa (webhook v14 + ai-gerar-orcamento + coleta dados + email SMTP)
+
+### Pendentes
+
+- [ ] **WA-02**: Configurar templates Meta Business (para mensagens proativas)
 - [ ] **CRON-01**: Agendar cron do agent-cron-loop no Supabase
 
 ## Out of Scope
@@ -87,13 +90,14 @@
 | AUTO-01 a AUTO-06 | CROMA 4.0 F1 | Done |
 | FLOW-01 a FLOW-03 | CROMA 4.0 F2 | Done |
 | UX-01 | CROMA 4.0 F3 | Done |
-| UX-02, WA-01, WA-02, CRON-01 | CROMA 4.0 F3+ | Pending |
+| WA-01 | CROMA 4.0 F2 | Done |
+| UX-02, WA-02, CRON-01 | CROMA 4.0 F3+ | Pending |
 
 **Coverage:**
 - v1: 12/12 complete (100%)
 - v2: 8/8 complete (100%)
-- v3: 10/14 complete (71%) — 4 pendentes dependem de ações do Junior
-- Overall: 30/34 complete (88%)
+- v3: 12/15 complete (80%) — WA-01 concluído, 3 pendentes (UX-02, WA-02, CRON-01)
+- Overall: 32/35 complete (91%)
 
 ---
 *Requirements defined: 2026-03-28*

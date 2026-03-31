@@ -74,12 +74,8 @@ export interface AgentConfig {
   canais_ativos: AgentCanal[];
   segmentos_ativos: string[];
   tom: string;
-  modelo_qualificacao: string;
-  modelo_composicao: string;
-  modelo_fallback: string;
   email_remetente: string;
   nome_remetente: string;
-  auto_aprovacao_leads_frios?: boolean;
 }
 
 export interface AgentQualification {

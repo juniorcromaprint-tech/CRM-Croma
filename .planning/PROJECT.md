@@ -37,30 +37,36 @@ O fluxo Lead → Orçamento → Pedido → Produção → Instalação → Fatur
 - [x] **CAMPO-01**: App de Campo PWA (campo-croma.vercel.app)
 - [x] **CAMPO-02**: Bridge ERP↔Campo com views e triggers de sincronização
 
+### Completed (previously Active)
+
+<!-- Bugs e gaps da auditoria 2026-03-21 — todos resolvidos nos sprints/phases -->
+
+- [x] **BUG-01**: Status faturado funciona corretamente
+- [x] **BUG-02**: NCM preenchido em produtos
+- [x] **BUG-03**: Pagamento conectado ao fluxo
+- [x] **BUG-04**: Comissões calculadas
+- [x] **BUG-05**: Dimensões propagam no orçamento
+- [x] **GAP-01**: Dashboard financeiro consolidado
+- [x] **GAP-02**: Integração bancária boletos
+- [x] **GAP-03**: Reserva de estoque
+- [x] **GAP-04**: Gantt funcional
+- [x] **GAP-05**: Alertas e notificações
+- [x] **GAP-06**: Funil comercial completo
+- [x] **GAP-07**: Proposta→Pedido sem gaps
+- [x] **PROD-01**: Contratos recorrentes
+- [x] **PROD-02**: NPS e satisfação do cliente
+- [x] **PROD-03**: PIX como forma de pagamento
+- [x] **PROD-04**: RFQ (cotação fornecedores)
+- [x] **PROD-05**: Approval workflow
+- [x] **AI-03**: Agente de Vendas WhatsApp com integração CRM completa (v14)
+- [x] **AI-04**: AI Orçamento com detecção de intenção + proposta automática + motor Mubisys
+- [x] **TELE-01**: Gestão via Telegram/Cowork (Channels)
+
 ### Active
 
-<!-- Bugs e gaps identificados na auditoria 2026-03-21 -->
-
-- [ ] **BUG-01**: Status faturado não funciona corretamente
-- [ ] **BUG-02**: NCM null em produtos (fiscal quebra)
-- [ ] **BUG-03**: Pagamento desconectado do fluxo
-- [ ] **BUG-04**: Comissões sem cálculo
-- [ ] **BUG-05**: Dimensões não propagam no orçamento
-- [ ] **GAP-01**: Financeiro cego (sem dashboard consolidado)
-- [ ] **GAP-02**: Boleto manual (sem integração bancária automática)
-- [ ] **GAP-03**: Sem reserva de estoque ao criar pedido
-- [ ] **GAP-04**: Gantt decorativo (sem função real na produção)
-- [ ] **GAP-05**: Alertas e notificações inexistentes
-- [ ] **GAP-06**: Funil comercial incompleto
-- [ ] **GAP-07**: Proposta→Pedido com gaps de dados
-- [ ] **PROD-01**: Contratos recorrentes
-- [ ] **PROD-02**: NPS e satisfação do cliente
-- [ ] **PROD-03**: PIX como forma de pagamento
-- [ ] **PROD-04**: RFQ (solicitação de cotação fornecedores)
-- [ ] **PROD-05**: Approval workflow (aprovações em cadeia)
-- [ ] **AI-03**: Agente de Vendas multicanal completo
-- [ ] **AI-04**: AI Orçamento com detecção de intenção e proposta automática
-- [ ] **TELE-01**: Gestão completa via Telegram (o Junior gerencia tudo pelo celular)
+- [ ] **CROMA-F3**: Automação de fluxo (cobrança escalonada, PCP, transição Produção→Instalação)
+- [ ] **CROMA-F4**: Inteligência (cockpit executivo, score crédito, memory layer)
+- [ ] **CROMA-F5**: Conversacional (chat natural ERP, relatórios linguagem natural)
 
 ### Out of Scope
 
@@ -108,6 +114,10 @@ O fluxo Lead → Orçamento → Pedido → Produção → Instalação → Fatur
 | Nunca inventar preços | Sempre consultar materiais + produto_modelos + regras_precificacao | ✓ Good — REGRA |
 | Operar como vendedor real | Criar propostas reais, enviar emails reais, não prometer sem executar | ✓ Good — REGRA |
 | WhatsApp IA usa Claude API direta | Scheduled task + futuro Worker Fly.io com tool_use | ✓ Good |
+| WhatsApp webhook v14 com CRM | Detecta intenção → ai-gerar-orcamento → proposta real no sistema | ✓ Good |
+| Coleta dados antes de orçar | Nome, email, empresa, cidade — sem dados = sem proposta formal | ✓ Good — REGRA |
+| PIX/email hardcoded | CNPJ 18.923.994/0001-83 + junior@cromaprint.com.br — nunca outro | ✓ Good — REGRA |
+| Email SMTP direto no webhook | Evita dependência de JWT/auth para envio automático | ✓ Good |
 
 ---
-*Last updated: 2026-03-30 — regra MCP absoluta + WhatsApp IA fixes*
+*Last updated: 2026-03-31 — WhatsApp v14 CRM integrado, PIX/email corretos, coleta cadastral*

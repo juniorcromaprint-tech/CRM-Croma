@@ -9,7 +9,6 @@ import {
   jsonResponse,
   getServiceClient,
 } from '../ai-shared/ai-helpers.ts';
-import { createClient } from 'https://esm.sh/@supabase/supabase-js@2';
 
 const META_API_VERSION = 'v22.0';
 
@@ -72,17 +71,15 @@ serve(async (req: Request) => {
       });
     }
     const token = authHeader.replace('Bearer ', '');
-    const supabaseAuth = createClient(
-      Deno.env.get('SUPABASE_URL')!,
-      Deno.env.get('SUPABASE_ANON_KEY')!
-    );
-    const { data: { user }, error: userAuthError } = await supabaseAuth.auth.getUser(token);
+    // Use service client to validate user token (anon client can fail with certain JWT configs)
+    const supabaseService = getServiceClient();
+    const { data: { user }, error: userAuthError } = await supabaseService.auth.getUser(token);
     if (userAuthError || !user) {
+      console.error('whatsapp-enviar: auth failed', userAuthError?.message);
       return new Response(JSON.stringify({ error: 'Token inválido' }), {
         status: 401, headers: { ...corsHeaders, 'Content-Type': 'application/json' }
       });
     }
-    const supabaseService = getServiceClient();
     const { data: profile } = await supabaseService.from('profiles').select('role').eq('id', user.id).single();
     const allowedRoles = ['comercial', 'gerente', 'admin'];
     if (!profile || !allowedRoles.includes(profile.role)) {

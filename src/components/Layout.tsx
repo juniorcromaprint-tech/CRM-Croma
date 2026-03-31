@@ -18,6 +18,7 @@ import { NotificationBadge } from "@/components/NotificationBadge";
 import AIAlertsBadge from '@/domains/ai/components/AIAlertsBadge';
 import EstoqueAlertaBadge from '@/domains/admin/components/EstoqueAlertaBadge';
 import { useEmpresaPrincipal } from "@/shared/hooks/useEmpresaPrincipal";
+import ChatERP from "@/shared/components/ChatERP";
 
 // ---------------------------------------------------------------------------
 // Lucide Icons — mapped by string name from navigation.ts
@@ -31,7 +32,7 @@ import {
   PanelLeftClose, PanelLeftOpen, Search, Truck,
   Calendar, Megaphone, Package2, ArrowLeftRight, Building, Layers, BarChart2, GanttChart,
   TrendingUp, FileInput, Bot, Clock, RefreshCw,
-  ChevronDown, ChevronRight, Crown, Brain,
+  ChevronDown, ChevronRight, Crown, Brain, Gauge, Zap, Webhook,
   type LucideIcon,
 } from "lucide-react";
 
@@ -42,7 +43,7 @@ const ICON_MAP: Record<string, LucideIcon> = {
   Users, Settings, Shield, Receipt, FileCheck, List,
   SlidersHorizontal, Key, BookOpen, Calculator, Cog, Database, Truck,
   Calendar, Megaphone, Package2, ArrowLeftRight, Building, Layers, BarChart2, Gantt: GanttChart,
-  TrendingUp, FileInput, Bot, Clock, RefreshCw, Crown, Brain,
+  TrendingUp, FileInput, Bot, Clock, RefreshCw, Crown, Brain, Gauge, Zap, Webhook,
 };
 
 // ---------------------------------------------------------------------------
@@ -527,6 +528,11 @@ export default function Layout() {
           <Outlet />
         </div>
       </main>
+
+      {/* --------------------------------------------------------------- */}
+      {/* Chat ERP — Floating AI Assistant                                  */}
+      {/* --------------------------------------------------------------- */}
+      <ChatERP />
 
       {/* --------------------------------------------------------------- */}
       {/* Mobile Bottom Nav                                                 */}

@@ -81,11 +81,12 @@ O MCP Server Croma é a interface oficial para operar a Croma Print. Claude oper
 | "query customizada" | `croma_executar_sql` (SELECT only) |
 
 ### PROIBIDO
-- ❌ Inventar/estimar preços — SEMPRE consultar banco
+- ❌ Inventar/estimar preços — SEMPRE consultar banco (materiais + produto_modelos + regras_precificacao)
 - ❌ Prometer ações sem executar (email, proposta, etc.)
 - ❌ Manipular dados editando código React
 - ❌ Usar SQL direto no Supabase para operações que o MCP Server cobre
 - ❌ Chutar qualquer valor que existe no banco
+- ❌ Informar PIX ou email incorretos — ver dados oficiais abaixo
 
 ### OBRIGATÓRIO
 - ✅ Consultar preço real antes de cotar qualquer produto
@@ -93,6 +94,8 @@ O MCP Server Croma é a interface oficial para operar a Croma Print. Claude oper
 - ✅ Enviar emails reais quando prometer ao cliente
 - ✅ Operar como vendedor real usando o ERP
 - ✅ Usar o motor Mubisys (materiais + markup + regras) para precificação
+- ✅ Coletar dados cadastrais (nome completo, email, empresa, cidade/estado) antes de formalizar orçamento
+- ✅ Usar dados de pagamento oficiais: PIX CNPJ 18.923.994/0001-83 | Email: junior@cromaprint.com.br
 
 ### Regra: Usar GSD
 1. Ler `.planning/STATE.md` antes de qualquer tarefa
@@ -106,5 +109,16 @@ O MCP Server Croma é a interface oficial para operar a Croma Print. Claude oper
 
 A Croma Print está se tornando a **primeira empresa de comunicação visual gerida quase exclusivamente por IA**. O objetivo é que o Junior gerencie a empresa inteiramente pelo celular, com eu (Claude) sendo o cérebro que executa operações, analisa dados, toma decisões operacionais e mantém tudo funcionando.
 
+### Dados Oficiais da Empresa (para uso em propostas, emails e WhatsApp)
+
+| Campo | Valor |
+|---|---|
+| **PIX** | CNPJ 18.923.994/0001-83 (Croma Print Comunicação Visual) |
+| **Email oficial** | junior@cromaprint.com.br |
+| **WhatsApp Business** | +55 11 93947-1862 |
+| **Site** | www.cromaprint.com.br |
+| **Portal do cliente** | crm-croma.vercel.app/p/:token |
+| **Formas de pagamento** | PIX, transferência bancária, boleto |
+
 ---
-*Criado: 2026-03-28*
+*Criado: 2026-03-28 | Atualizado: 2026-03-31 — PIX, email, dados oficiais, coleta cadastral*

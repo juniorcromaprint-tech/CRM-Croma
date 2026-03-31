@@ -1,6 +1,6 @@
 # CROMA PRINT — CRM/ERP SISTEMA
 
-> **Versão**: 5.3 | **Atualizado**: 2026-03-30 | **Status**: Operacional em Produção — 4 Sprints + 5 bugs E2E corrigidos + GSD ativo + WhatsApp IA ativo
+> **Versão**: 5.4 | **Atualizado**: 2026-03-31 | **Status**: Operacional em Produção — 4 Sprints + 5 bugs E2E corrigidos + GSD ativo + WhatsApp IA v14 com CRM integrado
 
 ---
 
@@ -112,11 +112,19 @@ O script `start-dev.cmd` na raiz do repo:
 ### Clientes de referência
 Redes de lojas, franquias e grandes varejistas: **Beira Rio, Renner, Paquetá**, entre outros.
 
+### Dados Oficiais (para propostas, emails e WhatsApp)
+| Campo | Detalhe |
+|---|---|
+| **PIX** | CNPJ 18.923.994/0001-83 (Croma Print Comunicação Visual) |
+| **Email oficial** | junior@cromaprint.com.br |
+| **Formas de pagamento** | PIX, transferência bancária, boleto |
+
 ### Dono / Contato Principal
 | Campo | Detalhe |
 |---|---|
 | **Nome** | Junior |
-| **Email** | junior.cromaprint@gmail.com |
+| **Email pessoal** | junior.cromaprint@gmail.com |
+| **Email comercial** | junior@cromaprint.com.br |
 | **Telegram** | @Jucabio |
 | **Telegram chat_id** | 1065519625 |
 
@@ -130,9 +138,9 @@ Redes de lojas, franquias e grandes varejistas: **Beira Rio, Renner, Paquetá**,
 ### Funcionalidades IA
 - **12 Edge Functions de IA** via OpenRouter
 - **AI Sidebar** com 20+ appliers de contexto
-- **Agente de Vendas** multicanal com conversas e follow-ups automáticos
+- **Agente de Vendas WhatsApp v14** — CRM integrado: detecta intenção via tags [INTENT:xxx], coleta dados cadastrais (nome, email, empresa, cidade), cria propostas reais via ai-gerar-orcamento com motor Mubisys, envia link do portal + email SMTP, dados PIX/email corretos hardcoded
 - **Motor Mubisys** — precificação em 9 passos (materiais, máquinas, encargos, markup)
-- **AI Orçamento** — agente detecta intenção, gera proposta completa, humano aprova
+- **AI Orçamento** — agente detecta intenção, gera proposta completa no CRM, envia por email e WhatsApp
 
 ### App de Campo (PWA)
 - URL: `campo-croma.vercel.app`
@@ -212,7 +220,7 @@ Lead → Orçamento → Pedido → Produção → Instalação → Faturamento
 
 ---
 
-## ESTADO ATUAL DO BANCO (2026-03-26)
+## ESTADO ATUAL DO BANCO (2026-03-31)
 
 | Migration | Status | Conteúdo |
 |---|---|---|
@@ -295,6 +303,16 @@ Auditoria identificou 66 problemas. 4 sprints executados para resolver todos:
 **Padrão aprendido — REGRA NOVA**: Toda mutation dentro de `AlertDialogAction` DEVE usar `e.preventDefault()` para impedir o close automático. O dialog deve ser fechado manualmente via `onSettled` ou `onSuccess`.
 
 **Padrão aprendido — REGRA NOVA**: Todo `.insert()` e `.update()` no Supabase DEVE usar `.select().single()` para detectar bloqueio por RLS (que retorna 0 rows sem erro explícito).
+
+### WhatsApp IA v14 — Integração CRM (2026-03-31)
+Auditoria com lead teste "Vih" revelou 3 problemas no agente WhatsApp. Corrigidos:
+- **Problema #1 — Preços inventados**: Agente usava Claude para "chutar" preços ao invés de consultar CRM. Corrigido: webhook agora detecta intenção via tags `[INTENT:xxx]` e chama `ai-gerar-orcamento` que usa motor Mubisys com preços reais do banco.
+- **Problema #2 — Sem coleta de dados**: Cadastrava lead só com nome e telefone. Corrigido: `checkDadosFaltantes()` verifica nome completo, email, empresa, cidade. System prompt instrui coleta antes de orçar. `tryUpdateLeadFromMessage()` extrai dados automaticamente das mensagens.
+- **Problema #3 — PIX/email incorretos**: Corrigido em 3 Edge Functions (whatsapp-webhook, ai-compor-mensagem, agent-enviar-email). PIX: CNPJ 18.923.994/0001-83. Email: junior@cromaprint.com.br.
+
+**Padrão aprendido — REGRA NOVA**: Todo agente de vendas DEVE coletar dados cadastrais (nome completo, email, empresa, cidade/estado) ANTES de gerar qualquer orçamento formal.
+
+**Padrão aprendido — REGRA NOVA**: Dados de pagamento (PIX, email) devem ser HARDCODED no system prompt e nas mensagens de orçamento. Nunca confiar no Claude para "lembrar" dados financeiros.
 
 ### Auditorias pendentes (2026-03-21)
 Ver `docs/qa-reports/2026-03-21-MASTER-AUDIT-REPORT.md` para issues restantes:

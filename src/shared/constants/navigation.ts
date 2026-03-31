@@ -22,6 +22,7 @@ export const NAV_GROUPS: NavGroup[] = [
     items: [
       { name: 'Dashboard', path: '/', icon: 'LayoutDashboard', module: 'dashboard' },
       { name: 'Dashboard Executivo', path: '/executivo', icon: 'Crown', module: 'admin' },
+      { name: 'Cockpit IA', path: '/admin/cockpit', icon: 'Gauge', module: 'admin' },
       { name: 'Hub de IA', path: '/ia', icon: 'Brain', module: 'dashboard' },
     ],
   },
@@ -131,6 +132,7 @@ export const NAV_GROUPS: NavGroup[] = [
       { name: 'Gestão de Dados', path: '/admin/dados', icon: 'Database', module: 'admin' },
       { name: 'Webhooks', path: '/admin/webhooks', icon: 'Webhook', module: 'admin' },
       { name: 'Quadro de Avisos', path: '/admin/avisos', icon: 'Megaphone', module: 'admin' },
+      { name: 'Automação', path: '/admin/automacao', icon: 'Zap', module: 'admin' },
       { name: 'Relatórios', path: '/relatorios', icon: 'BarChart3', module: 'admin' },
     ],
   },

@@ -9,8 +9,8 @@ import {
 } from '../ai-shared/ai-helpers.ts';
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2';
 
-const DEFAULT_EMAIL_FROM = 'Croma Print <comercial@cromaprint.com.br>';
-const DEFAULT_EMAIL_REPLY_TO = 'comercial@cromaprint.com.br';
+const DEFAULT_EMAIL_FROM = 'Croma Print <junior@cromaprint.com.br>';
+const DEFAULT_EMAIL_REPLY_TO = 'junior@cromaprint.com.br';
 
 /** Convert plain text to basic HTML: split on blank lines → <p> tags */
 function textToHtml(text: string): string {

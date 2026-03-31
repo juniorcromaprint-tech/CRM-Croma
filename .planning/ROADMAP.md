@@ -104,13 +104,91 @@
 
 ---
 
+## CROMA 4.0 — Autonomia Total
+
+> **Foco:** Empresa gerida quase exclusivamente por IA
+> **Status:** Fases 1-2 concluídas, 3-5 planejadas em detalhe
+
+| Fase | Foco | Status | Estimativa | Entregues / Entregas |
+|------|------|--------|------------|----------------------|
+| F1 — Infraestrutura | Ponte MCP, triggers, scheduled tasks | ✅ Done | — | 6 tabelas, 4 triggers, 3 tasks, hooks frontend |
+| F2 — Agente de Vendas | WhatsApp IA integrado ao CRM | ✅ Done | — | Webhook v15, ai-gerar-orcamento, coleta dados, email SMTP, PIX correto |
+| F3 — Automação Fluxo | Cobrança, PCP, transições automáticas | ✅ Done | — | Migration 106+107, agent-cron-loop v3 (motor 15 rules), cobrança D1→D30, PCP trigger, transição Prod→Inst, AutomacaoPage |
+| F4 — Inteligência | Cockpit, score crédito, memory layer | ✅ Done | — | Migration 108+109, score crédito A-E (312 clientes), CockpitExecutivoPage (7 seções), memory layer (4 padrões auto), resumo diário 22h Telegram |
+| F5 — Conversacional | Chat natural, relatórios linguagem natural | ✅ Done | — | ai-chat-erp (3 estágios, 24 templates), ChatERP floating panel, integração Telegram |
+
+### Fase 3 — Automação de Fluxo (detalhes)
+
+> Plano completo: `.planning/phases/FASE-3-AUTOMACAO-FLUXO.md`
+
+**Entregas:**
+- **3.1** Motor de execução de regras (`agent-cron-loop`) — Edge Function que varre 15 agent_rules a cada 30min
+- **3.2** Cobrança automática escalonada — D+1 WhatsApp amigável → D+3 lembrete → D+7 email formal → D+15 Telegram Junior → D+30 alerta crítico + suspensão
+- **3.3** PCP inteligente — sequenciamento de OPs: gera etapas por categoria, atribui máquina, calcula datas previstas
+- **3.4** Transição Produção→Instalação — unificação de status, notificação automática ao criar OI
+- **3.5** Dashboard de automação — `/admin/automacao` com cobranças, fila produção, transições, saúde das regras
+
+**Infra existente**: `cobranca_automatica` (tabela), `agent_rules` (15 ativas), `system_events`, 6 setores, 6 máquinas, 12 triggers de produção
+**Gap principal**: camada de execução — regras existem mas ninguém as lê e executa
+
+### Fase 4 — Inteligência (detalhes)
+
+> Plano completo: `.planning/phases/FASE-4-INTELIGENCIA.md`
+
+**Entregas:**
+- **4.1** Cockpit Executivo — 7 seções: pulso do dia, alertas IA, financeiro, produção, comercial, automação, timeline
+- **4.2** Score de crédito — fórmula 4 fatores (pagamento 40%, volume 25%, relacionamento 20%, recência 15%), níveis A-E, limite sugerido
+- **4.3** Memory layer — detecção automática de 7 tipos de padrão (pagamento, pricing, produção, dia da semana, recorrência, consumo, sazonalidade)
+- **4.4** Resumo diário inteligente — 22h via Telegram, gerado por IA com dados reais do dia
+
+**Infra existente**: `ai_memory` (4 padrões), `business_intelligence_config` (15 configs, sazonalidade), `DashboardExecutivoPage` (incompleta)
+**Gap principal**: cockpit sem dados de automação, scores não calculados, memory layer com apenas 4 padrões
+
+### Fase 5 — Conversacional (detalhes)
+
+> Plano completo: `.planning/phases/FASE-5-CONVERSACIONAL.md`
+
+**Entregas:**
+- **5.1** Backend `ai-chat-erp` — pipeline 3 estágios (classificação → plano → execução), text-to-SQL seguro
+- **5.2** Frontend ChatERP — floating button, respostas ricas (tabelas, gráficos, ações), histórico
+- **5.3** Relatórios por linguagem natural — 10 templates (vendas, contas, produção, funil, estoque, inativos, etc.)
+- **5.4** Integração Telegram — Junior conversa com ERP pelo Telegram
+- **5.5** Sugestões proativas — chat sugere ações baseado no contexto
+
+**Infra existente**: `ai_requests/ai_responses` (ponte MCP), `agent_conversations/agent_messages`, ChatERP componente (criado, não integrado), 12 Edge Functions IA
+**Gap principal**: ChatERP desconectado do backend, text-to-SQL inexistente, relatórios NL não implementados
+
+---
+
+## Sequência de execução recomendada
+
+```
+Fase 3 (5-7d) ──→ Fase 4 (5-7d) ──→ Fase 5 (6-8d)
+                                               │
+Total estimado: 16-22 dias de desenvolvimento  │
+                                               ▼
+                                    CROMA 4.0 COMPLETO
+                                    Empresa gerida por IA
+```
+
+**Dependências:**
+- F4 depende de F3 (cockpit precisa dos dados de automação/cobrança)
+- F5 depende de F4 (chat usa cockpit views + memory layer + scores)
+- F5.4 (Telegram) depende de F3.1 (agent-cron-loop) para contexto
+
+---
+
 ## References
 
 - Auditoria: `docs/qa-reports/2026-03-21-MASTER-AUDIT-REPORT.md`
 - Plano IA Mestre: `docs/plano-ia/01_Estrategia/CROMA_AI_PLANO_MESTRE.md`
 - Spec detalhada: `docs/superpowers/specs/2026-03-14-plano-acao-erp-design.md`
 - Requirements: `.planning/REQUIREMENTS.md`
+- Fase 3: `.planning/phases/FASE-3-AUTOMACAO-FLUXO.md`
+- Fase 4: `.planning/phases/FASE-4-INTELIGENCIA.md`
+- Fase 5: `.planning/phases/FASE-5-CONVERSACIONAL.md`
 
 ---
 *Roadmap created: 2026-03-28*
-*All phases complete — 100% do roadmap entregue em 2026-03-29*
+*v1 phases complete — 100% do roadmap entregue em 2026-03-29*
+*CROMA 4.0 F3-F5 planejadas em detalhe: 2026-03-31*

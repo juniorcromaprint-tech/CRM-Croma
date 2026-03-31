@@ -1,8 +1,11 @@
 // supabase/functions/whatsapp-webhook/index.ts
-// v13 — Claude-powered WhatsApp auto-responder with full Croma context.
-//   - Uses Claude (via OpenRouter) instead of generic GPT
-//   - Rich system prompt with real product catalog, pricing, company info
+// v14 — Claude-powered WhatsApp auto-responder with full Croma CRM integration.
+//   - Uses Claude (via OpenRouter) for intelligent responses
+//   - Rich system prompt with real product catalog + company info
 //   - Queries database for lead history before responding
+//   - Detects quote intent → calls ai-gerar-orcamento → creates real proposal in CRM
+//   - Sends portal link + PDF via email when quote is generated
+//   - Collects customer data (name, email, company, city) before formalizing
 //   - Sends response directly to WhatsApp (no human approval needed)
 //   - Notifies Junior on Telegram with what was said
 //   - Escalation: detects complaints/urgency and notifies without auto-responding
@@ -153,7 +156,16 @@ async function sendWhatsApp(
 // ─────────────────────────────────────────────────────────────
 // Build Claude system prompt with full Croma context
 // ─────────────────────────────────────────────────────────────
-function buildCromaSystemPrompt(): string {
+function buildCromaSystemPrompt(dadosFaltantes: string[]): string {
+  const coletaDados = dadosFaltantes.length > 0
+    ? `\n## COLETA DE DADOS — PRIORIDADE
+Antes de gerar qualquer orçamento formal, você PRECISA coletar os seguintes dados que ainda faltam do cliente:
+${dadosFaltantes.map(d => `- ${d}`).join('\n')}
+
+Peça essas informações de forma natural e amigável na conversa. Exemplo: "Para formalizar o orçamento, preciso de alguns dados: seu nome completo, email para envio e a cidade/estado de vocês."
+NÃO gere orçamento sem ter pelo menos: nome completo, email e cidade/estado.\n`
+    : '';
+
   return `Você é o vendedor consultivo da *Croma Print Comunicação Visual*, respondendo clientes via WhatsApp.
 
 ## SOBRE A EMPRESA
@@ -184,18 +196,26 @@ function buildCromaSystemPrompt(): string {
 2. Experiência com redes = padronização para múltiplas lojas
 3. Atendimento personalizado = cada projeto é único
 4. Desde o projeto até a instalação = solução completa
-
+${coletaDados}
 ## REGRAS DE RESPOSTA
 1. SEMPRE em português brasileiro, profissional mas caloroso
 2. Máximo 2-3 parágrafos curtos (WhatsApp = tela pequena)
 3. Use *negrito* para destaques importantes
 4. Emojis com moderação (1-2 por mensagem)
-5. NUNCA invente preços — diga que vai preparar um orçamento personalizado
-6. Se o cliente pedir preço/orçamento → peça: produto, dimensões, quantidade, se precisa de arte/instalação
-7. Se for saudação simples → apresente-se brevemente e pergunte como pode ajudar
-8. Se for dúvida técnica → responda com expertise e redirecione para valor
-9. Se já conversou antes (histórico) → NÃO repita perguntas já respondidas
-10. Assine como "Junior - Croma Print" (o cliente fala com o Junior, não com IA)
+5. NUNCA invente preços — os preços serão calculados pelo sistema de precificação automaticamente
+6. Se o cliente pedir preço/orçamento → peça: produto, dimensões, quantidade, acabamento, se precisa de arte/instalação
+7. Se o cliente já informou produto + dimensões + quantidade → diga que vai gerar o orçamento no sistema e enviar o link
+8. Se for saudação simples → apresente-se brevemente e pergunte como pode ajudar
+9. Se for dúvida técnica → responda com expertise e redirecione para valor
+10. Se já conversou antes (histórico) → NÃO repita perguntas já respondidas
+11. Assine como "Junior - Croma Print" (o cliente fala com o Junior, não com IA)
+12. Se o cliente pedir para FORMALIZAR o orçamento → informe que vai gerar no sistema e enviar por email + link
+
+## DADOS DE PAGAMENTO (CORRETOS — usar estes)
+- *PIX*: CNPJ 18.923.994/0001-83 (Croma Print Comunicação Visual)
+- *Email oficial*: junior@cromaprint.com.br
+- Também aceitamos transferência bancária e boleto
+- NUNCA informe outros dados de PIX ou email que não sejam estes
 
 ## TRATAMENTO DE OBJEÇÕES
 - "Muito caro" → fale sobre durabilidade, qualidade e ROI
@@ -207,20 +227,278 @@ function buildCromaSystemPrompt(): string {
 - Comercial: 8h-18h (seg-sex)
 - Fora do horário: responda normalmente mas mencione que detalhes técnicos serão confirmados no próximo dia útil
 
+## DETECÇÃO DE INTENÇÃO
+Ao final da sua resposta, adicione numa linha separada uma tag invisível com a intenção detectada:
+[INTENT:conversa] — saudação, dúvida geral, informação
+[INTENT:coleta_dados] — preciso coletar dados faltantes antes de orçar
+[INTENT:orcamento] — cliente já forneceu produto+dimensões+quantidade E eu tenho os dados cadastrais dele (nome, email, cidade)
+[INTENT:formalizar] — cliente pediu para formalizar/gerar/enviar orçamento E eu tenho os dados cadastrais dele
+[INTENT:suporte] — problema com pedido existente
+[INTENT:reclamacao] — insatisfação
+
+IMPORTANTE: Só marque [INTENT:orcamento] ou [INTENT:formalizar] se os dados cadastrais (nome completo, email, cidade/estado) JÁ foram coletados. Se faltarem dados, use [INTENT:coleta_dados].
+
 ## FORMATO DA RESPOSTA
-Responda APENAS o texto da mensagem que será enviada ao cliente. Sem JSON, sem metadata, sem explicações. Apenas o texto puro da resposta.`;
+Responda o texto da mensagem + a tag [INTENT:xxx] na última linha. Sem JSON, sem metadata. Apenas o texto puro da resposta seguido da tag de intenção.`;
 }
 
 // ─────────────────────────────────────────────────────────────
 // Generate Claude response with full context
 // ─────────────────────────────────────────────────────────────
+// ─────────────────────────────────────────────────────────────
+// Check which customer data is still missing
+// ─────────────────────────────────────────────────────────────
+function checkDadosFaltantes(lead: Record<string, unknown>): string[] {
+  const faltantes: string[] = [];
+  const nome = (lead.contato_nome as string) || '';
+  // Name with only first name or generic WhatsApp name
+  if (!nome || nome.split(' ').length < 2) faltantes.push('Nome completo');
+  if (!lead.contato_email && !lead.email) faltantes.push('Email');
+  if (!lead.empresa || lead.empresa === nome || (lead.empresa as string)?.startsWith('WhatsApp ')) faltantes.push('Nome da empresa');
+  // Check observacoes for city/state info
+  const obs = ((lead.observacoes as string) || '').toLowerCase();
+  const hasCidade = obs.includes('cidade') || obs.includes('estado') || obs.includes('/rs') || obs.includes('/sp');
+  if (!hasCidade && !lead.segmento) faltantes.push('Cidade/Estado');
+  return faltantes;
+}
+
+// ─────────────────────────────────────────────────────────────
+// Extract intent tag from Claude response
+// ─────────────────────────────────────────────────────────────
+function extractIntent(response: string): { cleanText: string; intent: string } {
+  const intentMatch = response.match(/\[INTENT:(\w+)\]\s*$/);
+  if (intentMatch) {
+    return {
+      cleanText: response.replace(/\[INTENT:\w+\]\s*$/, '').trim(),
+      intent: intentMatch[1],
+    };
+  }
+  return { cleanText: response.trim(), intent: 'conversa' };
+}
+
+// ─────────────────────────────────────────────────────────────
+// Update lead data from conversation context
+// ─────────────────────────────────────────────────────────────
+async function tryUpdateLeadFromMessage(
+  supabase: ReturnType<typeof getServiceClient>,
+  leadId: string,
+  message: string,
+  currentLead: Record<string, unknown>,
+): Promise<void> {
+  // Simple extraction patterns for common data shared by customers
+  const updates: Record<string, unknown> = {};
+
+  // Email detection
+  const emailMatch = message.match(/[\w.-]+@[\w.-]+\.\w{2,}/);
+  if (emailMatch && !currentLead.contato_email) {
+    updates.contato_email = emailMatch[0].toLowerCase();
+  }
+
+  // City/state detection (common Brazilian formats)
+  const cidadeMatch = message.match(/(?:de|em|sou de|fico em|estou em|moro em|cidade[:\s]*)\s*([A-ZÀ-Ü][a-zà-ü]+(?:\s+[A-ZÀ-Ü][a-zà-ü]+)*)\s*[-\/]\s*([A-Z]{2})/i);
+  if (cidadeMatch) {
+    const obsAtual = (currentLead.observacoes as string) || '';
+    if (!obsAtual.includes(cidadeMatch[1])) {
+      updates.observacoes = obsAtual ? `${obsAtual} | Cidade: ${cidadeMatch[1]}/${cidadeMatch[2]}` : `Cidade: ${cidadeMatch[1]}/${cidadeMatch[2]}`;
+    }
+  }
+
+  // Full name detection (when they say "meu nome é X" or "sou X Y")
+  const nomeMatch = message.match(/(?:meu nome[:\s]+(?:é\s+)?|me chamo\s+|sou\s+(?:o|a)?\s*)([A-ZÀ-Ü][a-zà-ü]+(?:\s+[A-ZÀ-Ü][a-zà-ü]+)+)/i);
+  if (nomeMatch && (!currentLead.contato_nome || (currentLead.contato_nome as string).split(' ').length < 2)) {
+    updates.contato_nome = nomeMatch[1].trim();
+  }
+
+  // Company name detection
+  const empresaMatch = message.match(/(?:empresa[:\s]+(?:é\s+)?|trabalho\s+(?:na|no)\s+|sou\s+(?:da|do)\s+)([A-ZÀ-Ü][^\n,]{2,40})/i);
+  if (empresaMatch && (!currentLead.empresa || (currentLead.empresa as string).startsWith('WhatsApp '))) {
+    updates.empresa = empresaMatch[1].trim();
+  }
+
+  if (Object.keys(updates).length > 0) {
+    updates.updated_at = new Date().toISOString();
+    await supabase.from('leads').update(updates).eq('id', leadId);
+    console.log('whatsapp-webhook: Lead data updated from message:', Object.keys(updates));
+  }
+}
+
+// ─────────────────────────────────────────────────────────────
+// Call ai-gerar-orcamento to create real proposal in CRM
+// ─────────────────────────────────────────────────────────────
+async function gerarOrcamentoReal(
+  supabase: ReturnType<typeof getServiceClient>,
+  conversationId: string,
+  leadId: string,
+  canal: string,
+): Promise<{ success: boolean; portalUrl?: string; total?: number; numero?: string; propostaId?: string; mensagem?: string }> {
+  try {
+    // Load conversation messages for context
+    const { data: msgs } = await supabase
+      .from('agent_messages')
+      .select('direcao, conteudo')
+      .eq('conversation_id', conversationId)
+      .order('created_at', { ascending: true })
+      .limit(20);
+
+    const mensagens = (msgs ?? []).map((m: Record<string, unknown>) => ({
+      direcao: m.direcao as string,
+      conteudo: m.conteudo as string,
+    }));
+
+    const orcamentoUrl = `${Deno.env.get('SUPABASE_URL')}/functions/v1/ai-gerar-orcamento`;
+    const resp = await fetch(orcamentoUrl, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'Authorization': `Bearer ${Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')}`,
+      },
+      body: JSON.stringify({
+        conversation_id: conversationId,
+        lead_id: leadId,
+        mensagens,
+        canal,
+      }),
+    });
+
+    const result = await resp.json();
+
+    if (result.status === 'proposta_criada') {
+      return {
+        success: true,
+        portalUrl: result.portal_url,
+        total: result.total,
+        numero: result.proposta_numero,
+        propostaId: result.proposta_id,
+      };
+    }
+
+    return {
+      success: false,
+      mensagem: result.status === 'info_faltante'
+        ? 'Preciso de mais informações para gerar o orçamento.'
+        : 'Não consegui gerar o orçamento automaticamente.',
+    };
+  } catch (err) {
+    console.error('whatsapp-webhook: ai-gerar-orcamento call failed:', err);
+    return { success: false, mensagem: 'Erro ao gerar orçamento no sistema.' };
+  }
+}
+
+// ─────────────────────────────────────────────────────────────
+// Send proposal email via Edge Function
+// ─────────────────────────────────────────────────────────────
+async function enviarEmailProposta(
+  supabase: ReturnType<typeof getServiceClient>,
+  leadId: string,
+  propostaId: string,
+): Promise<void> {
+  try {
+    // Get lead email
+    const { data: lead } = await supabase
+      .from('leads')
+      .select('contato_email, contato_nome, empresa')
+      .eq('id', leadId)
+      .single();
+
+    const email = lead?.contato_email as string;
+    if (!email) {
+      console.log('whatsapp-webhook: No email for lead, skipping email send');
+      return;
+    }
+
+    // Load SMTP config from admin_config (same as enviar-email-proposta uses as fallback)
+    const { data: smtpRows } = await supabase
+      .from('admin_config')
+      .select('chave, valor')
+      .in('chave', ['smtp_host', 'smtp_port', 'smtp_user', 'smtp_password']);
+
+    const smtpMap: Record<string, string> = {};
+    for (const row of smtpRows ?? []) {
+      if (row.chave && row.valor) smtpMap[row.chave] = row.valor;
+    }
+
+    const smtpUser = smtpMap['smtp_user'] || Deno.env.get('SMTP_USER') || '';
+    const smtpPassword = smtpMap['smtp_password'] || Deno.env.get('SMTP_PASSWORD') || '';
+
+    if (!smtpUser || !smtpPassword) {
+      console.log('whatsapp-webhook: SMTP not configured, skipping email');
+      return;
+    }
+
+    // Get proposta data
+    const { data: proposta } = await supabase
+      .from('propostas')
+      .select('numero, total, share_token')
+      .eq('id', propostaId)
+      .single();
+
+    if (!proposta?.share_token) {
+      console.log('whatsapp-webhook: Proposta without share_token, skipping email');
+      return;
+    }
+
+    const portalUrl = `https://crm-croma.vercel.app/p/${proposta.share_token}`;
+    const nomeCliente = lead?.contato_nome || lead?.empresa || 'Cliente';
+    const smtpHost = smtpMap['smtp_host'] || 'mail.cromaprint.com.br';
+    const smtpPort = parseInt(smtpMap['smtp_port'] || '465');
+
+    // Dynamic import of nodemailer
+    const nodemailer = (await import('npm:nodemailer@6.9')).default;
+
+    const transporter = nodemailer.createTransport({
+      host: smtpHost,
+      port: smtpPort,
+      secure: smtpPort === 465,
+      auth: { user: smtpUser, pass: smtpPassword },
+      tls: { rejectUnauthorized: false },
+    });
+
+    const htmlBody = `
+      <div style="font-family:sans-serif;max-width:600px;margin:0 auto;padding:24px;color:#1e293b;">
+        <h2 style="color:#1e40af;margin-bottom:4px;">Croma Print Comunicação Visual</h2>
+        <p style="color:#64748b;font-size:13px;margin-top:0;">Comunicação Visual Profissional</p>
+        <hr style="border:none;border-top:1px solid #e2e8f0;margin:20px 0;" />
+        <p>Olá, <strong>${nomeCliente}</strong>!</p>
+        <p>Preparamos sua proposta comercial <strong>${proposta.numero}</strong>.</p>
+        <p>Acesse o link abaixo para ver todos os detalhes, aprovar e enviar seus arquivos:</p>
+        <p style="text-align:center;margin:32px 0;">
+          <a href="${portalUrl}" style="background:#2563eb;color:white;padding:14px 36px;border-radius:8px;text-decoration:none;font-weight:bold;">
+            Ver Orçamento
+          </a>
+        </p>
+        <p><strong>Valor total: R$ ${(proposta.total as number || 0).toFixed(2).replace('.', ',')}</strong></p>
+        <p>Formas de pagamento: PIX (CNPJ 18.923.994/0001-83), transferência ou boleto.</p>
+        <hr style="border:none;border-top:1px solid #e2e8f0;margin:20px 0;" />
+        <p style="color:#64748b;font-size:12px;">Junior - Croma Print | junior@cromaprint.com.br</p>
+      </div>`;
+
+    await transporter.sendMail({
+      from: `"Croma Print" <${smtpUser}>`,
+      replyTo: 'junior@cromaprint.com.br',
+      to: email,
+      subject: `Orçamento ${proposta.numero} - Croma Print`,
+      html: htmlBody,
+    });
+
+    // Update proposta status to 'enviada'
+    await supabase
+      .from('propostas')
+      .update({ status: 'enviada', updated_at: new Date().toISOString() })
+      .eq('id', propostaId);
+
+    console.log(`whatsapp-webhook: Proposal email sent to ${email}`);
+  } catch (err) {
+    console.error('whatsapp-webhook: Email send failed (non-blocking):', err);
+  }
+}
+
 async function generateClaudeResponse(
   supabase: ReturnType<typeof getServiceClient>,
   lead: Record<string, unknown>,
   conversation: Record<string, unknown>,
   incomingMessage: string,
   contactName: string,
-): Promise<string | null> {
+): Promise<{ text: string; intent: string } | null> {
   try {
     // Check API key
     let apiKey = Deno.env.get('OPENROUTER_API_KEY');
@@ -255,7 +533,7 @@ async function generateClaudeResponse(
     // Load full lead info
     const { data: fullLead } = await supabase
       .from('leads')
-      .select('empresa, contato_nome, segmento, temperatura, observacoes, status')
+      .select('empresa, contato_nome, contato_email, segmento, temperatura, observacoes, status')
       .eq('id', lead.id)
       .single();
 
@@ -267,15 +545,20 @@ async function generateClaudeResponse(
       .order('created_at', { ascending: false })
       .limit(3);
 
+    // Determine missing customer data
+    const dadosFaltantes = checkDadosFaltantes(fullLead || lead);
+
     // Build user prompt with all context
     const userPrompt = [
       `## DADOS DO LEAD`,
       `Nome: ${contactName || fullLead?.contato_nome || 'Não informado'}`,
+      `Email: ${fullLead?.contato_email || 'Não informado'}`,
       `Empresa: ${fullLead?.empresa || 'Não informada'}`,
       `Segmento: ${fullLead?.segmento || 'Não identificado'}`,
       `Temperatura: ${fullLead?.temperatura || 'morno'}`,
       `Status: ${fullLead?.status || 'novo'}`,
       fullLead?.observacoes ? `Observações: ${fullLead.observacoes}` : '',
+      dadosFaltantes.length > 0 ? `\n⚠️ DADOS FALTANTES PARA ORÇAMENTO: ${dadosFaltantes.join(', ')}` : '\n✅ Todos os dados cadastrais coletados — pode gerar orçamento',
       ``,
       pedidos && pedidos.length > 0 ? `## PEDIDOS ANTERIORES\n${pedidos.map((p: Record<string, unknown>) => `- Pedido #${p.numero}: ${p.status} (R$ ${p.valor_total})`).join('\n')}` : '## PEDIDOS ANTERIORES\nNenhum pedido anterior (lead novo)',
       ``,
@@ -285,16 +568,16 @@ async function generateClaudeResponse(
       `## MENSAGEM RECEBIDA AGORA`,
       incomingMessage,
       ``,
-      `Responda como Junior da Croma Print. Texto puro, sem JSON.`,
+      `Responda como Junior da Croma Print. Texto da mensagem + tag [INTENT:xxx] na última linha.`,
     ].filter(Boolean).join('\n');
 
     const aiResult = await callOpenRouter(
-      buildCromaSystemPrompt(),
+      buildCromaSystemPrompt(dadosFaltantes),
       userPrompt,
       {
         model: CLAUDE_MODEL,
         temperature: 0.7,
-        max_tokens: 500,
+        max_tokens: 600,
         text_mode: true,
       }
     );
@@ -313,7 +596,9 @@ async function generateClaudeResponse(
     });
 
     console.log(`whatsapp-webhook: Claude response generated (${aiResult.duration_ms}ms, $${aiResult.cost_usd.toFixed(4)})`);
-    return aiResult.content.trim();
+
+    const { cleanText, intent } = extractIntent(aiResult.content);
+    return { text: cleanText, intent };
   } catch (err) {
     console.error('whatsapp-webhook: Claude response failed:', err);
     return null;
@@ -531,12 +816,15 @@ serve(async (req: Request) => {
       return new Response('OK', { status: 200 });
     }
 
+    // ── 7.5. Try to extract data from incoming message ────
+    await tryUpdateLeadFromMessage(supabase, lead.id as string, textBody, lead);
+
     // ── 8. Generate Claude response ─────────────────────────
-    const resposta = await generateClaudeResponse(
+    const claudeResult = await generateClaudeResponse(
       supabase, lead, conversation, textBody, contactName,
     );
 
-    if (!resposta) {
+    if (!claudeResult) {
       // Claude failed — notify Junior to respond manually
       await notifyTelegram(
         `📱 *WhatsApp — ${isNewLead ? '🆕 NOVO LEAD' : '💬 MENSAGEM'}*\n\n` +
@@ -546,6 +834,59 @@ serve(async (req: Request) => {
         `⚠️ _Não consegui gerar resposta automática. Responda manualmente._`
       );
       return new Response('OK', { status: 200 });
+    }
+
+    let resposta = claudeResult.text;
+    const intent = claudeResult.intent;
+    let orcamentoGerado = false;
+
+    // ── 8.5. If intent is orcamento/formalizar → create real proposal via CRM ──
+    if (intent === 'orcamento' || intent === 'formalizar') {
+      console.log(`whatsapp-webhook: Intent '${intent}' detected — calling ai-gerar-orcamento`);
+
+      const orcResult = await gerarOrcamentoReal(
+        supabase,
+        conversation.id as string,
+        lead.id as string,
+        'whatsapp',
+      );
+
+      if (orcResult.success && orcResult.portalUrl) {
+        orcamentoGerado = true;
+
+        // Build response with real CRM data
+        const primeiroNome = (contactName || (lead.contato_nome as string) || '').split(' ')[0];
+        resposta = [
+          `${primeiroNome ? primeiroNome + ', p' : 'P'}reparei o orçamento no sistema! 📋`,
+          ``,
+          `*Orçamento ${orcResult.numero}*`,
+          `*Total: R$ ${(orcResult.total ?? 0).toFixed(2).replace('.', ',')}*`,
+          ``,
+          `Acesse todos os detalhes, aprove e envie seus arquivos por este link:`,
+          `${orcResult.portalUrl}`,
+          ``,
+          `Também enviei por email com o PDF completo.`,
+          ``,
+          `*Pagamento:*`,
+          `PIX: CNPJ 18.923.994/0001-83`,
+          `Também aceitamos transferência e boleto.`,
+          ``,
+          `Qualquer dúvida, estou aqui! 😊`,
+          `Junior - Croma Print`,
+        ].join('\n');
+
+        // Send email with proposal link (non-blocking)
+        enviarEmailProposta(supabase, lead.id as string, orcResult.propostaId!);
+
+        // Update conversation etapa
+        await supabase
+          .from('agent_conversations')
+          .update({ etapa: 'proposta', updated_at: new Date().toISOString() })
+          .eq('id', conversation.id);
+      } else {
+        // Fallback: couldn't generate — use Claude's original response
+        console.log('whatsapp-webhook: ai-gerar-orcamento failed, using Claude response');
+      }
     }
 
     // ── 9. Send response via WhatsApp ───────────────────────
@@ -560,9 +901,11 @@ serve(async (req: Request) => {
       status: sent ? 'enviada' : 'erro',
       metadata: {
         auto_generated: true,
-        sent_by: 'claude-whatsapp-v13',
+        sent_by: 'claude-whatsapp-v14',
         modelo_ia: CLAUDE_MODEL,
         sent_success: sent,
+        intent_detected: intent,
+        orcamento_gerado: orcamentoGerado,
       },
     });
 
@@ -576,11 +919,12 @@ serve(async (req: Request) => {
 
     // ── 11. Notify Junior on Telegram ───────────────────────
     const statusEmoji = sent ? '✅' : '❌';
+    const intentLabel = orcamentoGerado ? '📋 ORÇAMENTO GERADO' : `🏷️ ${intent}`;
     const truncResp = resposta.length > 200 ? resposta.substring(0, 200) + '…' : resposta;
     const truncMsg = textBody.length > 150 ? textBody.substring(0, 150) + '…' : textBody;
 
     await notifyTelegram(
-      `🤖 *Auto-resposta WhatsApp* ${statusEmoji}\n\n` +
+      `🤖 *Auto-resposta WhatsApp* ${statusEmoji} ${intentLabel}\n\n` +
       `👤 *${contactName || 'Sem nome'}*${isNewLead ? ' (NOVO LEAD)' : ''}\n` +
       `📞 +${normalizedPhone}\n\n` +
       `💬 *Cliente:* ${truncMsg}\n\n` +
@@ -588,7 +932,7 @@ serve(async (req: Request) => {
       `_${sent ? 'Enviado com sucesso' : 'FALHA no envio — responda manualmente'}_`
     );
 
-    console.log('whatsapp-webhook: Claude auto-response sent for lead', lead.id);
+    console.log('whatsapp-webhook: Claude auto-response sent for lead', lead.id, '| intent:', intent, '| orcamento:', orcamentoGerado);
     return new Response('OK', { status: 200 });
   } catch (err) {
     console.error('whatsapp-webhook error:', err);

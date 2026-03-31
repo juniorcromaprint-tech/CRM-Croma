@@ -22,6 +22,8 @@ const ImportEntityPage = lazy(() => import("@/domains/dados/pages/ImportEntityPa
 const CatalogoProdutosPage = lazy(() => import("@/domains/admin/pages/CatalogoProdutosPage"));
 const WebhooksPage = lazy(() => import("@/domains/admin/pages/WebhooksPage"));
 const AdminAvisosPage = lazy(() => import("@/domains/admin/pages/AdminAvisosPage"));
+const AutomacaoPage = lazy(() => import("@/domains/admin/pages/AutomacaoPage"));
+const CockpitExecutivoPage = lazy(() => import("@/domains/admin/pages/CockpitExecutivoPage"));
 const DashboardExecutivoPage = lazy(() => import("@/domains/comercial/pages/DashboardExecutivoPage"));
 
 export const adminRoutes = (
@@ -109,6 +111,16 @@ export const adminRoutes = (
     <Route path="admin/avisos" element={
       <PermissionGuard module="admin" action="ver">
         <LazyPage><AdminAvisosPage /></LazyPage>
+      </PermissionGuard>
+    } />
+    <Route path="admin/automacao" element={
+      <PermissionGuard module="admin" action="ver">
+        <LazyPage><AutomacaoPage /></LazyPage>
+      </PermissionGuard>
+    } />
+    <Route path="admin/cockpit" element={
+      <PermissionGuard module="admin" action="ver">
+        <LazyPage><CockpitExecutivoPage /></LazyPage>
       </PermissionGuard>
     } />
     <Route path="executivo" element={<PermissionGuard module="admin" action="ver"><LazyPage><DashboardExecutivoPage /></LazyPage></PermissionGuard>} />

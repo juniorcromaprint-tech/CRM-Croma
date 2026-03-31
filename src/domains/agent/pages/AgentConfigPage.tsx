@@ -3,12 +3,10 @@
 // Configurações do Agente de Vendas: Geral, Modelos IA, Templates
 // ============================================================================
 
-import { useState, useEffect } from 'react';
+import { useState } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { supabase } from '@/integrations/supabase/client';
 import { showSuccess, showError } from '@/utils/toast';
-import { useAIModels } from '@/domains/ai/hooks/useAIModels';
-
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -29,7 +27,6 @@ import { Textarea } from '@/components/ui/textarea';
 import {
   Bot,
   Settings,
-  Brain,
   FileText,
   Save,
   Loader2,
@@ -56,12 +53,8 @@ const DEFAULT_CONFIG: AgentConfig = {
   canais_ativos: ['email'],
   segmentos_ativos: ['varejo', 'franquia', 'industria', 'servicos'],
   tom: 'consultivo',
-  modelo_qualificacao: 'openai/gpt-4.1-mini',
-  modelo_composicao: 'openai/gpt-4.1-mini',
-  modelo_fallback: 'openai/gpt-4.1-mini',
   email_remetente: 'comercial@cromaprint.com.br',
   nome_remetente: 'Croma Print',
-  auto_aprovacao_leads_frios: false,
 };
 
 const CANAIS: { value: AgentCanal; label: string }[] = [
@@ -336,28 +329,6 @@ function TabGeralConfig() {
           </CardContent>
         </Card>
 
-        {/* Auto-aprovação */}
-        <Card className="rounded-2xl border-none shadow-sm">
-          <CardHeader className="pb-3">
-            <CardTitle className="text-slate-800 text-base">Auto-aprovação</CardTitle>
-            <CardDescription>Enviar mensagens automaticamente sem aprovação manual</CardDescription>
-          </CardHeader>
-          <CardContent>
-            <div className="flex items-center justify-between">
-              <div className="space-y-1">
-                <Label className="text-slate-700 font-medium">Leads frios (score &lt; 50)</Label>
-                <p className="text-xs text-slate-400">
-                  Mensagens para leads com baixo engajamento serão enviadas automaticamente pelo loop do agente
-                </p>
-              </div>
-              <Switch
-                checked={config.auto_aprovacao_leads_frios ?? false}
-                onCheckedChange={(checked) => setConfig((p) => ({ ...p, auto_aprovacao_leads_frios: checked }))}
-              />
-            </div>
-          </CardContent>
-        </Card>
-
         {/* Segmentos ativos */}
         <Card className="rounded-2xl border-none shadow-sm">
           <CardHeader className="pb-3">
@@ -404,193 +375,7 @@ function TabGeralConfig() {
   );
 }
 
-// ─── Tab 2: Modelos IA ─────────────────────────────────────────────────────────
-
-function TabModelosIA() {
-  const queryClient = useQueryClient();
-  const { models, isLoading: modelsLoading } = useAIModels();
-
-  const { data: agentConfigData, isLoading: configLoading } = useQuery({
-    queryKey: ['agent_config'],
-    queryFn: async () => {
-      const { data, error } = await supabase
-        .from('admin_config')
-        .select('valor')
-        .eq('chave', 'agent_config')
-        .maybeSingle();
-      if (error) throw error;
-      if (data?.valor) {
-        try {
-          return JSON.parse(data.valor) as Partial<AgentConfig>;
-        } catch {
-          return null;
-        }
-      }
-      return null;
-    },
-  });
-
-  const [modeloQual, setModeloQual] = useState('');
-  const [modeloComp, setModeloComp] = useState('');
-  const [modeloFallback, setModeloFallback] = useState('');
-  const [initialized, setInitialized] = useState(false);
-
-  // Sync state from query data once loaded
-  useEffect(() => {
-    if (agentConfigData && !initialized) {
-      setModeloQual(agentConfigData.modelo_qualificacao ?? 'openai/gpt-4.1-mini');
-      setModeloComp(agentConfigData.modelo_composicao ?? 'openai/gpt-4.1-mini');
-      setModeloFallback(agentConfigData.modelo_fallback ?? 'openai/gpt-4.1-mini');
-      setInitialized(true);
-    }
-  }, [agentConfigData, initialized]);
-
-  const saveModelos = useMutation({
-    mutationFn: async () => {
-      // Load current config and merge
-      const { data } = await supabase
-        .from('admin_config')
-        .select('valor')
-        .eq('chave', 'agent_config')
-        .maybeSingle();
-
-      let current: Partial<AgentConfig> = {};
-      if (data?.valor) {
-        try { current = JSON.parse(data.valor); } catch { /* ignore */ }
-      }
-
-      const updated = { ...current, modelo_qualificacao: modeloQual, modelo_composicao: modeloComp, modelo_fallback: modeloFallback };
-      const { error } = await supabase
-        .from('admin_config')
-        .upsert({ chave: 'agent_config', valor: JSON.stringify(updated) }, { onConflict: 'chave' });
-      if (error) throw new Error(error.message);
-    },
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['agent_config'] });
-      showSuccess('Modelos IA salvos!');
-    },
-    onError: () => showError('Erro ao salvar modelos.'),
-  });
-
-  if (modelsLoading || configLoading) {
-    return (
-      <div className="flex items-center justify-center py-16 gap-2 text-slate-400">
-        <Loader2 className="h-5 w-5 animate-spin" />
-        <span>Carregando modelos...</span>
-      </div>
-    );
-  }
-
-  return (
-    <div className="space-y-6 max-w-2xl">
-      <Card className="rounded-2xl border-none shadow-sm">
-        <CardHeader className="pb-3">
-          <div className="flex items-center gap-2">
-            <Brain className="h-5 w-5 text-blue-600" />
-            <CardTitle className="text-slate-800 text-base">Modelos de Inteligência Artificial</CardTitle>
-          </div>
-          <CardDescription>
-            Modelos usados nas etapas de qualificação de leads e composição de mensagens.
-            Configure os modelos disponíveis em <strong>Admin → Configurações → Inteligência Artificial</strong>.
-          </CardDescription>
-        </CardHeader>
-        <CardContent className="space-y-5">
-          <div className="space-y-1.5">
-            <Label className="text-slate-700 font-medium">Modelo de Qualificação</Label>
-            <p className="text-xs text-slate-400">Usado para analisar leads e determinar score e próxima ação</p>
-            <Select value={modeloQual} onValueChange={setModeloQual}>
-              <SelectTrigger className="h-11 rounded-xl">
-                <SelectValue placeholder="Selecione o modelo" />
-              </SelectTrigger>
-              <SelectContent>
-                {models.map((m) => (
-                  <SelectItem key={m.slug} value={m.slug}>
-                    <span>{m.label}</span>
-                    {m.free && (
-                      <Badge variant="secondary" className="ml-2 text-xs px-1.5 py-0">Free</Badge>
-                    )}
-                  </SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
-          </div>
-
-          <Separator />
-
-          <div className="space-y-1.5">
-            <Label className="text-slate-700 font-medium">Modelo de Composição</Label>
-            <p className="text-xs text-slate-400">Usado para redigir mensagens de prospecção e follow-ups</p>
-            <Select value={modeloComp} onValueChange={setModeloComp}>
-              <SelectTrigger className="h-11 rounded-xl">
-                <SelectValue placeholder="Selecione o modelo" />
-              </SelectTrigger>
-              <SelectContent>
-                {models.map((m) => (
-                  <SelectItem key={m.slug} value={m.slug}>
-                    <span>{m.label}</span>
-                    {m.free && (
-                      <Badge variant="secondary" className="ml-2 text-xs px-1.5 py-0">Free</Badge>
-                    )}
-                  </SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
-          </div>
-
-          <Separator />
-
-          <div className="space-y-1.5">
-            <Label className="text-slate-700 font-medium">Modelo de Fallback</Label>
-            <p className="text-xs text-slate-400">Usado automaticamente se o modelo principal falhar (ex: modelo gratuito indisponível)</p>
-            <Select value={modeloFallback} onValueChange={setModeloFallback}>
-              <SelectTrigger className="h-11 rounded-xl">
-                <SelectValue placeholder="Selecione o modelo de fallback" />
-              </SelectTrigger>
-              <SelectContent>
-                {models.map((m) => (
-                  <SelectItem key={m.slug} value={m.slug}>
-                    <span>{m.label}</span>
-                    {m.free && (
-                      <Badge variant="secondary" className="ml-2 text-xs px-1.5 py-0">Free</Badge>
-                    )}
-                  </SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
-          </div>
-
-          <div className="bg-blue-50 border border-blue-100 rounded-xl p-3 text-xs text-blue-700 space-y-1">
-            <p className="font-semibold">Informação de custo</p>
-            <p>Cada qualificação de lead realiza 1 chamada ao modelo de qualificação.</p>
-            <p>Cada mensagem composta realiza 1 chamada ao modelo de composição.</p>
-            <p>Se o modelo principal falhar, o sistema usa o <strong>modelo de fallback</strong> automaticamente.</p>
-            <p>Modelos marcados como <strong>Free</strong> não geram custo no OpenRouter.</p>
-          </div>
-        </CardContent>
-      </Card>
-
-      <Button
-        onClick={() => saveModelos.mutate()}
-        disabled={saveModelos.isPending}
-        className="h-11 bg-blue-600 hover:bg-blue-700 text-white rounded-xl px-8"
-      >
-        {saveModelos.isPending ? (
-          <>
-            <Loader2 className="h-4 w-4 mr-2 animate-spin" />
-            Salvando...
-          </>
-        ) : (
-          <>
-            <Save className="h-4 w-4 mr-2" />
-            Salvar Modelos
-          </>
-        )}
-      </Button>
-    </div>
-  );
-}
-
-// ─── Tab 3: Templates ─────────────────────────────────────────────────────────
+// ─── Tab 2: Templates ─────────────────────────────────────────────────────────
 
 interface TemplateRowProps {
   template: AgentTemplate;
@@ -1129,13 +914,6 @@ export default function AgentConfigPage() {
             Configurações Gerais
           </TabsTrigger>
           <TabsTrigger
-            value="modelos"
-            className="rounded-lg data-[state=active]:bg-white data-[state=active]:shadow-sm px-4 py-2 text-sm"
-          >
-            <Brain className="h-4 w-4 mr-1.5" />
-            Modelos IA
-          </TabsTrigger>
-          <TabsTrigger
             value="templates"
             className="rounded-lg data-[state=active]:bg-white data-[state=active]:shadow-sm px-4 py-2 text-sm"
           >
@@ -1153,10 +931,6 @@ export default function AgentConfigPage() {
 
         <TabsContent value="geral" className="mt-6">
           <TabGeralConfig />
-        </TabsContent>
-
-        <TabsContent value="modelos" className="mt-6">
-          <TabModelosIA />
         </TabsContent>
 
         <TabsContent value="templates" className="mt-6">

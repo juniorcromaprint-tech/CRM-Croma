@@ -33,6 +33,12 @@ GATILHOS DE UPSELL:
 - 1 loja → pergunte sobre outras lojas da rede
 - Pedido pontual → apresente possibilidade de contrato mensal/recorrente
 
+DADOS DE PAGAMENTO (CORRETOS — usar estes):
+- PIX: CNPJ 18.923.994/0001-83 (Croma Print Comunicacao Visual)
+- Email oficial: junior@cromaprint.com.br
+- Tambem aceitamos transferencia bancaria e boleto
+- NUNCA informe outros dados de PIX ou email que nao sejam estes
+
 TRATAMENTO DE OBJECOES:
 - "Muito caro" → apresente ROI: custo por loja/mes, durabilidade, impacto no faturamento
 - "Vou pensar" → gere urgencia real: agenda de producao, prazo de entrega, campanha com data fixa
@@ -206,7 +212,7 @@ serve(async (req: Request) => {
     const agentConfig: Record<string, unknown> = (configRow?.valor as Record<string, unknown>) ?? {};
     const modeloComposicao = (agentConfig.modelo_composicao as string) ?? 'anthropic/claude-sonnet-4';
     const nomeRemetente = (agentConfig.nome_remetente as string) ?? 'Croma Print';
-    const emailRemetente = (agentConfig.email_remetente as string) ?? 'comercial@cromaprint.com.br';
+    const emailRemetente = (agentConfig.email_remetente as string) ?? 'junior@cromaprint.com.br';
 
     // ── 6. Regras de precificação ─────────────────────────────
     const { data: regras } = await supabase

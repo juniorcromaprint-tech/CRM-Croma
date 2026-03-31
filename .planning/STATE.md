@@ -12,14 +12,21 @@ See: docs/plano-ia/01_Estrategia/CROMA_4.0_PLANO_AUTONOMIA_TOTAL.md (CROMA 4.0)
 
 ## Current Position
 
-Phase: CROMA 4.0 — Fase 2 WhatsApp Inteligente: EM TESTE
+Phase: CROMA 4.0 — Fases 3+4+5 CONCLUÍDAS — Autonomia Total
 Roadmap v1: 20/20 completo (100%) ✅
-CROMA 4.0: 32/34 requirements (94%) — Fase 1 completa, WhatsApp IA respondendo em produção
-Status: WhatsApp IA ativo + 4 bugs corrigidos + scheduled task reescrita com precificação real
-Last activity: 2026-03-30 — Corrigidos 4 bugs do WhatsApp: (1) auto-scroll chat, (2) AI agora cria propostas reais e envia emails via sistema, (3) whatsapp-enviar v22 + bypass horário para manual, (4) precificação real via MCP (não chuta mais preços). Scheduled task reescrita para operar como vendedor real. REGRA ABSOLUTA estabelecida: MCP Server Croma para TODAS operações de dados.
+CROMA 4.0: 5/5 fases concluídas (100%) — Empresa gerida por IA
+Status: CROMA 4.0 COMPLETO + Limpeza centralização Claude concluída.
+Last activity: 2026-03-31 — Limpeza do agente de vendas para centralizar no Claude:
+  - Removida aba "Modelos IA" do AgentConfigPage (seleção de modelos OpenRouter não faz sentido quando Claude Cowork é o agente)
+  - Removido switch "Auto-aprovação leads frios" (existia na UI mas não era lido por nenhum código)
+  - Removidos campos modelo_qualificacao/modelo_composicao/modelo_fallback do type AgentConfig
+  - Limpas 9 mensagens órfãs (status 'aprovada' nunca enviadas — bug 401 whatsapp-enviar v9, já corrigido em v10)
+  - Deletados 2 templates desativados v1 com 0 usos (substituídos por v2)
+  - whatsapp-enviar v10 deployado com fix auth (service client ao invés de anon)
+  - MAPA-IA-CROMA.md criado com inventário completo de 45 Edge Functions e plano de simplificação
 
 Progress Roadmap v1: [████████████████████] 100% (20/20) ✅
-Progress CROMA 4.0:  [█████████████████░░░] 88% (30/34 requirements)
+Progress CROMA 4.0:  [████████████████████] 100% (5/5 fases)
 
 ## Performance Metrics
 
@@ -43,16 +50,17 @@ Progress CROMA 4.0:  [█████████████████░░�
 | Phase 2 | Auditoria + validação | GAP-01 a GAP-05 confirmados implementados |
 | Phase 3 | Produto + IA | PROD-01 a PROD-05, AI-03, AI-04, TELE-01 |
 | CROMA 4.0 F1 | Infraestrutura Autonomia | Ponte MCP, triggers eventos, scheduled tasks, hooks frontend |
+| CROMA 4.0 F2 | WhatsApp IA v14 | Webhook v14 com CRM, coleta dados, ai-gerar-orcamento, email SMTP, PIX correto |
 
 ## CROMA 4.0 — Status das Fases
 
 | Fase | Status | Entregues |
 |------|--------|-----------|
-| Fase 1 — Infraestrutura | 🔧 Em andamento | Ponte MCP (ai_requests/ai_responses), 3 triggers eventos (production_completed, installation_completed, payment_received), fn_detect_overdue_payments, system_events, ai_memory, useAIBridge.ts, 3 scheduled tasks |
-| Fase 2 — Agente de Vendas | 🔧 Em andamento | WhatsApp API PRODUÇÃO: +55 11 93947-1862 registrado, Phone ID 1042016058997037, WABA 1262844242060742, CromaBot token permanente, falta: webhook + templates |
-| Fase 3 — Automação Fluxo | ⬜ Pendente | Produção→Instalação, cobrança automática, PCP inteligente, compras |
-| Fase 4 — Inteligência | ⬜ Pendente | Memory layer (tabela criada), score crédito, cockpit executivo |
-| Fase 5 — Conversacional | ⬜ Pendente | Chat natural no ERP, relatórios linguagem natural |
+| Fase 1 — Infraestrutura | ✅ Concluída | Ponte MCP (ai_requests/ai_responses), 3 triggers eventos (production_completed, installation_completed, payment_received), fn_detect_overdue_payments, system_events, ai_memory, useAIBridge.ts, 3 scheduled tasks |
+| Fase 2 — Agente de Vendas | ✅ Concluída | WhatsApp webhook v14 com CRM integrado: detecta intenção, coleta dados cadastrais, cria propostas reais via ai-gerar-orcamento (motor Mubisys), envia link portal + email SMTP, PIX CNPJ 18.923.994/0001-83 correto, 3 Edge Functions deployadas (whatsapp-webhook, ai-compor-mensagem, agent-enviar-email) |
+| Fase 3 — Automação Fluxo | ✅ Concluída | Migration 106+107: vw_fila_producao, fn_pcp_sequenciar_op (trigger auto-cria etapas), fn_op_finalizada_transicao (dual status), vw_automacao_cobrancas, vw_automacao_rules_status, execute_sql_readonly RPC. agent-cron-loop v3: motor de regras (15 rules), cobrança escalonada D1→D30 (WhatsApp/email/Telegram), PCP sequenciamento, alertas estoque/produção. AutomacaoPage (/admin/automacao) com 4 KPIs + 4 tabs. |
+| Fase 4 — Inteligência | ✅ Concluída | Migration 108+109: score_credito/score_nivel/limite_credito_sugerido em clientes (312 calculados: 3×C, 309×D), vw_cockpit_executivo, vw_cockpit_timeline, vw_resumo_diario, fn_calcular_score_credito (4 fatores: pagamento 40%, volume 25%, relacionamento 20%, recência 15%), fn_recalcular_todos_scores, fn_detectar_padroes_memoria (4 padrões auto). CockpitExecutivoPage (/admin/cockpit) 7 seções. Resumo diário 22h BRT via Telegram. Memory layer com unique index + detecção automática. |
+| Fase 5 — Conversacional | ✅ Concluída | ai-chat-erp Edge Function: pipeline 3 estágios (classify intent via OpenRouter → plan query templates → execute via execute_sql_readonly + format response). 24 SQL query templates em 6 categorias (financeiro, vendas, produção, estoque, comercial, geral). ChatERP floating panel integrado no Layout.tsx (bottom-right, mobile-responsive). |
 
 ## Accumulated Context
 
@@ -85,46 +93,61 @@ Progress CROMA 4.0:  [█████████████████░░�
 - [2026-03-30]: Scheduled task whatsapp-auto-responder reescrita: agora consulta preços reais, cria propostas no sistema, é direto (máx 2-3 perguntas antes de cotar), opera como vendedor real.
 - [2026-03-30]: whatsapp-enviar Edge Function v9: API Meta v22.0 + bypass horário comercial para mensagens manuais.
 - [2026-03-30]: AgentConversationPage.tsx: auto-scroll para última mensagem.
+- [2026-03-31]: Auditoria do agente WhatsApp: lead "Vih" testado por pessoa se passando por cliente. Agente inventava preços ao invés de usar CRM.
+- [2026-03-31]: whatsapp-webhook v14: integração completa com CRM — detecta intenção via [INTENT:xxx], chama ai-gerar-orcamento para propostas reais, coleta dados cadastrais automaticamente (nome, email, empresa, cidade), envia email SMTP com link do portal.
+- [2026-03-31]: PIX correto hardcoded: CNPJ 18.923.994/0001-83 | Email: junior@cromaprint.com.br (corrigido em 3 Edge Functions: whatsapp-webhook, ai-compor-mensagem, agent-enviar-email).
+- [2026-03-31]: 3 Edge Functions deployadas em produção: whatsapp-webhook v15, ai-compor-mensagem v8, agent-enviar-email v7.
+- [2026-03-31]: WA-01 reclassificado como CONCLUÍDO — agente WhatsApp operando com integração CRM real (não precisa mais de chip dedicado separado, já usa API Business ativa).
+- [2026-03-31]: CROMA 4.0 Fase 3 concluída — agent-cron-loop v3 é o motor de execução central: varre 15+ agent_rules a cada 30min, cobrança escalonada D1→D30, PCP auto-sequenciamento.
+- [2026-03-31]: CROMA 4.0 Fase 4 concluída — Score de crédito A-E implementado com 4 fatores (pagamento, volume, relacionamento, recência). 312 clientes calculados. Memory layer com 4 padrões auto-detectados. Resumo diário 22h no Telegram.
+- [2026-03-31]: CROMA 4.0 Fase 5 concluída — ai-chat-erp com pipeline 3 estágios (classify→plan→execute). ChatERP floating panel no Layout. 24 query templates cobrindo 6 categorias do negócio.
+- [2026-03-31]: CROMA 4.0 100% COMPLETO — 5/5 fases implementadas. Croma Print é a primeira empresa de comunicação visual gerida por IA.
+- [2026-03-31]: LIMPEZA CENTRALIZAÇÃO CLAUDE — Removida aba "Modelos IA" (OpenRouter) do AgentConfigPage, removido switch auto_aprovacao_leads_frios, limpas 9 mensagens órfãs, deletados 2 templates inativos. AgentConfig agora tem 3 tabs: Geral, Templates, WhatsApp.
+- [2026-03-31]: whatsapp-enviar v10 deployado — fix auth 401 (service client substitui anon client para validar JWT).
+- [2026-03-31]: MAPA-IA-CROMA.md criado — inventário completo de 45 Edge Functions, 22 usam OpenRouter, plano de simplificação em 3 fases (A: limpeza imediata ✅, B: ponte MCP médio prazo, C: prospecção ativa pelo Claude longo prazo).
 
 ### Pending Todos
 
-**CROMA 4.0 — WhatsApp Inteligente (PRIORIDADE):**
+**CROMA 4.0 — WhatsApp Inteligente:**
 - ~~Chip WhatsApp dedicado~~ ✅ CONCLUÍDO
-- ~~Plano definitivo de arquitetura~~ ✅ CONCLUÍDO (PLANO-DEFINITIVO-WhatsApp-IA-Croma4.docx)
+- ~~Plano definitivo de arquitetura~~ ✅ CONCLUÍDO
 - ~~Scheduled task atualizada para 1min~~ ✅ CONCLUÍDO
-- **PRÓXIMO: Construir croma-worker/** — Worker Node.js com Claude API tool_use
-  - Dia 1: Setup + extrair tools do MCP
-  - Dia 2: Claude engine + system prompt
-  - Dia 3: Message processor + listeners (Realtime)
-  - Dia 4: WhatsApp send + Telegram notify
-  - Dia 5: Deploy Fly.io + teste real
-- Migration banco: 6 colunas novas (locked_at, locked_by, tentativas, erro_detalhes, automacao_pausada, pausada_motivo)
-- Dashboard de conversas WhatsApp no ERP
-- Handoff manual: botão 'assumir conversa'
+- ~~Webhook v14 com CRM integrado~~ ✅ CONCLUÍDO (2026-03-31)
+- ~~PIX e email corrigidos~~ ✅ CONCLUÍDO (2026-03-31)
+- ~~Coleta de dados cadastrais~~ ✅ CONCLUÍDO (2026-03-31)
+- ~~Deploy 3 Edge Functions~~ ✅ CONCLUÍDO (2026-03-31)
 - Submeter templates WhatsApp à Meta (croma_abertura, croma_followup)
+- Handoff manual: botão 'assumir conversa' no ERP
+- Worker Fly.io com Claude API tool_use (opcional — webhook Edge Function já funciona)
 
-**Outros pendentes:**
+**Fase 3 — Automação de Fluxo (próximo foco):**
 - Cobrança automática escalonada (D+1, D+3, D+7, D+15, D+30)
 - PCP inteligente — sequenciamento automático de OPs
-- Cockpit executivo — tela única com KPIs
+- Transição automática Produção→Instalação
+
+**Fase 4 — Inteligência:**
+- Cockpit executivo — tela única com KPIs + system_events
+- Score de crédito de clientes
+- Memory layer — padrões detectados
+
+**Fase 5 — Conversacional:**
 - Chat natural no ERP (ChatERP.tsx)
+- Relatórios por linguagem natural
 
 ### Blockers/Concerns
 
 - NF-e ainda em homologação (não produção)
-- Scheduled task whatsapp-auto-responder precisa de 'Run now' para pré-aprovar ferramentas
-- Worker Fly.io precisa de chave API Anthropic (Junior pode criar conta gratuita em console.anthropic.com)
-- Permissões do sandbox Cowork impediram deletar dist/ e apps/
+- Templates WhatsApp ainda não submetidos à Meta (precisa para mensagens proativas)
+- SMTP precisa estar configurado no admin_config para emails da proposta funcionarem
 
 ## Session Continuity
 
-Last session: 2026-03-30
-Stopped at: 4 bugs do WhatsApp corrigidos. Scheduled task reescrita com precificação real. REGRA ABSOLUTA MCP estabelecida e documentada em CLAUDE.md, IDENTITY.md, PROJECT.md, STATE.md.
+Last session: 2026-03-31
+Stopped at: Limpeza do agente concluída — aba Modelos IA removida, switch auto_aprovacao removido, mensagens órfãs limpas, templates inativos deletados. MAPA-IA-CROMA.md criado. whatsapp-enviar v10 deployado com fix 401.
 Resume file: N/A — tudo documentado nos .md
 
 ### Próximos passos imediatos
-1. **Junior testar WhatsApp** — mandar mensagem pedindo orçamento e ver se preço vem correto
-2. **Rodar 'Run now' na task whatsapp-auto-responder** para pré-aprovar ferramentas MCP
-3. Criar conta Anthropic (console.anthropic.com) e gerar API key para Worker
-4. Começar implementação do croma-worker/ (5 dias)
-5. Deploy no Fly.io
+1. Submeter templates WhatsApp à Meta para mensagens proativas (WA-02)
+2. Fase B do plano de simplificação — migrar botões do ERP da AI Sidebar para ponte MCP (ai_requests → Claude processa → ai_responses)
+3. Verificar se email SMTP está chegando ao cliente
+4. Deploy do frontend atualizado (sem aba Modelos IA) via push para main
