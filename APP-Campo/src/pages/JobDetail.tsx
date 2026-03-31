@@ -440,6 +440,22 @@ export default function JobDetail() {
               <p className="text-xs text-slate-500 font-bold uppercase">Local</p>
               <p className="font-bold text-sm text-slate-800">{job.stores?.name}</p>
               <p className="text-xs text-slate-500">{job.stores?.address}</p>
+              {(job.stores?.lat && job.stores?.lng) && (
+                <div className="flex gap-2 mt-2 print:hidden">
+                  <button
+                    onClick={() => window.open(`https://www.google.com/maps/dir/?api=1&destination=${job.stores.lat},${job.stores.lng}`, '_blank')}
+                    className="flex items-center gap-1 text-xs font-bold text-blue-600 bg-blue-50 px-2 py-1 rounded-lg hover:bg-blue-100"
+                  >
+                    <Navigation size={12} /> Maps
+                  </button>
+                  <button
+                    onClick={() => window.open(`https://waze.com/ul?ll=${job.stores.lat},${job.stores.lng}&navigate=yes`, '_blank')}
+                    className="flex items-center gap-1 text-xs font-bold text-purple-600 bg-purple-50 px-2 py-1 rounded-lg hover:bg-purple-100"
+                  >
+                    <ExternalLink size={12} /> Waze
+                  </button>
+                </div>
+              )}
             </div>
             <div className="bg-slate-50 p-4 rounded-xl print:bg-transparent print:border print:border-slate-100 print:p-3">
               <p className="text-xs text-slate-500 font-bold uppercase">Data</p>

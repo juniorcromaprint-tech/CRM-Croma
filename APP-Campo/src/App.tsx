@@ -17,6 +17,8 @@ import StoreDetail from "./pages/StoreDetail";
 import Analytics from "./pages/Analytics";
 import BillingReport from "./pages/BillingReport";
 import Team from "./pages/Team";
+import VisitRoute from "./pages/VisitRoute";
+import NewJob from "./pages/NewJob";
 
 const queryClient = new QueryClient();
 
@@ -57,6 +59,8 @@ const App = () => (
               <Route path="analytics" element={<Analytics />} />
               <Route path="billing-report" element={<BillingReport />} />
               <Route path="team" element={<Team />} />
+              <Route path="roteiro" element={<VisitRoute />} />
+              <Route path="new-job" element={<NewJob />} />
             </Route>
           </Routes>
         </BrowserRouter>

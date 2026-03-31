@@ -1,12 +1,13 @@
 import React, { useState } from "react";
 import { useParams, useNavigate } from "react-router-dom";
-import { useQuery } from "@tanstack/react-query";
+import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import { 
-  ArrowLeft, Store, MapPin, Phone, Mail, Building2, 
+  ArrowLeft, Store, MapPin, Phone, Mail, Building2,
   Briefcase, Calendar, AlertTriangle, FileText, Image as ImageIcon,
-  CheckCircle2, Clock, XCircle, Edit, ExternalLink, Plus
+  CheckCircle2, Clock, XCircle, Edit, ExternalLink, Plus, Navigation, Loader2, Zap
 } from "lucide-react";
+import { showSuccess, showError } from "@/utils/toast";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import StoreFormSheet from "@/components/StoreFormSheet";
@@ -15,8 +16,39 @@ import JobFormSheet from "@/components/JobFormSheet";
 export default function StoreDetail() {
   const { id } = useParams();
   const navigate = useNavigate();
+  const queryClient = useQueryClient();
   const [isStoreSheetOpen, setIsStoreSheetOpen] = useState(false);
   const [isJobSheetOpen, setIsJobSheetOpen] = useState(false);
+
+  // Mutation para criar lead no CRM a partir desta loja
+  const createLeadMutation = useMutation({
+    mutationFn: async (store: any) => {
+      const { data, error } = await supabase
+        .from('leads')
+        .insert({
+          empresa: store.corporate_name || store.name,
+          contato_nome: '',
+          telefone: store.phone || '',
+          email: store.email || '',
+          segmento: 'Comunicação Visual',
+          origem_id: null,
+          status: 'novo',
+          temperatura: 'morno',
+          observacoes: `Lead gerado via App Campo.\nLoja: ${store.name}\nMarca: ${store.brand || ''}\nEndereço: ${store.address || ''}, ${store.neighborhood || ''} - ${store.state || ''}\nOrigem: Visita de merchandising/instalação`,
+        })
+        .select()
+        .single();
+      if (error) throw error;
+      return data;
+    },
+    onSuccess: () => {
+      showSuccess("Lead criado no CRM! Visível no módulo Comercial.");
+      queryClient.invalidateQueries({ queryKey: ['store', id] });
+    },
+    onError: () => {
+      showError("Erro ao criar lead. Tente novamente.");
+    }
+  });
 
   // Busca os dados da loja
   const { data: store, isLoading: isLoadingStore } = useQuery({
@@ -121,22 +153,41 @@ export default function StoreDetail() {
               </span>
             </div>
             {store.code && <p className="text-slate-500 mt-1 font-medium">Código do Cliente: {store.code}</p>}
+            <div className="flex flex-wrap gap-2 mt-2">
+              {store.origem === 'crm' && (
+                <span className="text-xs font-bold text-amber-700 bg-amber-50 px-2 py-1 rounded-md border border-amber-200">Cliente CRM</span>
+              )}
+              {(!store.lat || !store.lng) && (
+                <span className="text-xs font-bold text-red-600 bg-red-50 px-2 py-1 rounded-md border border-red-200">Sem coordenadas — edite para marcar no mapa</span>
+              )}
+            </div>
           </div>
         </div>
         
-        <div className="flex items-center gap-2 w-full md:w-auto">
-          <Button 
+        <div className="flex flex-wrap items-center gap-2 w-full md:w-auto">
+          <Button
             onClick={() => setIsStoreSheetOpen(true)}
             variant="outline"
             className="bg-white border-slate-200 text-slate-700 hover:bg-slate-50 rounded-xl h-11 shadow-sm flex-1 md:flex-none"
           >
             <Edit size={18} className="mr-2" /> Editar
           </Button>
-          <Button 
+          <Button
             onClick={() => setIsJobSheetOpen(true)}
             className="bg-blue-600 hover:bg-blue-700 text-white rounded-xl h-11 shadow-sm flex-1 md:flex-none"
           >
             <Plus size={18} className="mr-2" /> Nova OS
+          </Button>
+          <Button
+            onClick={() => store && createLeadMutation.mutate(store)}
+            disabled={createLeadMutation.isPending}
+            variant="outline"
+            className="bg-amber-50 border-amber-200 text-amber-700 hover:bg-amber-100 rounded-xl h-11 shadow-sm flex-1 md:flex-none"
+          >
+            {createLeadMutation.isPending
+              ? <><Loader2 size={18} className="mr-2 animate-spin" /> Criando...</>
+              : <><Zap size={18} className="mr-2" /> Lead Croma</>
+            }
           </Button>
         </div>
       </div>
@@ -173,24 +224,29 @@ export default function StoreDetail() {
                   <p className="text-xs font-bold text-slate-400 uppercase tracking-wider mb-1 flex items-center gap-1">
                     <MapPin size={12} /> Endereço
                   </p>
-                  <a 
-                    href={mapsUrl} 
-                    target="_blank" 
-                    rel="noopener noreferrer"
-                    className="group flex items-start gap-2 p-3 -mx-3 rounded-xl hover:bg-blue-50 transition-colors"
-                  >
-                    <div className="bg-blue-100 text-blue-600 p-2 rounded-lg shrink-0 group-hover:bg-blue-600 group-hover:text-white transition-colors">
-                      <MapPin size={18} />
-                    </div>
-                    <div>
-                      <p className="text-slate-800 font-medium group-hover:text-blue-700 transition-colors line-clamp-3">
-                        {fullAddress}
-                      </p>
-                      <p className="text-xs text-blue-600 font-bold mt-1 flex items-center gap-1 opacity-80 group-hover:opacity-100">
-                        Abrir no Mapa <ExternalLink size={10} />
-                      </p>
-                    </div>
-                  </a>
+                  <p className="text-slate-800 font-medium px-0 py-2 line-clamp-3">{fullAddress}</p>
+                  <div className="flex gap-2 mt-1">
+                    <a
+                      href={store.lat && store.lng
+                        ? `https://www.google.com/maps/dir/?api=1&destination=${store.lat},${store.lng}`
+                        : mapsUrl}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      className="flex items-center gap-1 text-xs font-bold text-blue-600 bg-blue-50 px-3 py-2 rounded-lg hover:bg-blue-100 transition-colors"
+                    >
+                      <Navigation size={14} /> Google Maps
+                    </a>
+                    {store.lat && store.lng && (
+                      <a
+                        href={`https://waze.com/ul?ll=${store.lat},${store.lng}&navigate=yes`}
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        className="flex items-center gap-1 text-xs font-bold text-purple-600 bg-purple-50 px-3 py-2 rounded-lg hover:bg-purple-100 transition-colors"
+                      >
+                        <ExternalLink size={14} /> Waze
+                      </a>
+                    )}
+                  </div>
                 </div>
               )}
 

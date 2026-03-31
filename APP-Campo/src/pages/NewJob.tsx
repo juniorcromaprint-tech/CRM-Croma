@@ -9,6 +9,15 @@ import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import { showSuccess, showError } from "@/utils/toast";
 
+const MERCH_TYPE = 'Merchandising';
+
+/** Gera código automático para merchandising: MERCH-2026-0001 */
+function generateMerchCode(): string {
+  const year = new Date().getFullYear();
+  const rand = String(Math.floor(Math.random() * 9999) + 1).padStart(4, '0');
+  return `MERCH-${year}-${rand}`;
+}
+
 export default function NewJob() {
   const navigate = useNavigate();
   const queryClient = useQueryClient();
@@ -18,6 +27,7 @@ export default function NewJob() {
   const [storeId, setStoreId] = useState("");
   const [osNumber, setOsNumber] = useState("");
   const [type, setType] = useState("Merchandising");
+  const isMerch = type === MERCH_TYPE;
   const [scheduledDate, setScheduledDate] = useState(new Date().toISOString().split('T')[0]);
   const [notes, setNotes] = useState("");
 
@@ -51,8 +61,17 @@ export default function NewJob() {
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     
-    if (!storeId || !osNumber || !type) {
-      showError("Por favor, preencha a Loja, Número da OS e o Tipo de Serviço.");
+    // Para merchandising, OS não é obrigatório — gera automaticamente
+    const osValue = isMerch && !osNumber.trim()
+      ? generateMerchCode()
+      : osNumber;
+
+    if (!storeId || !type) {
+      showError("Por favor, preencha a Loja e o Tipo de Serviço.");
+      return;
+    }
+    if (!isMerch && !osValue.trim()) {
+      showError("Número da OS é obrigatório para este tipo de serviço.");
       return;
     }
 
@@ -63,7 +82,7 @@ export default function NewJob() {
         .insert([
           {
             store_id: storeId,
-            os_number: osNumber,
+            os_number: osValue,
             type: type,
             scheduled_date: scheduledDate,
             notes: notes,
@@ -129,14 +148,17 @@ export default function NewJob() {
               {/* Número da OS */}
               <div className="space-y-2">
                 <label className="text-sm font-bold text-slate-700 flex items-center gap-2">
-                  <Tag size={18} className="text-blue-600" /> Número da OS *
+                  <Tag size={18} className="text-blue-600" /> Número da OS {isMerch ? '(auto)' : '*'}
                 </label>
-                <Input 
-                  placeholder="Ex: OS-1050" 
-                  className="h-12 rounded-xl border-slate-200"
+                <Input
+                  placeholder={isMerch ? "Gerado automaticamente" : "Ex: OS-1050"}
+                  className={`h-12 rounded-xl border-slate-200 ${isMerch ? 'bg-slate-100 text-slate-400' : ''}`}
                   value={osNumber}
                   onChange={(e) => setOsNumber(e.target.value)}
                 />
+                {isMerch && !osNumber && (
+                  <p className="text-xs text-blue-600">Será gerado um código MERCH automaticamente ao salvar.</p>
+                )}
               </div>
 
               {/* Data Agendada */}
@@ -166,8 +188,11 @@ export default function NewJob() {
                 <option value="Merchandising">Merchandising (Ação no PDV)</option>
                 <option value="Adesivagem Vitrine">Adesivagem de Vitrine</option>
                 <option value="Adesivo Interno">Adesivo Interno / Parede</option>
-                <option value="Placa Fachada">Instalação de Placa / Fachada</option>
+                <option value="Instalação de Fachada">Instalação de Fachada</option>
+                <option value="Instalação de Banner">Instalação de Banner</option>
+                <option value="Instalação de Placa">Instalação de Placa</option>
                 <option value="Totem / Display">Montagem de Totem / Display</option>
+                <option value="Retirada de Material">Retirada de Material</option>
                 <option value="Vistoria / Medição">Vistoria / Medição Técnica</option>
                 <option value="Outros">Outros</option>
               </select>

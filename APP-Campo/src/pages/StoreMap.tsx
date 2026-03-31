@@ -365,14 +365,24 @@ export default function StoreMap() {
                     >
                       Ver Loja
                     </Button>
-                    <Button 
-                      size="sm" 
-                      variant="outline"
-                      className="w-full text-xs h-8"
-                      onClick={() => window.open(`https://www.google.com/maps/dir/?api=1&destination=${store.lat},${store.lng}`, '_blank')}
-                    >
-                      <ExternalLink size={12} className="mr-1" /> Rota
-                    </Button>
+                    <div className="flex gap-1 w-full">
+                      <Button
+                        size="sm"
+                        variant="outline"
+                        className="flex-1 text-xs h-8 text-blue-600"
+                        onClick={() => window.open(`https://www.google.com/maps/dir/?api=1&destination=${store.lat},${store.lng}`, '_blank')}
+                      >
+                        <Navigation size={12} className="mr-1" /> Maps
+                      </Button>
+                      <Button
+                        size="sm"
+                        variant="outline"
+                        className="flex-1 text-xs h-8 text-purple-600"
+                        onClick={() => window.open(`https://waze.com/ul?ll=${store.lat},${store.lng}&navigate=yes`, '_blank')}
+                      >
+                        <ExternalLink size={12} className="mr-1" /> Waze
+                      </Button>
+                    </div>
                   </div>
                 </div>
               </Popup>

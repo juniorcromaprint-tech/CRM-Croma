@@ -1,11 +1,11 @@
 import React, { useState, useEffect } from "react";
-import { Save, Loader2, Store, MapPin, Phone, Navigation, Search } from "lucide-react";
+import { Save, Loader2, Store, MapPin, Phone, Navigation, Search, Link2 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Sheet, SheetContent, SheetHeader, SheetTitle, SheetDescription } from "@/components/ui/sheet";
 import { supabase } from "@/integrations/supabase/client";
 import { showSuccess, showError } from "@/utils/toast";
-import { useQueryClient } from "@tanstack/react-query";
+import { useQueryClient, useQuery } from "@tanstack/react-query";
 
 interface StoreFormSheetProps {
   isOpen: boolean;
@@ -17,6 +17,22 @@ export default function StoreFormSheet({ isOpen, onClose, storeToEdit }: StoreFo
   const queryClient = useQueryClient();
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [isLocating, setIsLocating] = useState(false);
+  const [isFetchingCnpj, setIsFetchingCnpj] = useState(false);
+
+  // Buscar clientes CRM para vínculo opcional
+  const { data: crmClientes } = useQuery({
+    queryKey: ['crm-clientes-list'],
+    queryFn: async () => {
+      const { data, error } = await supabase
+        .from('clientes')
+        .select('id, razao_social, nome_fantasia')
+        .eq('ativo', true)
+        .order('razao_social');
+      if (error) throw error;
+      return data || [];
+    },
+    enabled: isOpen
+  });
 
   const [formData, setFormData] = useState({
     name: "",
@@ -31,7 +47,8 @@ export default function StoreFormSheet({ isOpen, onClose, storeToEdit }: StoreFo
     email: "",
     phone: "",
     lat: null as number | null,
-    lng: null as number | null
+    lng: null as number | null,
+    cliente_id: null as string | null,
   });
 
   useEffect(() => {
@@ -49,19 +66,54 @@ export default function StoreFormSheet({ isOpen, onClose, storeToEdit }: StoreFo
         email: storeToEdit.email || "",
         phone: storeToEdit.phone || "",
         lat: storeToEdit.lat || null,
-        lng: storeToEdit.lng || null
+        lng: storeToEdit.lng || null,
+        cliente_id: storeToEdit.cliente_id || null,
       });
     } else {
       setFormData({
         name: "", brand: "", corporate_name: "", cnpj: "", code: "",
         address: "", neighborhood: "", state: "", zip_code: "", email: "", phone: "",
-        lat: null, lng: null
+        lat: null, lng: null, cliente_id: null,
       });
     }
   }, [storeToEdit, isOpen]);
 
   const handleChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     setFormData(prev => ({ ...prev, [e.target.name]: e.target.value }));
+  };
+
+  // Busca dados da empresa pelo CNPJ (BrasilAPI — gratuita)
+  const fetchCnpjData = async () => {
+    const cleanCnpj = formData.cnpj.replace(/\D/g, '');
+    if (cleanCnpj.length !== 14) {
+      showError("Digite um CNPJ válido com 14 dígitos.");
+      return;
+    }
+
+    setIsFetchingCnpj(true);
+    try {
+      const res = await fetch(`https://brasilapi.com.br/api/cnpj/v1/${cleanCnpj}`);
+      if (!res.ok) throw new Error('CNPJ não encontrado');
+      const data = await res.json();
+
+      setFormData(prev => ({
+        ...prev,
+        corporate_name: prev.corporate_name || data.razao_social || '',
+        name: prev.name || data.nome_fantasia || data.razao_social || '',
+        zip_code: prev.zip_code || data.cep || '',
+        address: prev.address || [data.descricao_tipo_de_logradouro, data.logradouro, data.numero].filter(Boolean).join(' ') || '',
+        neighborhood: prev.neighborhood || data.bairro || '',
+        state: prev.state || data.uf || '',
+        phone: prev.phone || data.ddd_telefone_1?.replace(/^(\d{2})(\d+)/, '($1) $2') || '',
+        email: prev.email || data.email?.toLowerCase() || '',
+      }));
+
+      showSuccess(`Dados de "${data.nome_fantasia || data.razao_social}" preenchidos!`);
+    } catch (error) {
+      showError("CNPJ não encontrado. Verifique o número digitado.");
+    } finally {
+      setIsFetchingCnpj(false);
+    }
   };
 
   // Busca coordenadas de forma inteligente usando ViaCEP + OpenStreetMap
@@ -149,24 +201,60 @@ export default function StoreFormSheet({ isOpen, onClose, storeToEdit }: StoreFo
     }
   };
 
-  // Pega a localização atual do GPS do celular
+  // Geocodificação reversa: coordenadas GPS → endereço completo
+  const reverseGeocode = async (lat: number, lng: number) => {
+    try {
+      const res = await fetch(
+        `https://nominatim.openstreetmap.org/reverse?format=json&lat=${lat}&lon=${lng}&addressdetails=1&accept-language=pt-BR`
+      );
+      const data = await res.json();
+
+      if (data && data.address) {
+        const addr = data.address;
+        // Monta endereço legível: "Rua X, 123"
+        const road = addr.road || addr.pedestrian || addr.footway || '';
+        const houseNumber = addr.house_number || '';
+        const fullAddress = houseNumber ? `${road}, ${houseNumber}` : road;
+
+        setFormData(prev => ({
+          ...prev,
+          address: prev.address || fullAddress,
+          neighborhood: prev.neighborhood || addr.suburb || addr.neighbourhood || addr.city_district || '',
+          state: prev.state || addr.state_code?.toUpperCase() || addr['ISO3166-2-lvl4']?.replace('BR-', '') || '',
+          zip_code: prev.zip_code || addr.postcode || '',
+        }));
+
+        showSuccess("Endereço preenchido via GPS!");
+      }
+    } catch (e) {
+      console.error("Erro na geocodificação reversa:", e);
+      // Não mostra erro — o GPS já foi capturado, endereço é bônus
+    }
+  };
+
+  // Pega a localização atual do GPS do celular + preenche endereço
   const captureCurrentLocation = () => {
     setIsLocating(true);
     if ("geolocation" in navigator) {
       navigator.geolocation.getCurrentPosition(
-        (position) => {
+        async (position) => {
+          const { latitude, longitude } = position.coords;
           setFormData(prev => ({
             ...prev,
-            lat: position.coords.latitude,
-            lng: position.coords.longitude
+            lat: latitude,
+            lng: longitude
           }));
+
+          // Tenta preencher endereço automaticamente via geocodificação reversa
+          await reverseGeocode(latitude, longitude);
+
           setIsLocating(false);
-          showSuccess("Localização atual capturada!");
         },
         (error) => {
           setIsLocating(false);
           showError("Não foi possível capturar o GPS. Verifique as permissões.");
-        }
+        },
+        { enableHighAccuracy: true, timeout: 10000 }
       );
     } else {
       setIsLocating(false);
@@ -237,15 +325,52 @@ export default function StoreFormSheet({ isOpen, onClose, storeToEdit }: StoreFo
                 <label className="text-xs font-bold text-slate-500 mb-1 block">Razão Social</label>
                 <Input name="corporate_name" value={formData.corporate_name} onChange={handleChange} placeholder="Ex: Vicci Comércio Ltda" className="h-11 rounded-xl bg-slate-50 border-slate-200" />
               </div>
-              <div className="grid grid-cols-2 gap-3">
-                <div>
-                  <label className="text-xs font-bold text-slate-500 mb-1 block">CNPJ</label>
-                  <Input name="cnpj" value={formData.cnpj} onChange={handleChange} placeholder="00.000.000/0000-00" className="h-11 rounded-xl bg-slate-50 border-slate-200" />
+              <div>
+                <label className="text-xs font-bold text-slate-500 mb-1 block">CNPJ</label>
+                <div className="flex gap-2">
+                  <Input name="cnpj" value={formData.cnpj} onChange={handleChange} placeholder="00.000.000/0000-00" className="h-11 rounded-xl bg-slate-50 border-slate-200 flex-1" />
+                  <Button
+                    type="button"
+                    variant="outline"
+                    onClick={fetchCnpjData}
+                    disabled={isFetchingCnpj || !formData.cnpj}
+                    className="h-11 px-3 rounded-xl border-amber-200 bg-amber-50 text-amber-700 hover:bg-amber-100 shrink-0"
+                  >
+                    {isFetchingCnpj ? <Loader2 className="animate-spin" size={16} /> : <Search size={16} />}
+                  </Button>
                 </div>
-                <div>
-                  <label className="text-xs font-bold text-slate-500 mb-1 block">Código</label>
-                  <Input name="code" value={formData.code} onChange={handleChange} placeholder="Ex: LJ-001" className="h-11 rounded-xl bg-slate-50 border-slate-200" />
+                <p className="text-xs text-slate-400 mt-1">Digite o CNPJ e clique na lupa para preencher tudo</p>
+              </div>
+              <div>
+                <label className="text-xs font-bold text-slate-500 mb-1 block">Código</label>
+                <Input name="code" value={formData.code} onChange={handleChange} placeholder="Ex: LJ-001" className="h-11 rounded-xl bg-slate-50 border-slate-200" />
+              </div>
+
+              {/* Vínculo com Cliente CRM */}
+              <div>
+                <label className="text-xs font-bold text-slate-500 mb-1 block flex items-center gap-1">
+                  <Link2 size={12} /> Vincular ao CRM (opcional)
+                </label>
+                <div className="relative">
+                  <select
+                    value={formData.cliente_id || ''}
+                    onChange={(e) => setFormData(prev => ({ ...prev, cliente_id: e.target.value || null }))}
+                    className="w-full h-11 pl-3 pr-10 rounded-xl border border-slate-200 bg-amber-50 shadow-sm text-sm focus:ring-2 focus:ring-amber-500 focus:border-transparent appearance-none outline-none text-slate-700"
+                  >
+                    <option value="">Sem vínculo CRM</option>
+                    {crmClientes?.map(c => (
+                      <option key={c.id} value={c.id}>
+                        {c.nome_fantasia || c.razao_social}
+                      </option>
+                    ))}
+                  </select>
+                  <div className="absolute right-3 top-1/2 -translate-y-1/2 pointer-events-none text-slate-400">
+                    <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="m6 9 6 6 6-6"/></svg>
+                  </div>
                 </div>
+                {formData.cliente_id && (
+                  <p className="text-xs text-amber-600 mt-1 font-medium">Esta loja será vinculada ao cliente no CRM/ERP.</p>
+                )}
               </div>
             </div>
           </div>
@@ -307,16 +432,17 @@ export default function StoreFormSheet({ isOpen, onClose, storeToEdit }: StoreFo
                     {isLocating ? <Loader2 className="animate-spin mr-2" size={16} /> : <Search size={16} className="mr-2" />}
                     Buscar pelo CEP ou Endereço
                   </Button>
-                  <Button 
-                    type="button" 
-                    variant="outline" 
+                  <Button
+                    type="button"
+                    variant="outline"
                     onClick={captureCurrentLocation}
                     disabled={isLocating}
-                    className="w-full bg-white border-blue-200 text-blue-700 hover:bg-blue-100"
+                    className="w-full bg-emerald-50 border-emerald-200 text-emerald-700 hover:bg-emerald-100"
                   >
                     {isLocating ? <Loader2 className="animate-spin mr-2" size={16} /> : <Navigation size={16} className="mr-2" />}
-                    Usar meu GPS Atual (Estou na loja)
+                    Estou na loja — Preencher pelo GPS
                   </Button>
+                  <p className="text-xs text-slate-400 text-center">Preenche endereço, CEP, bairro e estado automaticamente</p>
                 </div>
               </div>
             </div>

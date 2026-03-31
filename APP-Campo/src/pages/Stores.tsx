@@ -1,5 +1,5 @@
 import React, { useState, useMemo, useEffect, useRef } from "react";
-import { Search, Store, MapPin, ChevronRight, Filter, Building2, ChevronLeft, Plus, Edit, Map, Check, Navigation, Loader2 } from "lucide-react";
+import { Search, Store, MapPin, ChevronRight, Filter, Building2, ChevronLeft, Plus, Edit, Map, Check, Navigation, Loader2, ExternalLink } from "lucide-react";
 import { Input } from "@/components/ui/input";
 import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -105,6 +105,7 @@ export default function Stores() {
   const [selectedBrands, setSelectedBrands] = useState<string[]>([]);
   const [selectedStates, setSelectedStates] = useState<string[]>([]);
   const [selectedNeighborhoods, setSelectedNeighborhoods] = useState<string[]>([]);
+  const [origemFilter, setOrigemFilter] = useState<'todos' | 'campo' | 'crm'>('todos');
   
   const [currentPage, setCurrentPage] = useState(1);
   const itemsPerPage = 50;
@@ -200,10 +201,11 @@ export default function Stores() {
       const matchesBrand = selectedBrands.length === 0 || selectedBrands.includes(store.brand);
       const matchesState = selectedStates.length === 0 || (store.state && selectedStates.includes(store.state.trim().toUpperCase()));
       const matchesNeighborhood = selectedNeighborhoods.length === 0 || (store.neighborhood && selectedNeighborhoods.includes(store.neighborhood.trim()));
+      const matchesOrigem = origemFilter === 'todos' || (store.origem || 'campo') === origemFilter;
 
-      return matchesSearch && matchesBrand && matchesState && matchesNeighborhood;
+      return matchesSearch && matchesBrand && matchesState && matchesNeighborhood && matchesOrigem;
     });
-  }, [stores, debouncedSearch, selectedBrands, selectedStates, selectedNeighborhoods]);
+  }, [stores, debouncedSearch, selectedBrands, selectedStates, selectedNeighborhoods, origemFilter]);
 
   const totalPages = Math.ceil(filteredStores.length / itemsPerPage);
   const paginatedStores = filteredStores.slice(
@@ -222,9 +224,14 @@ export default function Stores() {
     setIsSheetOpen(true);
   };
 
-  const openRoute = (e: React.MouseEvent, lat: number, lng: number) => {
+  const openGoogleMaps = (e: React.MouseEvent, lat: number, lng: number) => {
     e.stopPropagation();
     window.open(`https://www.google.com/maps/dir/?api=1&destination=${lat},${lng}`, '_blank');
+  };
+
+  const openWaze = (e: React.MouseEvent, lat: number, lng: number) => {
+    e.stopPropagation();
+    window.open(`https://waze.com/ul?ll=${lat},${lng}&navigate=yes`, '_blank');
   };
 
   return (
@@ -270,13 +277,34 @@ export default function Stores() {
             icon={Map}
           />
 
-          <MultiSelect 
+          <MultiSelect
             options={neighborhoods}
             selected={selectedNeighborhoods}
             onChange={setSelectedNeighborhoods}
             placeholder="Todos os Bairros / Regiões"
             icon={MapPin}
           />
+        </div>
+
+        {/* Filtro por origem */}
+        <div className="flex gap-2">
+          {[
+            { key: 'todos' as const, label: 'Todos' },
+            { key: 'campo' as const, label: 'App Campo' },
+            { key: 'crm' as const, label: 'Clientes CRM' },
+          ].map(opt => (
+            <button
+              key={opt.key}
+              onClick={() => setOrigemFilter(opt.key)}
+              className={`text-xs font-bold px-3 py-1.5 rounded-lg border transition-colors ${
+                origemFilter === opt.key
+                  ? opt.key === 'crm' ? 'bg-amber-100 border-amber-300 text-amber-800' : 'bg-blue-100 border-blue-300 text-blue-800'
+                  : 'bg-white border-slate-200 text-slate-500 hover:bg-slate-50'
+              }`}
+            >
+              {opt.label}
+            </button>
+          ))}
         </div>
       </div>
 
@@ -346,6 +374,11 @@ export default function Stores() {
                           <span className="text-xs font-bold text-blue-700 bg-blue-50 px-2 py-1 rounded-md border border-blue-100">
                             {store.brand}
                           </span>
+                          {store.origem === 'crm' && (
+                            <span className="text-xs font-bold text-amber-700 bg-amber-50 px-2 py-1 rounded-md border border-amber-200">
+                              Cliente CRM
+                            </span>
+                          )}
                           {store.state && (
                             <span className="text-xs font-bold text-emerald-700 bg-emerald-50 px-2 py-1 rounded-md border border-emerald-100">
                               {store.state}
@@ -364,17 +397,28 @@ export default function Stores() {
                     </div>
                     
                     <div className="flex items-center gap-1 ml-4">
-                      {/* Botão de Rota */}
+                      {/* Botões de Rota */}
                       {isSynced ? (
-                        <Button 
-                          variant="ghost" 
-                          size="icon" 
-                          className="text-emerald-600 hover:text-emerald-700 hover:bg-emerald-50 rounded-lg h-9 w-9"
-                          onClick={(e) => openRoute(e, store.lat, store.lng)}
-                          title="Endereço Sincronizado - Traçar Rota"
-                        >
-                          <Navigation size={18} />
-                        </Button>
+                        <>
+                          <Button
+                            variant="ghost"
+                            size="icon"
+                            className="text-blue-600 hover:text-blue-700 hover:bg-blue-50 rounded-lg h-9 w-9"
+                            onClick={(e) => openGoogleMaps(e, store.lat, store.lng)}
+                            title="Rota via Google Maps"
+                          >
+                            <Navigation size={18} />
+                          </Button>
+                          <Button
+                            variant="ghost"
+                            size="icon"
+                            className="text-purple-600 hover:text-purple-700 hover:bg-purple-50 rounded-lg h-9 w-9"
+                            onClick={(e) => openWaze(e, store.lat, store.lng)}
+                            title="Rota via Waze"
+                          >
+                            <ExternalLink size={18} />
+                          </Button>
+                        </>
                       ) : (
                         <div 
                           className="flex items-center justify-center h-9 w-9 text-slate-200 cursor-help"

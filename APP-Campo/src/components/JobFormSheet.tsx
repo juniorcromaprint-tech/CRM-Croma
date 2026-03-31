@@ -19,15 +19,25 @@ interface JobFormSheetProps {
 }
 
 const SERVICE_TYPES = [
-  'Instalação de Adesivo',
-  'Troca de Adesivo',
-  'Manutenção de Adesivo',
+  'Merchandising',
+  'Adesivagem Vitrine',
+  'Adesivo Interno',
   'Instalação de Fachada',
   'Instalação de Banner',
   'Instalação de Placa',
+  'Totem / Display',
   'Retirada de Material',
-  'Vistoria Técnica',
+  'Vistoria / Medição',
 ];
+
+const MERCH_TYPE = 'Merchandising';
+
+/** Gera código automático para merchandising: MERCH-2026-0001 */
+function generateMerchCode(): string {
+  const year = new Date().getFullYear();
+  const rand = String(Math.floor(Math.random() * 9999) + 1).padStart(4, '0');
+  return `MERCH-${year}-${rand}`;
+}
 
 export default function JobFormSheet({ isOpen, onClose, jobToEdit, initialStoreId }: JobFormSheetProps) {
   const queryClient = useQueryClient();
@@ -107,10 +117,22 @@ export default function JobFormSheet({ isOpen, onClose, jobToEdit, initialStoreI
     setOpenStoreSelect(false);
   };
 
+  const isMerch = formData.type === MERCH_TYPE;
+
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!formData.store_id || !formData.os_number || !formData.type) {
-      showError("Loja, Número da OS e Tipo são obrigatórios.");
+
+    // Para merchandising, OS não é obrigatório — gera automaticamente
+    const osValue = isMerch && !formData.os_number.trim()
+      ? generateMerchCode()
+      : formData.os_number;
+
+    if (!formData.store_id || !formData.type) {
+      showError("Loja e Tipo de Serviço são obrigatórios.");
+      return;
+    }
+    if (!isMerch && !osValue.trim()) {
+      showError("Número da OS é obrigatório para este tipo de serviço.");
       return;
     }
 
@@ -118,6 +140,7 @@ export default function JobFormSheet({ isOpen, onClose, jobToEdit, initialStoreI
     try {
       const submitData = {
         ...formData,
+        os_number: osValue,
         assigned_to: formData.assigned_to === "" ? null : formData.assigned_to
       };
 
@@ -232,15 +255,16 @@ export default function JobFormSheet({ isOpen, onClose, jobToEdit, initialStoreI
             <div className="grid grid-cols-2 gap-3">
               <div>
                 <label className="text-xs font-bold text-slate-500 mb-1 block flex items-center gap-1">
-                  <Hash size={12} /> Número da OS *
+                  <Hash size={12} /> Número da OS {isMerch ? '(auto)' : '*'}
                 </label>
-                <Input 
-                  name="os_number" 
-                  value={formData.os_number} 
-                  onChange={handleChange} 
-                  placeholder="Ex: OS-2023-001" 
-                  className="h-11 rounded-xl bg-slate-50 border-slate-200" 
-                  required 
+                <Input
+                  name="os_number"
+                  value={formData.os_number}
+                  onChange={handleChange}
+                  placeholder={isMerch ? "Gerado automaticamente" : "Ex: OS-2023-001"}
+                  className={`h-11 rounded-xl border-slate-200 ${isMerch ? 'bg-slate-100 text-slate-400' : 'bg-slate-50'}`}
+                  required={!isMerch}
+                  disabled={false}
                 />
               </div>
               <div>
