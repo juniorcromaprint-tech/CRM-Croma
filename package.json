@@ -100,5 +100,10 @@
     "vite": "^6.3.4",
     "vitest": "^4.1.0"
   },
-  "packageManager": "pnpm@9.15.0"
+  "packageManager": "pnpm@9.15.0",
+  "pnpm": {
+    "overrides": {
+      "lodash": "4.17.21"
+    }
+  }
 }
