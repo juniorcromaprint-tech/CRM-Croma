@@ -126,7 +126,7 @@ function DialogModelo({ open, onClose, produtoId, modelo }: DialogModeloProps) {
         nome: form.nome.trim(),
         markup_padrao: parseFloat(form.markup_padrao) || 45,
         margem_minima: parseFloat(form.margem_minima) || 25,
-        ncm: form.ncm.trim() || null,
+        ncm: form.ncm.trim(),
         descricao_fiscal: form.descricao_fiscal.trim() || null,
         ativo: form.ativo,
       };
@@ -159,9 +159,10 @@ function DialogModelo({ open, onClose, produtoId, modelo }: DialogModeloProps) {
   });
 
   function handleSave() {
-    // BUG-02: Avisar se NCM não preenchido (NF-e vai falhar sem ele)
+    // BUG-02: NCM obrigatório — NF-e não pode ser emitida sem ele
     if (!form.ncm.trim()) {
-      showError("Aviso: NCM não preenchido — NF-e pode falhar. Preencha o NCM para emitir notas fiscais.");
+      showError("NCM é obrigatório. Preencha o código NCM para poder salvar o modelo.");
+      return;
     }
     mutation.mutate(undefined, {
       onSuccess: () => {
@@ -278,7 +279,7 @@ function DialogModelo({ open, onClose, produtoId, modelo }: DialogModeloProps) {
 
           <div className="grid grid-cols-2 gap-3">
             <div className="space-y-1">
-              <Label htmlFor="edit-ncm">NCM</Label>
+              <Label htmlFor="edit-ncm">NCM *</Label>
               <Input
                 id="edit-ncm"
                 value={form.ncm}
@@ -933,4 +934,3 @@ export function TabModelos() {
       />
     </div>
   );
-}

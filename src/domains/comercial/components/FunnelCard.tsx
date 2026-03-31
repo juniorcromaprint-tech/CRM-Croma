@@ -1,12 +1,15 @@
-import { TrendingDown, Users, FileText, ShoppingBag, CheckSquare } from 'lucide-react'
+import { TrendingDown, Users, FileText, ShoppingBag, CheckSquare, Factory, Banknote } from 'lucide-react'
 import { brl } from '@/shared/utils/format'
 
 interface FunnelData {
   totalLeads: number
   totalPropostas: number
   totalPedidos: number
+  totalProducao?: number
   totalFaturados: number
   valorFaturado: number
+  totalRecebido?: number
+  leadsPorStatus?: Record<string, number>
   txLeadProposta: number
   txPropostaPedido: number
   txPedidoFaturado: number
@@ -19,6 +22,7 @@ export default function FunnelCard({ data }: { data: FunnelData }) {
     { icon: <Users size={16} />, label: 'Leads', value: data.totalLeads, tx: null, color: 'bg-blue-500' },
     { icon: <FileText size={16} />, label: 'Propostas', value: data.totalPropostas, tx: data.txLeadProposta, color: 'bg-indigo-500' },
     { icon: <ShoppingBag size={16} />, label: 'Pedidos', value: data.totalPedidos, tx: data.txPropostaPedido, color: 'bg-purple-500' },
+    ...(data.totalProducao != null ? [{ icon: <Factory size={16} />, label: 'Produção', value: data.totalProducao, tx: null as number | null, color: 'bg-orange-500' }] : []),
     { icon: <CheckSquare size={16} />, label: 'Faturados', value: data.totalFaturados, tx: data.txPedidoFaturado, color: 'bg-emerald-500' },
   ]
 
@@ -68,10 +72,20 @@ export default function FunnelCard({ data }: { data: FunnelData }) {
         </span>
       </div>
 
-      <div className="mt-2 text-right">
-        <span className="text-xs text-slate-400">Receita faturada: </span>
+      <div className="mt-2 flex items-center justify-between">
+        <span className="text-xs text-slate-400">Receita faturada</span>
         <span className="text-xs font-semibold text-slate-700">{brl(data.valorFaturado)}</span>
       </div>
+
+      {data.totalRecebido != null && data.totalRecebido > 0 && (
+        <div className="mt-1 flex items-center justify-between">
+          <div className="flex items-center gap-1 text-slate-400">
+            <Banknote size={12} />
+            <span className="text-xs">Recebido</span>
+          </div>
+          <span className="text-xs font-semibold text-emerald-600">{brl(data.totalRecebido)}</span>
+        </div>
+      )}
     </div>
   )
 }

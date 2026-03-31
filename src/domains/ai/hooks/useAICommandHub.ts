@@ -26,8 +26,8 @@ export const AGENTES: AgentDef[] = [
   {
     id: 'orcamentista',
     nome: 'Orçamentista',
-    descricao: 'Gera e analisa orçamentos com motor Mubisys',
-    functions: ['ai-gerar-orcamento', 'ai-analisar-orcamento'],
+    descricao: 'Detecta intenção de compra, gera e analisa orçamentos com motor Mubisys',
+    functions: ['ai-detectar-intencao-orcamento', 'ai-gerar-orcamento', 'ai-analisar-orcamento'],
     icon: 'FileText',
     cor: 'violet',
   },

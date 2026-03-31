@@ -64,6 +64,7 @@ export const NAV_GROUPS: NavGroup[] = [
     items: [
       { name: 'Fornecedores', path: '/compras/fornecedores', icon: 'Users', module: 'compras' },
       { name: 'Pedidos de Compra', path: '/compras/pedidos', icon: 'ShoppingCart', module: 'compras' },
+      { name: 'Cotações', path: '/compras/cotacoes', icon: 'Scale', module: 'compras' },
       { name: 'Estoque', path: '/estoque', icon: 'Warehouse', module: 'estoque' },
       { name: 'Movimentações', path: '/estoque/movimentacoes', icon: 'ArrowLeftRight', module: 'estoque' },
       { name: 'Inventário', path: '/estoque/inventario', icon: 'ClipboardList', module: 'estoque' },

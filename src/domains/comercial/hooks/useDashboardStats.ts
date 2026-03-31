@@ -243,21 +243,33 @@ export function useFunnelStats() {
       const inicio = new Date(now.getFullYear(), now.getMonth() - 2, 1); // últimos 3 meses
       const isoInicio = inicio.toISOString();
 
-      const [leadsRes, propostasRes, pedidosRes] = await Promise.all([
+      const [leadsRes, propostasRes, pedidosRes, opsRes, crRes] = await Promise.all([
         supabase.from('leads').select('id, status, created_at').gte('created_at', isoInicio),
         supabase.from('propostas').select('id, status, total, created_at').is('excluido_em', null).gte('created_at', isoInicio),
         supabase.from('pedidos').select('id, status, valor_total, created_at').is('excluido_em', null).gte('created_at', isoInicio),
+        supabase.from('ordens_producao').select('id, status, created_at').is('excluido_em', null).gte('created_at', isoInicio),
+        supabase.from('contas_receber').select('id, status, valor_original, valor_pago, created_at').gte('created_at', isoInicio),
       ]);
 
       const leads = leadsRes.data ?? [];
       const propostas = propostasRes.data ?? [];
       const pedidos = pedidosRes.data ?? [];
+      const ops = opsRes.data ?? [];
+      const crs = crRes.data ?? [];
 
       const totalLeads = leads.length;
       const totalPropostas = propostas.length;
-      const totalPedidos = pedidos.filter(p => !['cancelado'].includes(p.status)).length;
+      const totalPedidos = pedidos.filter(p => p.status !== 'cancelado').length;
+      const totalProducao = ops.length;
       const totalFaturados = pedidos.filter(p => p.status === 'faturado').length;
       const valorFaturado = pedidos.filter(p => p.status === 'faturado').reduce((s, p) => s + (Number(p.valor_total) || 0), 0);
+      const totalRecebido = crs.filter(c => c.status === 'pago').reduce((s, c) => s + (Number(c.valor_pago) || 0), 0);
+
+      // Leads por status para mini-breakdown
+      const leadsPorStatus: Record<string, number> = {};
+      for (const l of leads) {
+        leadsPorStatus[l.status] = (leadsPorStatus[l.status] || 0) + 1;
+      }
 
       const txLeadProposta = totalLeads > 0 ? Math.round((totalPropostas / totalLeads) * 100) : 0;
       const txPropostaPedido = totalPropostas > 0 ? Math.round((totalPedidos / totalPropostas) * 100) : 0;
@@ -268,8 +280,11 @@ export function useFunnelStats() {
         totalLeads,
         totalPropostas,
         totalPedidos,
+        totalProducao,
         totalFaturados,
         valorFaturado,
+        totalRecebido,
+        leadsPorStatus,
         txLeadProposta,
         txPropostaPedido,
         txPedidoFaturado,
