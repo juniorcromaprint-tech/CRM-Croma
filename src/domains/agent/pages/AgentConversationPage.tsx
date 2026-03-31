@@ -3,7 +3,7 @@
 // Standalone page for /agente/conversa/:id — shows full conversation timeline
 // ============================================================================
 
-import { useState } from 'react';
+import { useState, useRef, useEffect } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import { useQuery } from '@tanstack/react-query';
 import {
@@ -174,6 +174,14 @@ export default function AgentConversationPage() {
   const deleteConversation = useDeleteConversation();
   const deleteMessage = useDeleteMessage();
   const [manualText, setManualText] = useState('');
+  const messagesEndRef = useRef<HTMLDivElement>(null);
+
+  // Auto-scroll to bottom when messages change
+  useEffect(() => {
+    if (messagesEndRef.current && messages.length > 0) {
+      messagesEndRef.current.scrollIntoView({ behavior: 'smooth' });
+    }
+  }, [messages]);
 
   if (convLoading) {
     return (
@@ -293,7 +301,7 @@ export default function AgentConversationPage() {
 
       {/* Messages timeline */}
       <div className="bg-white rounded-2xl border border-slate-200 p-6">
-        <h2 className="font-semibold text-slate-700 mb-6">Mensagens</h2>
+        <h2 className="font-semibold text-slate-700 mb-4">Mensagens</h2>
 
         {msgsLoading ? (
           <div className="flex items-center justify-center py-12 gap-2 text-slate-400">
@@ -307,7 +315,7 @@ export default function AgentConversationPage() {
             <p className="text-xs text-slate-400 mt-1">Esta conversa ainda nao tem mensagens.</p>
           </div>
         ) : (
-          <div className="space-y-6">
+          <div className="max-h-[60vh] overflow-y-auto space-y-6 pr-2">
             {messages.map((msg) => (
               <MessageBubble
                 key={msg.id}
@@ -317,6 +325,7 @@ export default function AgentConversationPage() {
                 }
               />
             ))}
+            <div ref={messagesEndRef} />
           </div>
         )}
       </div>

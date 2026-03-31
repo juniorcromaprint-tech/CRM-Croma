@@ -11,7 +11,7 @@ import {
 } from '../ai-shared/ai-helpers.ts';
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2';
 
-const META_API_VERSION = 'v19.0';
+const META_API_VERSION = 'v22.0';
 
 // ─────────────────────────────────────────────────────────────
 // Phone normalization
@@ -100,8 +100,18 @@ serve(async (req: Request) => {
 
     const supabase = getServiceClient();
 
-    // ── 0. Check daily send limit ───────────────────────────────
+    // ── 0. Check daily send limit & business hours ──────────────
+    // Skip business hours check for manual messages (human operator)
     {
+      // Pre-fetch message metadata to check if manual
+      const { data: preCheck } = await supabase
+        .from('agent_messages')
+        .select('metadata')
+        .eq('id', message_id)
+        .single();
+
+      const isManual = preCheck?.metadata?.manual === true;
+
       const { data: configRow } = await supabase
         .from('admin_config')
         .select('valor')
@@ -120,15 +130,17 @@ serve(async (req: Request) => {
         } catch { /* use default */ }
       }
 
-      // Check business hours (Brazil timezone UTC-3)
-      const nowBR = new Date(Date.now() - 3 * 60 * 60 * 1000);
-      const hhmm = `${String(nowBR.getUTCHours()).padStart(2, '0')}:${String(nowBR.getUTCMinutes()).padStart(2, '0')}`;
-      if (hhmm < horarioInicio || hhmm >= horarioFim) {
-        return jsonResponse(
-          { error: `Fora do horário de envio (${horarioInicio}–${horarioFim})` },
-          429,
-          corsHeaders
-        );
+      // Check business hours (Brazil timezone UTC-3) — skip for manual messages
+      if (!isManual) {
+        const nowBR = new Date(Date.now() - 3 * 60 * 60 * 1000);
+        const hhmm = `${String(nowBR.getUTCHours()).padStart(2, '0')}:${String(nowBR.getUTCMinutes()).padStart(2, '0')}`;
+        if (hhmm < horarioInicio || hhmm >= horarioFim) {
+          return jsonResponse(
+            { error: `Fora do horário de envio (${horarioInicio}–${horarioFim})` },
+            429,
+            corsHeaders
+          );
+        }
       }
 
       const todayStart = new Date();
