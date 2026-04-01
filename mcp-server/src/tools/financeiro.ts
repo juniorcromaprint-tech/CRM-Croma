@@ -5,7 +5,7 @@
 
 import type { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
 import { z } from "zod";
-import { getSupabaseClient } from "../supabase-client.js";
+import { getSupabaseClient, getUserClient } from "../supabase-client.js";
 import { ResponseFormat } from "../types.js";
 import { errorResult } from "../utils/errors.js";
 import { buildPaginatedResponse, truncateIfNeeded } from "../utils/pagination.js";
@@ -248,6 +248,89 @@ Args:
         return {
           content: [{ type: "text" as const, text: truncateIfNeeded(text, items.length) }],
           structuredContent: { ...response, total_aberto: totalAberto },
+        };
+      } catch (error) {
+        return errorResult(error);
+      }
+    }
+  );
+
+  // ─── croma_criar_conta_receber ─────────────────────────────────────────────
+
+  server.registerTool(
+    "croma_criar_conta_receber",
+    {
+      title: "Criar Conta a Receber",
+      description: `Cria um título a receber vinculado a um pedido/cliente.
+
+NOTA: Contas a receber são geradas AUTOMATICAMENTE em dois cenários:
+1. Quando pedido é aprovado (trigger trg_pedido_gera_conta_receber)
+2. Quando instalação é concluída (trigger trg_instalacao_concluida_financeiro)
+Use esta ferramenta para criação manual ou quando os triggers não dispararem.
+
+ATENÇÃO: Ação que modifica dados. Confirme antes de executar.
+
+Args:
+  - pedido_id (string, obrigatório): UUID do pedido
+  - cliente_id (string, obrigatório): UUID do cliente
+  - valor_original (number, obrigatório): Valor do título em R$
+  - data_vencimento (string, obrigatório): Data ISO do vencimento
+  - forma_pagamento (string, opcional): boleto|pix|cartao|transferencia|dinheiro
+  - observacoes (string, opcional): Observações`,
+      inputSchema: z.object({
+        pedido_id: z.string().uuid(),
+        cliente_id: z.string().uuid(),
+        valor_original: z.number().positive(),
+        data_vencimento: z.string(),
+        forma_pagamento: z.enum(["boleto", "pix", "cartao", "transferencia", "dinheiro"]).optional(),
+        observacoes: z.string().max(500).optional(),
+      }).strict(),
+      annotations: { readOnlyHint: false, destructiveHint: false, idempotentHint: false, openWorldHint: false },
+    },
+    async (params) => {
+      try {
+        const sb = getUserClient();
+
+        // Idempotência: verificar se já existe CR para este pedido
+        const { data: existente } = await sb
+          .from("contas_receber")
+          .select("id, numero_titulo")
+          .eq("pedido_id", params.pedido_id)
+          .limit(1);
+
+        if (existente && existente.length > 0) {
+          return {
+            content: [{
+              type: "text" as const,
+              text: `⚠️ Já existe conta a receber para este pedido: ${existente[0].numero_titulo ?? existente[0].id.slice(0, 8)}. Use croma_listar_contas_receber para consultar.`,
+            }],
+          };
+        }
+
+        const { data: cr, error } = await sb
+          .from("contas_receber")
+          .insert({
+            pedido_id: params.pedido_id,
+            cliente_id: params.cliente_id,
+            valor_original: params.valor_original,
+            saldo: params.valor_original,
+            data_emissao: new Date().toISOString().split("T")[0],
+            data_vencimento: params.data_vencimento,
+            status: "aberto",
+            forma_pagamento: params.forma_pagamento || null,
+            observacoes: params.observacoes || null,
+          })
+          .select()
+          .single();
+
+        if (error) return errorResult(error);
+
+        return {
+          content: [{
+            type: "text" as const,
+            text: `✅ Conta a receber criada!\n\n- **ID**: \`${cr.id}\`\n- **Valor**: R$ ${params.valor_original.toFixed(2)}\n- **Vencimento**: ${params.data_vencimento}\n- **Status**: Aberto`,
+          }],
+          structuredContent: cr,
         };
       } catch (error) {
         return errorResult(error);

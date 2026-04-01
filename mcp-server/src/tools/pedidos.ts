@@ -23,7 +23,7 @@ export function registerPedidosTools(server: McpServer): void {
 Use para "pedidos em produção", "pedidos atrasados", "pedidos do cliente Renner", etc.
 
 Args:
-  - status (string, opcional): aguardando_aprovacao|aprovado|em_producao|producao_concluida|em_instalacao|entregue|faturado|cancelado
+  - status (string, opcional): rascunho|aguardando_aprovacao|aprovado|em_producao|produzido|pronto_entrega|aguardando_instalacao|em_instalacao|parcialmente_concluido|concluido|faturar|faturado|entregue|cancelado
   - cliente_id (string, opcional): UUID do cliente
   - cliente_busca (string, opcional): Busca por nome do cliente
   - prioridade (string, opcional): normal|alta|urgente
@@ -34,7 +34,7 @@ Args:
   - offset (number): Paginação
   - response_format ('markdown'|'json'): Padrão markdown`,
       inputSchema: z.object({
-        status: z.enum(["aguardando_aprovacao", "aprovado", "em_producao", "producao_concluida", "em_instalacao", "entregue", "faturado", "cancelado"]).optional(),
+        status: z.enum(["rascunho", "aguardando_aprovacao", "aprovado", "em_producao", "produzido", "pronto_entrega", "aguardando_instalacao", "em_instalacao", "parcialmente_concluido", "concluido", "faturar", "faturado", "entregue", "cancelado"]).optional(),
         cliente_id: z.string().uuid().optional(),
         cliente_busca: z.string().optional(),
         prioridade: z.enum(["normal", "alta", "urgente"]).optional(),
@@ -225,16 +225,16 @@ Args:
 Use para "OPs em andamento hoje", "o que está no corte", "produção atrasada", "OPs pendentes".
 
 Args:
-  - status (string, opcional): pendente|em_andamento|concluido|pausado|retrabalho
-  - setor (string, opcional): Filtrar por setor (corte, impressao, acabamento, etc.)
+  - status (string, opcional): aguardando_programacao|em_fila|em_producao|em_acabamento|em_conferencia|liberado|retrabalho|finalizado
+  - setor (string, opcional): Filtrar por setor (UUID do setor_atual_id)
   - responsavel_id (string, opcional): UUID do responsável
   - atrasadas (boolean, opcional): Apenas OPs com prazo_interno vencido
   - limit (number): Padrão 20
   - offset (number): Paginação
   - response_format ('markdown'|'json'): Padrão markdown`,
       inputSchema: z.object({
-        status: z.enum(["pendente", "em_andamento", "concluido", "pausado", "retrabalho"]).optional(),
-        setor: z.string().optional(),
+        status: z.enum(["aguardando_programacao", "em_fila", "em_producao", "em_acabamento", "em_conferencia", "liberado", "retrabalho", "finalizado"]).optional(),
+        setor: z.string().uuid().optional().describe("UUID do setor_atual_id"),
         responsavel_id: z.string().uuid().optional(),
         atrasadas: z.boolean().optional(),
         limit: z.number().int().min(1).max(100).default(20),
@@ -259,7 +259,7 @@ Args:
         if (params.status) query = query.eq("status", params.status);
         if (params.setor) query = query.eq("setor_atual_id", params.setor);
         if (params.responsavel_id) query = query.eq("responsavel_id", params.responsavel_id);
-        if (params.atrasadas) query = query.lt("prazo_interno", new Date().toISOString()).not("status", "in", '("concluido")');
+        if (params.atrasadas) query = query.lt("prazo_interno", new Date().toISOString()).not("status", "in", '("finalizado","liberado")');
 
         query = query
           .order("prioridade", { ascending: false })
@@ -321,10 +321,13 @@ Args:
 ATENÇÃO: Ação que modifica dados. Confirme antes de executar.
 
 Transições válidas:
-- pendente → em_andamento
-- em_andamento → concluido, pausado, retrabalho
-- pausado → em_andamento
-- retrabalho → em_andamento
+- aguardando_programacao → em_fila
+- em_fila → em_producao
+- em_producao → em_acabamento, retrabalho
+- em_acabamento → em_conferencia, retrabalho
+- em_conferencia → liberado, retrabalho
+- retrabalho → em_producao
+- liberado → finalizado
 
 Args:
   - id (string, obrigatório): UUID da OP
@@ -333,7 +336,7 @@ Args:
   - responsavel_id (string, opcional): UUID do responsável`,
       inputSchema: z.object({
         id: z.string().uuid(),
-        status: z.enum(["em_andamento", "concluido", "pausado", "retrabalho"]),
+        status: z.enum(["em_fila", "em_producao", "em_acabamento", "em_conferencia", "liberado", "retrabalho", "finalizado"]),
         observacao: z.string().max(500).optional(),
         responsavel_id: z.string().uuid().optional(),
       }).strict(),
@@ -353,11 +356,14 @@ Args:
         if (!atual) return { content: [{ type: "text" as const, text: `OP não encontrada: ${params.id}` }] };
 
         const transicoes: Record<string, string[]> = {
-          pendente: ["em_andamento"],
-          em_andamento: ["concluido", "pausado", "retrabalho"],
-          pausado: ["em_andamento"],
-          retrabalho: ["em_andamento"],
-          concluido: [],
+          aguardando_programacao: ["em_fila"],
+          em_fila: ["em_producao"],
+          em_producao: ["em_acabamento", "retrabalho"],
+          em_acabamento: ["em_conferencia", "retrabalho"],
+          em_conferencia: ["liberado", "retrabalho"],
+          retrabalho: ["em_producao"],
+          liberado: ["finalizado"],
+          finalizado: [],
         };
 
         const permitidas = transicoes[atual.status] ?? [];
@@ -374,9 +380,9 @@ Args:
         const updateData: Record<string, unknown> = { status: params.status };
         if (params.observacao) updateData.observacoes = params.observacao;
         if (params.responsavel_id) updateData.responsavel_id = params.responsavel_id;
-        if (params.status === "concluido") updateData.concluido_em = new Date().toISOString();
-        if (params.status === "em_andamento" && atual.status === "pendente") {
-          updateData.iniciado_em = new Date().toISOString();
+        if (params.status === "finalizado") updateData.data_conclusao = new Date().toISOString();
+        if (params.status === "em_producao" && (atual.status === "em_fila" || atual.status === "aguardando_programacao")) {
+          updateData.data_inicio = new Date().toISOString();
         }
 
         const { error } = await sb.from("ordens_producao").update(updateData).eq("id", params.id);
@@ -387,6 +393,194 @@ Args:
             type: "text" as const,
             text: `✅ OP **${atual.numero}** atualizada: ${formatStatus(atual.status)} → **${formatStatus(params.status)}**`,
           }],
+        };
+      } catch (error) {
+        return errorResult(error);
+      }
+    }
+  );
+
+  // ─── croma_atualizar_status_pedido ──────────────────────────────────────────
+
+  server.registerTool(
+    "croma_atualizar_status_pedido",
+    {
+      title: "Atualizar Status do Pedido",
+      description: `Atualiza o status de um pedido de venda.
+
+ATENÇÃO: Ação que modifica dados. Confirme antes de executar.
+
+Transições válidas:
+- rascunho → aguardando_aprovacao
+- aguardando_aprovacao → aprovado, cancelado
+- aprovado → em_producao, cancelado
+- em_producao → produzido, cancelado
+- produzido → pronto_entrega
+- pronto_entrega → aguardando_instalacao, entregue
+- aguardando_instalacao → em_instalacao
+- em_instalacao → parcialmente_concluido, concluido
+- parcialmente_concluido → em_instalacao, concluido
+- concluido → faturar
+- faturar → faturado
+
+Args:
+  - id (string, obrigatório): UUID do pedido
+  - status (string, obrigatório): Novo status
+  - observacao (string, opcional): Observação sobre a mudança`,
+      inputSchema: z.object({
+        id: z.string().uuid(),
+        status: z.enum([
+          "aguardando_aprovacao", "aprovado", "em_producao", "produzido",
+          "pronto_entrega", "aguardando_instalacao", "em_instalacao",
+          "parcialmente_concluido", "concluido", "faturar", "faturado",
+          "entregue", "cancelado"
+        ]),
+        observacao: z.string().max(500).optional(),
+      }).strict(),
+      annotations: { readOnlyHint: false, destructiveHint: false, idempotentHint: false, openWorldHint: false },
+    },
+    async (params) => {
+      try {
+        const sb = getUserClient();
+
+        const { data: atual, error: fetchError } = await sb
+          .from("pedidos")
+          .select("id, numero, status")
+          .eq("id", params.id)
+          .single();
+
+        if (fetchError) return errorResult(fetchError);
+        if (!atual) return { content: [{ type: "text" as const, text: `Pedido não encontrado: ${params.id}` }] };
+
+        const transicoes: Record<string, string[]> = {
+          rascunho: ["aguardando_aprovacao"],
+          aguardando_aprovacao: ["aprovado", "cancelado"],
+          aprovado: ["em_producao", "cancelado"],
+          em_producao: ["produzido", "cancelado"],
+          produzido: ["pronto_entrega"],
+          pronto_entrega: ["aguardando_instalacao", "entregue"],
+          aguardando_instalacao: ["em_instalacao"],
+          em_instalacao: ["parcialmente_concluido", "concluido"],
+          parcialmente_concluido: ["em_instalacao", "concluido"],
+          concluido: ["faturar"],
+          faturar: ["faturado"],
+          faturado: [],
+          entregue: [],
+          cancelado: [],
+        };
+
+        const permitidas = transicoes[atual.status] ?? [];
+        if (!permitidas.includes(params.status)) {
+          return {
+            content: [{
+              type: "text" as const,
+              text: `Transição inválida: ${formatStatus(atual.status)} → ${formatStatus(params.status)}.\n` +
+                    `Permitidas de "${atual.status}": ${permitidas.length > 0 ? permitidas.join(", ") : "nenhuma (status final)"}`,
+            }],
+          };
+        }
+
+        const updateData: Record<string, unknown> = { status: params.status };
+        if (params.observacao) updateData.observacoes = params.observacao;
+        if (params.status === "cancelado") {
+          updateData.cancelado_em = new Date().toISOString();
+          if (params.observacao) updateData.motivo_cancelamento = params.observacao;
+        }
+
+        const { error } = await sb
+          .from("pedidos")
+          .update(updateData)
+          .eq("id", params.id)
+          .select()
+          .single();
+
+        if (error) return errorResult(error);
+
+        return {
+          content: [{
+            type: "text" as const,
+            text: `✅ Pedido **${atual.numero}** atualizado: ${formatStatus(atual.status)} → **${formatStatus(params.status)}**${params.observacao ? `\nObs: ${params.observacao}` : ""}`,
+          }],
+        };
+      } catch (error) {
+        return errorResult(error);
+      }
+    }
+  );
+
+  // ─── croma_criar_ordem_producao ─────────────────────────────────────────────
+
+  server.registerTool(
+    "croma_criar_ordem_producao",
+    {
+      title: "Criar Ordem de Produção",
+      description: `Cria uma OP manualmente vinculada a um pedido.
+
+NOTA: Ao aprovar um pedido via croma_atualizar_status_pedido, OPs são criadas
+AUTOMATICAMENTE pelo trigger do banco (1 OP por item do pedido). Use esta
+ferramenta apenas para OPs avulsas ou retrabalho.
+
+ATENÇÃO: Ação que modifica dados. Confirme antes de executar.
+
+Args:
+  - pedido_id (string, obrigatório): UUID do pedido
+  - pedido_item_id (string, opcional): UUID do item específico
+  - prioridade (0-3, opcional): 0=normal, 1=alta, 2=urgente, 3=crítica (padrão: 0)
+  - prazo_interno (string, opcional): Data ISO do prazo
+  - observacoes (string, opcional): Observações`,
+      inputSchema: z.object({
+        pedido_id: z.string().uuid(),
+        pedido_item_id: z.string().uuid().optional(),
+        prioridade: z.number().int().min(0).max(3).default(0),
+        prazo_interno: z.string().optional(),
+        observacoes: z.string().max(500).optional(),
+      }).strict(),
+      annotations: { readOnlyHint: false, destructiveHint: false, idempotentHint: false, openWorldHint: false },
+    },
+    async (params) => {
+      try {
+        const sb = getUserClient();
+
+        const { data: pedido, error: pedidoErr } = await sb
+          .from("pedidos")
+          .select("id, numero, status")
+          .eq("id", params.pedido_id)
+          .single();
+
+        if (pedidoErr) return errorResult(pedidoErr);
+        if (!pedido) return { content: [{ type: "text" as const, text: `Pedido não encontrado: ${params.pedido_id}` }] };
+
+        const statusValidos = ["aprovado", "em_producao"];
+        if (!statusValidos.includes(pedido.status)) {
+          return {
+            content: [{
+              type: "text" as const,
+              text: `Pedido ${pedido.numero} está em "${pedido.status}". OPs só podem ser criadas para pedidos aprovados ou em produção.`,
+            }],
+          };
+        }
+
+        const { data: op, error: opErr } = await sb
+          .from("ordens_producao")
+          .insert({
+            pedido_id: params.pedido_id,
+            pedido_item_id: params.pedido_item_id || null,
+            status: "aguardando_programacao",
+            prioridade: params.prioridade,
+            prazo_interno: params.prazo_interno || null,
+            observacoes: params.observacoes || null,
+          })
+          .select()
+          .single();
+
+        if (opErr) return errorResult(opErr);
+
+        return {
+          content: [{
+            type: "text" as const,
+            text: `✅ OP criada com sucesso!\n\n- **Número**: ${op.numero}\n- **ID**: \`${op.id}\`\n- **Pedido**: ${pedido.numero}\n- **Status**: Aguardando programação\n- **Prioridade**: ${params.prioridade}`,
+          }],
+          structuredContent: op,
         };
       } catch (error) {
         return errorResult(error);

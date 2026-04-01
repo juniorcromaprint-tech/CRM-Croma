@@ -5,7 +5,7 @@
 
 import type { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
 import { z } from "zod";
-import { getAdminClient, getUserClient, SUPABASE_URL } from "../supabase-client.js";
+import { getAdminClient, getUserClient, getJuniorUserId, SUPABASE_URL } from "../supabase-client.js";
 import { ResponseFormat } from "../types.js";
 import { errorResult } from "../utils/errors.js";
 import { buildPaginatedResponse, truncateIfNeeded } from "../utils/pagination.js";
@@ -152,8 +152,7 @@ Args:
             .single(),
           sb
             .from("proposta_itens")
-            .select(`*, proposta_item_acabamentos(acabamentos(nome, custo_unitario)),
-                        proposta_servicos(servicos(nome, custo_hora), quantidade_horas, valor_total)`)
+            .select(`*`)
             .eq("proposta_id", params.id)
             .order("ordem"),
         ]);
@@ -398,8 +397,11 @@ Args:
         }
 
         const updateData: Record<string, unknown> = { status: params.status };
-        if (params.motivo) updateData.motivo_recusa = params.motivo;
-        if (params.status === "aprovada") updateData.aprovado_em = new Date().toISOString();
+        if (params.motivo) updateData.observacoes = params.motivo;
+        if (params.status === "aprovada") {
+          updateData.aprovado_em = new Date().toISOString();
+          updateData.aprovado_por = getJuniorUserId() ?? "MCP Agent";
+        }
 
         const { error } = await sb.from("propostas").update(updateData).eq("id", params.id);
         if (error) return errorResult(error);

@@ -312,6 +312,7 @@ Retorna: dados do cliente criado com ID gerado`,
         estado: z.string().max(2).optional(),
         cep: z.string().max(9).optional(),
         endereco: z.string().max(300).optional(),
+        lead_id: z.string().uuid().optional().describe("UUID do lead de origem (para rastreamento de conversão)"),
       }).strict(),
       annotations: {
         readOnlyHint: false,
@@ -428,7 +429,7 @@ Args:
 Use para "leads de hoje", "leads novos", "leads do vendedor X", etc.
 
 Args:
-  - status (string, opcional): novo|em_contato|qualificando|qualificado|descartado
+  - status (string, opcional): novo|em_contato|contatado|qualificando|qualificado|proposta_enviada|negociando|convertido|perdido|descartado
   - busca (string, opcional): Busca por empresa ou nome do contato
   - vendedor_id (string, opcional): UUID do vendedor responsável
   - segmento (string, opcional): Segmento de atuação
@@ -437,7 +438,7 @@ Args:
   - offset (number): Paginação (padrão: 0)
   - response_format ('markdown'|'json'): Formato (padrão: markdown)`,
       inputSchema: z.object({
-        status: z.enum(["novo", "em_contato", "qualificando", "qualificado", "descartado"]).optional(),
+        status: z.enum(["novo", "em_contato", "contatado", "qualificando", "qualificado", "proposta_enviada", "negociando", "convertido", "perdido", "descartado"]).optional(),
         busca: z.string().optional().describe("Busca por empresa ou nome do contato"),
         vendedor_id: z.string().uuid().optional(),
         segmento: z.string().optional(),
@@ -569,6 +570,103 @@ Args:
             text: `✅ Lead cadastrado com sucesso!\n\n- **ID**: \`${data.id}\`\n- **Empresa**: ${data.empresa}\n- **Status**: Novo\n- **Score**: ${data.score}/100\n- **Criado em**: ${formatDate(data.created_at)}`,
           }],
           structuredContent: data,
+        };
+      } catch (error) {
+        return errorResult(error);
+      }
+    }
+  );
+
+  // ─── croma_atualizar_status_lead ──────────────────────────────────────────
+
+  server.registerTool(
+    "croma_atualizar_status_lead",
+    {
+      title: "Atualizar Status do Lead",
+      description: `Atualiza o status de um lead no pipeline de vendas.
+
+ATENÇÃO: Ação que modifica dados. Confirme antes de executar.
+
+Transições válidas:
+- novo → em_contato, contatado, descartado
+- em_contato → contatado, qualificando, descartado
+- contatado → qualificando, descartado
+- qualificando → qualificado, descartado
+- qualificado → proposta_enviada, negociando, descartado
+- proposta_enviada → negociando, convertido, perdido
+- negociando → convertido, perdido
+- convertido → (final)
+- perdido → novo (reabrir)
+- descartado → novo (reabrir)
+
+Args:
+  - id (string, obrigatório): UUID do lead
+  - status (string, obrigatório): Novo status
+  - observacao (string, opcional): Motivo da mudança`,
+      inputSchema: z.object({
+        id: z.string().uuid(),
+        status: z.enum([
+          "novo", "em_contato", "contatado", "qualificando", "qualificado",
+          "proposta_enviada", "negociando", "convertido", "perdido", "descartado"
+        ]),
+        observacao: z.string().max(500).optional(),
+      }).strict(),
+      annotations: { readOnlyHint: false, destructiveHint: false, idempotentHint: false, openWorldHint: false },
+    },
+    async (params) => {
+      try {
+        const sb = getUserClient();
+
+        const { data: atual, error: fetchError } = await sb
+          .from("leads")
+          .select("id, empresa, status")
+          .eq("id", params.id)
+          .single();
+
+        if (fetchError) return errorResult(fetchError);
+        if (!atual) return { content: [{ type: "text" as const, text: `Lead não encontrado: ${params.id}` }] };
+
+        const transicoes: Record<string, string[]> = {
+          novo: ["em_contato", "contatado", "descartado"],
+          em_contato: ["contatado", "qualificando", "descartado"],
+          contatado: ["qualificando", "descartado"],
+          qualificando: ["qualificado", "descartado"],
+          qualificado: ["proposta_enviada", "negociando", "descartado"],
+          proposta_enviada: ["negociando", "convertido", "perdido"],
+          negociando: ["convertido", "perdido"],
+          convertido: [],
+          perdido: ["novo"],
+          descartado: ["novo"],
+        };
+
+        const permitidas = transicoes[atual.status] ?? [];
+        if (!permitidas.includes(params.status)) {
+          return {
+            content: [{
+              type: "text" as const,
+              text: `Transição inválida: ${formatStatus(atual.status)} → ${formatStatus(params.status)}.\n` +
+                    `Permitidas de "${atual.status}": ${permitidas.length > 0 ? permitidas.join(", ") : "nenhuma (status final)"}`,
+            }],
+          };
+        }
+
+        const updateData: Record<string, unknown> = { status: params.status };
+        if (params.observacao) updateData.observacoes = params.observacao;
+
+        const { error } = await sb
+          .from("leads")
+          .update(updateData)
+          .eq("id", params.id)
+          .select()
+          .single();
+
+        if (error) return errorResult(error);
+
+        return {
+          content: [{
+            type: "text" as const,
+            text: `✅ Lead **${atual.empresa}** atualizado: ${formatStatus(atual.status)} → **${formatStatus(params.status)}**${params.observacao ? `\nObs: ${params.observacao}` : ""}`,
+          }],
         };
       } catch (error) {
         return errorResult(error);
