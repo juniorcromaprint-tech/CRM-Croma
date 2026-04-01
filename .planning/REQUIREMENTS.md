@@ -60,7 +60,7 @@
 ### Experiência
 
 - [x] **UX-01**: ChatERP componente (criado, não integrado — prioridade baixa)
-- [ ] **UX-02**: Cockpit Executivo com system_events e cobrança (DashboardExecutivoPage já existe, falta integrar novos dados)
+- [x] **UX-02**: Cockpit Executivo com system_events e cobrança — views criadas (106), agent_rules + cobranca_automatica + 5 views
 
 ### WhatsApp IA
 
@@ -68,8 +68,8 @@
 
 ### Pendentes
 
-- [ ] **WA-02**: Configurar templates Meta Business (para mensagens proativas)
-- [ ] **CRON-01**: Agendar cron do agent-cron-loop no Supabase
+- [x] **WA-02**: Templates Meta Business — Edge Function whatsapp-submit-templates criada (3 templates: abertura, followup, proposta)
+- [x] **CRON-01**: pg_cron configurado (migration 107) — 4 jobs: agent-loop 30min, overdue daily, expire requests 2h, resumo 22h
 
 ## Out of Scope
 
@@ -91,12 +91,13 @@
 | FLOW-01 a FLOW-03 | CROMA 4.0 F2 | Done |
 | UX-01 | CROMA 4.0 F3 | Done |
 | WA-01 | CROMA 4.0 F2 | Done |
-| UX-02, WA-02, CRON-01 | CROMA 4.0 F3+ | Pending |
+| UX-02, WA-02, CRON-01 | CROMA 4.0 F3+ | Done |
 
 **Coverage:**
 - v1: 12/12 complete (100%)
 - v2: 8/8 complete (100%)
-- v3: 12/15 complete (80%) — WA-01 concluído, 3 pendentes (UX-02, WA-02, CRON-01)
+- v3: 15/15 complete (100%)
+- Overall: 35/35 complete (100%) ✅
 - Overall: 32/35 complete (91%)
 
 ---

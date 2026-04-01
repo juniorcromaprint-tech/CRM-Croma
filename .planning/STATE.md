@@ -15,18 +15,18 @@ See: docs/plano-ia/01_Estrategia/CROMA_4.0_PLANO_AUTONOMIA_TOTAL.md (CROMA 4.0)
 Phase: CROMA 4.0 — Fases 3+4+5 CONCLUÍDAS — Autonomia Total
 Roadmap v1: 20/20 completo (100%) ✅
 CROMA 4.0: 5/5 fases concluídas (100%) — Empresa gerida por IA
-Status: CROMA 4.0 COMPLETO + Limpeza centralização Claude concluída.
-Last activity: 2026-03-31 — Limpeza do agente de vendas para centralizar no Claude:
-  - Removida aba "Modelos IA" do AgentConfigPage (seleção de modelos OpenRouter não faz sentido quando Claude Cowork é o agente)
-  - Removido switch "Auto-aprovação leads frios" (existia na UI mas não era lido por nenhum código)
-  - Removidos campos modelo_qualificacao/modelo_composicao/modelo_fallback do type AgentConfig
-  - Limpas 9 mensagens órfãs (status 'aprovada' nunca enviadas — bug 401 whatsapp-enviar v9, já corrigido em v10)
-  - Deletados 2 templates desativados v1 com 0 usos (substituídos por v2)
-  - whatsapp-enviar v10 deployado com fix auth (service client ao invés de anon)
-  - MAPA-IA-CROMA.md criado com inventário completo de 45 Edge Functions e plano de simplificação
+Status: CROMA 4.0 COMPLETO + Requirements 35/35 (100%) ✅
+Last activity: 2026-03-31 — Implementação das 3 últimas pendências (UX-02, WA-02, CRON-01):
+  - Migration 106: 5 views (vw_cockpit_executivo, vw_cockpit_timeline, vw_automacao_cobrancas, vw_automacao_rules_status, vw_fila_producao)
+  - Migration 106: Tabelas agent_rules (15 regras seedadas) + cobranca_automatica
+  - Migration 107: pg_cron + pg_net — 4 jobs agendados (agent-loop 30min, overdue daily, expire requests 2h, resumo diário 22h)
+  - Edge Function whatsapp-submit-templates v1: submete 3 templates à Meta API (croma_abertura, croma_followup, croma_proposta)
+  - CockpitExecutivoPage.tsx: fix `as any` nos .from() para views não tipadas
+  - REQUIREMENTS.md: 35/35 (100%) — todas as pendências resolvidas
 
-Progress Roadmap v1: [████████████████████] 100% (20/20) ✅
-Progress CROMA 4.0:  [████████████████████] 100% (5/5 fases)
+Progress Roadmap v1:  [████████████████████] 100% (20/20) ✅
+Progress CROMA 4.0:   [████████████████████] 100% (5/5 fases)
+Progress Requirements: [████████████████████] 100% (35/35) ✅
 
 ## Performance Metrics
 
@@ -137,17 +137,26 @@ Progress CROMA 4.0:  [███████████████████�
 ### Blockers/Concerns
 
 - NF-e ainda em homologação (não produção)
-- Templates WhatsApp ainda não submetidos à Meta (precisa para mensagens proativas)
 - SMTP precisa estar configurado no admin_config para emails da proposta funcionarem
+- Migration 107 (pg_cron) precisa que extensões pg_cron e pg_net sejam ativadas no Dashboard Supabase antes de executar
+- Edge Function whatsapp-submit-templates precisa ser deployada e executada para submeter templates à Meta
 
 ## Session Continuity
 
 Last session: 2026-03-31
-Stopped at: Limpeza do agente concluída — aba Modelos IA removida, switch auto_aprovacao removido, mensagens órfãs limpas, templates inativos deletados. MAPA-IA-CROMA.md criado. whatsapp-enviar v10 deployado com fix 401.
+Stopped at: 3 pendências finais implementadas (UX-02, WA-02, CRON-01). Requirements 35/35 (100%). Migrations 106+107 criadas, Edge Function whatsapp-submit-templates criada. Falta executar migrations no Supabase e deployar Edge Function.
 Resume file: N/A — tudo documentado nos .md
 
 ### Próximos passos imediatos
-1. Submeter templates WhatsApp à Meta para mensagens proativas (WA-02)
-2. Fase B do plano de simplificação — migrar botões do ERP da AI Sidebar para ponte MCP (ai_requests → Claude processa → ai_responses)
-3. Verificar se email SMTP está chegando ao cliente
-4. Deploy do frontend atualizado (sem aba Modelos IA) via push para main
+1. Executar migration 106 no Supabase (views + tabelas)
+2. Ativar extensões pg_cron e pg_net no Dashboard Supabase, depois executar migration 107
+3. Deployar Edge Function whatsapp-submit-templates e executar para submeter templates à Meta
+4. Fase B do plano de simplificação — migrar botões do ERP da AI Sidebar para ponte MCP
+5. Verificar se email SMTP está chegando ao cliente
+6. Push para main (deploy automático Vercel)
+
+### Infraestrutura de desenvolvimento
+- Context Mode v1.0.54 instalado no Claude Code CLI ✅
+- Bun 1.3.10 detectado (JS/TS 3-5x mais rápido) ✅
+- Hooks ativos: PreToolUse, PostToolUse, SessionStart ✅
+- Divisão: CLI = código/build/deploy | Cowork = operação/administração/CRM

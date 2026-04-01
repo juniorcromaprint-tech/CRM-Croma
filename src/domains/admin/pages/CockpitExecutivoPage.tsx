@@ -125,7 +125,7 @@ export default function CockpitExecutivoPage() {
     queryKey: ["cockpit-executivo"],
     queryFn: async () => {
       const { data, error } = await supabase
-        .from("vw_cockpit_executivo")
+        .from("vw_cockpit_executivo" as any)
         .select("*")
         .single();
       if (error) throw error;
@@ -140,12 +140,12 @@ export default function CockpitExecutivoPage() {
     queryKey: ["cockpit-timeline"],
     queryFn: async () => {
       const { data, error } = await supabase
-        .from("vw_cockpit_timeline")
+        .from("vw_cockpit_timeline" as any)
         .select("*")
         .order("created_at", { ascending: false })
         .limit(20);
       if (error) throw error;
-      return data as TimelineEvent[];
+      return (data ?? []) as TimelineEvent[];
     },
     refetchInterval: 60000,
     staleTime: 30000,
@@ -156,10 +156,10 @@ export default function CockpitExecutivoPage() {
     queryKey: ["automacao-rules-status"],
     queryFn: async () => {
       const { data, error } = await supabase
-        .from("vw_automacao_rules_status")
+        .from("vw_automacao_rules_status" as any)
         .select("*");
       if (error) throw error;
-      return data as AutomacaoRule[];
+      return (data ?? []) as AutomacaoRule[];
     },
     refetchInterval: 120000,
     staleTime: 60000,
