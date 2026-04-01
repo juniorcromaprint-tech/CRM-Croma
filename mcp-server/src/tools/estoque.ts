@@ -158,7 +158,7 @@ Args:
 
         let query = sb
           .from("materiais")
-          .select("id, codigo, nome, categoria, unidade, preco_medio, custo_metro_quadrado, estoque_minimo, ativo", { count: "exact" });
+          .select("id, codigo, nome, categoria, unidade, preco_medio, estoque_minimo, ativo", { count: "exact" });
 
         if (params.ativo !== undefined) query = query.eq("ativo", params.ativo);
         if (params.busca) query = query.or(`nome.ilike.%${params.busca}%,codigo.ilike.%${params.busca}%`);
@@ -187,7 +187,6 @@ Args:
             }
             lines.push(`- **${m.nome}**${m.codigo ? ` (${m.codigo})` : ""}`);
             if (m.preco_medio) lines.push(`  - Preço: ${formatBRL(m.preco_medio)}/${m.unidade ?? "un"}`);
-            if (m.custo_metro_quadrado) lines.push(`  - Custo/m²: ${formatBRL(m.custo_metro_quadrado)}`);
           }
           if (response.has_more) lines.push(`\n_Mais resultados. Use offset: ${response.next_offset}._`);
           text = lines.join("\n");

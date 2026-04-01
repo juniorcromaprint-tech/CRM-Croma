@@ -300,12 +300,12 @@ Args:
           proposta_id: proposta.id,
           ordem: idx + 1,
           descricao: item.descricao,
+          especificacao: item.material_descricao,
           quantidade: item.quantidade,
           valor_unitario: item.valor_unitario,
           valor_total: item.quantidade * item.valor_unitario,
           largura_cm: item.largura_cm,
           altura_cm: item.altura_cm,
-          material_descricao: item.material_descricao,
         }));
 
         const { error: itensError } = await sb.from("proposta_itens").insert(itensData);
@@ -399,8 +399,7 @@ Args:
 
         const updateData: Record<string, unknown> = { status: params.status };
         if (params.motivo) updateData.motivo_recusa = params.motivo;
-        if (params.status === "aprovada") updateData.aprovada_em = new Date().toISOString();
-        if (params.status === "enviada") updateData.enviada_em = new Date().toISOString();
+        if (params.status === "aprovada") updateData.aprovado_em = new Date().toISOString();
 
         const { error } = await sb.from("propostas").update(updateData).eq("id", params.id);
         if (error) return errorResult(error);

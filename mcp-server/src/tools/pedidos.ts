@@ -251,13 +251,13 @@ Args:
           .from("ordens_producao")
           .select(
             `id, numero, status, prioridade, prazo_interno, tempo_estimado_min,
-             setor, responsavel_id, created_at,
+             setor_atual_id, responsavel_id, created_at,
              pedidos!inner(numero, clientes(razao_social, nome_fantasia))`,
             { count: "exact" }
           );
 
         if (params.status) query = query.eq("status", params.status);
-        if (params.setor) query = query.ilike("setor", `%${params.setor}%`);
+        if (params.setor) query = query.eq("setor_atual_id", params.setor);
         if (params.responsavel_id) query = query.eq("responsavel_id", params.responsavel_id);
         if (params.atrasadas) query = query.lt("prazo_interno", new Date().toISOString()).not("status", "in", '("concluido")');
 
@@ -288,7 +288,7 @@ Args:
               lines.push(`### ${op.numero}${atrasada ? " ⚠️" : ""} — Pedido ${pedido.numero ?? "?"}`);
               lines.push(`- **Cliente**: ${nomeCliente}`);
               lines.push(`- **Status**: ${formatStatus(op.status)}`);
-              if (op.setor) lines.push(`- **Setor**: ${op.setor}`);
+              if (op.setor_atual_id) lines.push(`- **Setor ID**: ${op.setor_atual_id}`);
               if (op.prazo_interno) lines.push(`- **Prazo**: ${formatDate(op.prazo_interno)}${atrasada ? " ⚠️ VENCIDO" : ""}`);
               if (op.tempo_estimado_min) lines.push(`- **Tempo est.**: ${op.tempo_estimado_min} min`);
               lines.push("");

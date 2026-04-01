@@ -50,16 +50,16 @@ Args:
         let query = sb
           .from("ordens_instalacao")
           .select(
-            `id, numero, status, data_agendada, endereco_completo, cidade, estado,
+            `id, numero, status, data_agendada, endereco_completo,
              contato_local, telefone_local, observacoes, created_at,
              pedidos(numero, clientes(razao_social, nome_fantasia)),
-             equipes_instalacao(nome)`,
+             equipes(nome)`,
             { count: "exact" }
           );
 
         if (params.status) query = query.eq("status", params.status);
         if (params.equipe_id) query = query.eq("equipe_id", params.equipe_id);
-        if (params.cidade) query = query.ilike("cidade", `%${params.cidade}%`);
+        if (params.cidade) query = query.ilike("endereco_completo", `%${params.cidade}%`);
         if (params.data_inicio) query = query.gte("data_agendada", params.data_inicio);
         if (params.data_fim) query = query.lte("data_agendada", params.data_fim + "T23:59:59");
 
@@ -83,7 +83,7 @@ Args:
             for (const inst of items) {
               const pedido = (inst.pedidos as unknown as { numero: string; clientes: { razao_social: string; nome_fantasia?: string } }) ?? {};
               const cliente = pedido.clientes ?? {};
-              const equipe = (inst.equipes_instalacao as { nome?: string }) ?? {};
+              const equipe = (inst.equipes as { nome?: string }) ?? {};
               const nomeCliente = cliente.nome_fantasia ?? cliente.razao_social ?? "—";
 
               lines.push(`### ${inst.numero} — ${nomeCliente}`);
@@ -91,7 +91,6 @@ Args:
               lines.push(`- **Status**: ${formatStatus(inst.status)}`);
               if (inst.data_agendada) lines.push(`- **Data agendada**: ${formatDate(inst.data_agendada)}`);
               if (inst.endereco_completo) lines.push(`- **Endereço**: ${inst.endereco_completo}`);
-              if (inst.cidade) lines.push(`- **Cidade**: ${inst.cidade}${inst.estado ? `/${inst.estado}` : ""}`);
               if (inst.contato_local) lines.push(`- **Contato local**: ${inst.contato_local}`);
               if (inst.telefone_local) lines.push(`- **Telefone**: ${formatPhone(inst.telefone_local)}`);
               if (equipe.nome) lines.push(`- **Equipe**: ${equipe.nome}`);
@@ -162,15 +161,19 @@ Args:
         if (pedidoError) return errorResult(pedidoError);
         if (!pedido) return { content: [{ type: "text" as const, text: `Pedido não encontrado: ${params.pedido_id}` }] };
 
+        const enderecoFull = [
+          params.endereco_completo,
+          params.cidade,
+          params.estado,
+        ].filter(Boolean).join(", ");
+
         const { data, error } = await sb
           .from("ordens_instalacao")
           .insert({
             pedido_id: params.pedido_id,
             status: "agendada",
             data_agendada: params.data_agendada,
-            endereco_completo: params.endereco_completo,
-            cidade: params.cidade,
-            estado: params.estado,
+            endereco_completo: enderecoFull,
             contato_local: params.contato_local,
             telefone_local: params.telefone_local,
             equipe_id: params.equipe_id,
@@ -191,7 +194,6 @@ Args:
               `- **Pedido**: ${pedido.numero}`,
               `- **Data**: ${formatDateTime(data.data_agendada)}`,
               `- **Local**: ${data.endereco_completo}`,
-              `- **Cidade**: ${data.cidade}`,
             ].join("\n"),
           }],
           structuredContent: data,

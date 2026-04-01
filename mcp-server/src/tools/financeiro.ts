@@ -180,7 +180,7 @@ Args:
         let query = sb
           .from("contas_pagar")
           .select(
-            `id, numero_titulo, descricao, valor_original, valor_pago, saldo,
+            `id, numero_titulo, valor_original, valor_pago, saldo,
              data_vencimento, data_pagamento, status, categoria, fornecedor_id, created_at,
              fornecedores(razao_social, nome_fantasia)`,
             { count: "exact" }
@@ -227,7 +227,7 @@ Args:
               const vencido = isVencido(cp.data_vencimento) && ["aberto", "vencido"].includes(cp.status);
               const atraso = vencido ? diasAtraso(cp.data_vencimento) : 0;
 
-              const titulo = cp.descricao ?? cp.numero_titulo ?? cp.id.slice(0, 8);
+              const titulo = cp.numero_titulo ?? cp.categoria ?? cp.id.slice(0, 8);
               lines.push(`### ${titulo}${vencido ? ` ⚠️ ${atraso}d atraso` : ""}`);
               if (cp.fornecedor_id) lines.push(`- **Fornecedor**: ${nomeFornecedor}`);
               if (cp.categoria) lines.push(`- **Categoria**: ${cp.categoria}`);

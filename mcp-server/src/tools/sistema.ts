@@ -91,16 +91,14 @@ estoque_saldos, estoque_movimentos, profiles, fornecedores`,
         }
 
         const sb = getSupabaseClient();
-        const { data, error } = await sb.rpc("execute_readonly_query" as never, { query: sql } as never).single();
+        const { data, error } = await sb.rpc("execute_sql_readonly" as never, { query: sql } as never).single();
 
-        // Fallback: tenta via from().select() se a RPC não existir
+        // Fallback: RPC não existe no banco
         if (error && error.code === "PGRST202") {
-          // RPC não existe — usa approach direto via REST não disponível,
-          // retorna instruções para o usuário
           return {
             content: [{
               type: "text" as const,
-              text: `❌ A função execute_readonly_query não existe no banco.\n\nPara habilitar SQL ad-hoc, execute no Supabase SQL editor:\n\n\`\`\`sql\nCREATE OR REPLACE FUNCTION execute_readonly_query(query text)\nRETURNS json\nLANGUAGE plpgsql\nSECURITY DEFINER\nAS $$\nDECLARE\n  result json;\nBEGIN\n  EXECUTE 'SELECT json_agg(t) FROM (' || query || ') t' INTO result;\n  RETURN result;\nEND;\n$$;\n\`\`\``,
+              text: `❌ A função execute_sql_readonly não existe no banco.\n\nPara habilitar SQL ad-hoc, execute no Supabase SQL editor:\n\n\`\`\`sql\nCREATE OR REPLACE FUNCTION execute_sql_readonly(query text)\nRETURNS json\nLANGUAGE plpgsql\nSECURITY DEFINER\nAS $$\nDECLARE\n  result json;\nBEGIN\n  EXECUTE 'SELECT json_agg(t) FROM (' || query || ') t' INTO result;\n  RETURN result;\nEND;\n$$;\n\`\`\``,
             }],
           };
         }
