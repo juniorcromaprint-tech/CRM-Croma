@@ -255,6 +255,74 @@ Args:
     }
   );
 
+  // ─── croma_registrar_pagamento_cp ──────────────────────────────────────────
+
+  server.registerTool(
+    "croma_registrar_pagamento_cp",
+    {
+      title: "Registrar Pagamento de Conta a Pagar",
+      description: `Registra pagamento (total ou parcial) de uma conta a pagar.
+
+ATENÇÃO: Ação que modifica dados. Confirme antes de executar.
+
+Args:
+  - id (string, obrigatório): UUID da conta a pagar
+  - valor_pago (number, obrigatório): Valor pago nesta operação
+  - data_pagamento (string, obrigatório): Data do pagamento (ISO: YYYY-MM-DD)
+  - forma_pagamento (string, opcional): boleto|pix|cartao|transferencia|dinheiro`,
+      inputSchema: z.object({
+        id: z.string().uuid(),
+        valor_pago: z.number().positive(),
+        data_pagamento: z.string(),
+        forma_pagamento: z.enum(["boleto", "pix", "cartao", "transferencia", "dinheiro"]).optional(),
+      }).strict(),
+      annotations: { readOnlyHint: false, destructiveHint: false, idempotentHint: false, openWorldHint: false },
+    },
+    async (params) => {
+      try {
+        const sb = getUserClient();
+
+        const { data: cp, error: fetchErr } = await sb
+          .from("contas_pagar")
+          .select("id, numero_titulo, valor_original, valor_pago, saldo, status")
+          .eq("id", params.id)
+          .single();
+
+        if (fetchErr) return errorResult(fetchErr);
+        if (!cp) return { content: [{ type: "text" as const, text: `Conta a pagar não encontrada: ${params.id}` }] };
+
+        const valorPagoAnterior = cp.valor_pago ?? 0;
+        const totalPago = valorPagoAnterior + params.valor_pago;
+        const novoSaldo = (cp.valor_original ?? 0) - totalPago;
+        const novoStatus = novoSaldo <= 0 ? "pago" : "aberto";
+
+        const { error } = await sb
+          .from("contas_pagar")
+          .update({
+            valor_pago: totalPago,
+            saldo: Math.max(0, novoSaldo),
+            data_pagamento: params.data_pagamento,
+            status: novoStatus,
+            ...(params.forma_pagamento ? { forma_pagamento: params.forma_pagamento } : {}),
+          })
+          .eq("id", params.id)
+          .select()
+          .single();
+
+        if (error) return errorResult(error);
+
+        return {
+          content: [{
+            type: "text" as const,
+            text: `✅ Pagamento registrado!\n\n- **Título**: ${cp.numero_titulo ?? params.id.slice(0, 8)}\n- **Valor pago agora**: R$ ${params.valor_pago.toFixed(2)}\n- **Total pago**: R$ ${totalPago.toFixed(2)}\n- **Saldo**: R$ ${Math.max(0, novoSaldo).toFixed(2)}\n- **Status**: ${novoStatus}`,
+          }],
+        };
+      } catch (error) {
+        return errorResult(error);
+      }
+    }
+  );
+
   // ─── croma_criar_conta_receber ─────────────────────────────────────────────
 
   server.registerTool(
@@ -331,6 +399,144 @@ Args:
             text: `✅ Conta a receber criada!\n\n- **ID**: \`${cr.id}\`\n- **Valor**: R$ ${params.valor_original.toFixed(2)}\n- **Vencimento**: ${params.data_vencimento}\n- **Status**: Aberto`,
           }],
           structuredContent: cr,
+        };
+      } catch (error) {
+        return errorResult(error);
+      }
+    }
+  );
+
+  // ─── croma_registrar_pagamento ─────────────────────────────────────────────
+
+  server.registerTool(
+    "croma_registrar_pagamento",
+    {
+      title: "Registrar Pagamento de Conta a Receber",
+      description: `Registra pagamento (total ou parcial) de uma conta a receber.
+
+Lógica automática:
+- Se valor_pago >= saldo → status = "pago", saldo = 0
+- Se valor_pago < saldo → status = "parcial", saldo reduzido
+
+ATENÇÃO: Ação que modifica dados. Confirme antes de executar.
+
+Args:
+  - id (string, obrigatório): UUID da conta a receber
+  - valor_pago (number, obrigatório): Valor recebido nesta operação
+  - data_pagamento (string, obrigatório): Data do pagamento (ISO: YYYY-MM-DD)
+  - forma_pagamento (string, opcional): boleto|pix|cartao|transferencia|dinheiro`,
+      inputSchema: z.object({
+        id: z.string().uuid(),
+        valor_pago: z.number().positive(),
+        data_pagamento: z.string(),
+        forma_pagamento: z.enum(["boleto", "pix", "cartao", "transferencia", "dinheiro"]).optional(),
+      }).strict(),
+      annotations: { readOnlyHint: false, destructiveHint: false, idempotentHint: false, openWorldHint: false },
+    },
+    async (params) => {
+      try {
+        const sb = getUserClient();
+
+        const { data: cr, error: fetchErr } = await sb
+          .from("contas_receber")
+          .select("id, numero_titulo, valor_original, valor_pago, saldo, status")
+          .eq("id", params.id)
+          .single();
+
+        if (fetchErr) return errorResult(fetchErr);
+        if (!cr) return { content: [{ type: "text" as const, text: `Conta a receber não encontrada: ${params.id}` }] };
+
+        const valorPagoAnterior = cr.valor_pago ?? 0;
+        const totalPago = valorPagoAnterior + params.valor_pago;
+        const saldoAtual = cr.saldo ?? cr.valor_original ?? 0;
+        const novoSaldo = Math.max(0, saldoAtual - params.valor_pago);
+        const novoStatus = novoSaldo <= 0 ? "pago" : "parcial";
+
+        const { error } = await sb
+          .from("contas_receber")
+          .update({
+            valor_pago: totalPago,
+            saldo: novoSaldo,
+            data_pagamento: params.data_pagamento,
+            status: novoStatus,
+            ...(params.forma_pagamento ? { forma_pagamento: params.forma_pagamento } : {}),
+          })
+          .eq("id", params.id)
+          .select()
+          .single();
+
+        if (error) return errorResult(error);
+
+        return {
+          content: [{
+            type: "text" as const,
+            text: `✅ Pagamento registrado!\n\n- **Título**: ${cr.numero_titulo ?? params.id.slice(0, 8)}\n- **Valor recebido agora**: R$ ${params.valor_pago.toFixed(2)}\n- **Total recebido**: R$ ${totalPago.toFixed(2)}\n- **Saldo restante**: R$ ${novoSaldo.toFixed(2)}\n- **Status**: ${novoStatus}`,
+          }],
+        };
+      } catch (error) {
+        return errorResult(error);
+      }
+    }
+  );
+
+  // ─── croma_criar_conta_pagar ───────────────────────────────────────────────
+
+  server.registerTool(
+    "croma_criar_conta_pagar",
+    {
+      title: "Criar Conta a Pagar",
+      description: `Cria um título a pagar (despesa, fornecedor, salário, etc.).
+
+ATENÇÃO: Ação que modifica dados. Confirme antes de executar.
+
+Args:
+  - valor_original (number, obrigatório): Valor do título em R$
+  - data_vencimento (string, obrigatório): Data ISO do vencimento (YYYY-MM-DD)
+  - categoria (string, obrigatório): Ex: fornecedor, aluguel, salario, insumo
+  - fornecedor_id (string, opcional): UUID do fornecedor
+  - numero_titulo (string, opcional): Número do documento/NF
+  - forma_pagamento (string, opcional): boleto|pix|cartao|transferencia|dinheiro
+  - observacoes (string, opcional): Observações`,
+      inputSchema: z.object({
+        valor_original: z.number().positive(),
+        data_vencimento: z.string(),
+        categoria: z.string().max(100),
+        fornecedor_id: z.string().uuid().optional(),
+        numero_titulo: z.string().max(50).optional(),
+        forma_pagamento: z.enum(["boleto", "pix", "cartao", "transferencia", "dinheiro"]).optional(),
+        observacoes: z.string().max(500).optional(),
+      }).strict(),
+      annotations: { readOnlyHint: false, destructiveHint: false, idempotentHint: false, openWorldHint: false },
+    },
+    async (params) => {
+      try {
+        const sb = getUserClient();
+
+        const { data: cp, error } = await sb
+          .from("contas_pagar")
+          .insert({
+            valor_original: params.valor_original,
+            saldo: params.valor_original,
+            data_emissao: new Date().toISOString().split("T")[0],
+            data_vencimento: params.data_vencimento,
+            categoria: params.categoria,
+            status: "aberto",
+            fornecedor_id: params.fornecedor_id || null,
+            numero_titulo: params.numero_titulo || null,
+            forma_pagamento: params.forma_pagamento || null,
+            observacoes: params.observacoes || null,
+          })
+          .select()
+          .single();
+
+        if (error) return errorResult(error);
+
+        return {
+          content: [{
+            type: "text" as const,
+            text: `✅ Conta a pagar criada!\n\n- **ID**: \`${cp.id}\`\n- **Categoria**: ${params.categoria}\n- **Valor**: R$ ${params.valor_original.toFixed(2)}\n- **Vencimento**: ${params.data_vencimento}\n- **Status**: Aberto`,
+          }],
+          structuredContent: cp,
         };
       } catch (error) {
         return errorResult(error);

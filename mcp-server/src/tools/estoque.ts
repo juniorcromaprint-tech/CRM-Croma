@@ -5,7 +5,7 @@
 
 import type { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
 import { z } from "zod";
-import { getSupabaseClient } from "../supabase-client.js";
+import { getSupabaseClient, getUserClient } from "../supabase-client.js";
 import { ResponseFormat } from "../types.js";
 import { errorResult } from "../utils/errors.js";
 import { buildPaginatedResponse, truncateIfNeeded } from "../utils/pagination.js";
@@ -197,6 +197,77 @@ Args:
         return {
           content: [{ type: "text" as const, text: truncateIfNeeded(text, items.length) }],
           structuredContent: response,
+        };
+      } catch (error) {
+        return errorResult(error);
+      }
+    }
+  );
+
+  // ─── croma_registrar_movimento ─────────────────────────────────────────────
+
+  server.registerTool(
+    "croma_registrar_movimento",
+    {
+      title: "Registrar Movimento de Estoque",
+      description: `Registra uma movimentação de estoque (entrada, saída ou ajuste).
+
+ATENÇÃO: Ação que modifica dados. Confirme antes de executar.
+
+Args:
+  - material_id (string, obrigatório): UUID do material
+  - tipo (string, obrigatório): entrada|saida|ajuste
+  - quantidade (number, obrigatório): Quantidade movimentada (positivo)
+  - referencia_tipo (string, opcional): pedido|compra|ajuste|devolucao
+  - referencia_id (string, opcional): UUID da referência (pedido, OP, etc.)
+  - motivo (string, opcional): Motivo da movimentação`,
+      inputSchema: z.object({
+        material_id: z.string().uuid(),
+        tipo: z.enum(["entrada", "saida", "ajuste"]),
+        quantidade: z.number().positive(),
+        referencia_tipo: z.enum(["pedido", "compra", "ajuste", "devolucao"]).optional(),
+        referencia_id: z.string().uuid().optional(),
+        motivo: z.string().max(300).optional(),
+      }).strict(),
+      annotations: { readOnlyHint: false, destructiveHint: false, idempotentHint: false, openWorldHint: false },
+    },
+    async (params) => {
+      try {
+        const sb = getUserClient();
+
+        // Verificar material existe
+        const { data: mat, error: matErr } = await sb
+          .from("materiais")
+          .select("id, nome, unidade")
+          .eq("id", params.material_id)
+          .single();
+
+        if (matErr) return errorResult(matErr);
+        if (!mat) return { content: [{ type: "text" as const, text: `Material não encontrado: ${params.material_id}` }] };
+
+        const { data: mov, error } = await sb
+          .from("estoque_movimentacoes")
+          .insert({
+            material_id: params.material_id,
+            tipo: params.tipo,
+            quantidade: params.quantidade,
+            referencia_tipo: params.referencia_tipo || null,
+            referencia_id: params.referencia_id || null,
+            motivo: params.motivo || null,
+          })
+          .select()
+          .single();
+
+        if (error) return errorResult(error);
+
+        const tipoLabel = params.tipo === "entrada" ? "Entrada" : params.tipo === "saida" ? "Saída" : "Ajuste";
+
+        return {
+          content: [{
+            type: "text" as const,
+            text: `✅ Movimento registrado!\n\n- **Material**: ${mat.nome}\n- **Tipo**: ${tipoLabel}\n- **Quantidade**: ${params.quantidade} ${mat.unidade ?? "un"}\n- **ID**: \`${mov.id}\``,
+          }],
+          structuredContent: mov,
         };
       } catch (error) {
         return errorResult(error);

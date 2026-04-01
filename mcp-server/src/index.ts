@@ -27,6 +27,9 @@ import { registerFinanceiroTools } from "./tools/financeiro.js";
 import { registerEstoqueTools } from "./tools/estoque.js";
 import { registerBiTools } from "./tools/bi.js";
 import { registerSistemaTools } from "./tools/sistema.js";
+import { registerFiscalTools } from "./tools/fiscal.js";
+import { registerQualidadeTools } from "./tools/qualidade.js";
+import { registerAdminTools } from "./tools/admin.js";
 
 // ─── Inicialização do servidor ──────────────────────────────────────────────
 
@@ -41,12 +44,15 @@ registerCrmTools(server);         // 7 ferramentas: clientes, leads + atualizar_
 registerPropostasTools(server);   // 5 ferramentas: propostas/orçamentos (+ enviar email)
 registerPedidosTools(server);     // 6 ferramentas: pedidos, produção + atualizar_status_pedido + criar_ordem_producao
 registerCampoTools(server);       // 2 ferramentas: instalações
-registerFinanceiroTools(server);  // 3 ferramentas: financeiro
-registerEstoqueTools(server);     // 2 ferramentas: estoque
+registerFinanceiroTools(server);  // 6 ferramentas: CR, CP, pagamentos
+registerEstoqueTools(server);     // 3 ferramentas: estoque + registrar_movimento
 registerBiTools(server);          // 3 ferramentas: BI e relatórios
 registerSistemaTools(server);     // 2 ferramentas: sistema
+registerFiscalTools(server);      // 3 ferramentas: NF-e
+registerQualidadeTools(server);   // 3 ferramentas: ocorrências de qualidade
+registerAdminTools(server);       // 3 ferramentas: catálogo e precificação
 
-// Total: 30 ferramentas
+// Total: 43 ferramentas
 
 // ─── Validação de credenciais ───────────────────────────────────────────────
 
@@ -86,7 +92,7 @@ async function main(): Promise<void> {
   await server.connect(transport);
 
   process.stderr.write("[croma-mcp] 🚀 Servidor iniciado — aguardando conexões via stdio\n");
-  process.stderr.write("[croma-mcp] 📊 30 ferramentas disponíveis\n");
+  process.stderr.write("[croma-mcp] 📊 43 ferramentas disponíveis\n");
 }
 
 main().catch((error: unknown) => {
