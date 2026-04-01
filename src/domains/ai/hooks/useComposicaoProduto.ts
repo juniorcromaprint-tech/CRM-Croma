@@ -1,21 +1,31 @@
 // src/domains/ai/hooks/useComposicaoProduto.ts
+// Migrado para ponte MCP — Claude primeiro, fallback OpenRouter
 
-import { useMutation } from '@tanstack/react-query';
-import { supabase } from '@/integrations/supabase/client';
-import { showError } from '@/utils/toast';
+import { useAIBridge } from './useAIBridge';
 import type { AIActionableResponse } from '../types/ai.types';
+import type { AIBridgeResult } from './useAIBridge';
 
 export function useComposicaoProduto() {
-  return useMutation({
-    mutationFn: async ({ descricao, model }: { descricao: string; model?: string }): Promise<AIActionableResponse> => {
-      const { data, error } = await supabase.functions.invoke('ai-composicao-produto', {
-        body: { descricao, model },
-      });
+  const bridge = useAIBridge();
 
-      if (error) throw new Error(error.message);
-      if (data?.error) throw new Error(data.error);
-      return data as AIActionableResponse;
+  return {
+    ...bridge,
+    mutate: (vars: { descricao: string; model?: string }, options?: Parameters<typeof bridge.mutate>[1]) =>
+      bridge.mutate(
+        {
+          tipo: 'composicao-produto',
+          entityType: 'produto',
+          contexto: { descricao: vars.descricao, model: vars.model },
+        },
+        options,
+      ),
+    mutateAsync: async (vars: { descricao: string; model?: string }): Promise<AIActionableResponse> => {
+      const result: AIBridgeResult = await bridge.mutateAsync({
+        tipo: 'composicao-produto',
+        entityType: 'produto',
+        contexto: { descricao: vars.descricao, model: vars.model },
+      });
+      return result.response as AIActionableResponse;
     },
-    onError: (err: Error) => showError(err.message || 'Erro ao sugerir composicao'),
-  });
+  };
 }

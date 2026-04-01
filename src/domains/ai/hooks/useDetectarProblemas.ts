@@ -1,21 +1,31 @@
 // src/domains/ai/hooks/useDetectarProblemas.ts
+// Migrado para ponte MCP — Claude primeiro, fallback OpenRouter
 
-import { useMutation } from '@tanstack/react-query';
-import { supabase } from '@/integrations/supabase/client';
-import { showError } from '@/utils/toast';
+import { useAIBridge } from './useAIBridge';
 import type { AIActionableResponse } from '../types/ai.types';
+import type { AIBridgeResult } from './useAIBridge';
 
 export function useDetectarProblemas() {
-  return useMutation({
-    mutationFn: async ({ mode = 'manual', model }: { mode?: 'manual' | 'cron'; model?: string } = {}): Promise<AIActionableResponse> => {
-      const { data, error } = await supabase.functions.invoke('ai-detectar-problemas', {
-        body: { mode, model },
-      });
+  const bridge = useAIBridge();
 
-      if (error) throw new Error(error.message);
-      if (data?.error) throw new Error(data.error);
-      return data as AIActionableResponse;
+  return {
+    ...bridge,
+    mutate: (vars: { mode?: 'manual' | 'cron'; model?: string } = {}, options?: Parameters<typeof bridge.mutate>[1]) =>
+      bridge.mutate(
+        {
+          tipo: 'detectar-problemas',
+          entityType: 'sistema',
+          contexto: { mode: vars.mode ?? 'manual', model: vars.model },
+        },
+        options,
+      ),
+    mutateAsync: async (vars: { mode?: 'manual' | 'cron'; model?: string } = {}): Promise<AIActionableResponse> => {
+      const result: AIBridgeResult = await bridge.mutateAsync({
+        tipo: 'detectar-problemas',
+        entityType: 'sistema',
+        contexto: { mode: vars.mode ?? 'manual', model: vars.model },
+      });
+      return result.response as AIActionableResponse;
     },
-    onError: (err: Error) => showError(err.message || 'Erro ao detectar problemas'),
-  });
+  };
 }

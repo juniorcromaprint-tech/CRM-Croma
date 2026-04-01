@@ -389,7 +389,7 @@ export default function AgentConversationPage() {
             className="gap-2 text-amber-700 border-amber-200 hover:bg-amber-50"
           >
             {escalate.isPending ? <Loader2 size={16} className="animate-spin" /> : <UserCog size={16} />}
-            Escalar para Humano
+            Assumir Conversa
           </Button>
         </div>
       )}

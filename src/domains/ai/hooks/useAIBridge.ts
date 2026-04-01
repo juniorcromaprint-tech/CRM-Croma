@@ -18,7 +18,7 @@ interface AIBridgeRequest {
   claudeOnly?: boolean;
 }
 
-interface AIBridgeResult {
+export interface AIBridgeResult {
   response: AIActionableResponse | Record<string, unknown>;
   source: 'claude' | 'openrouter';
   durationMs: number;
