@@ -16,13 +16,7 @@ Phase: CROMA 4.0 — Fases 3+4+5 CONCLUÍDAS — Autonomia Total
 Roadmap v1: 20/20 completo (100%) ✅
 CROMA 4.0: 5/5 fases concluídas (100%) — Empresa gerida por IA
 Status: CROMA 4.0 COMPLETO + Requirements 35/35 (100%) ✅
-Last activity: 2026-03-31 — Implementação das 3 últimas pendências (UX-02, WA-02, CRON-01):
-  - Migration 106: 5 views (vw_cockpit_executivo, vw_cockpit_timeline, vw_automacao_cobrancas, vw_automacao_rules_status, vw_fila_producao)
-  - Migration 106: Tabelas agent_rules (15 regras seedadas) + cobranca_automatica
-  - Migration 107: pg_cron + pg_net — 4 jobs agendados (agent-loop 30min, overdue daily, expire requests 2h, resumo diário 22h)
-  - Edge Function whatsapp-submit-templates v1: submete 3 templates à Meta API (croma_abertura, croma_followup, croma_proposta)
-  - CockpitExecutivoPage.tsx: fix `as any` nos .from() para views não tipadas
-  - REQUIREMENTS.md: 35/35 (100%) — todas as pendências resolvidas
+Last activity: 2026-03-31 — CROMA 4.0 finalizado. Código pushado para main, deploy Vercel ativo, 384 testes passando. Migrations criadas, Edge Functions deployadas, hooks AI migrados para ponte MCP.
 
 Progress Roadmap v1:  [████████████████████] 100% (20/20) ✅
 Progress CROMA 4.0:   [████████████████████] 100% (5/5 fases)
@@ -108,55 +102,30 @@ Progress Requirements: [██████████████████�
 
 ### Pending Todos
 
-**CROMA 4.0 — WhatsApp Inteligente:**
-- ~~Chip WhatsApp dedicado~~ ✅ CONCLUÍDO
-- ~~Plano definitivo de arquitetura~~ ✅ CONCLUÍDO
-- ~~Scheduled task atualizada para 1min~~ ✅ CONCLUÍDO
-- ~~Webhook v14 com CRM integrado~~ ✅ CONCLUÍDO (2026-03-31)
-- ~~PIX e email corrigidos~~ ✅ CONCLUÍDO (2026-03-31)
-- ~~Coleta de dados cadastrais~~ ✅ CONCLUÍDO (2026-03-31)
-- ~~Deploy 3 Edge Functions~~ ✅ CONCLUÍDO (2026-03-31)
-- Submeter templates WhatsApp à Meta (croma_abertura, croma_followup)
-- Handoff manual: botão 'assumir conversa' no ERP
+**Todos os itens principais concluídos. Pendências menores:**
+- Submeter templates WhatsApp à Meta (croma_abertura, croma_followup) — Edge Function criada, falta executar
 - Worker Fly.io com Claude API tool_use (opcional — webhook Edge Function já funciona)
-
-**Fase 3 — Automação de Fluxo (próximo foco):**
-- Cobrança automática escalonada (D+1, D+3, D+7, D+15, D+30)
-- PCP inteligente — sequenciamento automático de OPs
-- Transição automática Produção→Instalação
-
-**Fase 4 — Inteligência:**
-- Cockpit executivo — tela única com KPIs + system_events
-- Score de crédito de clientes
-- Memory layer — padrões detectados
-
-**Fase 5 — Conversacional:**
-- Chat natural no ERP (ChatERP.tsx)
-- Relatórios por linguagem natural
+- NF-e: migrar de homologação para produção SEFAZ
+- Fase B do plano de simplificação — migrar botões AI Sidebar para ponte MCP
 
 ### Blockers/Concerns
 
 - NF-e ainda em homologação (não produção)
 - SMTP precisa estar configurado no admin_config para emails da proposta funcionarem
-- Migration 107 (pg_cron) precisa que extensões pg_cron e pg_net sejam ativadas no Dashboard Supabase antes de executar
-- Edge Function whatsapp-submit-templates precisa ser deployada e executada para submeter templates à Meta
 
 ## Session Continuity
 
 Last session: 2026-03-31
-Stopped at: 3 pendências finais implementadas (UX-02, WA-02, CRON-01). Requirements 35/35 (100%). Migrations 106+107 criadas, Edge Function whatsapp-submit-templates criada. Falta executar migrations no Supabase e deployar Edge Function.
+Status: CROMA 4.0 100% completo. Código pushado, 384 testes passando, deploy Vercel ativo.
 Resume file: N/A — tudo documentado nos .md
 
-### Próximos passos imediatos
-1. Executar migration 106 no Supabase (views + tabelas)
-2. Ativar extensões pg_cron e pg_net no Dashboard Supabase, depois executar migration 107
-3. Deployar Edge Function whatsapp-submit-templates e executar para submeter templates à Meta
-4. Fase B do plano de simplificação — migrar botões do ERP da AI Sidebar para ponte MCP
-5. Verificar se email SMTP está chegando ao cliente
-6. Push para main (deploy automático Vercel)
+### Próximos passos (evolução contínua)
+1. Submeter templates WhatsApp à Meta (executar Edge Function whatsapp-submit-templates)
+2. Fase B do plano de simplificação — migrar botões AI Sidebar para ponte MCP
+3. Verificar se email SMTP está chegando ao cliente
+4. NF-e: migrar de homologação para produção SEFAZ quando Junior decidir
 
 ### Infraestrutura de desenvolvimento
 - Context Mode v1.0.54 instalado no Claude Code CLI ✅
 - Bun 1.3.10 detectado (JS/TS 3-5x mais rápido) ✅
-- Hooks ativos: PreToolUse, PostToolUse, SessionStart ✅
-- Divisão: CLI = código/build/deploy | Cowork = operação/administração/CRM
+- H
