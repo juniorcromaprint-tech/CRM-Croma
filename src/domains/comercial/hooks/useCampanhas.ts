@@ -63,6 +63,8 @@ export function useExcluirCampanha() {
         .from('campanhas')
         .update({ excluido_em: new Date().toISOString() })
         .eq('id', id)
+        .select('id')
+        .single()
       if (error) throw new Error(error.message)
     },
     onSuccess: () => { qc.invalidateQueries({ queryKey: [KEY] }); showSuccess('Campanha excluída!') },
@@ -78,6 +80,8 @@ export function useAtualizarCampanha() {
         .from('campanhas')
         .update(updates)
         .eq('id', id)
+        .select('id')
+        .single()
       if (error) throw new Error(error.message)
     },
     onSuccess: () => { qc.invalidateQueries({ queryKey: [KEY] }); showSuccess('Campanha atualizada!') },

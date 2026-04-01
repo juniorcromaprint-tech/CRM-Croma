@@ -29,11 +29,12 @@ export function SharePropostaModal({ open, onClose, propostaId, propostaNumero, 
   const portalUrl = `${window.location.origin}/p/${shareToken}`;
 
   const activateToken = async () => {
-    await supabase.from('propostas').update({
+    const { error } = await supabase.from('propostas').update({
       share_token_active: true,
       share_token_expires_at: new Date(Date.now() + 30 * 24 * 60 * 60 * 1000).toISOString(),
       status: 'enviada',
-    } as any).eq('id', propostaId);
+    } as any).eq('id', propostaId).select('id').single();
+    if (error) throw new Error(`Erro ao ativar proposta: ${error.message}`);
   };
 
   const activateAndCopy = async () => {

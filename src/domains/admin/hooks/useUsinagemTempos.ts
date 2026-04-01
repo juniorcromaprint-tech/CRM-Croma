@@ -87,7 +87,7 @@ export function useInsertUsinagemTempo() {
 
   return useMutation({
     mutationFn: async (values: UsinagemTempoInsert) => {
-      const { error } = await db.from("usinagem_tempos").insert(values);
+      const { error } = await db.from("usinagem_tempos").insert(values).select('id').single();
       if (error) throw error;
     },
     onSuccess: (_, vars) => {

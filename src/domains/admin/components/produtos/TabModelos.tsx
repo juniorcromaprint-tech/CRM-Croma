@@ -148,7 +148,9 @@ function DialogModelo({ open, onClose, produtoId, modelo }: DialogModeloProps) {
       } else {
         const { error } = await (supabase as unknown as any)
           .from("produto_modelos")
-          .insert(payload);
+          .insert(payload)
+          .select('id')
+          .single();
         if (error) throw error;
       }
     },
@@ -406,7 +408,7 @@ function PainelModeloDetalhe({ modeloId }: PainelModeloDetalheProps) {
         material_id: novoMaterialId,
         quantidade_por_unidade: qtd,
         unidade: novoMaterialUnidade || null,
-      });
+      }).select('id').single();
       if (error) throw error;
     },
     onSettled: () => {
@@ -439,7 +441,7 @@ function PainelModeloDetalhe({ modeloId }: PainelModeloDetalheProps) {
         etapa: novaEtapa.trim(),
         tempo_por_unidade_min: tempo,
         ordem: modeloProcessos.length + 1,
-      });
+      }).select('id').single();
       if (error) throw error;
     },
     onSettled: () => {

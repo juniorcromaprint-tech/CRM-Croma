@@ -1117,7 +1117,10 @@ export default function PedidosPage() {
           <AlertDialogFooter className="gap-2">
             <AlertDialogCancel className="rounded-xl">Cancelar</AlertDialogCancel>
             <AlertDialogAction
-              onClick={() => deleteId && deleteMutation.mutate(deleteId)}
+              onClick={(e) => {
+                e.preventDefault();
+                if (deleteId) deleteMutation.mutate(deleteId, { onSettled: () => setDeleteId(null) });
+              }}
               disabled={deleteMutation.isPending}
               className="rounded-xl bg-red-600 hover:bg-red-700 text-white"
             >

@@ -530,7 +530,8 @@ export default function LeadDetailPage() {
             <AlertDialogCancel className="rounded-xl">Cancelar</AlertDialogCancel>
             <AlertDialogAction
               className="rounded-xl bg-blue-600 hover:bg-blue-700 text-white"
-              onClick={() => {
+              onClick={(e) => {
+                e.preventDefault();
                 setDuplicateNameDialog({ open: false, razaoSocial: '', cnpjLimpo: null });
                 doConvert(duplicateNameDialog.cnpjLimpo);
               }}

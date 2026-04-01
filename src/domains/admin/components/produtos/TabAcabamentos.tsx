@@ -100,7 +100,9 @@ function DialogAcabamento({ open, onClose, acabamento }: DialogAcabamentoProps) 
       } else {
         const { error } = await (supabase as unknown as any)
           .from("acabamentos")
-          .insert(payload);
+          .insert(payload)
+          .select('id')
+          .single();
         if (error) throw error;
       }
     },

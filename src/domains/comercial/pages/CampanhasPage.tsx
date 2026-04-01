@@ -296,7 +296,7 @@ function CampanhaSheet({
           <AlertDialogFooter>
             <AlertDialogCancel>Cancelar</AlertDialogCancel>
             <AlertDialogAction
-              onClick={handleDisparar}
+              onClick={async (e) => { e.preventDefault(); await handleDisparar(); }}
               className="bg-blue-600 hover:bg-blue-700"
             >
               {disparar.isPending ? 'Enviando...' : 'Sim, disparar'}
