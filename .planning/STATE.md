@@ -12,13 +12,13 @@ See: docs/plano-ia/01_Estrategia/CROMA_4.0_PLANO_AUTONOMIA_TOTAL.md (CROMA 4.0)
 
 ## Current Position
 
-Phase: Produção — E2E completo, MCP 54 ferramentas, deploy em produção
+Phase: Produção — E2E completo, MCP 93 ferramentas, deploy em produção
 Roadmap v1: 20/20 completo (100%) ✅
 CROMA 4.0: 5/5 fases concluídas (100%) — Empresa gerida por IA
-MCP Server: 54 ferramentas (expandido de 48→54 em 2026-04-02, +6 ferramentas HP Latex 365)
+MCP Server: 93 ferramentas (expandido 91→93 em 2026-04-02, +2 ferramentas monitoramento consumíveis)
 E2E: 10/10 bugs corrigidos + 1 novo (BUG-FIN-01b) encontrado e corrigido. Regras 11/11. Dados teste limpos.
-Status: EM PRODUÇÃO — Integração HP Latex 365 completa, 54 ferramentas MCP, sync automático ativo
-Last activity: 2026-04-02 — Integração HP Latex 365 ↔ CRM: modelo custo 3 componentes (tinta + substrato + máquina R$2,40/m²), 6 ferramentas MCP impressora, script coleta automática (1h seg-sex 8-18h), 10 jobs reais sincronizados no Supabase.
+Status: EM PRODUÇÃO — HP Latex 365 integrada com monitoramento de consumíveis + nível estimado de tinta
+Last activity: 2026-04-02 (sessão 3 Cowork) — Monitoramento de consumíveis HP Latex: migration 116 (impressora_consumiveis + impressora_recargas + vw_nivel_cartuchos), 2 novas ferramentas MCP (croma_registrar_recarga, croma_nivel_cartuchos), sync script atualizado com coleta ConsumableConfigDyn.xml. Documentação corrigida: tinta é HP original de bag 3L (não paralela). Campo nivel_confiavel para diferenciar cartuchos com/sem medição real.
 
 Progress Roadmap v1:  [████████████████████] 100% (20/20) ✅
 Progress CROMA 4.0:   [████████████████████] 100% (5/5 fases)
@@ -174,6 +174,13 @@ Progress Requirements: [██████████████████�
 - Submeter templates WhatsApp à Meta
 - NF-e: migrar de homologação para produção SEFAZ
 - Fase 3 MCP — ferramentas avançadas (WhatsApp, campanhas, compras, score crédito)
+
+  - [2026-04-02 sessão 2]: MCP SERVER CORRIGIDO — 3 bugs raiz que causavam timeout em todas as chamadas:
+    - **Bug 1**: `dist/tools/crm.js` truncado/corrompido — SyntaxError no boot. Fix: rebuild completo (`npm run build`).
+    - **Bug 2**: `impressora.ts` — `structuredContent` tipado como `any[]` (inválido no SDK MCP). Fix: envolvidos em `{ items }`.
+    - **Bug 3**: `sistema.ts` — chamava `.rpc("execute_sql_readonly", { query })` mas banco espera `{ query_text }`. Fix: parâmetro corrigido + `.single()` removido.
+  - [2026-04-02 sessão 2]: `automacao_pausada` adicionada à tabela `agent_conversations` (estava no SKILL.md do cron mas faltava no banco).
+  - [2026-04-02 sessão 2]: Cron `whatsapp-auto-responder` testado end-to-end via MCP Server — funciona sem gambiarras. Commits: `09b13a7` (fix impressora/sistema) e `ef108bc` (fix completo).
 
 ### Blockers/Concerns
 

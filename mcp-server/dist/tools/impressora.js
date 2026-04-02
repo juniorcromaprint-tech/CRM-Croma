@@ -3,7 +3,7 @@
  * Consultar jobs de impressão, produção, custos e vincular ao CRM
  *
  * MODELO DE CUSTEIO: "LM Âncora"
- * Tinta paralela: bag 3L a R$1.560 → R$0,52/ml
+ * Tinta HP original (bag 3L de outro modelo): R$1.560 → R$0,52/ml
  * Cartucho LM original = âncora de medição real
  * total_ml = lm_ml_real × 21,5316 (proporções históricas)
  * Fallback: 9,86 ml/m² (média histórica)
@@ -391,7 +391,7 @@ Deduplicação automática via hash_job (upsert).
 Args:
   - jobs (array): Lista de jobs com campos obrigatórios e opcionais`,
         inputSchema: z.object({
-            jobs: z.array(z.object({
+            jobs: z.preprocess((val) => typeof val === 'string' ? JSON.parse(val) : val, z.array(z.object({
                 documento: z.string(),
                 estado: z.string().default("impresso"),
                 area_m2: z.number(),
@@ -409,9 +409,9 @@ Args:
                 custo_por_m2_tinta: z.number().default(0),
                 cliente_extraido: z.string().optional(),
                 tintas_detalhe: z.record(z.unknown()).optional(),
-                alertas: z.array(z.string()).optional(),
+                alertas: z.preprocess((val) => typeof val === 'string' ? JSON.parse(val) : val, z.array(z.string()).optional()),
                 hash_job: z.string(),
-            })).min(1).max(500),
+            })).min(1).max(500)),
         }).strict(),
         annotations: { readOnlyHint: false, destructiveHint: false, idempotentHint: true, openWorldHint: false },
     }, async (params) => {
@@ -602,6 +602,144 @@ Args:
             return {
                 content: [{ type: "text", text: `✅ Substrato **${data.nome_ews}** mapeado para material ${data.material_id}` }],
                 structuredContent: data,
+            };
+        }
+        catch (error) {
+            return errorResult(error);
+        }
+    });
+    // ─── croma_registrar_recarga ────────────────────────────────────────────────
+    server.registerTool("croma_registrar_recarga", {
+        title: "Registrar Recarga de Cartucho",
+        description: `Registra quando um cartucho foi recarregado com tinta HP original (bag 3L).
+A partir desse registro, o sistema calcula quantos ml de tinta restam no cartucho
+subtraindo o consumo estimado de cada job impresso desde a recarga.
+
+Use para:
+- "registrar recarga do cartucho magenta"
+- "enchi o cartucho C com 800ml"
+- "recarreguei todos os cartuchos hoje"
+
+Cores válidas: M (Magenta), LM (Magenta Claro), LC (Ciano Claro), C (Ciano),
+OP (Otimizador), Y (Amarelo), K (Preto)
+
+Args:
+  - cor (string): Código da cor (M, LM, LC, C, OP, Y, K)
+  - ml_injetado (number, default 800): Volume injetado em ml
+  - observacoes (string, opcional): Notas sobre a recarga`,
+        inputSchema: z.object({
+            cor: z.enum(["M", "LM", "LC", "C", "OP", "Y", "K"]),
+            ml_injetado: z.number().default(800),
+            observacoes: z.string().optional(),
+        }).strict(),
+        annotations: { readOnlyHint: false, destructiveHint: false, idempotentHint: false, openWorldHint: false },
+    }, async ({ cor, ml_injetado, observacoes }) => {
+        try {
+            const supabase = getSupabaseClient();
+            const maquinaId = "f7f320c9-baa8-4658-a178-fa67f8de3b9e";
+            // Desativar recarga anterior desta cor (se existir)
+            await supabase
+                .from("impressora_recargas")
+                .update({ ativo: false })
+                .eq("maquina_id", maquinaId)
+                .eq("label_code", cor)
+                .eq("ativo", true);
+            // Registrar nova recarga
+            const { data, error } = await supabase
+                .from("impressora_recargas")
+                .insert({
+                maquina_id: maquinaId,
+                label_code: cor,
+                ml_injetado,
+                observacoes: observacoes || null,
+                ativo: true,
+            })
+                .select()
+                .single();
+            if (error)
+                return errorResult(error);
+            const nomes = {
+                M: "Magenta", LM: "Magenta Claro", LC: "Ciano Claro",
+                C: "Ciano", OP: "Otimizador", Y: "Amarelo", K: "Preto",
+            };
+            return {
+                content: [{
+                        type: "text",
+                        text: `✅ Recarga registrada: **${nomes[cor] || cor}** (${cor}) com ${ml_injetado}ml\n` +
+                            `A partir de agora, o sistema subtrai o consumo de cada job para estimar o nível restante.\n` +
+                            (observacoes ? `Obs: ${observacoes}` : ""),
+                    }],
+                structuredContent: data,
+            };
+        }
+        catch (error) {
+            return errorResult(error);
+        }
+    });
+    // ─── croma_nivel_cartuchos ──────────────────────────────────────────────────
+    server.registerTool("croma_nivel_cartuchos", {
+        title: "Nível Estimado dos Cartuchos de Tinta",
+        description: `Consulta o nível estimado de tinta em cada cartucho baseado no modelo LM Âncora.
+
+Calcula: ml_restante = ml_injetado_na_recarga - consumo_estimado_desde_recarga
+
+Requer que as recargas estejam registradas via croma_registrar_recarga.
+
+Use para:
+- "quanto de tinta tem nos cartuchos"
+- "nível dos cartuchos"
+- "preciso recarregar algum cartucho?"
+- "estimativa de tinta"`,
+        inputSchema: z.object({}).strict(),
+        annotations: { readOnlyHint: true, destructiveHint: false, idempotentHint: true, openWorldHint: false },
+    }, async () => {
+        try {
+            const supabase = getSupabaseClient();
+            const { data, error } = await supabase
+                .from("vw_nivel_cartuchos")
+                .select("*")
+                .order("cor");
+            if (error)
+                return errorResult(error);
+            if (!data || data.length === 0) {
+                return {
+                    content: [{
+                            type: "text",
+                            text: "⚠️ Nenhuma recarga registrada. Use **croma_registrar_recarga** para registrar quando encheu cada cartucho.\n\n" +
+                                "Exemplo: registrar recarga do Magenta com 800ml",
+                        }],
+                };
+            }
+            const nomes = {
+                M: "Magenta", LM: "Mg Claro", LC: "Ci Claro",
+                C: "Ciano", OP: "Otimizador", Y: "Amarelo", K: "Preto",
+            };
+            let text = "## 🎨 Nível Estimado dos Cartuchos\n\n";
+            const alertas = [];
+            for (const n of data) {
+                const pct = Number(n.pct_restante || 0);
+                const restante = Number(n.ml_restante || 0);
+                const injetado = Number(n.ml_injetado || 0);
+                const consumido = Number(n.ml_consumido || 0);
+                const jobs = Number(n.jobs_desde_recarga || 0);
+                const nome = nomes[n.cor] || n.cor;
+                // Barra visual
+                const barLen = 15;
+                const filled = Math.round(pct / 100 * barLen);
+                const bar = "█".repeat(filled) + "░".repeat(barLen - filled);
+                text += `**${nome}** (${n.cor}): ${bar} ${pct}%\n`;
+                text += `  ${restante.toFixed(0)}ml restante de ${injetado.toFixed(0)}ml | ${consumido.toFixed(0)}ml consumido | ${jobs} jobs\n\n`;
+                if (pct < 15) {
+                    alertas.push(`⚠️ **${nome}**: apenas ${pct}% (${restante.toFixed(0)}ml) — recarregar!`);
+                }
+            }
+            if (alertas.length > 0) {
+                text += "### Alertas\n" + alertas.join("\n") + "\n";
+            }
+            text += `\n_Modelo: LM Âncora | Tinta HP original bag 3L (R$0,52/ml)_`;
+            return {
+                content: [{ type: "text", text }],
+                structuredContent: { cartuchos: data, alertas },
             };
         }
         catch (error) {

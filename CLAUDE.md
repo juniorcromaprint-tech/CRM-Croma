@@ -1,6 +1,6 @@
 # CROMA PRINT — CRM/ERP SISTEMA
 
-> **Versão**: 5.9 | **Atualizado**: 2026-04-02 | **Status**: Operacional em Produção — CROMA 4.0 completo + MCP Server 91 ferramentas (cobertura 100%) + HP Latex 365 integrada + Ponte Cowork→MCP ativa
+> **Versão**: 5.10 | **Atualizado**: 2026-04-02 | **Status**: Operacional em Produção — CROMA 4.0 completo + MCP Server 93 ferramentas (cobertura 100%) + HP Latex 365 integrada + Monitoramento consumíveis + Ponte Cowork→MCP ativa
 
 ---
 
@@ -19,7 +19,7 @@
 **Hierarquia de ferramentas (SEM EXCEÇÕES):**
 
 1. **MCP Server Croma — OBRIGATÓRIO PARA TUDO que envolve dados do negócio**
-   - **Localização**: `mcp-server/` na raiz do projeto (**91 ferramentas** — atualizado 2026-04-02)
+   - **Localização**: `mcp-server/` na raiz do projeto (**93 ferramentas** — atualizado 2026-04-02)
    - **No Claude Code (CLI)**: ferramentas `croma_*` diretamente via stdio
    - **No Cowork (Claude Desktop)**: ferramentas `croma_*` via ponte Desktop Commander:
      ```
@@ -53,7 +53,7 @@
 
 **O MCP Server Croma está disponível em AMBOS os ambientes (CLI e Cowork). Usar `execute_sql` direto no Supabase APENAS para diagnóstico técnico (bugs, triggers, schema).**
 
-### Ferramentas MCP Server Croma (91 total — atualizado 2026-04-02)
+### Ferramentas MCP Server Croma (93 total — atualizado 2026-04-02)
 | Módulo | Ferramentas |
 |---|---|
 | **CRM** | `croma_listar_clientes`, `croma_detalhe_cliente`, `croma_cadastrar_cliente`, `croma_atualizar_cliente`, `croma_listar_leads`, `croma_cadastrar_lead`, `croma_atualizar_status_lead`, `croma_listar_atividades_comerciais`, `croma_registrar_atividade_comercial`, `croma_listar_comissoes`, `croma_registrar_comissao`, `croma_listar_contratos`, `croma_criar_contrato`, `croma_listar_campanhas`, `croma_listar_nps` |
@@ -64,7 +64,7 @@
 | **Fiscal** | `croma_listar_nfe`, `croma_emitir_nfe`, `croma_consultar_status_nfe` |
 | **Qualidade** | `croma_listar_ocorrencias`, `croma_criar_ocorrencia`, `croma_atualizar_ocorrencia` |
 | **Estoque** | `croma_consultar_estoque`, `croma_listar_materiais`, `croma_registrar_movimento`, `croma_cadastrar_material`, `croma_atualizar_material`, `croma_sugerir_compra`, `croma_historico_precos_material` |
-| **Impressora** | `croma_listar_jobs_impressora`, `croma_resumo_impressora`, `croma_vincular_job_impressora`, `croma_registrar_jobs_impressora`, `croma_custo_real_pedido`, `croma_mapear_substrato` |
+| **Impressora** | `croma_listar_jobs_impressora`, `croma_resumo_impressora`, `croma_vincular_job_impressora`, `croma_registrar_jobs_impressora`, `croma_custo_real_pedido`, `croma_mapear_substrato`, `croma_registrar_recarga`, `croma_nivel_cartuchos` |
 | **Admin** | `croma_listar_produtos`, `croma_atualizar_preco_material`, `croma_listar_regras_precificacao`, `croma_criar_produto`, `croma_criar_modelo_produto`, `croma_atualizar_modelo_produto`, `croma_criar_regra_precificacao`, `croma_atualizar_regra_precificacao`, `croma_listar_maquinas`, `croma_listar_acabamentos_servicos` |
 | **Fornecedores** | `croma_listar_fornecedores`, `croma_detalhe_fornecedor`, `croma_cadastrar_fornecedor`, `croma_atualizar_fornecedor`, `croma_historico_compras_fornecedor` |
 | **Compras** | `croma_listar_compras`, `croma_detalhe_compra`, `croma_criar_compra`, `croma_atualizar_status_compra`, `croma_registrar_recebimento` |
@@ -165,12 +165,14 @@ Redes de lojas, franquias e grandes varejistas: **Beira Rio, Renner, Paquetá**,
 - **Sync automático**: Scheduled task `hp-latex-sync` — a cada 1h, seg-sex 8-18h
 - **Autenticação**: Supabase service_role JWT (hardcoded no script)
 - **Modelo custeio "LM Âncora"**: custo = tinta (R$0,52/ml × ml estimado) + substrato (variável) + máquina (R$2,40/m²)
-- **Tinta paralela**: bag 3L = R$1.560 → R$0,52/ml. 6 cores paralelas + LM original (âncora)
+- **Tinta HP original**: bag 3L (de outro modelo HP Latex) = R$1.560 → R$0,52/ml. Tinta retirada do bag e injetada nos cartuchos de 775ml. Impressora detecta como "refilledColor" (cartucho recarregado, não porque tinta é paralela).
 - **Fator LM**: consumo_total_ml = lm_ml_real × 21,5316. Fallback: 9,86 ml/m²
 - **Máquina R$2,40/m²**: depreciação + cabeçotes de impressão + cartucho de manutenção
 - **Tabelas**: `impressora_jobs`, `impressora_config` (12 params), `impressora_substrato_map` (22 substratos), `impressora_proporcoes_tinta`
 - **Views**: `vw_custo_real_por_pedido`, `vw_custo_real_por_op` (com 3 componentes)
 - **Trigger**: ao vincular job a OP, `custo_mp_real` atualiza automaticamente
+- **Monitoramento de consumíveis**: coleta automática via ConsumableConfigDyn.xml — nível%, serial, estado (refilledColor/nonHP/ok), datas de instalação/fabricação/validade, garantia
+- **Tabelas consumíveis**: `impressora_consumiveis` (estado atual), `impressora_consumiveis_historico` (gráficos de consumo)
 - **21/22 substratos** pendentes de mapeamento no `impressora_substrato_map` (só SM790 mapeado)
 
 ---
@@ -269,6 +271,7 @@ Lead → Orçamento → Pedido → Produção → Instalação → Faturamento
 | `113_impressora_jobs.sql` | ✅ Executada | impressora_jobs, impressora_config (12 params), impressora_proporcoes_tinta (7 cores) |
 | `114_impressora_integracao_completa.sql` | ✅ Executada | impressora_substrato_map (22 substratos), views vw_custo_real_por_pedido/op, trigger auto-custo OP, maquina_id/substrato_material_id |
 | `115_impressora_custo_maquina_3componentes.sql` | ✅ Executada | custo_maquina_brl, config custo_maquina_m2=2.40, views com 3 componentes (tinta+substrato+máquina) |
+| `116_impressora_consumiveis.sql` | ✅ Executada | impressora_consumiveis, impressora_consumiveis_historico, impressora_recargas, vw_nivel_cartuchos (monitoramento consumíveis + nível estimado por cor) |
 
 ### Dados no Banco
 - `clientes`: 307 registros
@@ -412,33 +415,4 @@ O projeto usa o sistema GSD para manter contexto entre sessões. **SEMPRE leia e
 .planning/
   IDENTITY.md         — papel do Claude, divisão de responsabilidades, regras de operação
   PROJECT.md          — visão, requirements, constraints, decisões
-  STATE.md            — estado atual, posição, continuidade
-  REQUIREMENTS.md     — requirements checkáveis com IDs
-  codebase/           — mapas do codebase (quando gerados)
-  phases/             — planos de execução por fase
-  summaries/          — resumos de sessão
-  todos/pending/      — ideias e tasks pendentes
-  todos/completed/    — tasks completadas
-```
-
----
-
-## SKILLS DISPONÍVEIS
-
-Ver `C:\Users\Caldera\.claude\skills\` para lista completa.
-
-Skills mais usadas neste projeto:
-- `dispatching-parallel-agents` — tarefas independentes em paralelo
-- `executing-plans` — execução em lotes com checkpoints
-- `using-git-worktrees` — isolamento de branches
-- `verification-before-completion` — build check antes de commitar
-- `ui-ux-pro-max` — design de componentes
-
----
-
-## SUPABASE
-
-**Projeto**: `djwjmfgplnqyffdcgdaw.supabase.co`
-**Anon Key**: `eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImRqd2ptZmdwbG5xeWZmZGNnZGF3Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzMwNjU2OTcsImV4cCI6MjA4ODY0MTY5N30.pi2HDGyXhsoZS0sivfUDzn9z3Qao-6hMKrWBxoQ-1uE`
-
-Para executar SQL no banco: abrir `supabase.com/dashboard/project/djwjmfgplnqyffdcgdaw/sql`
+  STATE.md            — esta

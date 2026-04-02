@@ -1,12 +1,18 @@
 #!/usr/bin/env python3
 """
-croma_plotter_sync.py — Coleta automática de dados da HP Latex 365 para o CRM Croma
+croma_plotter_sync.py — Coleta automatica de dados da HP Latex 365 para o CRM Croma
 
-MODELO DE CUSTEIO: "LM Âncora"
-- Tinta paralela: bag 3L a R$1.560 → R$0,52/ml
-- Cartucho LM (Magenta Claro) = único original, reporta ml reais
-- Consumo total = lm_ml_real × 21,5316 (proporções históricas)
-- Fallback: 9,86 ml/m² quando LM não está disponível
+MODELO DE CUSTEIO: "LM Ancora"
+- Tinta HP original: bag 3L (de outro modelo HP Latex) a R$1.560 -> R$0,52/ml
+- Cartuchos de 775ml recarregados com tinta HP original dos bags 3L
+- Cartucho LM (Magenta Claro) = ancora, reporta ml reais
+- Consumo total = lm_ml_real x 21,5316 (proporcoes historicas)
+- Fallback: 9,86 ml/m2 quando LM nao esta disponivel
+
+MONITORAMENTO DE CONSUMIVEIS:
+- Coleta estado de cartuchos, cabecotes e cartucho de manutencao
+- Dados de ConsumableConfigDyn.xml (nivel%, serial, estado, datas)
+- Historico de nivel para graficos de consumo
 
 Uso:
     python croma_plotter_sync.py                    # coleta e salva localmente
@@ -26,6 +32,8 @@ import sys
 from datetime import datetime
 from pathlib import Path
 
+import xml.etree.ElementTree as ET
+
 try:
     import requests
     from bs4 import BeautifulSoup
@@ -41,7 +49,7 @@ except ImportError:
 DEFAULT_PRINTER_IP = "192.168.0.136"
 TIMEOUT_SECONDS = 15
 
-# ─── Custo de tinta (bag paralela) ───────────────────────────
+# --- Custo de tinta (HP original, bag 3L de outro modelo) ----
 PRECO_BAG_BRL   = 1560.00
 VOLUME_BAG_ML   = 3000
 PRECO_POR_ML    = PRECO_BAG_BRL / VOLUME_BAG_ML  # R$0,52/ml
@@ -378,9 +386,306 @@ def send_to_supabase(jobs: list):
     print(f"[OK] Supabase: {inseridos} inseridos/atualizados, {erros} erros")
 
 
-# ═══════════════════════════════════════════════════════════════
+# ===============================================================
+# CONSUMIVEIS (cartuchos, cabecotes, cartucho de manutencao)
+# ===============================================================
+
+CONSUMABLE_NS = {
+    "ccdyn": "http://www.hp.com/schemas/imaging/con/ledm/consumableconfigdyn/2007/11/19",
+    "dd": "http://www.hp.com/schemas/imaging/con/dictionaries/1.0/",
+    "dd2": "http://www.hp.com/schemas/imaging/con/dictionaries/2008/10/10",
+}
+
+
+def classify_consumable_type(tipo_enum: str) -> str:
+    """Classifica tipo do consumivel baseado no ConsumableTypeEnum."""
+    t = tipo_enum.lower()
+    if "ink" in t and "cartridge" not in t:
+        return "ink"
+    if "printhead" in t or "print head" in t:
+        return "printhead"
+    if "maintenance" in t or "cleaning" in t:
+        return "maintenance"
+    if "cartridge" in t:
+        return "ink"
+    return "other"
+
+
+def parse_date_safe(date_str: str):
+    """Parse data ISO ou retorna None."""
+    if not date_str or not date_str.strip():
+        return None
+    try:
+        # Formato ISO: 2025-07-15T00:00:00Z ou 2025-07-15
+        clean = date_str.strip().split("T")[0]
+        datetime.strptime(clean, "%Y-%m-%d")
+        return clean
+    except ValueError:
+        return None
+
+
+def parse_consumables_xml(xml_text: str) -> list[dict]:
+    """Parse ConsumableConfigDyn.xml e retorna lista de consumiveis."""
+    try:
+        root = ET.fromstring(xml_text)
+    except ET.ParseError as e:
+        print(f"[ERRO] XML parse error: {e}")
+        return []
+
+    ns = CONSUMABLE_NS
+    consumables = []
+
+    for info in root.findall("ccdyn:ConsumableInfo", ns):
+        tipo_enum = info.findtext("dd:ConsumableTypeEnum", "", ns)
+        label = info.findtext("dd:ConsumableLabelCode", "", ns)
+        station = info.findtext("dd:ConsumableStation", "", ns)
+        content = info.findtext("dd:ConsumableContentType", "", ns)
+        product = info.findtext("dd:ProductNumber", "", ns)
+        serial = info.findtext("dd:SerialNumber", "", ns)
+
+        # Estado
+        state_elem = info.find("dd:ConsumableLifeState", ns)
+        consumable_state = ""
+        measured_state = ""
+        if state_elem is not None:
+            consumable_state = state_elem.findtext("dd:ConsumableState", "", ns)
+            measured_state = state_elem.findtext("dd:MeasuredQuantityState", "", ns)
+
+        # Nivel
+        level = info.findtext("dd:ConsumablePercentageLevelRemaining", "", ns)
+        level_pct = int(level) if level and level.strip().isdigit() else None
+
+        # Capacidade
+        cap = info.find("dd:Capacity", ns)
+        max_cap = None
+        cap_unit = ""
+        if cap is not None:
+            mc = cap.findtext("dd:MaxCapacity", "", ns)
+            max_cap = float(mc) if mc and mc.strip() else None
+            cap_unit = cap.findtext("dd:Unit", "", ns) or ""
+
+        # Fabricante
+        mfg = info.find("dd:Manufacturer", ns)
+        mfg_name = ""
+        mfg_date = None
+        if mfg is not None:
+            mfg_name = mfg.findtext("dd:Name", "", ns) or ""
+            mfg_date = parse_date_safe(mfg.findtext("dd:Date", "", ns) or "")
+
+        # Instalacao
+        inst = info.find("dd:Installation", ns)
+        inst_date = None
+        if inst is not None:
+            inst_date = parse_date_safe(inst.findtext("dd:Date", "", ns) or "")
+
+        # Garantia
+        warranty = info.find("dd:Warranty", ns)
+        w_status = ""
+        if warranty is not None:
+            w_status = warranty.findtext("dd:WarrantyStatus", "", ns) or ""
+
+        # Expiracao
+        exp_date = parse_date_safe(info.findtext("dd:ExpirationDate", "", ns) or "")
+
+        consumables.append({
+            "tipo": classify_consumable_type(tipo_enum),
+            "tipo_raw": tipo_enum,
+            "label_code": label or "?",
+            "station": station or "",
+            "content_type": content or "",
+            "product_number": product or "",
+            "serial_number": serial or "",
+            "consumable_state": consumable_state or "unknown",
+            "measured_state": measured_state or "",
+            "level_pct": level_pct,
+            "max_capacity": max_cap,
+            "capacity_unit": cap_unit,
+            "manufacture_date": mfg_date,
+            "manufacturer": mfg_name,
+            "installation_date": inst_date,
+            "warranty_status": w_status,
+            "expiration_date": exp_date,
+        })
+
+    return consumables
+
+
+def fetch_consumables(ip: str) -> list[dict]:
+    """Busca e parse consumiveis da impressora."""
+    url = f"http://{ip}/DevMgmt/ConsumableConfigDyn.xml"
+    xml_text = fetch_page(url)
+    if not xml_text:
+        return []
+    return parse_consumables_xml(xml_text)
+
+
+def send_consumables_to_supabase(consumables: list):
+    """Envia consumiveis para Supabase (upsert por maquina_id+tipo+label_code)."""
+    headers = {
+        "apikey": SUPABASE_SERVICE_ROLE_KEY,
+        "Authorization": f"Bearer {SUPABASE_SERVICE_ROLE_KEY}",
+        "Content-Type": "application/json",
+        "Prefer": "resolution=merge-duplicates,return=representation",
+    }
+
+    maquina_id = "f7f320c9-baa8-4658-a178-fa67f8de3b9e"
+    inseridos = 0
+    erros = 0
+
+    for c in consumables:
+        payload = {
+            "maquina_id": maquina_id,
+            "tipo": c["tipo"],
+            "label_code": c["label_code"],
+            "station": c["station"],
+            "content_type": c["content_type"],
+            "product_number": c["product_number"],
+            "serial_number": c["serial_number"],
+            "consumable_state": c["consumable_state"],
+            "measured_state": c["measured_state"],
+            "level_pct": c["level_pct"],
+            "nivel_confiavel": c["level_pct"] is not None and c["measured_state"] != "unknown",
+            "max_capacity": c["max_capacity"],
+            "capacity_unit": c["capacity_unit"],
+            "manufacture_date": c["manufacture_date"],
+            "installation_date": c["installation_date"],
+            "expiration_date": c["expiration_date"],
+            "manufacturer": c["manufacturer"],
+            "warranty_status": c["warranty_status"],
+            "updated_at": datetime.now().isoformat(),
+        }
+
+        resp = requests.post(
+            f"{SUPABASE_URL}/rest/v1/impressora_consumiveis",
+            json=payload,
+            headers=headers,
+            params={"on_conflict": "maquina_id,tipo,label_code"},
+            timeout=15,
+        )
+
+        if resp.ok or resp.status_code == 201:
+            inseridos += 1
+            # Registrar historico de nivel
+            if c["level_pct"] is not None and resp.json():
+                consumivel_id = resp.json()[0].get("id") if isinstance(resp.json(), list) else resp.json().get("id")
+                if consumivel_id:
+                    hist_payload = {
+                        "consumivel_id": consumivel_id,
+                        "level_pct": c["level_pct"],
+                        "consumable_state": c["consumable_state"],
+                    }
+                    requests.post(
+                        f"{SUPABASE_URL}/rest/v1/impressora_consumiveis_historico",
+                        json=hist_payload,
+                        headers={k: v for k, v in headers.items() if k != "Prefer"},
+                        timeout=10,
+                    )
+        else:
+            erros += 1
+            if erros <= 3:
+                print(f"[ERRO] Consumivel {c['label_code']}: {resp.status_code} {resp.text[:100]}")
+
+    print(f"[OK] Consumiveis Supabase: {inseridos} atualizados, {erros} erros")
+
+
+def print_consumables_summary(consumables: list):
+    """Imprime resumo dos consumiveis no terminal."""
+    if not consumables:
+        return
+
+    print("\n" + "=" * 60)
+    print("  CONSUMIVEIS HP LATEX 365")
+    print("  * Cartuchos recarregados (refilledColor) nao reportam nivel")
+    print("  * Nivel real de tinta estimado pelo modelo LM Ancora")
+    print("=" * 60)
+
+    for c in consumables:
+        icon = "OK" if c["consumable_state"] == "ok" else "RF" if "refill" in c["consumable_state"].lower() else "!!" if c["consumable_state"] == "nonHP" else "??"
+
+        # Nivel: nao confiar quando measured_state = unknown (cartucho recarregado)
+        nivel_confiavel = c["level_pct"] is not None and c["measured_state"] != "unknown"
+        if nivel_confiavel:
+            level_str = f"{c['level_pct']}%"
+        elif c["level_pct"] is not None:
+            level_str = f"~{c['level_pct']}%?"  # reportado mas nao confiavel
+        else:
+            level_str = "N/A"
+
+        print(f"  [{icon}] {c['tipo']:12s} {c['label_code']:4s} | Nivel: {level_str:>6s} | Estado: {c['consumable_state']}")
+        if c["serial_number"]:
+            print(f"         Serial: {c['serial_number']} | Part: {c['product_number']}")
+
+    # Alertas: so para consumiveis com nivel confiavel (ok ou printhead)
+    low = [c for c in consumables
+           if c["level_pct"] is not None
+           and c["level_pct"] < 15
+           and c["measured_state"] != "unknown"]
+    if low:
+        print("\n  ALERTA - NIVEL BAIXO:")
+        for c in low:
+            print(f"   {c['tipo']} {c['label_code']}: {c['level_pct']}% restante!")
+
+    # Info sobre cartuchos sem medicao
+    sem_nivel = [c for c in consumables if c["tipo"] == "ink" and c["measured_state"] == "unknown"]
+    if sem_nivel:
+        cores = ", ".join(c["label_code"] for c in sem_nivel)
+        print(f"\n  INFO: {len(sem_nivel)} cartuchos sem medicao de nivel ({cores})")
+        print(f"         Nivel real estimado pelo modelo LM Ancora (ver abaixo)")
+    print()
+
+
+def fetch_nivel_cartuchos():
+    """Consulta vw_nivel_cartuchos no Supabase para mostrar nivel estimado."""
+    headers = {
+        "apikey": SUPABASE_SERVICE_ROLE_KEY,
+        "Authorization": f"Bearer {SUPABASE_SERVICE_ROLE_KEY}",
+    }
+    try:
+        resp = requests.get(
+            f"{SUPABASE_URL}/rest/v1/vw_nivel_cartuchos",
+            headers=headers,
+            params={"select": "*", "order": "cor"},
+            timeout=10,
+        )
+        if resp.ok and resp.json():
+            return resp.json()
+    except Exception:
+        pass
+    return []
+
+
+def print_nivel_cartuchos(niveis: list):
+    """Imprime nivel estimado dos cartuchos baseado em recargas registradas."""
+    if not niveis:
+        return
+
+    print("=" * 60)
+    print("  NIVEL ESTIMADO DE TINTA (modelo LM Ancora)")
+    print("  Baseado em: volume injetado - consumo calculado por job")
+    print("=" * 60)
+
+    for n in niveis:
+        pct = int(n.get("pct_restante", 0))
+        restante = float(n.get("ml_restante", 0))
+        injetado = float(n.get("ml_injetado", 0))
+        consumido = float(n.get("ml_consumido", 0))
+        jobs = int(n.get("jobs_desde_recarga", 0))
+        cor = n.get("cor", "?")
+
+        # Barra visual
+        bar_len = 20
+        filled = int(pct / 100 * bar_len)
+        bar = "#" * filled + "-" * (bar_len - filled)
+
+        alerta = " << BAIXO!" if pct < 15 else ""
+        print(f"  {cor:4s} [{bar}] {pct:3d}% | {restante:.0f}ml restante de {injetado:.0f}ml | {jobs} jobs{alerta}")
+
+    print()
+
+
+# ===============================================================
 # RESUMO NO TERMINAL
-# ═══════════════════════════════════════════════════════════════
+# ===============================================================
 
 def print_summary(jobs: list):
     """Imprime resumo formatado no terminal."""
@@ -398,7 +703,7 @@ def print_summary(jobs: list):
 
     print("\n" + "=" * 60)
     print("  CROMA — HP Latex 365 — RESUMO DE PRODUÇÃO")
-    print("  Modelo: LM Âncora | Tinta: R$0,52/ml (paralela)")
+    print("  Modelo: LM Ancora | Tinta: R$0,52/ml (HP original bag 3L)")
     print("  Custo = Tinta + Substrato + Máquina (R$2,40/m²)")
     print("=" * 60)
     print(f"  Jobs impressos : {len(impressos)}")
@@ -488,10 +793,29 @@ Variáveis de ambiente:
     if args.supabase:
         send_to_supabase(jobs)
 
-    # 5. Resumo
+    # 5. Resumo de jobs
     print_summary(jobs)
 
-    print("[OK] Coleta concluída.")
+    # 6. Coletar consumiveis (cartuchos, cabecotes, manutencao)
+    print("[INFO] Coletando estado dos consumiveis...")
+    consumables = fetch_consumables(args.ip)
+    if consumables:
+        print(f"[OK] {len(consumables)} consumiveis detectados.")
+        print_consumables_summary(consumables)
+        if args.supabase:
+            send_consumables_to_supabase(consumables)
+    else:
+        print("[OK] Consumiveis: sem dados (impressora pode estar em sleep).")
+
+    # 7. Nivel estimado de tinta (baseado em recargas registradas)
+    if args.supabase:
+        niveis = fetch_nivel_cartuchos()
+        if niveis:
+            print_nivel_cartuchos(niveis)
+        else:
+            print("[INFO] Sem recargas registradas. Use croma_registrar_recarga para registrar enchimento de cartuchos.")
+
+    print("[OK] Coleta concluida.")
 
 
 if __name__ == "__main__":

@@ -54,11 +54,11 @@ registerSistemaTools(server);     // 2 ferramentas: sistema
 registerFiscalTools(server);      // 3 ferramentas: NF-e
 registerQualidadeTools(server);   // 3 ferramentas: ocorrências de qualidade
 registerAdminTools(server);       // 3+7 ferramentas: catálogo, precificação, máquinas, acabamentos
-registerImpressoraTools(server);  // 6 ferramentas: HP Latex 365 — jobs, resumo, vincular, registrar, custo_real_pedido, mapear_substrato
+registerImpressoraTools(server);  // 8 ferramentas: HP Latex 365 — jobs, resumo, vincular, registrar, custo_real, mapear_substrato, registrar_recarga, nivel_cartuchos
 registerFornecedoresTools(server); // 5 ferramentas: listar, detalhe, cadastrar, atualizar, historico_compras
 registerComprasTools(server);      // 5 ferramentas: listar, detalhe, criar, atualizar_status, registrar_recebimento
 
-// Total: 91 ferramentas
+// Total: 93 ferramentas
 
 // ─── Validação de credenciais ───────────────────────────────────────────────
 
@@ -97,7 +97,7 @@ async function main(): Promise<void> {
   const transport = new StdioServerTransport();
   await server.connect(transport);
 
-  process.stderr.write(`[croma-mcp] 🚀 Servidor Croma MCP iniciado (91 ferramentas)\n`);
+  process.stderr.write(`[croma-mcp] 🚀 Servidor Croma MCP iniciado (93 ferramentas)\n`);
 }
 
 main().catch((err) => {

@@ -38,21 +38,21 @@ const server = new McpServer({
     version: "1.0.0",
 });
 // ─── Registra todas as ferramentas ──────────────────────────────────────────
-registerCrmTools(server); // 7 ferramentas: clientes, leads + atualizar_status_lead
+registerCrmTools(server); // 7+8 ferramentas: clientes, leads, atividades, comissoes, contratos, campanhas, nps
 registerPropostasTools(server); // 5 ferramentas: propostas/orçamentos (+ enviar email)
-registerPedidosTools(server); // 6 ferramentas: pedidos, produção + atualizar_status_pedido + criar_ordem_producao
-registerCampoTools(server); // 7 ferramentas: instalações + jobs campo
-registerFinanceiroTools(server); // 6 ferramentas: CR, CP, pagamentos
+registerPedidosTools(server); // 6+2 ferramentas: pedidos, produção, apontamentos
+registerCampoTools(server); // 7+1 ferramentas: instalações, jobs campo, equipes
+registerFinanceiroTools(server); // 6+5 ferramentas: CR, CP, pagamentos, caixa, DAS, boleto
 registerEstoqueTools(server); // 3 ferramentas: estoque + registrar_movimento
 registerBiTools(server); // 3 ferramentas: BI e relatórios
 registerSistemaTools(server); // 2 ferramentas: sistema
 registerFiscalTools(server); // 3 ferramentas: NF-e
 registerQualidadeTools(server); // 3 ferramentas: ocorrências de qualidade
-registerAdminTools(server); // 3 ferramentas: catálogo e precificação
-registerImpressoraTools(server); // 6 ferramentas: HP Latex 365 — jobs, resumo, vincular, registrar, custo_real_pedido, mapear_substrato
+registerAdminTools(server); // 3+7 ferramentas: catálogo, precificação, máquinas, acabamentos
+registerImpressoraTools(server); // 8 ferramentas: HP Latex 365 — jobs, resumo, vincular, registrar, custo_real, mapear_substrato, registrar_recarga, nivel_cartuchos
 registerFornecedoresTools(server); // 5 ferramentas: listar, detalhe, cadastrar, atualizar, historico_compras
 registerComprasTools(server); // 5 ferramentas: listar, detalhe, criar, atualizar_status, registrar_recebimento
-// Total: 73 ferramentas
+// Total: 93 ferramentas
 // ─── Validação de credenciais ───────────────────────────────────────────────
 function validateCredentials() {
     if (!process.env.SUPABASE_SERVICE_ROLE_KEY) {
@@ -83,7 +83,7 @@ async function main() {
     // Inicia o servidor via stdio (comunicação com Claude)
     const transport = new StdioServerTransport();
     await server.connect(transport);
-    process.stderr.write(`[croma-mcp] 🚀 Servidor Croma MCP iniciado (73 ferramentas)\n`);
+    process.stderr.write(`[croma-mcp] 🚀 Servidor Croma MCP iniciado (93 ferramentas)\n`);
 }
 main().catch((err) => {
     process.stderr.write(`[croma-mcp] Erro fatal: ${err instanceof Error ? err.message : String(err)}\n`);

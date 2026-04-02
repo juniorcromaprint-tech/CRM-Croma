@@ -3,7 +3,7 @@
  * Consultar jobs de impressão, produção, custos e vincular ao CRM
  *
  * MODELO DE CUSTEIO: "LM Âncora"
- * Tinta paralela: bag 3L a R$1.560 → R$0,52/ml
+ * Tinta HP original (bag 3L de outro modelo): R$1.560 → R$0,52/ml
  * Cartucho LM original = âncora de medição real
  * total_ml = lm_ml_real × 21,5316 (proporções históricas)
  * Fallback: 9,86 ml/m² (média histórica)
