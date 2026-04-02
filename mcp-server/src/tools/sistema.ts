@@ -91,10 +91,10 @@ estoque_saldos, estoque_movimentos, profiles, fornecedores`,
         }
 
         const sb = getSupabaseClient();
-        const { data, error } = await sb.rpc("execute_sql_readonly" as never, { query: sql } as never).single();
+        const { data, error } = await sb.rpc("execute_sql_readonly" as never, { query_text: sql } as never);
 
         // Fallback: RPC não existe no banco
-        if (error && error.code === "PGRST202") {
+        if (error && (error.code === "PGRST202" || error.code === "42883")) {
           return {
             content: [{
               type: "text" as const,
@@ -105,7 +105,8 @@ estoque_saldos, estoque_movimentos, profiles, fornecedores`,
 
         if (error) return errorResult(error);
 
-        const rows = Array.isArray(data) ? data : (data ? [data] : []);
+        // A RPC retorna json que já é o array de rows (ou null se sem resultados)
+        const rows: Record<string, unknown>[] = Array.isArray(data) ? data : (data ? [data as Record<string, unknown>] : []);
         const response = {
           descricao: params.descricao,
           sql_executado: sql,

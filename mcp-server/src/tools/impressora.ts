@@ -567,7 +567,7 @@ Args:
 
         return {
           content: [{ type: "text" as const, text }],
-          structuredContent: items,
+          structuredContent: { items },
         };
       } catch (error) {
         return errorResult(error);
@@ -636,7 +636,7 @@ Args:
 
           return {
             content: [{ type: "text" as const, text: lines.join("\n") }],
-            structuredContent: items,
+            structuredContent: { items },
           };
         }
 

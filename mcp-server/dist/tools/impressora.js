@@ -519,7 +519,7 @@ Args:
             }
             return {
                 content: [{ type: "text", text }],
-                structuredContent: items,
+                structuredContent: { items },
             };
         }
         catch (error) {
@@ -578,7 +578,7 @@ Args:
                 }
                 return {
                     content: [{ type: "text", text: lines.join("\n") }],
-                    structuredContent: items,
+                    structuredContent: { items },
                 };
             }
             // Ação: mapear
