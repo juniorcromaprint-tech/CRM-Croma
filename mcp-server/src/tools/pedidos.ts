@@ -226,6 +226,7 @@ Use para "OPs em andamento hoje", "o que está no corte", "produção atrasada",
 
 Args:
   - status (string, opcional): aguardando_programacao|em_fila|em_producao|em_acabamento|em_conferencia|liberado|retrabalho|finalizado
+  - pedido_id (string, opcional): UUID do pedido para filtrar OPs vinculadas
   - setor (string, opcional): Filtrar por setor (UUID do setor_atual_id)
   - responsavel_id (string, opcional): UUID do responsável
   - atrasadas (boolean, opcional): Apenas OPs com prazo_interno vencido
@@ -234,6 +235,7 @@ Args:
   - response_format ('markdown'|'json'): Padrão markdown`,
       inputSchema: z.object({
         status: z.enum(["aguardando_programacao", "em_fila", "em_producao", "em_acabamento", "em_conferencia", "liberado", "retrabalho", "finalizado"]).optional(),
+        pedido_id: z.string().uuid().optional().describe("UUID do pedido para filtrar OPs vinculadas"),
         setor: z.string().uuid().optional().describe("UUID do setor_atual_id"),
         responsavel_id: z.string().uuid().optional(),
         atrasadas: z.boolean().optional(),
@@ -257,6 +259,7 @@ Args:
           );
 
         if (params.status) query = query.eq("status", params.status);
+        if (params.pedido_id) query = query.eq("pedido_id", params.pedido_id);
         if (params.setor) query = query.eq("setor_atual_id", params.setor);
         if (params.responsavel_id) query = query.eq("responsavel_id", params.responsavel_id);
         if (params.atrasadas) query = query.lt("prazo_interno", new Date().toISOString()).not("status", "in", '("finalizado","liberado")');
@@ -496,10 +499,42 @@ Args:
 
         if (error) return errorResult(error);
 
+        // Se aprovado, cria OPs automaticamente (1 por item do pedido)
+        let opsMsg = "";
+        if (params.status === "aprovado") {
+          try {
+            const { data: itens } = await sb
+              .from("pedido_itens")
+              .select("id, descricao")
+              .eq("pedido_id", params.id);
+
+            if (itens && itens.length > 0) {
+              const opsToInsert = itens.map((item) => ({
+                pedido_id: params.id,
+                pedido_item_id: item.id,
+                status: "aguardando_programacao",
+                prioridade: 0,
+                observacoes: `OP automática — ${item.descricao}`,
+              }));
+
+              const { data: ops, error: opsError } = await sb
+                .from("ordens_producao")
+                .insert(opsToInsert)
+                .select("id, numero");
+
+              if (!opsError && ops) {
+                opsMsg = `\n📋 ${ops.length} OP(s) criada(s) automaticamente: ${ops.map(op => op.numero).join(", ")}`;
+              }
+            }
+          } catch {
+            opsMsg = "\n⚠️ Não foi possível criar OPs automaticamente. Crie manualmente via croma_criar_ordem_producao.";
+          }
+        }
+
         return {
           content: [{
             type: "text" as const,
-            text: `✅ Pedido **${atual.numero}** atualizado: ${formatStatus(atual.status)} → **${formatStatus(params.status)}**${params.observacao ? `\nObs: ${params.observacao}` : ""}`,
+            text: `✅ Pedido **${atual.numero}** atualizado: ${formatStatus(atual.status)} → **${formatStatus(params.status)}**${params.observacao ? `\nObs: ${params.observacao}` : ""}${opsMsg}`,
           }],
         };
       } catch (error) {
@@ -581,6 +616,173 @@ Args:
             text: `✅ OP criada com sucesso!\n\n- **Número**: ${op.numero}\n- **ID**: \`${op.id}\`\n- **Pedido**: ${pedido.numero}\n- **Status**: Aguardando programação\n- **Prioridade**: ${params.prioridade}`,
           }],
           structuredContent: op,
+        };
+      } catch (error) {
+        return errorResult(error);
+      }
+    }
+  );
+
+  // ─── croma_registrar_apontamento_producao ──────────────────────────────────
+
+  server.registerTool(
+    "croma_registrar_apontamento_producao",
+    {
+      title: "Registrar Apontamento de Produção",
+      description: `Registra um apontamento de tempo em uma etapa de produção.
+
+ATENÇÃO: Ação que modifica dados. Confirme com o usuário antes de executar.
+
+Args:
+  - ordem_producao_id (string, obrigatório): UUID da ordem de produção
+  - etapa_nome (string, obrigatório): Nome da etapa (impressao, corte, acabamento, conferencia)
+  - tempo_minutos (number, obrigatório): Tempo gasto em minutos
+  - operador_id (string, opcional): UUID do operador (perfil) — padrão: usuário logado
+  - observacoes (string, opcional): Observações`,
+      inputSchema: z.object({
+        ordem_producao_id: z.string().uuid().describe("UUID da ordem de produção"),
+        etapa_nome: z.string().max(100).describe("Nome da etapa: impressao, corte, acabamento, conferencia"),
+        tempo_minutos: z.coerce.number().int().positive().describe("Tempo em minutos"),
+        operador_id: z.string().uuid().optional().describe("UUID do operador — padrão: usuário logado"),
+        observacoes: z.string().max(300).optional(),
+      }).strict(),
+      annotations: { readOnlyHint: false, destructiveHint: false, idempotentHint: false, openWorldHint: false },
+    },
+    async (params) => {
+      try {
+        const sb = getUserClient();
+
+        // Buscar ou criar etapa na OP
+        let etapaId: string;
+        const { data: etapasExist } = await sb
+          .from("producao_etapas")
+          .select("id, nome")
+          .eq("ordem_producao_id", params.ordem_producao_id)
+          .ilike("nome", `%${params.etapa_nome}%`)
+          .limit(1);
+
+        if (etapasExist && etapasExist.length > 0) {
+          etapaId = etapasExist[0].id;
+        } else {
+          // Criar etapa se não existir
+          const { data: novaEtapa, error: etapaErr } = await sb
+            .from("producao_etapas")
+            .insert({ ordem_producao_id: params.ordem_producao_id, nome: params.etapa_nome, status: "em_andamento" })
+            .select()
+            .single();
+          if (etapaErr) return errorResult(etapaErr);
+          etapaId = novaEtapa.id;
+        }
+
+        // Resolver operador_id
+        let operadorId = params.operador_id;
+        if (!operadorId) {
+          const { data: { user } } = await sb.auth.getUser();
+          if (user) {
+            operadorId = user.id;
+          } else {
+            const { data: profiles } = await getAdminClient().from("profiles").select("id").limit(1);
+            operadorId = profiles?.[0]?.id ?? "00000000-0000-0000-0000-000000000000";
+          }
+        }
+
+        const inicio = new Date();
+        const fim = new Date(inicio.getTime() + params.tempo_minutos * 60000);
+
+        const { data, error } = await sb
+          .from("producao_apontamentos")
+          .insert({
+            producao_etapa_id: etapaId,
+            ordem_producao_id: params.ordem_producao_id,
+            operador_id: operadorId,
+            inicio: inicio.toISOString(),
+            fim: fim.toISOString(),
+            tempo_minutos: params.tempo_minutos,
+            tipo: "producao",
+            observacoes: params.observacoes ?? null,
+          })
+          .select()
+          .single();
+
+        if (error) return errorResult(error);
+
+        return {
+          content: [{
+            type: "text" as const,
+            text: `✅ Apontamento registrado!\n\n- **ID**: \`${data.id}\`\n- **OP**: \`${data.ordem_producao_id}\`\n- **Etapa**: ${params.etapa_nome}\n- **Tempo**: ${params.tempo_minutos} min\n- **Início**: ${formatDateTime(inicio.toISOString())}`,
+          }],
+          structuredContent: data,
+        };
+      } catch (error) {
+        return errorResult(error);
+      }
+    }
+  );
+
+  // ─── croma_listar_apontamentos_producao ────────────────────────────────────
+
+  server.registerTool(
+    "croma_listar_apontamentos_producao",
+    {
+      title: "Listar Apontamentos de Produção",
+      description: `Lista apontamentos de tempo de produção.
+
+Use para "tempo gasto na OP X", "apontamentos da semana", "produtividade de hoje".
+
+Args:
+  - ordem_producao_id (string, opcional): Filtrar por OP específica
+  - data_inicio / data_fim (string, opcional): Período YYYY-MM-DD
+  - response_format ('markdown'|'json'): Padrão markdown`,
+      inputSchema: z.object({
+        ordem_producao_id: z.string().uuid().optional(),
+        data_inicio: z.string().regex(/^\d{4}-\d{2}-\d{2}$/).optional(),
+        data_fim: z.string().regex(/^\d{4}-\d{2}-\d{2}$/).optional(),
+        response_format: z.nativeEnum(ResponseFormat).default(ResponseFormat.MARKDOWN),
+      }).strict(),
+      annotations: { readOnlyHint: true, destructiveHint: false, idempotentHint: true, openWorldHint: false },
+    },
+    async (params) => {
+      try {
+        const sb = getAdminClient();
+        let query = sb
+          .from("producao_apontamentos")
+          .select("id, ordem_producao_id, tempo_minutos, tipo, observacoes, inicio, fim, created_at, producao_etapas(nome), profiles(full_name)", { count: "exact" });
+
+        if (params.ordem_producao_id) query = query.eq("ordem_producao_id", params.ordem_producao_id);
+        if (params.data_inicio) query = query.gte("inicio", params.data_inicio);
+        if (params.data_fim) query = query.lte("inicio", params.data_fim + "T23:59:59");
+
+        query = query.order("inicio", { ascending: false }).limit(100);
+
+        const { data, error, count } = await query;
+        if (error) return errorResult(error);
+
+        const items = data ?? [];
+        const total = count ?? items.length;
+        const totalMinutos = items.reduce((s, a) => s + (Number(a.tempo_minutos) || 0), 0);
+        const totalHoras = (totalMinutos / 60).toFixed(1);
+
+        let text: string;
+        if (params.response_format === ResponseFormat.MARKDOWN) {
+          const lines = [`## Apontamentos de Produção (${total}) — Total: ${totalHoras}h`, ""];
+          if (items.length === 0) {
+            lines.push("_Nenhum apontamento encontrado._");
+          } else {
+            for (const a of items) {
+              const etapaNome = (a.producao_etapas as { nome?: string } | null)?.nome ?? "—";
+              const operador = (a.profiles as { full_name?: string } | null)?.full_name ?? "—";
+              lines.push(`- **${etapaNome}** — ${a.tempo_minutos} min — ${operador} — ${formatDate(a.inicio)}`);
+              if (a.observacoes) lines.push(`  _${a.observacoes}_`);
+            }
+          }
+          text = lines.join("\n");
+        } else {
+          text = JSON.stringify({ count: total, total_minutos: totalMinutos, items }, null, 2);
+        }
+
+        return {
+          content: [{ type: "text" as const, text }],
+          structuredContent: { count: total, total_minutos: totalMinutos, items },
         };
       } catch (error) {
         return errorResult(error);

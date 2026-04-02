@@ -628,4 +628,69 @@ Args:
       }
     }
   );
+
+  // ─── croma_listar_equipes ──────────────────────────────────────────────────
+
+  server.registerTool(
+    "croma_listar_equipes",
+    {
+      title: "Listar Equipes de Campo",
+      description: `Lista equipes de instalação/campo com seus membros.
+
+Use para "equipes disponíveis", "quem está na equipe X", "equipes por região".
+
+Args:
+  - response_format ('markdown'|'json'): Padrão markdown`,
+      inputSchema: z.object({
+        response_format: z.nativeEnum(ResponseFormat).default(ResponseFormat.MARKDOWN),
+      }).strict(),
+      annotations: { readOnlyHint: true, destructiveHint: false, idempotentHint: true, openWorldHint: false },
+    },
+    async (params) => {
+      try {
+        const sb = getAdminClient();
+
+        const { data, error } = await sb
+          .from("equipes")
+          .select("id, nome, regiao, ativo, equipe_membros(id, funcao, ativo, profiles(full_name))")
+          .eq("ativo", true)
+          .order("nome");
+
+        if (error) return errorResult(error);
+
+        const items = data ?? [];
+
+        let text: string;
+        if (params.response_format === ResponseFormat.MARKDOWN) {
+          const lines = [`## Equipes de Campo (${items.length})`, ""];
+          if (items.length === 0) {
+            lines.push("_Nenhuma equipe cadastrada._");
+          } else {
+            for (const e of items) {
+              const membros = (e.equipe_membros as { funcao?: string; ativo?: boolean; profiles?: { full_name?: string } | null }[]) ?? [];
+              const membrosAtivos = membros.filter(m => m.ativo !== false);
+              lines.push(`### ${e.nome}${e.regiao ? ` — ${e.regiao}` : ""}`);
+              lines.push(`- **ID**: \`${e.id}\``);
+              lines.push(`- **Membros**: ${membrosAtivos.length}`);
+              for (const m of membrosAtivos) {
+                const nome = m.profiles?.full_name ?? "—";
+                lines.push(`  - ${nome}${m.funcao ? ` (${m.funcao})` : ""}`);
+              }
+              lines.push("");
+            }
+          }
+          text = lines.join("\n");
+        } else {
+          text = JSON.stringify({ count: items.length, items }, null, 2);
+        }
+
+        return {
+          content: [{ type: "text" as const, text }],
+          structuredContent: { count: items.length, items },
+        };
+      } catch (error) {
+        return errorResult(error);
+      }
+    }
+  );
 }

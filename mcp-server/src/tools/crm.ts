@@ -673,4 +673,575 @@ Args:
       }
     }
   );
+
+  // ─── croma_listar_atividades_comerciais ────────────────────────────────────
+
+  server.registerTool(
+    "croma_listar_atividades_comerciais",
+    {
+      title: "Listar Atividades Comerciais",
+      description: `Lista atividades comerciais (visitas, ligações, reuniões, emails) registradas no CRM.
+
+Use para "atividades do cliente X", "ligações da semana", "histórico de visitas".
+
+Args:
+  - filtro_entidade_id (string, opcional): UUID do cliente ou lead
+  - filtro_entidade_tipo (string, opcional): 'cliente' ou 'lead'
+  - filtro_tipo (string, opcional): visita|ligacao|email|reuniao|whatsapp|outro
+  - data_inicio / data_fim (string, opcional): Período YYYY-MM-DD
+  - limit_rows (number): Padrão 50
+  - response_format ('markdown'|'json'): Padrão markdown`,
+      inputSchema: z.object({
+        filtro_entidade_id: z.string().uuid().optional().describe("UUID do cliente ou lead"),
+        filtro_entidade_tipo: z.enum(["cliente", "lead"]).optional(),
+        filtro_tipo: z.enum(["visita", "ligacao", "email", "reuniao", "whatsapp", "outro"]).optional(),
+        data_inicio: z.string().regex(/^\d{4}-\d{2}-\d{2}$/).optional(),
+        data_fim: z.string().regex(/^\d{4}-\d{2}-\d{2}$/).optional(),
+        limit_rows: z.coerce.number().int().min(1).max(500).default(50),
+        response_format: z.nativeEnum(ResponseFormat).default(ResponseFormat.MARKDOWN),
+      }).strict(),
+      annotations: { readOnlyHint: true, destructiveHint: false, idempotentHint: true, openWorldHint: false },
+    },
+    async (params) => {
+      try {
+        const sb = getAdminClient();
+        let query = sb
+          .from("atividades_comerciais")
+          .select("id, tipo, entidade_tipo, entidade_id, descricao, data_atividade, duracao_minutos, resultado, proximo_passo, created_at", { count: "exact" });
+
+        if (params.filtro_entidade_id) query = query.eq("entidade_id", params.filtro_entidade_id);
+        if (params.filtro_entidade_tipo) query = query.eq("entidade_tipo", params.filtro_entidade_tipo);
+        if (params.filtro_tipo) query = query.eq("tipo", params.filtro_tipo);
+        if (params.data_inicio) query = query.gte("data_atividade", params.data_inicio);
+        if (params.data_fim) query = query.lte("data_atividade", params.data_fim + "T23:59:59");
+
+        query = query.order("data_atividade", { ascending: false }).limit(params.limit_rows);
+
+        const { data, error, count } = await query;
+        if (error) return errorResult(error);
+
+        const items = data ?? [];
+        const total = count ?? items.length;
+        const response = buildPaginatedResponse(items, total, 0, params.limit_rows);
+
+        let text: string;
+        if (params.response_format === ResponseFormat.MARKDOWN) {
+          const tipoLabel: Record<string, string> = {
+            visita: "🚗 Visita", ligacao: "📞 Ligação", email: "📧 Email",
+            reuniao: "🤝 Reunião", whatsapp: "💬 WhatsApp", outro: "📋 Outro",
+          };
+          const lines = [`## Atividades Comerciais (${total})`, ""];
+          if (items.length === 0) {
+            lines.push("_Nenhuma atividade registrada._");
+          } else {
+            for (const a of items) {
+              lines.push(`### ${tipoLabel[a.tipo] ?? a.tipo} — ${formatDate(a.data_atividade)}`);
+              lines.push(`- **ID**: \`${a.id}\``);
+              lines.push(`- **Tipo entidade**: ${a.entidade_tipo} \`${a.entidade_id}\``);
+              if (a.descricao) lines.push(`- **Descrição**: ${a.descricao}`);
+              if (a.duracao_minutos) lines.push(`- **Duração**: ${a.duracao_minutos} min`);
+              if (a.resultado) lines.push(`- **Resultado**: ${a.resultado}`);
+              if (a.proximo_passo) lines.push(`- **Próximo passo**: ${a.proximo_passo}`);
+              lines.push("");
+            }
+          }
+          text = lines.join("\n");
+        } else {
+          text = JSON.stringify(response, null, 2);
+        }
+
+        return {
+          content: [{ type: "text" as const, text: truncateIfNeeded(text, items.length) }],
+          structuredContent: response,
+        };
+      } catch (error) {
+        return errorResult(error);
+      }
+    }
+  );
+
+  // ─── croma_registrar_atividade_comercial ───────────────────────────────────
+
+  server.registerTool(
+    "croma_registrar_atividade_comercial",
+    {
+      title: "Registrar Atividade Comercial",
+      description: `Registra uma atividade comercial (visita, ligação, reunião, email, WhatsApp).
+
+ATENÇÃO: Ação que modifica dados. Confirme com o usuário antes de executar.
+
+Args:
+  - entidade_tipo (string, obrigatório): 'cliente' ou 'lead'
+  - entidade_id (string, obrigatório): UUID do cliente ou lead
+  - tipo (string, obrigatório): visita|ligacao|email|reuniao|whatsapp|outro
+  - descricao (string, obrigatório): Descrição do que foi feito/discutido
+  - duracao_minutos (number, opcional): Duração em minutos
+  - data_atividade (string, opcional): Data/hora ISO — padrão: agora
+  - resultado (string, opcional): Resultado da atividade
+  - proximo_passo (string, opcional): Próxima ação prevista`,
+      inputSchema: z.object({
+        entidade_tipo: z.enum(["cliente", "lead"]).describe("Tipo: 'cliente' ou 'lead'"),
+        entidade_id: z.string().uuid().describe("UUID do cliente ou lead"),
+        tipo: z.enum(["visita", "ligacao", "email", "reuniao", "whatsapp", "outro"]),
+        descricao: z.string().min(3).max(500),
+        duracao_minutos: z.coerce.number().int().positive().optional(),
+        data_atividade: z.string().optional().describe("ISO datetime, padrão: agora"),
+        resultado: z.string().max(200).optional(),
+        proximo_passo: z.string().max(200).optional(),
+      }).strict(),
+      annotations: { readOnlyHint: false, destructiveHint: false, idempotentHint: false, openWorldHint: false },
+    },
+    async (params) => {
+      try {
+        const sb = getUserClient();
+        const { data, error } = await sb
+          .from("atividades_comerciais")
+          .insert({
+            tipo: params.tipo,
+            entidade_tipo: params.entidade_tipo,
+            entidade_id: params.entidade_id,
+            descricao: params.descricao,
+            duracao_minutos: params.duracao_minutos ?? null,
+            data_atividade: params.data_atividade ?? new Date().toISOString(),
+            resultado: params.resultado ?? null,
+            proximo_passo: params.proximo_passo ?? null,
+          })
+          .select()
+          .single();
+
+        if (error) return errorResult(error);
+
+        return {
+          content: [{
+            type: "text" as const,
+            text: `✅ Atividade registrada!\n\n- **ID**: \`${data.id}\`\n- **Tipo**: ${data.tipo}\n- **${data.entidade_tipo}**: \`${data.entidade_id}\`\n- **Descrição**: ${data.descricao}\n- **Data**: ${formatDate(data.data_atividade)}`,
+          }],
+          structuredContent: data,
+        };
+      } catch (error) {
+        return errorResult(error);
+      }
+    }
+  );
+
+  // ─── croma_listar_comissoes ────────────────────────────────────────────────
+
+  server.registerTool(
+    "croma_listar_comissoes",
+    {
+      title: "Listar Comissões",
+      description: `Lista comissões de vendedores com filtros opcionais.
+
+Use para "comissões do mês", "comissões pendentes", "comissões do vendedor X".
+
+Args:
+  - filtro_vendedor (string, opcional): UUID do vendedor
+  - filtro_status (string, opcional): gerada|paga|cancelada
+  - data_inicio / data_fim (string, opcional): Período YYYY-MM-DD
+  - response_format ('markdown'|'json'): Padrão markdown`,
+      inputSchema: z.object({
+        filtro_vendedor: z.string().uuid().optional(),
+        filtro_status: z.enum(["gerada", "paga", "cancelada"]).optional(),
+        data_inicio: z.string().regex(/^\d{4}-\d{2}-\d{2}$/).optional(),
+        data_fim: z.string().regex(/^\d{4}-\d{2}-\d{2}$/).optional(),
+        response_format: z.nativeEnum(ResponseFormat).default(ResponseFormat.MARKDOWN),
+      }).strict(),
+      annotations: { readOnlyHint: true, destructiveHint: false, idempotentHint: true, openWorldHint: false },
+    },
+    async (params) => {
+      try {
+        const sb = getAdminClient();
+        let query = sb
+          .from("comissoes")
+          .select("id, vendedor_id, pedido_id, percentual, valor_base, valor_comissao, status, data_pagamento, created_at, profiles(full_name)", { count: "exact" })
+          .is("excluido_em", null);
+
+        if (params.filtro_vendedor) query = query.eq("vendedor_id", params.filtro_vendedor);
+        if (params.filtro_status) query = query.eq("status", params.filtro_status);
+        if (params.data_inicio) query = query.gte("created_at", params.data_inicio);
+        if (params.data_fim) query = query.lte("created_at", params.data_fim + "T23:59:59");
+
+        query = query.order("created_at", { ascending: false });
+
+        const { data, error, count } = await query;
+        if (error) return errorResult(error);
+
+        const items = data ?? [];
+        const total = count ?? items.length;
+        const totalValor = items.reduce((s, c) => s + Number(c.valor_comissao), 0);
+
+        let text: string;
+        if (params.response_format === ResponseFormat.MARKDOWN) {
+          const lines = [`## Comissões (${total}) — Total: ${formatBRL(totalValor)}`, ""];
+          if (items.length === 0) {
+            lines.push("_Nenhuma comissão encontrada._");
+          } else {
+            for (const c of items) {
+              const vendedor = (c.profiles as { full_name?: string } | null)?.full_name ?? c.vendedor_id;
+              const statusIcon = c.status === "paga" ? "✅" : c.status === "cancelada" ? "❌" : "⏳";
+              lines.push(`- ${statusIcon} **${vendedor}** — Pedido \`${c.pedido_id?.substring(0, 8)}\` — ${c.percentual}% — **${formatBRL(c.valor_comissao)}** — ${formatDate(c.created_at)}`);
+            }
+          }
+          text = lines.join("\n");
+        } else {
+          text = JSON.stringify({ count: total, total_valor: totalValor, items }, null, 2);
+        }
+
+        return {
+          content: [{ type: "text" as const, text }],
+          structuredContent: { count: total, total_valor: totalValor, items },
+        };
+      } catch (error) {
+        return errorResult(error);
+      }
+    }
+  );
+
+  // ─── croma_registrar_comissao ──────────────────────────────────────────────
+
+  server.registerTool(
+    "croma_registrar_comissao",
+    {
+      title: "Registrar Comissão",
+      description: `Registra uma comissão de venda para um vendedor.
+
+ATENÇÃO: Ação que modifica dados. Confirme com o usuário antes de executar.
+
+Args:
+  - pedido_id (string, obrigatório): UUID do pedido gerador da comissão
+  - vendedor_id (string, obrigatório): UUID do vendedor (profile)
+  - percentual (number, obrigatório): Percentual de comissão (0-100)
+  - valor_base (number, obrigatório): Valor base de cálculo (normalmente valor do pedido)
+  - observacoes (string, opcional): Observações`,
+      inputSchema: z.object({
+        pedido_id: z.string().uuid().describe("UUID do pedido"),
+        vendedor_id: z.string().uuid().describe("UUID do vendedor (profile)"),
+        percentual: z.coerce.number().min(0).max(100),
+        valor_base: z.coerce.number().positive().describe("Valor base de cálculo"),
+        observacoes: z.string().max(200).optional(),
+      }).strict(),
+      annotations: { readOnlyHint: false, destructiveHint: false, idempotentHint: false, openWorldHint: false },
+    },
+    async (params) => {
+      try {
+        const sb = getUserClient();
+        const valorComissao = (params.valor_base * params.percentual) / 100;
+
+        const { data, error } = await sb
+          .from("comissoes")
+          .insert({
+            pedido_id: params.pedido_id,
+            vendedor_id: params.vendedor_id,
+            percentual: params.percentual,
+            valor_base: params.valor_base,
+            valor_comissao: valorComissao,
+            status: "gerada",
+          })
+          .select()
+          .single();
+
+        if (error) return errorResult(error);
+
+        return {
+          content: [{
+            type: "text" as const,
+            text: `✅ Comissão registrada!\n\n- **ID**: \`${data.id}\`\n- **Pedido**: \`${data.pedido_id}\`\n- **Percentual**: ${data.percentual}%\n- **Valor base**: ${formatBRL(data.valor_base)}\n- **Comissão**: **${formatBRL(data.valor_comissao)}**\n- **Status**: Gerada`,
+          }],
+          structuredContent: data,
+        };
+      } catch (error) {
+        return errorResult(error);
+      }
+    }
+  );
+
+  // ─── croma_listar_contratos ────────────────────────────────────────────────
+
+  server.registerTool(
+    "croma_listar_contratos",
+    {
+      title: "Listar Contratos de Serviço",
+      description: `Lista contratos de serviço recorrente com clientes.
+
+Use para "contratos ativos", "contratos do cliente X", "renovações do mês".
+
+Args:
+  - filtro_cliente (string, opcional): UUID do cliente
+  - filtro_status (string, opcional): ativo|encerrado|suspenso
+  - limit_rows (number): Padrão 50
+  - response_format ('markdown'|'json'): Padrão markdown`,
+      inputSchema: z.object({
+        filtro_cliente: z.string().uuid().optional(),
+        filtro_status: z.string().max(20).optional(),
+        limit_rows: z.coerce.number().int().min(1).max(500).default(50),
+        response_format: z.nativeEnum(ResponseFormat).default(ResponseFormat.MARKDOWN),
+      }).strict(),
+      annotations: { readOnlyHint: true, destructiveHint: false, idempotentHint: true, openWorldHint: false },
+    },
+    async (params) => {
+      try {
+        const sb = getAdminClient();
+        let query = sb
+          .from("contratos_servico")
+          .select("id, cliente_id, descricao, valor_mensal, periodicidade, data_inicio, data_fim, status, proximo_faturamento, clientes(razao_social, nome_fantasia)", { count: "exact" })
+          .is("excluido_em", null);
+
+        if (params.filtro_cliente) query = query.eq("cliente_id", params.filtro_cliente);
+        if (params.filtro_status) query = query.eq("status", params.filtro_status);
+
+        query = query.order("created_at", { ascending: false }).limit(params.limit_rows);
+
+        const { data, error, count } = await query;
+        if (error) return errorResult(error);
+
+        const items = data ?? [];
+        const total = count ?? items.length;
+
+        let text: string;
+        if (params.response_format === ResponseFormat.MARKDOWN) {
+          const lines = [`## Contratos de Serviço (${total})`, ""];
+          if (items.length === 0) {
+            lines.push("_Nenhum contrato encontrado._");
+          } else {
+            for (const c of items) {
+              const cliente = (c.clientes as { razao_social?: string; nome_fantasia?: string } | null);
+              const nomeCliente = cliente?.nome_fantasia ?? cliente?.razao_social ?? c.cliente_id;
+              const statusIcon = c.status === "ativo" ? "✅" : c.status === "encerrado" ? "🔴" : "⏸️";
+              lines.push(`### ${statusIcon} ${nomeCliente}`);
+              lines.push(`- **ID**: \`${c.id}\``);
+              lines.push(`- **Descrição**: ${c.descricao}`);
+              lines.push(`- **Valor mensal**: ${formatBRL(c.valor_mensal)}`);
+              if (c.periodicidade) lines.push(`- **Periodicidade**: ${c.periodicidade}`);
+              lines.push(`- **Início**: ${formatDate(c.data_inicio)}`);
+              if (c.data_fim) lines.push(`- **Fim**: ${formatDate(c.data_fim)}`);
+              if (c.proximo_faturamento) lines.push(`- **Próximo faturamento**: ${formatDate(c.proximo_faturamento)}`);
+              lines.push("");
+            }
+          }
+          text = lines.join("\n");
+        } else {
+          text = JSON.stringify(buildPaginatedResponse(items, total, 0, params.limit_rows), null, 2);
+        }
+
+        return {
+          content: [{ type: "text" as const, text: truncateIfNeeded(text, items.length) }],
+          structuredContent: buildPaginatedResponse(items, total, 0, params.limit_rows),
+        };
+      } catch (error) {
+        return errorResult(error);
+      }
+    }
+  );
+
+  // ─── croma_criar_contrato ──────────────────────────────────────────────────
+
+  server.registerTool(
+    "croma_criar_contrato",
+    {
+      title: "Criar Contrato de Serviço",
+      description: `Cria um novo contrato de serviço recorrente para um cliente.
+
+ATENÇÃO: Ação que modifica dados. Confirme com o usuário antes de executar.
+
+Args:
+  - cliente_id (string, obrigatório): UUID do cliente
+  - descricao (string, obrigatório): Descrição do serviço contratado
+  - valor_mensal (number, obrigatório): Valor mensal do contrato
+  - data_inicio (string, obrigatório): Data de início YYYY-MM-DD
+  - data_fim (string, opcional): Data de encerramento YYYY-MM-DD
+  - periodicidade (string, opcional): mensal|trimestral|anual (padrão: mensal)
+  - observacoes (string, opcional): Observações`,
+      inputSchema: z.object({
+        cliente_id: z.string().uuid().describe("UUID do cliente"),
+        descricao: z.string().min(3).max(500),
+        valor_mensal: z.coerce.number().positive(),
+        data_inicio: z.string().regex(/^\d{4}-\d{2}-\d{2}$/).describe("YYYY-MM-DD"),
+        data_fim: z.string().regex(/^\d{4}-\d{2}-\d{2}$/).optional(),
+        periodicidade: z.enum(["mensal", "trimestral", "semestral", "anual"]).default("mensal"),
+        observacoes: z.string().max(500).optional(),
+      }).strict(),
+      annotations: { readOnlyHint: false, destructiveHint: false, idempotentHint: false, openWorldHint: false },
+    },
+    async (params) => {
+      try {
+        const sb = getUserClient();
+        const { data, error } = await sb
+          .from("contratos_servico")
+          .insert({ ...params, status: "ativo" })
+          .select()
+          .single();
+
+        if (error) return errorResult(error);
+
+        return {
+          content: [{
+            type: "text" as const,
+            text: `✅ Contrato criado!\n\n- **ID**: \`${data.id}\`\n- **Cliente**: \`${data.cliente_id}\`\n- **Descrição**: ${data.descricao}\n- **Valor mensal**: ${formatBRL(data.valor_mensal)}\n- **Início**: ${formatDate(data.data_inicio)}\n- **Status**: Ativo`,
+          }],
+          structuredContent: data,
+        };
+      } catch (error) {
+        return errorResult(error);
+      }
+    }
+  );
+
+  // ─── croma_listar_campanhas ────────────────────────────────────────────────
+
+  server.registerTool(
+    "croma_listar_campanhas",
+    {
+      title: "Listar Campanhas Comerciais",
+      description: `Lista campanhas de marketing/comerciais com métricas de envio.
+
+Use para "campanhas ativas", "resultado das campanhas", "emails enviados".
+
+Args:
+  - filtro_status (string, opcional): ativa|rascunho|encerrada|pausada
+  - limit_rows (number): Padrão 50
+  - response_format ('markdown'|'json'): Padrão markdown`,
+      inputSchema: z.object({
+        filtro_status: z.string().max(20).optional(),
+        limit_rows: z.coerce.number().int().min(1).max(500).default(50),
+        response_format: z.nativeEnum(ResponseFormat).default(ResponseFormat.MARKDOWN),
+      }).strict(),
+      annotations: { readOnlyHint: true, destructiveHint: false, idempotentHint: true, openWorldHint: false },
+    },
+    async (params) => {
+      try {
+        const sb = getAdminClient();
+        let query = sb
+          .from("campanhas")
+          .select("id, nome, descricao, origem, status, data_inicio, data_fim, orcamento, total_enviados, total_abertos, created_at", { count: "exact" });
+
+        if (params.filtro_status) query = query.eq("status", params.filtro_status);
+        query = query.order("created_at", { ascending: false }).limit(params.limit_rows);
+
+        const { data, error, count } = await query;
+        if (error) return errorResult(error);
+
+        const items = data ?? [];
+        const total = count ?? items.length;
+
+        let text: string;
+        if (params.response_format === ResponseFormat.MARKDOWN) {
+          const lines = [`## Campanhas (${total})`, ""];
+          if (items.length === 0) {
+            lines.push("_Nenhuma campanha encontrada._");
+          } else {
+            for (const c of items) {
+              const taxaAbertura = c.total_enviados > 0
+                ? ((c.total_abertos / c.total_enviados) * 100).toFixed(1)
+                : "0";
+              lines.push(`### ${c.nome} — ${formatStatus(c.status)}`);
+              lines.push(`- **ID**: \`${c.id}\``);
+              if (c.descricao) lines.push(`- **Descrição**: ${c.descricao}`);
+              lines.push(`- **Canal**: ${c.origem}`);
+              if (c.data_inicio) lines.push(`- **Período**: ${formatDate(c.data_inicio)}${c.data_fim ? ` a ${formatDate(c.data_fim)}` : ""}`);
+              if (c.orcamento) lines.push(`- **Orçamento**: ${formatBRL(c.orcamento)}`);
+              lines.push(`- **Enviados**: ${c.total_enviados} | **Abertos**: ${c.total_abertos} (${taxaAbertura}%)`);
+              lines.push("");
+            }
+          }
+          text = lines.join("\n");
+        } else {
+          text = JSON.stringify({ count: total, items }, null, 2);
+        }
+
+        return {
+          content: [{ type: "text" as const, text: truncateIfNeeded(text, items.length) }],
+          structuredContent: { count: total, items },
+        };
+      } catch (error) {
+        return errorResult(error);
+      }
+    }
+  );
+
+  // ─── croma_listar_nps ─────────────────────────────────────────────────────
+
+  server.registerTool(
+    "croma_listar_nps",
+    {
+      title: "Listar Respostas NPS",
+      description: `Lista respostas do NPS (Net Promoter Score) com score calculado.
+
+Use para "NPS do mês", "clientes detratores", "comentários NPS", "satisfação dos clientes".
+
+Args:
+  - filtro_nota (number, opcional): Filtrar por nota exata (0-10)
+  - data_inicio / data_fim (string, opcional): Período YYYY-MM-DD
+  - response_format ('markdown'|'json'): Padrão markdown`,
+      inputSchema: z.object({
+        filtro_nota: z.coerce.number().int().min(0).max(10).optional(),
+        data_inicio: z.string().regex(/^\d{4}-\d{2}-\d{2}$/).optional(),
+        data_fim: z.string().regex(/^\d{4}-\d{2}-\d{2}$/).optional(),
+        response_format: z.nativeEnum(ResponseFormat).default(ResponseFormat.MARKDOWN),
+      }).strict(),
+      annotations: { readOnlyHint: true, destructiveHint: false, idempotentHint: true, openWorldHint: false },
+    },
+    async (params) => {
+      try {
+        const sb = getAdminClient();
+        let query = sb
+          .from("nps_respostas")
+          .select("id, pedido_id, cliente_id, nota, comentario, respondido_em, created_at, clientes(razao_social)")
+          .not("nota", "is", null);
+
+        if (params.filtro_nota !== undefined) query = query.eq("nota", params.filtro_nota);
+        if (params.data_inicio) query = query.gte("respondido_em", params.data_inicio);
+        if (params.data_fim) query = query.lte("respondido_em", params.data_fim + "T23:59:59");
+
+        query = query.order("respondido_em", { ascending: false });
+
+        const { data, error } = await query;
+        if (error) return errorResult(error);
+
+        const items = data ?? [];
+
+        // Calcular NPS
+        const promotores = items.filter(r => Number(r.nota) >= 9).length;
+        const detratores = items.filter(r => Number(r.nota) <= 6).length;
+        const nps = items.length > 0
+          ? Math.round(((promotores - detratores) / items.length) * 100)
+          : 0;
+        const mediaNota = items.length > 0
+          ? (items.reduce((s, r) => s + Number(r.nota), 0) / items.length).toFixed(1)
+          : "—";
+
+        let text: string;
+        if (params.response_format === ResponseFormat.MARKDOWN) {
+          const lines = [
+            `## NPS — ${items.length} respostas`,
+            `**Score NPS**: **${nps}** | **Média**: ${mediaNota}/10`,
+            `- 🟢 Promotores (9-10): ${promotores}`,
+            `- 🟡 Neutros (7-8): ${items.filter(r => Number(r.nota) >= 7 && Number(r.nota) <= 8).length}`,
+            `- 🔴 Detratores (0-6): ${detratores}`,
+            "",
+          ];
+          if (items.length === 0) {
+            lines.push("_Nenhuma resposta NPS encontrada._");
+          } else {
+            lines.push("## Respostas Recentes");
+            for (const r of items.slice(0, 20)) {
+              const cliente = (r.clientes as { razao_social?: string } | null)?.razao_social ?? r.cliente_id ?? "—";
+              const emoji = Number(r.nota) >= 9 ? "🟢" : Number(r.nota) >= 7 ? "🟡" : "🔴";
+              lines.push(`- ${emoji} **Nota ${r.nota}** — ${cliente}${r.comentario ? ` — "${r.comentario}"` : ""} — ${formatDate(r.respondido_em)}`);
+            }
+            if (items.length > 20) lines.push(`\n_...e mais ${items.length - 20} respostas_`);
+          }
+          text = lines.join("\n");
+        } else {
+          text = JSON.stringify({ count: items.length, nps, media_nota: mediaNota, promotores, detratores, items }, null, 2);
+        }
+
+        return {
+          content: [{ type: "text" as const, text }],
+          structuredContent: { count: items.length, nps, media_nota: mediaNota, promotores, detratores, items },
+        };
+      } catch (error) {
+        return errorResult(error);
+      }
+    }
+  );
 }

@@ -537,4 +537,153 @@ Args:
       }
     }
   );
+
+  // ─── croma_listar_maquinas ─────────────────────────────────────────────────
+
+  server.registerTool(
+    "croma_listar_maquinas",
+    {
+      title: "Listar Máquinas",
+      description: `Lista máquinas de produção cadastradas com custos de operação.
+
+Use para "máquinas disponíveis", "custo por hora da impressora", "equipamentos ativos".
+
+Args:
+  - ativo_only (boolean): Apenas ativas (padrão: true)
+  - response_format ('markdown'|'json'): Padrão markdown`,
+      inputSchema: z.object({
+        ativo_only: z.boolean().default(true),
+        response_format: z.nativeEnum(ResponseFormat).default(ResponseFormat.MARKDOWN),
+      }).strict(),
+      annotations: { readOnlyHint: true, destructiveHint: false, idempotentHint: true, openWorldHint: false },
+    },
+    async (params) => {
+      try {
+        const sb = getAdminClient();
+        let query = sb
+          .from("maquinas")
+          .select("id, nome, tipo, custo_hora, custo_m2, ativo, valor_compra, vida_util_meses, depreciacao_mensal, area_util_m");
+
+        if (params.ativo_only) query = query.eq("ativo", true);
+        query = query.order("tipo").order("nome");
+
+        const { data, error } = await query;
+        if (error) return errorResult(error);
+
+        const items = data ?? [];
+
+        let text: string;
+        if (params.response_format === ResponseFormat.MARKDOWN) {
+          const lines = [`## Máquinas (${items.length})`, ""];
+          if (items.length === 0) {
+            lines.push("_Nenhuma máquina cadastrada._");
+          } else {
+            let ultimoTipo = "";
+            for (const m of items) {
+              if (m.tipo !== ultimoTipo) {
+                lines.push(`### ${m.tipo}`);
+                ultimoTipo = m.tipo;
+              }
+              lines.push(`- **${m.nome}** (\`${m.id}\`)`);
+              if (m.custo_hora) lines.push(`  - Custo/hora: ${formatBRL(m.custo_hora)}`);
+              if (m.custo_m2) lines.push(`  - Custo/m²: ${formatBRL(m.custo_m2)}`);
+              if (m.depreciacao_mensal) lines.push(`  - Depreciação/mês: ${formatBRL(m.depreciacao_mensal)}`);
+              if (m.area_util_m) lines.push(`  - Área útil: ${m.area_util_m}m`);
+            }
+          }
+          text = lines.join("\n");
+        } else {
+          text = JSON.stringify({ count: items.length, items }, null, 2);
+        }
+
+        return {
+          content: [{ type: "text" as const, text }],
+          structuredContent: { count: items.length, items },
+        };
+      } catch (error) {
+        return errorResult(error);
+      }
+    }
+  );
+
+  // ─── croma_listar_acabamentos_servicos ─────────────────────────────────────
+
+  server.registerTool(
+    "croma_listar_acabamentos_servicos",
+    {
+      title: "Listar Acabamentos e Serviços",
+      description: `Lista acabamentos e serviços disponíveis para uso em orçamentos.
+
+Use para "quais acabamentos temos?", "serviços disponíveis", "custo de laminação", "valor de instalação".
+
+Args:
+  - tipo (string): 'acabamentos'|'servicos'|'ambos' (padrão: ambos)
+  - response_format ('markdown'|'json'): Padrão markdown`,
+      inputSchema: z.object({
+        tipo: z.enum(["acabamentos", "servicos", "ambos"]).default("ambos"),
+        response_format: z.nativeEnum(ResponseFormat).default(ResponseFormat.MARKDOWN),
+      }).strict(),
+      annotations: { readOnlyHint: true, destructiveHint: false, idempotentHint: true, openWorldHint: false },
+    },
+    async (params) => {
+      try {
+        const sb = getAdminClient();
+
+        const [acabResult, servResult] = await Promise.all([
+          params.tipo !== "servicos"
+            ? sb.from("acabamentos").select("id, nome, descricao, custo_unitario, unidade, ativo, ordem").eq("ativo", true).order("ordem").order("nome")
+            : Promise.resolve({ data: [], error: null }),
+          params.tipo !== "acabamentos"
+            ? sb.from("servicos").select("id, nome, descricao, custo_hora, horas_estimadas, preco_fixo, categoria, ativo").eq("ativo", true).order("categoria").order("nome")
+            : Promise.resolve({ data: [], error: null }),
+        ]);
+
+        if (acabResult.error) return errorResult(acabResult.error);
+        if (servResult.error) return errorResult(servResult.error);
+
+        const acabamentos = acabResult.data ?? [];
+        const servicos = servResult.data ?? [];
+
+        let text: string;
+        if (params.response_format === ResponseFormat.MARKDOWN) {
+          const lines: string[] = [];
+
+          if (acabamentos.length > 0) {
+            lines.push(`## Acabamentos (${acabamentos.length})`, "");
+            for (const a of acabamentos) {
+              lines.push(`- **${a.nome}** — ${formatBRL(a.custo_unitario)}/${a.unidade ?? "un"}${a.descricao ? ` — ${a.descricao}` : ""}`);
+            }
+            lines.push("");
+          }
+
+          if (servicos.length > 0) {
+            lines.push(`## Serviços (${servicos.length})`, "");
+            let ultimaCat = "";
+            for (const s of servicos) {
+              if (s.categoria !== ultimaCat) {
+                lines.push(`### ${s.categoria ?? "Outros"}`);
+                ultimaCat = s.categoria ?? "";
+              }
+              const preco = s.preco_fixo
+                ? formatBRL(s.preco_fixo)
+                : `${formatBRL(s.custo_hora)}/h × ${s.horas_estimadas}h`;
+              lines.push(`- **${s.nome}** — ${preco}${s.descricao ? ` — ${s.descricao}` : ""}`);
+            }
+          }
+
+          if (lines.length === 0) lines.push("_Nenhum item encontrado._");
+          text = lines.join("\n");
+        } else {
+          text = JSON.stringify({ acabamentos, servicos }, null, 2);
+        }
+
+        return {
+          content: [{ type: "text" as const, text }],
+          structuredContent: { acabamentos, servicos },
+        };
+      } catch (error) {
+        return errorResult(error);
+      }
+    }
+  );
 }
