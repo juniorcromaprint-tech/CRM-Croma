@@ -30,6 +30,7 @@ import { registerSistemaTools } from "./tools/sistema.js";
 import { registerFiscalTools } from "./tools/fiscal.js";
 import { registerQualidadeTools } from "./tools/qualidade.js";
 import { registerAdminTools } from "./tools/admin.js";
+import { registerImpressoraTools } from "./tools/impressora.js";
 
 // ─── Inicialização do servidor ──────────────────────────────────────────────
 
@@ -51,8 +52,9 @@ registerSistemaTools(server);     // 2 ferramentas: sistema
 registerFiscalTools(server);      // 3 ferramentas: NF-e
 registerQualidadeTools(server);   // 3 ferramentas: ocorrências de qualidade
 registerAdminTools(server);       // 3 ferramentas: catálogo e precificação
+registerImpressoraTools(server);  // 6 ferramentas: HP Latex 365 — jobs, resumo, vincular, registrar, custo_real_pedido, mapear_substrato
 
-// Total: 48 ferramentas
+// Total: 54 ferramentas
 
 // ─── Validação de credenciais ───────────────────────────────────────────────
 
@@ -87,15 +89,14 @@ async function main(): Promise<void> {
     process.stderr.write(`[croma-mcp] Aviso: ${err instanceof Error ? err.message : String(err)}\n`);
   }
 
-  // Inicia o servidor MCP com transport stdio
+  // Inicia o servidor via stdio (comunicação com Claude)
   const transport = new StdioServerTransport();
   await server.connect(transport);
 
-  process.stderr.write("[croma-mcp] 🚀 Servidor iniciado — aguardando conexões via stdio\n");
-  process.stderr.write("[croma-mcp] 📊 43 ferramentas disponíveis\n");
+  process.stderr.write(`[croma-mcp] 🚀 Servidor Croma MCP iniciado (54 ferramentas)\n`);
 }
 
-main().catch((error: unknown) => {
-  process.stderr.write(`[croma-mcp] ERRO FATAL: ${error instanceof Error ? error.message : String(error)}\n`);
+main().catch((err) => {
+  process.stderr.write(`[croma-mcp] Erro fatal: ${err instanceof Error ? err.message : String(err)}\n`);
   process.exit(1);
 });

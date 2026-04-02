@@ -1,6 +1,6 @@
 # CROMA PRINT — CRM/ERP SISTEMA
 
-> **Versão**: 5.6 | **Atualizado**: 2026-04-01 | **Status**: Operacional em Produção — CROMA 4.0 completo + MCP Server 48 ferramentas + Ponte Cowork→MCP ativa
+> **Versão**: 5.7 | **Atualizado**: 2026-04-02 | **Status**: Operacional em Produção — CROMA 4.0 completo + MCP Server 54 ferramentas + HP Latex 365 integrada + Ponte Cowork→MCP ativa
 
 ---
 
@@ -49,10 +49,11 @@
 - ✅ Enviar emails reais via Edge Functions quando prometer ao cliente
 - ✅ Operar como um vendedor real usando o ERP, não como chatbot
 - ✅ Usar o motor Mubisys (materiais + markup + regras) para precificação
+- ✅ Consultar custo real de impressão via `croma_custo_real_pedido` / `croma_resumo_impressora` antes de estimar margens
 
 **O MCP Server Croma está disponível em AMBOS os ambientes (CLI e Cowork). Usar `execute_sql` direto no Supabase APENAS para diagnóstico técnico (bugs, triggers, schema).**
 
-### Ferramentas MCP Server Croma (48 total — atualizado 2026-04-01)
+### Ferramentas MCP Server Croma (54 total — atualizado 2026-04-02)
 | Módulo | Ferramentas |
 |---|---|
 | **CRM** | `croma_listar_clientes`, `croma_detalhe_cliente`, `croma_cadastrar_cliente`, `croma_atualizar_cliente`, `croma_listar_leads`, `croma_cadastrar_lead`, `croma_atualizar_status_lead` |
@@ -63,6 +64,7 @@
 | **Fiscal** | `croma_listar_nfe`, `croma_emitir_nfe`, `croma_consultar_status_nfe` |
 | **Qualidade** | `croma_listar_ocorrencias`, `croma_criar_ocorrencia`, `croma_atualizar_ocorrencia` |
 | **Estoque** | `croma_consultar_estoque`, `croma_listar_materiais`, `croma_registrar_movimento` |
+| **Impressora** | `croma_listar_jobs_impressora`, `croma_resumo_impressora`, `croma_vincular_job_impressora`, `croma_registrar_jobs_impressora`, `croma_custo_real_pedido`, `croma_mapear_substrato` |
 | **Admin** | `croma_listar_produtos`, `croma_atualizar_preco_material`, `croma_listar_regras_precificacao` |
 | **BI** | `croma_dashboard_executivo`, `croma_alertas_ativos`, `croma_pipeline_comercial` |
 | **Sistema** | `croma_executar_sql` (SELECT only), `croma_health_check` |
@@ -101,7 +103,7 @@ O script `start-dev.cmd` na raiz do repo:
 |---|---|
 | **Nome** | Croma Print Comunicação Visual |
 | **Segmento** | Comunicação visual profissional para varejo e indústria |
-| **Localização** | Rio Grande do Sul, Brasil |
+| **Localização** | São Paulo-SP, Brasil |
 | **Especialização** | Redes de lojas, franquias, fabricantes de calçados, grandes varejistas |
 | **Diferenciais** | Produção própria, atendimento nacional, padronização de redes |
 | **Faturamento médio** | R$ 110.000/mês |
@@ -153,6 +155,21 @@ Redes de lojas, franquias e grandes varejistas: **Beira Rio, Renner, Paquetá**,
 - URL: `campo-croma.vercel.app`
 - Para técnicos e instaladores — mobile-first
 - Integrado ao ERP via bridge Supabase
+
+### Integração HP Latex 365
+- **IP**: `192.168.0.136` (rede local)
+- **UUID no banco**: `f7f320c9-baa8-4658-a178-fa67f8de3b9e`
+- **Script coleta**: `croma_plotter_sync.py` (raiz do projeto) — Python, roda no PC do Junior
+- **Sync automático**: Scheduled task `hp-latex-sync` — a cada 1h, seg-sex 8-18h
+- **Autenticação**: Supabase service_role JWT (hardcoded no script)
+- **Modelo custeio "LM Âncora"**: custo = tinta (R$0,52/ml × ml estimado) + substrato (variável) + máquina (R$2,40/m²)
+- **Tinta paralela**: bag 3L = R$1.560 → R$0,52/ml. 6 cores paralelas + LM original (âncora)
+- **Fator LM**: consumo_total_ml = lm_ml_real × 21,5316. Fallback: 9,86 ml/m²
+- **Máquina R$2,40/m²**: depreciação + cabeçotes de impressão + cartucho de manutenção
+- **Tabelas**: `impressora_jobs`, `impressora_config` (12 params), `impressora_substrato_map` (22 substratos), `impressora_proporcoes_tinta`
+- **Views**: `vw_custo_real_por_pedido`, `vw_custo_real_por_op` (com 3 componentes)
+- **Trigger**: ao vincular job a OP, `custo_mp_real` atualiza automaticamente
+- **21/22 substratos** pendentes de mapeamento no `impressora_substrato_map` (só SM790 mapeado)
 
 ---
 
@@ -247,6 +264,9 @@ Lead → Orçamento → Pedido → Produção → Instalação → Faturamento
 | `028_retornos_bancarios.sql` | ✅ Executada | Tabelas para retorno CNAB 400 (baixa automática boletos) |
 | `029_campanha_destinatarios.sql` | ✅ Executada | Destinatários de campanhas comerciais |
 | `030_optimistic_lock.sql` | ✅ Executada | Campo `version` para lock otimista em pedidos e propostas |
+| `113_impressora_jobs.sql` | ✅ Executada | impressora_jobs, impressora_config (12 params), impressora_proporcoes_tinta (7 cores) |
+| `114_impressora_integracao_completa.sql` | ✅ Executada | impressora_substrato_map (22 substratos), views vw_custo_real_por_pedido/op, trigger auto-custo OP, maquina_id/substrato_material_id |
+| `115_impressora_custo_maquina_3componentes.sql` | ✅ Executada | custo_maquina_brl, config custo_maquina_m2=2.40, views com 3 componentes (tinta+substrato+máquina) |
 
 ### Dados no Banco
 - `clientes`: 307 registros
