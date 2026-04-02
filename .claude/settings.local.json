@@ -10,6 +10,7 @@
       "Bash(pnpm tsc:*)",
       "Bash(pnpm install:*)",
       "Bash(pnpm run:*)",
+      "Bash(pnpm add:*)",
       "Bash(node:*)",
       "Bash(python3:*)",
       "Bash(git status:*)",
@@ -32,41 +33,62 @@
       "Bash(head:*)",
       "Bash(tail:*)",
       "Bash(cat:*)",
-      "Bash(done)",
-      "Read(//c/Users/Caldera/Claude/CRM-Croma/**)",
-      "mcp__claude_ai_Supabase__list_tables",
-      "mcp__claude_ai_Supabase__execute_sql",
-      "Read(//c/Users/Caldera/.claude/projects/c--Users-Caldera-Claude-CRM-Croma/54985425-7cf9-436c-9c3d-76c8fa42b8bc/tool-results/**)",
-      "Bash(pnpm add:*)",
-      "Read(//c/Users/Caldera/Claude/AutoBid-Instagram/**)",
-      "mcp__claude_ai_Rube__RUBE_SEARCH_TOOLS",
-      "mcp__claude_ai_Rube__RUBE_MANAGE_CONNECTIONS",
-      "Read(//c/Users/Caldera/Claude/**)",
-      "mcp__claude_ai_Rube__RUBE_MULTI_EXECUTE_TOOL",
-      "mcp__claude_ai_Rube__RUBE_REMOTE_WORKBENCH",
-      "Read(//c/Users/Caldera/.claude/**)",
-      "Read(//c/Users/Caldera/Documents/AutoBid_Instagram/**)",
-      "Bash(start \"https://ads.google.com/aw/bulk/scripts/edit/new?ocid=9928049560\")",
-      "Bash(powershell -Command \"Start-Process ''https://ads.google.com/aw/bulk/scripts/edit/new?ocid=9928049560''\")",
       "Bash(clip)",
-      "Bash(echo '{\"\"\"\"jsonrpc\"\"\"\":\"\"\"\"2.0\"\"\"\",\"\"\"\"id\"\"\"\":21,\"\"\"\"method\"\"\"\":\"\"\"\"tools/call\"\"\"\",\"\"\"\"params\"\"\"\":{\"\"\"\"name\"\"\"\":\"\"\"\"execute-gaql-query\"\"\"\",\"\"\"\"arguments\"\"\"\":{\"\"\"\"query\"\"\"\":\"\"\"\"SELECT campaign_criterion.negative, campaign_criterion.keyword.text, campaign_criterion.keyword.match_type FROM campaign_criterion WHERE campaign.name = ''''Leads-Search-1'''' AND campaign_criterion.negative = true ORDER BY campaign_criterion.keyword.text LIMIT 100\"\"\"\",\"\"\"\"customerId\"\"\"\":9928049560,\"\"\"\"loginCustomerId\"\"\"\":9928049560,\"\"\"\"reportAggregation\"\"\"\":\"\"\"\"\"\"\"\"}}}')",
-      "Bash(echo '{\"\"\"\"jsonrpc\"\"\"\":\"\"\"\"2.0\"\"\"\",\"\"\"\"id\"\"\"\":22,\"\"\"\"method\"\"\"\":\"\"\"\"tools/call\"\"\"\",\"\"\"\"params\"\"\"\":{\"\"\"\"name\"\"\"\":\"\"\"\"execute-gaql-query\"\"\"\",\"\"\"\"arguments\"\"\"\":{\"\"\"\"query\"\"\"\":\"\"\"\"SELECT campaign_criterion.keyword.text FROM campaign_criterion WHERE campaign.name = ''''Leads-Search-1'''' AND campaign_criterion.negative = true LIMIT 100\"\"\"\",\"\"\"\"customerId\"\"\"\":9928049560,\"\"\"\"loginCustomerId\"\"\"\":9928049560,\"\"\"\"reportAggregation\"\"\"\":\"\"\"\"\"\"\"\"}}}')",
-      "WebFetch(domain:docs.connectpay.vc)",
-      "Read(//d/OneDrive/Área de Trabalho/connectpay-pix-checkout-v2/**)",
-      "WebSearch",
-      "WebFetch(domain:connectpay.vc)",
-      "WebFetch(domain:artta.com.br)",
-      "Bash(find /c/Users/Caldera/Claude/CRM-Croma/src -type f \\\\\\(-name *ai* -o -name *AI* \\\\\\))",
-      "Bash(xargs -I {} basename {})",
-      "mcp__claude_ai_Supabase__apply_migration",
-      "mcp__Claude_Preview__preview_start",
+      "Bash(where claude:*)",
       "Bash(gh pr:*)",
       "Bash(gh auth:*)",
+      "Bash(xargs -I {} basename {})",
+      "Read(//c/Users/Caldera/Claude/**)",
+      "Read(//c/Users/Caldera/.claude/**)",
+      "Read(//c/Users/Caldera/Documents/AutoBid_Instagram/**)",
+      "Read(//d/OneDrive/Área de Trabalho/connectpay-pix-checkout-v2/**)",
+      "mcp__claude_ai_Supabase__list_tables",
+      "mcp__claude_ai_Supabase__execute_sql",
+      "mcp__claude_ai_Supabase__apply_migration",
+      "mcp__claude_ai_Supabase__deploy_edge_function",
+      "mcp__claude_ai_Rube__RUBE_SEARCH_TOOLS",
+      "mcp__claude_ai_Rube__RUBE_MANAGE_CONNECTIONS",
+      "mcp__claude_ai_Rube__RUBE_MULTI_EXECUTE_TOOL",
+      "mcp__claude_ai_Rube__RUBE_REMOTE_WORKBENCH",
+      "mcp__Claude_Preview__preview_start",
+      "mcp__plugin_telegram_telegram__reply",
+      "mcp__plugin_context-mode_context-mode__ctx_batch_execute",
+      "mcp__plugin_context-mode_context-mode__ctx_execute",
+      "mcp__plugin_context-mode_context-mode__ctx_stats",
       "Skill(telegram:configure)",
-      "mcp__plugin_telegram_telegram__reply"
+      "WebSearch",
+      "WebFetch(domain:docs.connectpay.vc)",
+      "WebFetch(domain:connectpay.vc)",
+      "WebFetch(domain:artta.com.br)",
+      "mcp__plugin_context-mode_context-mode__ctx_execute_file",
+      "mcp__claude_ai_Supabase__get_project"
     ],
     "additionalDirectories": [
       "C:\\Users\\Caldera\\Claude\\AutoBid-Instagram"
+    ]
+  },
+  "hooks": {
+    "PostToolUse": [
+      {
+        "matcher": "Bash(git commit*)",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "echo \"LEMBRETE: Atualizar .planning/STATE.md com a atividade desta sessão.\""
+          }
+        ]
+      }
+    ],
+    "PreToolUse": [
+      {
+        "matcher": "mcp__claude_ai_Supabase__apply_migration",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "echo \"ATENÇÃO: apply_migration executa DDL no banco de produção (djwjmfgplnqyffdcgdaw). Confirme com o Junior antes de prosseguir.\""
+          }
+        ]
+      }
     ]
   }
 }
