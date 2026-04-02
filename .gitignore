@@ -55,3 +55,11 @@ dev-dist/
 *.bak
 *.cmd
 !start-dev.cmd
+
+# HP Latex dump files (dados locais, nao versionar)
+hp_latex_consumables.xml
+hp_latex_ews_dump/
+
+# Notas fiscais locais
+nf-*.pdf
+
