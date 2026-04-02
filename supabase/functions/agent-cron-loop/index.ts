@@ -49,7 +49,7 @@ interface RuleExecutionResult {
 }
 
 // ── Config ───────────────────────────────────────────────────────────
-const TELEGRAM_BOT_TOKEN = Deno.env.get('TELEGRAM_BOT_TOKEN') ?? '';
+let TELEGRAM_BOT_TOKEN = Deno.env.get('TELEGRAM_BOT_TOKEN') ?? '';
 const TELEGRAM_CHAT_ID = '1065519625'; // Junior
 
 const PIX_CNPJ = '18.923.994/0001-83';
@@ -78,6 +78,16 @@ Deno.serve(async (req) => {
 
   const startTime = Date.now();
   const supabase = createClient(SUPABASE_URL, SERVICE_ROLE_KEY);
+
+  // Lazy-load TELEGRAM_BOT_TOKEN from admin_config if not in env
+  if (!TELEGRAM_BOT_TOKEN) {
+    const { data: tgConfig } = await supabase
+      .from('admin_config')
+      .select('valor')
+      .eq('chave', 'TELEGRAM_BOT_TOKEN')
+      .single();
+    TELEGRAM_BOT_TOKEN = tgConfig?.valor ?? '';
+  }
 
   try {
     // ── 1. Check business hours (BRT = UTC-3) ──
@@ -373,6 +383,10 @@ async function evaluateRule(supabase: SupabaseClient, rule: AgentRule): Promise<
     case 'valor_pedido_maximo':
       return []; // Rules de limite são validadas no frontend, não aqui
 
+    // ── RESUMO DIÁRIO — processado no ciclo noturno, não aqui ──
+    case 'Resumo diario':
+      return [];
+
     default:
       console.warn(`Rule ${rule.nome} não tem query mapeada — skip`);
       return [];
@@ -509,11 +523,25 @@ async function executeCobranca(supabase: SupabaseClient, rule: AgentRule, match:
   }
 
   // Executar envio baseado no canal
-  if (canal === 'whatsapp' && nivel <= 2) {
-    // WhatsApp: criar mensagem no sistema de agente para envio
-    // (WhatsApp proativo requer template Meta aprovado — WA-02 pendente)
-    // Fallback: registrar a cobrança e enviar por email
-    if (match.email) {
+  if (canal === 'whatsapp' && nivel <= 2 && match.telefone) {
+    // Tentar envio via template Meta aprovado
+    const { data: templateConfig } = await supabase
+      .from('admin_config')
+      .select('valor')
+      .eq('chave', 'WHATSAPP_TEMPLATE_COBRANCA')
+      .single();
+
+    if (templateConfig?.valor) {
+      const sent = await sendWhatsAppTemplate(supabase, match.telefone, templateConfig.valor, {
+        '1': match.cliente_nome ?? 'Cliente',
+        '2': formatBRL(match.saldo ?? match.valor_original ?? 0),
+        '3': formatDate(match.data_vencimento),
+      });
+      if (!sent && match.email) {
+        await sendCobrancaEmail(supabase, match, mensagem, nivel);
+      }
+    } else if (match.email) {
+      // Fallback: email
       await sendCobrancaEmail(supabase, match, mensagem, nivel);
     }
   } else if (canal === 'email' && nivel === 3) {
@@ -545,32 +573,62 @@ async function executeCobranca(supabase: SupabaseClient, rule: AgentRule, match:
 }
 
 async function sendCobrancaEmail(supabase: SupabaseClient, match: any, mensagem: string, nivel: number): Promise<void> {
-  // Buscar credenciais SMTP do admin_config
-  const { data: smtpConfig } = await supabase
-    .from('admin_config')
-    .select('valor')
-    .eq('chave', 'smtp_config')
-    .single();
-
-  if (!smtpConfig?.valor || !match.email) return;
-
-  const smtp = typeof smtpConfig.valor === 'string' ? JSON.parse(smtpConfig.valor) : smtpConfig.valor;
+  if (!match.email) return;
 
   const assunto = nivel <= 2
     ? `Lembrete de pagamento — Croma Print`
     : `Aviso de título em aberto — Croma Print`;
 
-  // Chamar Edge Function de envio de email
   try {
-    await supabase.functions.invoke('agent-enviar-email', {
-      body: {
-        to: match.email,
+    // Usar Resend diretamente (agent-enviar-email requer conversa ativa com lead)
+    let resendKey = Deno.env.get('RESEND_API_KEY') ?? '';
+    if (!resendKey) {
+      const { data: keyRow } = await supabase
+        .from('admin_config')
+        .select('valor')
+        .eq('chave', 'RESEND_API_KEY')
+        .single();
+      resendKey = keyRow?.valor ?? '';
+    }
+
+    if (!resendKey) {
+      console.warn('sendCobrancaEmail: RESEND_API_KEY não configurado — email não enviado');
+      return;
+    }
+
+    const paragrafos = mensagem
+      .split(/\n\n+/)
+      .map((p) => p.replace(/\n/g, '<br>'))
+      .map((p) => `<p style="margin:0 0 14px 0;font-family:Arial,sans-serif;font-size:15px;line-height:1.6;color:#333;">${p}</p>`)
+      .join('\n');
+
+    const htmlBody = `<!DOCTYPE html><html lang="pt-BR"><head><meta charset="UTF-8"></head>
+<body style="margin:0;padding:32px 24px;background:#f5f5f5;">
+  <div style="max-width:600px;margin:0 auto;background:#fff;border-radius:8px;padding:32px;">
+    ${paragrafos}
+    <hr style="border:none;border-top:1px solid #eee;margin:24px 0;">
+    <p style="font-family:Arial,sans-serif;font-size:12px;color:#999;margin:0;">Croma Print Comunicação Visual — ${EMAIL_COMERCIAL}</p>
+  </div>
+</body></html>`;
+
+    const resp = await fetch('https://api.resend.com/emails', {
+      method: 'POST',
+      headers: { 'Authorization': `Bearer ${resendKey}`, 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        from: `Croma Print <${EMAIL_COMERCIAL}>`,
+        to: [match.email],
         subject: assunto,
-        body: mensagem,
-        from_name: 'Croma Print',
+        html: htmlBody,
         reply_to: EMAIL_COMERCIAL,
-      },
+      }),
     });
+
+    if (!resp.ok) {
+      const errText = await resp.text();
+      console.error(`sendCobrancaEmail: Resend erro ${resp.status}: ${errText.substring(0, 200)}`);
+    } else {
+      console.log(`sendCobrancaEmail: Email enviado para ${match.email} (nível ${nivel})`);
+    }
   } catch (emailErr) {
     console.error(`Erro ao enviar email cobrança: ${(emailErr as Error).message}`);
   }
@@ -749,86 +807,90 @@ async function processNightlyCycle(supabase: SupabaseClient): Promise<any> {
 // FOLLOW-UPS (lógica existente preservada)
 // ══════════════════════════════════════════════════════════════════════
 
+function nextEtapa(current: string): string {
+  const progression: Record<string, string> = {
+    'abertura': 'followup1',
+    'followup1': 'followup2',
+    'followup2': 'followup3',
+    'followup3': 'reengajamento',
+    'reengajamento': 'reengajamento',
+    'proposta': 'negociacao',
+    'negociacao': 'negociacao',
+  };
+  return progression[current] ?? current;
+}
+
 async function processLeadFollowUps(supabase: SupabaseClient, config: any): Promise<any> {
   try {
-    // Check daily send limit
-    const todayStart = new Date();
-    todayStart.setUTCHours(todayStart.getUTCHours() - 3);
-    todayStart.setHours(0, 0, 0, 0);
+    // 1. Buscar conversas ativas com follow-up agendado para agora ou no passado
+    const { data: convs } = await supabase
+      .from('agent_conversations')
+      .select(`
+        id, lead_id, canal, etapa, status, tentativas, max_tentativas,
+        score_engajamento, auto_aprovacao, proximo_followup,
+        leads!inner(id, contato_nome, empresa, email, telefone, temperatura, status, segmento)
+      `)
+      .eq('status', 'ativa')
+      .lte('proximo_followup', new Date().toISOString())
+      .order('proximo_followup', { ascending: true })
+      .limit(config.max_contatos_dia ?? 20);
 
-    const { count: sentToday } = await supabase
-      .from('agent_messages')
-      .select('*', { count: 'exact', head: true })
-      .eq('direcao', 'enviada')
-      .gte('enviado_em', todayStart.toISOString());
-
-    if ((sentToday ?? 0) >= (config.max_contatos_dia ?? 20)) {
-      return { status: 'skipped', motivo: `Limite diário: ${sentToday}/${config.max_contatos_dia}` };
-    }
-
-    // Run orchestrator
-    const { data: orqResult, error: orqError } = await supabase.functions.invoke(
-      'ai-decidir-acao',
-      { body: { modo: 'batch' } }
-    );
-
-    if (orqError) return { status: 'error', motivo: orqError.message };
-
-    const acoes = orqResult?.acoes ?? [];
-    if (acoes.length === 0) return { status: 'ok', total: 0 };
+    if (!convs || convs.length === 0) return { status: 'ok', total: 0, enviadas: 0 };
 
     let enviadas = 0;
-    const remaining = (config.max_contatos_dia ?? 20) - (sentToday ?? 0);
 
-    for (const acao of acoes) {
-      if (enviadas >= remaining) break;
-      if (!['enviar_followup', 'compor_resposta'].includes(acao.acao)) continue;
+    for (const conv of convs) {
+      if (enviadas >= (config.max_contatos_dia ?? 20)) break;
+      if (!conv.leads) continue;
 
-      // Intent detection for quote requests
-      if (acao.acao === 'compor_resposta') {
-        try {
-          const { data: intentResult } = await supabase.functions.invoke(
-            'ai-detectar-intencao-orcamento',
-            { body: { conversation_id: acao.conversation_id, auto_gerar: true } }
-          );
-          if (intentResult?.orcamento_auto && intentResult?.orcamento_resultado?.status === 'proposta_criada') {
-            enviadas++;
-            continue;
-          }
-        } catch { /* continue normal flow */ }
+      // Verificar se já atingiu máximo de tentativas
+      if ((conv.tentativas ?? 0) >= (conv.max_tentativas || config.max_tentativas || 5)) {
+        await supabase.from('agent_conversations').update({
+          status: 'encerrada',
+          metadata: { motivo: 'max_tentativas' },
+        }).eq('id', conv.id);
+        continue;
       }
 
       try {
-        const { data: conv } = await supabase
-          .from('agent_conversations')
-          .select('lead_id, auto_aprovacao, score_engajamento')
-          .eq('id', acao.conversation_id)
-          .single();
-
-        if (!conv?.lead_id) continue;
-
+        // Compor mensagem via ai-compor-mensagem (agora aceita service_role)
         const { data: msgResult, error: msgError } = await supabase.functions.invoke(
           'ai-compor-mensagem',
-          { body: { lead_id: conv.lead_id, canal: acao.canal, etapa: acao.etapa, contexto_extra: acao.motivo } }
+          { body: { lead_id: conv.lead_id, canal: conv.canal, etapa: conv.etapa } }
         );
         if (msgError || !msgResult?.message_id) continue;
 
-        const autoApprove = conv.auto_aprovacao === true && (conv.score_engajamento ?? 0) < 50;
-        if (!autoApprove) continue;
+        // Auto-aprovar se configurado
+        const autoApprove = conv.auto_aprovacao === true;
+        if (autoApprove) {
+          await supabase.from('agent_messages').update({
+            status: 'aprovada',
+            aprovado_em: new Date().toISOString(),
+            metadata: { auto_aprovado: true, motivo: 'followup_automatico' },
+          }).eq('id', msgResult.message_id);
 
-        await supabase.from('agent_messages').update({
-          status: 'aprovada',
-          aprovado_em: new Date().toISOString(),
-          metadata: { auto_aprovado: true, motivo: 'cron_loop_lead_frio' },
-        }).eq('id', msgResult.message_id);
+          // Enviar
+          const dispatchFn = conv.canal === 'whatsapp' ? 'whatsapp-enviar' : 'agent-enviar-email';
+          await supabase.functions.invoke(dispatchFn, { body: { message_id: msgResult.message_id } });
+          enviadas++;
+        }
 
-        const dispatchFn = acao.canal === 'whatsapp' ? 'whatsapp-enviar' : 'agent-enviar-email';
-        await supabase.functions.invoke(dispatchFn, { body: { message_id: msgResult.message_id } });
-        enviadas++;
-      } catch { /* log and continue */ }
+        // Atualizar próximo follow-up
+        const diasFollowup = config.dias_entre_followup ?? 3;
+        const proxFollowup = new Date();
+        proxFollowup.setDate(proxFollowup.getDate() + diasFollowup);
+
+        await supabase.from('agent_conversations').update({
+          tentativas: (conv.tentativas ?? 0) + 1,
+          proximo_followup: proxFollowup.toISOString(),
+          etapa: nextEtapa(conv.etapa),
+        }).eq('id', conv.id);
+      } catch (err) {
+        console.error(`Follow-up error conv ${conv.id}:`, (err as Error).message);
+      }
     }
 
-    return { status: 'ok', total: acoes.length, enviadas };
+    return { status: 'ok', total: convs.length, enviadas };
   } catch (err) {
     return { status: 'error', motivo: (err as Error).message };
   }
@@ -860,4 +922,55 @@ function jsonOk(data: unknown) {
   return new Response(JSON.stringify(data), {
     status: 200, headers: { 'Content-Type': 'application/json' },
   });
+}
+
+// ══════════════════════════════════════════════════════════════════════
+// WHATSAPP TEMPLATE SENDER (proactive messages)
+// ══════════════════════════════════════════════════════════════════════
+
+async function sendWhatsAppTemplate(
+  supabase: SupabaseClient,
+  toPhone: string,
+  templateName: string,
+  params: Record<string, string>
+): Promise<boolean> {
+  const keys = ['WHATSAPP_ACCESS_TOKEN', 'WHATSAPP_PHONE_NUMBER_ID', 'WHATSAPP_API_VERSION'];
+  const { data: configs } = await supabase
+    .from('admin_config')
+    .select('chave, valor')
+    .in('chave', keys);
+
+  const cfg: Record<string, string> = {};
+  for (const c of configs ?? []) cfg[c.chave] = c.valor;
+
+  const token = cfg['WHATSAPP_ACCESS_TOKEN'];
+  const phoneId = cfg['WHATSAPP_PHONE_NUMBER_ID'];
+  const apiVersion = cfg['WHATSAPP_API_VERSION'] || 'v22.0';
+  if (!token || !phoneId) return false;
+
+  const bodyParameters = Object.values(params).map((value) => ({ type: 'text', text: value }));
+
+  const resp = await fetch(
+    `https://graph.facebook.com/${apiVersion}/${phoneId}/messages`,
+    {
+      method: 'POST',
+      headers: { 'Authorization': `Bearer ${token}`, 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        messaging_product: 'whatsapp',
+        to: toPhone,
+        type: 'template',
+        template: {
+          name: templateName,
+          language: { code: 'pt_BR' },
+          components: [{ type: 'body', parameters: bodyParameters }],
+        },
+      }),
+    }
+  );
+
+  if (!resp.ok) {
+    const err = await resp.text();
+    console.error(`sendWhatsAppTemplate: ${resp.status} — ${err.substring(0, 200)}`);
+  }
+  return resp.ok;
 }

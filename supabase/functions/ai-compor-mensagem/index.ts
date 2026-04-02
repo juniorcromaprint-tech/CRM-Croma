@@ -87,33 +87,38 @@ serve(async (req: Request) => {
   const corsHeaders = getCorsHeaders(req);
 
   try {
-    // Auth: validate JWT and check role
+    // Auth: accept user JWT OR service_role (for cron/internal calls)
     const authHeader = req.headers.get('Authorization');
-    if (!authHeader?.startsWith('Bearer ')) {
-      return new Response(JSON.stringify({ error: 'Token não fornecido' }), {
-        status: 401, headers: { ...corsHeaders, 'Content-Type': 'application/json' }
-      });
-    }
-    const token = authHeader.replace('Bearer ', '');
-    const supabaseAuth = createClient(
-      Deno.env.get('SUPABASE_URL')!,
-      Deno.env.get('SUPABASE_ANON_KEY')!
-    );
-    const { data: { user }, error: userAuthError } = await supabaseAuth.auth.getUser(token);
-    if (userAuthError || !user) {
-      return new Response(JSON.stringify({ error: 'Token inválido' }), {
-        status: 401, headers: { ...corsHeaders, 'Content-Type': 'application/json' }
-      });
-    }
-    {
-      const supabaseService = getServiceClient();
-      const { data: profile } = await supabaseService.from('profiles').select('role').eq('id', user.id).single();
-      const allowedRoles = ['comercial', 'gerente', 'admin'];
-      if (!profile || !allowedRoles.includes(profile.role)) {
-        return new Response(JSON.stringify({ error: 'Sem permissão' }), {
-          status: 403, headers: { ...corsHeaders, 'Content-Type': 'application/json' }
-        });
+    const SERVICE_ROLE_KEY = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!;
+    let isAuthorized = false;
+    let userId: string | null = null;
+
+    if (authHeader?.startsWith('Bearer ')) {
+      const token = authHeader.replace('Bearer ', '');
+      if (token === SERVICE_ROLE_KEY) {
+        isAuthorized = true;
+      } else {
+        const supabaseAuth = createClient(
+          Deno.env.get('SUPABASE_URL')!,
+          Deno.env.get('SUPABASE_ANON_KEY')!
+        );
+        const { data: { user } } = await supabaseAuth.auth.getUser(token);
+        if (user) {
+          const supabaseService = getServiceClient();
+          const { data: profile } = await supabaseService.from('profiles').select('role').eq('id', user.id).single();
+          const allowedRoles = ['comercial', 'gerente', 'admin'];
+          if (profile && allowedRoles.includes(profile.role)) {
+            isAuthorized = true;
+            userId = user.id;
+          }
+        }
       }
+    }
+
+    if (!isAuthorized) {
+      return new Response(JSON.stringify({ error: 'Unauthorized' }), {
+        status: 401, headers: { ...corsHeaders, 'Content-Type': 'application/json' }
+      });
     }
 
     const body = await req.json();
@@ -370,7 +375,7 @@ serve(async (req: Request) => {
           await supabase.from('agent_messages').delete().eq('id', savedMsg.id);
 
           await logAICall({
-            user_id: user.id,
+            user_id: userId ?? undefined,
             function_name: 'compor-mensagem' as any,
             entity_type: 'geral',
             entity_id: lead_id,
@@ -401,7 +406,7 @@ serve(async (req: Request) => {
           await supabase.from('agent_messages').delete().eq('id', savedMsg.id);
 
           await logAICall({
-            user_id: user.id,
+            user_id: userId ?? undefined,
             function_name: 'compor-mensagem' as any,
             entity_type: 'geral',
             entity_id: lead_id,
@@ -428,7 +433,7 @@ serve(async (req: Request) => {
 
     // ── 15. Log ───────────────────────────────────────────────
     await logAICall({
-      user_id: user.id,
+      user_id: userId ?? undefined,
       function_name: 'compor-mensagem' as any,
       entity_type: 'geral',
       entity_id: lead_id,

@@ -17,9 +17,22 @@ import { callOpenRouter, setFallbackModel } from '../ai-shared/openrouter-provid
 // ─────────────────────────────────────────────────────────────
 // Constants
 // ─────────────────────────────────────────────────────────────
-const TELEGRAM_BOT_TOKEN = '8750164337:AAH8Diet4zGJddKHq_F2F1JobUA2djisU8s';
+let _telegramToken: string | null = null;
 const JUNIOR_CHAT_ID = '1065519625';
-const TELEGRAM_API = `https://api.telegram.org/bot${TELEGRAM_BOT_TOKEN}`;
+
+async function getTelegramToken(supabase: ReturnType<typeof getServiceClient>): Promise<string> {
+  if (_telegramToken) return _telegramToken;
+  _telegramToken = Deno.env.get('TELEGRAM_BOT_TOKEN') ?? '';
+  if (!_telegramToken) {
+    const { data } = await supabase
+      .from('admin_config')
+      .select('valor')
+      .eq('chave', 'TELEGRAM_BOT_TOKEN')
+      .single();
+    _telegramToken = data?.valor ?? '';
+  }
+  return _telegramToken;
+}
 const CLAUDE_MODEL = 'anthropic/claude-sonnet-4';
 const FALLBACK_MODEL = 'openai/gpt-4.1-mini';
 
@@ -78,9 +91,11 @@ async function validateSignature(req: Request, rawBody: string): Promise<boolean
 // ─────────────────────────────────────────────────────────────
 // Send Telegram notification
 // ─────────────────────────────────────────────────────────────
-async function notifyTelegram(text: string): Promise<void> {
+async function notifyTelegram(supabase: ReturnType<typeof getServiceClient>, text: string): Promise<void> {
   try {
-    await fetch(`${TELEGRAM_API}/sendMessage`, {
+    const token = await getTelegramToken(supabase);
+    if (!token) return;
+    await fetch(`https://api.telegram.org/bot${token}/sendMessage`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({
@@ -196,6 +211,16 @@ NÃO gere orçamento sem ter pelo menos: nome completo, email e cidade/estado.\n
 2. Experiência com redes = padronização para múltiplas lojas
 3. Atendimento personalizado = cada projeto é único
 4. Desde o projeto até a instalação = solução completa
+
+## FAIXAS DE PREÇO (referência — orçamento formal calculado pelo sistema)
+- *Banners/Lonas*: a partir de R$ 25/m² (lona 280g) até R$ 55/m² (lona 440g frontlit)
+- *Adesivos*: a partir de R$ 35/m² (vinil comum) até R$ 120/m² (perfurado/especial)
+- *Fachadas ACM*: a partir de R$ 450/m² (projeto completo com instalação)
+- *Placas PVC*: a partir de R$ 90/m² | PS: R$ 80/m² | ACM: R$ 280/m²
+- *Letras caixa*: a partir de R$ 85/letra (galvanizada 20cm)
+- *Cavaletes*: R$ 120 (P madeira) a R$ 350 (G metálico)
+- *Material PDV*: displays a partir de R$ 45, faixas de gôndola a partir de R$ 12
+- ATENÇÃO: estes são valores de *REFERÊNCIA*. O orçamento formal terá o preço exato calculado automaticamente pelo sistema com os materiais e configurações específicas.
 ${coletaDados}
 ## REGRAS DE RESPOSTA
 1. SEMPRE em português brasileiro, profissional mas caloroso
@@ -657,6 +682,31 @@ serve(async (req: Request) => {
     const messages = value.messages as Record<string, unknown>[] | undefined;
     const contacts = value.contacts as Record<string, unknown>[] | undefined;
 
+    // ── Process delivery/read status updates ────────────────
+    const statuses = (value.statuses as Record<string, unknown>[] | undefined) ?? [];
+    if (statuses.length > 0) {
+      const supabaseStatus = getServiceClient();
+      for (const status of statuses) {
+        const waMessageId = status.id as string;
+        const statusType = status.status as string;
+        const { data: msgs } = await supabaseStatus
+          .from('agent_messages')
+          .select('id, status')
+          .contains('metadata', { whatsapp_message_id: waMessageId })
+          .limit(1);
+        if (msgs && msgs.length > 0) {
+          const newStatus = statusType === 'read' ? 'lida'
+            : statusType === 'delivered' ? 'entregue'
+            : statusType === 'failed' ? 'erro'
+            : (msgs[0] as any).status;
+          const updateData: Record<string, unknown> = { status: newStatus };
+          if (statusType === 'read') updateData.lido_em = new Date().toISOString();
+          if (statusType === 'failed') updateData.erro_mensagem = (status.errors as any)?.[0]?.message ?? 'Delivery failed';
+          await supabaseStatus.from('agent_messages').update(updateData).eq('id', (msgs[0] as any).id);
+        }
+      }
+    }
+
     if (!messages || messages.length === 0) return new Response('OK', { status: 200 });
 
     const message = messages[0];
@@ -803,7 +853,7 @@ serve(async (req: Request) => {
         .eq('id', conversation.id);
 
       const leadLabel = isNewLead ? '🆕 NOVO' : '⚠️';
-      await notifyTelegram(
+      await notifyTelegram(supabase,
         `${leadLabel} *ESCALAÇÃO WhatsApp*\n\n` +
         `👤 *${contactName || 'Sem nome'}*\n` +
         `📞 +${normalizedPhone}\n\n` +
@@ -826,7 +876,7 @@ serve(async (req: Request) => {
 
     if (!claudeResult) {
       // Claude failed — notify Junior to respond manually
-      await notifyTelegram(
+      await notifyTelegram(supabase,
         `📱 *WhatsApp — ${isNewLead ? '🆕 NOVO LEAD' : '💬 MENSAGEM'}*\n\n` +
         `👤 *${contactName || 'Sem nome'}*\n` +
         `📞 +${normalizedPhone}\n\n` +
@@ -923,7 +973,7 @@ serve(async (req: Request) => {
     const truncResp = resposta.length > 200 ? resposta.substring(0, 200) + '…' : resposta;
     const truncMsg = textBody.length > 150 ? textBody.substring(0, 150) + '…' : textBody;
 
-    await notifyTelegram(
+    await notifyTelegram(supabase,
       `🤖 *Auto-resposta WhatsApp* ${statusEmoji} ${intentLabel}\n\n` +
       `👤 *${contactName || 'Sem nome'}*${isNewLead ? ' (NOVO LEAD)' : ''}\n` +
       `📞 +${normalizedPhone}\n\n` +
