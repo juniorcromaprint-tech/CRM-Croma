@@ -9,7 +9,7 @@ import { getSupabaseClient, getUserClient } from "../supabase-client.js";
 import { ResponseFormat } from "../types.js";
 import { errorResult } from "../utils/errors.js";
 import { buildPaginatedResponse, truncateIfNeeded } from "../utils/pagination.js";
-import { formatBRL } from "../utils/formatting.js";
+import { formatBRL, formatDate } from "../utils/formatting.js";
 
 export function registerEstoqueTools(server: McpServer): void {
   // ─── croma_consultar_estoque ───────────────────────────────────────────────
@@ -197,6 +197,342 @@ Args:
         return {
           content: [{ type: "text" as const, text: truncateIfNeeded(text, items.length) }],
           structuredContent: response,
+        };
+      } catch (error) {
+        return errorResult(error);
+      }
+    }
+  );
+
+  // ─── croma_cadastrar_material ──────────────────────────────────────────────
+
+  server.registerTool(
+    "croma_cadastrar_material",
+    {
+      title: "Cadastrar Material",
+      description: `Cria um novo material no catálogo da Croma Print.
+
+ATENÇÃO: Ação que modifica dados. Confirme com o usuário antes de executar.
+
+Args:
+  - codigo (string, obrigatório): Código interno (ex: "MPI3822137")
+  - nome (string, obrigatório): Nome completo do material
+  - categoria (string, opcional): Categoria (Mídia, Acabamento, Estrutura, etc.)
+  - unidade (string, obrigatório): Unidade de medida (m², m, un, kg, L, ml, rolo, chapa, pç)
+  - preco_medio (number, obrigatório): Preço médio por unidade em R$
+  - ncm (string, opcional): NCM fiscal
+  - estoque_minimo (number, opcional): Quantidade mínima (padrão: 0)
+  - estoque_ideal (number, opcional): Quantidade ideal de reposição
+  - estoque_controlado (boolean, opcional): Controlar estoque? (padrão: false)
+  - localizacao (string, opcional): Local no galpão
+  - venda_direta (boolean, opcional): Vendido diretamente? (padrão: false)
+  - aproveitamento (number, opcional): % de aproveitamento (padrão: 100)
+
+Retorna: dados do material criado com ID gerado`,
+      inputSchema: z.object({
+        codigo: z.string().min(1).max(50).describe("Código interno do material"),
+        nome: z.string().min(3).max(300).describe("Nome completo do material"),
+        categoria: z.string().min(1).max(50).optional(),
+        unidade: z.enum(["m²", "m", "un", "kg", "L", "ml", "rolo", "chapa", "pç"]),
+        preco_medio: z.coerce.number().positive().describe("Preço por unidade em R$"),
+        ncm: z.string().max(10).optional(),
+        estoque_minimo: z.coerce.number().min(0).default(0),
+        estoque_ideal: z.coerce.number().min(0).optional(),
+        estoque_controlado: z.boolean().default(false),
+        localizacao: z.string().max(100).optional(),
+        venda_direta: z.boolean().default(false),
+        aproveitamento: z.coerce.number().min(0).max(100).optional(),
+      }).strict(),
+      annotations: {
+        readOnlyHint: false,
+        destructiveHint: false,
+        idempotentHint: false,
+        openWorldHint: false,
+      },
+    },
+    async (params) => {
+      try {
+        const sb = getUserClient();
+        const { data, error } = await sb
+          .from("materiais")
+          .insert({ ...params, ativo: true })
+          .select()
+          .single();
+
+        if (error) return errorResult(error);
+
+        // Criar saldo inicial zerado
+        await sb
+          .from("estoque_saldos")
+          .insert({ material_id: data.id, quantidade_disponivel: 0, quantidade_reservada: 0 });
+
+        return {
+          content: [{
+            type: "text" as const,
+            text: `✅ Material cadastrado com sucesso!\n\n- **ID**: \`${data.id}\`\n- **Código**: ${data.codigo}\n- **Nome**: ${data.nome}\n- **Unidade**: ${data.unidade}\n- **Preço médio**: ${formatBRL(data.preco_medio)}/${data.unidade}`,
+          }],
+          structuredContent: data,
+        };
+      } catch (error) {
+        return errorResult(error);
+      }
+    }
+  );
+
+  // ─── croma_atualizar_material ──────────────────────────────────────────────
+
+  server.registerTool(
+    "croma_atualizar_material",
+    {
+      title: "Atualizar Material",
+      description: `Atualiza dados de um material existente no catálogo. Apenas os campos informados são alterados.
+
+ATENÇÃO: Ação que modifica dados. Alterações no preço afetam orçamentos futuros.
+Confirme com o usuário antes de executar.
+
+Args:
+  - material_id (string, obrigatório): UUID do material
+  - codigo, nome, categoria, unidade, ncm: dados cadastrais
+  - estoque_minimo, estoque_ideal, estoque_controlado: configuração de estoque
+  - localizacao (string, opcional): Local no galpão
+  - ativo (boolean, opcional): Ativar/desativar material
+  - aproveitamento (number, opcional): % de aproveitamento`,
+      inputSchema: z.object({
+        material_id: z.string().uuid().describe("UUID do material"),
+        codigo: z.string().max(50).optional(),
+        nome: z.string().max(300).optional(),
+        categoria: z.string().max(50).optional(),
+        unidade: z.enum(["m²", "m", "un", "kg", "L", "ml", "rolo", "chapa", "pç"]).optional(),
+        ncm: z.string().max(10).optional(),
+        estoque_minimo: z.coerce.number().min(0).optional(),
+        estoque_ideal: z.coerce.number().min(0).optional(),
+        estoque_controlado: z.boolean().optional(),
+        localizacao: z.string().max(100).optional(),
+        ativo: z.boolean().optional(),
+        aproveitamento: z.coerce.number().min(0).max(100).optional(),
+      }).strict(),
+      annotations: {
+        readOnlyHint: false,
+        destructiveHint: false,
+        idempotentHint: true,
+        openWorldHint: false,
+      },
+    },
+    async (params) => {
+      try {
+        const { material_id, ...updates } = params;
+        if (Object.keys(updates).length === 0) {
+          return { content: [{ type: "text" as const, text: "Nenhum campo para atualizar foi informado." }] };
+        }
+
+        const sb = getUserClient();
+        const { data, error } = await sb
+          .from("materiais")
+          .update(updates)
+          .eq("id", material_id)
+          .select()
+          .single();
+
+        if (error) return errorResult(error);
+        if (!data) return { content: [{ type: "text" as const, text: `Material não encontrado: ${material_id}` }] };
+
+        return {
+          content: [{
+            type: "text" as const,
+            text: `✅ Material atualizado!\n\n- **${data.nome}** (\`${data.id}\`)\n- Campos atualizados: ${Object.keys(updates).join(", ")}`,
+          }],
+          structuredContent: data,
+        };
+      } catch (error) {
+        return errorResult(error);
+      }
+    }
+  );
+
+  // ─── croma_sugerir_compra ──────────────────────────────────────────────────
+
+  server.registerTool(
+    "croma_sugerir_compra",
+    {
+      title: "Sugerir Lista de Compras",
+      description: `Gera uma lista de materiais que precisam ser repostos com base nos saldos vs estoque mínimo/ideal.
+
+Use para "o que preciso comprar?", "materiais abaixo do mínimo", "lista de compras semanal".
+
+Args:
+  - apenas_criticos (boolean, opcional): Apenas abaixo do mínimo (padrão: false = todos que precisam de reposição)
+  - response_format ('markdown'|'json'): Padrão markdown`,
+      inputSchema: z.object({
+        apenas_criticos: z.boolean().default(false).describe("Apenas materiais abaixo do mínimo"),
+        response_format: z.nativeEnum(ResponseFormat).default(ResponseFormat.MARKDOWN),
+      }).strict(),
+      annotations: { readOnlyHint: true, destructiveHint: false, idempotentHint: true, openWorldHint: false },
+    },
+    async (params) => {
+      try {
+        const sb = getSupabaseClient();
+
+        const { data, error } = await sb
+          .from("materiais")
+          .select(
+            `id, codigo, nome, categoria, unidade, preco_medio, estoque_minimo, estoque_ideal, estoque_controlado,
+             estoque_saldos(quantidade_disponivel)`
+          )
+          .eq("ativo", true)
+          .eq("estoque_controlado", true);
+
+        if (error) return errorResult(error);
+
+        const materiais = (data ?? []).map(m => {
+          const saldoObj = (m.estoque_saldos as { quantidade_disponivel?: number }[])?.[0] ?? {};
+          const saldo = saldoObj.quantidade_disponivel ?? 0;
+          const minimo = Number(m.estoque_minimo) || 0;
+          const ideal = Number(m.estoque_ideal) || minimo;
+          const qtdSugerida = Math.max(ideal - saldo, 0);
+          const valorEstimado = qtdSugerida * (Number(m.preco_medio) || 0);
+          const critico = saldo < minimo;
+
+          return { ...m, saldo, minimo, ideal, qtdSugerida, valorEstimado, critico };
+        });
+
+        let lista = materiais.filter(m => m.qtdSugerida > 0);
+        if (params.apenas_criticos) {
+          lista = lista.filter(m => m.critico);
+        }
+
+        // Ordenar: críticos primeiro, depois por prioridade (menor proporção saldo/mínimo)
+        lista.sort((a, b) => {
+          if (a.critico && !b.critico) return -1;
+          if (!a.critico && b.critico) return 1;
+          const propA = a.minimo > 0 ? a.saldo / a.minimo : 1;
+          const propB = b.minimo > 0 ? b.saldo / b.minimo : 1;
+          return propA - propB;
+        });
+
+        const valorTotalEstimado = lista.reduce((sum, m) => sum + m.valorEstimado, 0);
+
+        let text: string;
+        if (params.response_format === ResponseFormat.MARKDOWN) {
+          const lines = [
+            `## Lista de Compras Sugerida (${lista.length} itens)`,
+            `**Valor estimado total**: ${formatBRL(valorTotalEstimado)}`,
+            "",
+          ];
+
+          if (lista.length === 0) {
+            lines.push("_Nenhum material precisa de reposição no momento._ ✅");
+          } else {
+            for (const m of lista) {
+              const alerta = m.critico ? " 🔴 CRÍTICO" : " 🟡";
+              lines.push(`### ${m.nome}${alerta}`);
+              if (m.codigo) lines.push(`- **Código**: ${m.codigo}`);
+              if (m.categoria) lines.push(`- **Categoria**: ${m.categoria}`);
+              lines.push(`- **Saldo atual**: ${m.saldo} ${m.unidade ?? "un"}`);
+              lines.push(`- **Mínimo**: ${m.minimo} ${m.unidade ?? "un"}`);
+              lines.push(`- **Ideal**: ${m.ideal} ${m.unidade ?? "un"}`);
+              lines.push(`- **Qtd sugerida**: **${m.qtdSugerida} ${m.unidade ?? "un"}**`);
+              if (m.preco_medio) lines.push(`- **Valor estimado**: ${formatBRL(m.valorEstimado)}`);
+              lines.push("");
+            }
+          }
+
+          text = lines.join("\n");
+        } else {
+          text = JSON.stringify({ count: lista.length, valor_total_estimado: valorTotalEstimado, items: lista }, null, 2);
+        }
+
+        return {
+          content: [{ type: "text" as const, text: truncateIfNeeded(text, lista.length) }],
+          structuredContent: { count: lista.length, valor_total_estimado: valorTotalEstimado, items: lista },
+        };
+      } catch (error) {
+        return errorResult(error);
+      }
+    }
+  );
+
+  // ─── croma_historico_precos_material ───────────────────────────────────────
+
+  server.registerTool(
+    "croma_historico_precos_material",
+    {
+      title: "Histórico de Preços do Material",
+      description: `Retorna o histórico de variações de preço de um material ao longo do tempo.
+
+Use para "como o preço do vinil mudou?", "reajustes do banner lona", "histórico de custo do ACM".
+
+Args:
+  - material_id (string, obrigatório): UUID do material
+  - periodo_meses (number, opcional): Período em meses (padrão: 12, máx: 24)
+  - response_format ('markdown'|'json'): Padrão markdown`,
+      inputSchema: z.object({
+        material_id: z.string().uuid().describe("UUID do material"),
+        periodo_meses: z.coerce.number().int().min(1).max(24).default(12),
+        response_format: z.nativeEnum(ResponseFormat).default(ResponseFormat.MARKDOWN),
+      }).strict(),
+      annotations: { readOnlyHint: true, destructiveHint: false, idempotentHint: true, openWorldHint: false },
+    },
+    async (params) => {
+      try {
+        const sb = getSupabaseClient();
+        const dataInicio = new Date();
+        dataInicio.setMonth(dataInicio.getMonth() - params.periodo_meses);
+
+        const [matResult, histResult] = await Promise.all([
+          sb.from("materiais").select("id, nome, codigo, unidade, preco_medio").eq("id", params.material_id).single(),
+          sb
+            .from("materiais_historico_preco")
+            .select("id, preco_anterior, preco_novo, motivo, created_at")
+            .eq("material_id", params.material_id)
+            .gte("created_at", dataInicio.toISOString())
+            .order("created_at", { ascending: false }),
+        ]);
+
+        if (matResult.error) return errorResult(matResult.error);
+        if (!matResult.data) {
+          return { content: [{ type: "text" as const, text: `Material não encontrado: ${params.material_id}` }] };
+        }
+
+        const mat = matResult.data;
+        const historico = histResult.data ?? [];
+        const fullData = { material: mat, historico, periodo_meses: params.periodo_meses };
+
+        let text: string;
+        if (params.response_format === ResponseFormat.MARKDOWN) {
+          const lines = [
+            `## Histórico de Preços — ${mat.nome}`,
+            mat.codigo ? `**Código**: ${mat.codigo}` : "",
+            `**Preço atual**: ${formatBRL(mat.preco_medio)}/${mat.unidade ?? "un"}`,
+            `**Período**: últimos ${params.periodo_meses} meses`,
+            `**Atualizações**: ${historico.length}`,
+            "",
+          ].filter(Boolean);
+
+          if (historico.length === 0) {
+            lines.push("_Nenhuma alteração de preço registrada no período._");
+          } else {
+            lines.push("## Histórico");
+            for (const h of historico) {
+              const variacao = h.preco_anterior
+                ? ((Number(h.preco_novo) - Number(h.preco_anterior)) / Number(h.preco_anterior) * 100).toFixed(1)
+                : null;
+              const seta = variacao ? (Number(variacao) > 0 ? "📈" : "📉") : "→";
+              lines.push(`### ${formatDate(h.created_at)}`);
+              if (h.preco_anterior) lines.push(`- **Preço anterior**: ${formatBRL(h.preco_anterior)}`);
+              lines.push(`- **Novo preço**: ${formatBRL(h.preco_novo)} ${seta}${variacao ? ` (${Number(variacao) > 0 ? "+" : ""}${variacao}%)` : ""}`);
+              if (h.motivo) lines.push(`- **Motivo**: ${h.motivo}`);
+              lines.push("");
+            }
+          }
+
+          text = lines.join("\n");
+        } else {
+          text = JSON.stringify(fullData, null, 2);
+        }
+
+        return {
+          content: [{ type: "text" as const, text: truncateIfNeeded(text, historico.length) }],
+          structuredContent: fullData,
         };
       } catch (error) {
         return errorResult(error);

@@ -1,6 +1,6 @@
 # CROMA PRINT — CRM/ERP SISTEMA
 
-> **Versão**: 5.7 | **Atualizado**: 2026-04-02 | **Status**: Operacional em Produção — CROMA 4.0 completo + MCP Server 54 ferramentas + HP Latex 365 integrada + Ponte Cowork→MCP ativa
+> **Versão**: 5.8 | **Atualizado**: 2026-04-02 | **Status**: Operacional em Produção — CROMA 4.0 completo + MCP Server 73 ferramentas + HP Latex 365 integrada + Ponte Cowork→MCP ativa
 
 ---
 
@@ -19,7 +19,7 @@
 **Hierarquia de ferramentas (SEM EXCEÇÕES):**
 
 1. **MCP Server Croma — OBRIGATÓRIO PARA TUDO que envolve dados do negócio**
-   - **Localização**: `mcp-server/` na raiz do projeto (**48 ferramentas** — atualizado 2026-04-01)
+   - **Localização**: `mcp-server/` na raiz do projeto (**73 ferramentas** — atualizado 2026-04-02)
    - **No Claude Code (CLI)**: ferramentas `croma_*` diretamente via stdio
    - **No Cowork (Claude Desktop)**: ferramentas `croma_*` via ponte Desktop Commander:
      ```
@@ -53,7 +53,7 @@
 
 **O MCP Server Croma está disponível em AMBOS os ambientes (CLI e Cowork). Usar `execute_sql` direto no Supabase APENAS para diagnóstico técnico (bugs, triggers, schema).**
 
-### Ferramentas MCP Server Croma (54 total — atualizado 2026-04-02)
+### Ferramentas MCP Server Croma (73 total — atualizado 2026-04-02)
 | Módulo | Ferramentas |
 |---|---|
 | **CRM** | `croma_listar_clientes`, `croma_detalhe_cliente`, `croma_cadastrar_cliente`, `croma_atualizar_cliente`, `croma_listar_leads`, `croma_cadastrar_lead`, `croma_atualizar_status_lead` |
@@ -63,9 +63,11 @@
 | **Financeiro** | `croma_listar_contas_receber`, `croma_listar_contas_pagar`, `croma_criar_conta_receber`, `croma_registrar_pagamento`, `croma_criar_conta_pagar`, `croma_registrar_pagamento_cp` |
 | **Fiscal** | `croma_listar_nfe`, `croma_emitir_nfe`, `croma_consultar_status_nfe` |
 | **Qualidade** | `croma_listar_ocorrencias`, `croma_criar_ocorrencia`, `croma_atualizar_ocorrencia` |
-| **Estoque** | `croma_consultar_estoque`, `croma_listar_materiais`, `croma_registrar_movimento` |
+| **Estoque** | `croma_consultar_estoque`, `croma_listar_materiais`, `croma_registrar_movimento`, `croma_cadastrar_material`, `croma_atualizar_material`, `croma_sugerir_compra`, `croma_historico_precos_material` |
 | **Impressora** | `croma_listar_jobs_impressora`, `croma_resumo_impressora`, `croma_vincular_job_impressora`, `croma_registrar_jobs_impressora`, `croma_custo_real_pedido`, `croma_mapear_substrato` |
-| **Admin** | `croma_listar_produtos`, `croma_atualizar_preco_material`, `croma_listar_regras_precificacao` |
+| **Admin** | `croma_listar_produtos`, `croma_atualizar_preco_material`, `croma_listar_regras_precificacao`, `croma_criar_produto`, `croma_criar_modelo_produto`, `croma_atualizar_modelo_produto`, `croma_criar_regra_precificacao`, `croma_atualizar_regra_precificacao` |
+| **Fornecedores** | `croma_listar_fornecedores`, `croma_detalhe_fornecedor`, `croma_cadastrar_fornecedor`, `croma_atualizar_fornecedor`, `croma_historico_compras_fornecedor` |
+| **Compras** | `croma_listar_compras`, `croma_detalhe_compra`, `croma_criar_compra`, `croma_atualizar_status_compra`, `croma_registrar_recebimento` |
 | **BI** | `croma_dashboard_executivo`, `croma_alertas_ativos`, `croma_pipeline_comercial` |
 | **Sistema** | `croma_executar_sql` (SELECT only), `croma_health_check` |
 
