@@ -33,8 +33,8 @@ Args:
         busca: z.string().optional(),
         categoria: z.string().optional(),
         ativo: z.boolean().optional().default(true),
-        limit: z.number().int().min(1).max(100).default(30),
-        offset: z.number().int().min(0).default(0),
+        limit: z.coerce.number().int().min(1).max(100).default(30),
+        offset: z.coerce.number().int().min(0).default(0),
         response_format: z.nativeEnum(ResponseFormat).default(ResponseFormat.MARKDOWN),
       }).strict(),
       annotations: { readOnlyHint: true, destructiveHint: false, idempotentHint: true, openWorldHint: false },
@@ -47,7 +47,7 @@ Args:
           .from("produtos")
           .select(
             `id, codigo, nome, categoria, descricao, unidade_padrao, ativo,
-             produto_modelos(id, nome, markup_padrao, margem_minima, preco_fixo, area_m2, ativo)`,
+             produto_modelos(id, nome, markup_padrao, margem_minima, area_m2, ativo)`,
             { count: "exact" }
           );
 
@@ -76,13 +76,12 @@ Args:
               lines.push(`### ${p.categoria ?? "Sem categoria"}`);
               ultimaCategoria = p.categoria ?? "";
             }
-            const modelos = (p.produto_modelos as { nome: string; markup_padrao?: number; preco_fixo?: number; ativo?: boolean }[]) ?? [];
+            const modelos = (p.produto_modelos as { nome: string; markup_padrao?: number; ativo?: boolean }[]) ?? [];
             const modelosAtivos = modelos.filter(m => m.ativo !== false);
             lines.push(`- **${p.nome}**${p.codigo ? ` (${p.codigo})` : ""} — ${modelosAtivos.length} modelo(s)`);
             for (const m of modelosAtivos.slice(0, 3)) {
               const markup = m.markup_padrao ? ` markup ${m.markup_padrao}%` : "";
-              const fixo = m.preco_fixo ? ` preço fixo ${formatBRL(m.preco_fixo)}` : "";
-              lines.push(`  - ${m.nome}${markup}${fixo}`);
+              lines.push(`  - ${m.nome}${markup}`);
             }
             if (modelosAtivos.length > 3) lines.push(`  - ... e mais ${modelosAtivos.length - 3} modelos`);
           }
@@ -119,7 +118,7 @@ Args:
   - motivo (string, opcional): Motivo da atualização (ex: "reajuste fornecedor")`,
       inputSchema: z.object({
         id: z.string().uuid(),
-        preco_medio: z.number().positive(),
+        preco_medio: z.coerce.number().positive(),
         motivo: z.string().max(200).optional(),
       }).strict(),
       annotations: { readOnlyHint: false, destructiveHint: false, idempotentHint: true, openWorldHint: false },

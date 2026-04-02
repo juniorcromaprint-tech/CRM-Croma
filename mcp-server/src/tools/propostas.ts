@@ -39,10 +39,10 @@ Args:
         cliente_busca: z.string().optional().describe("Busca textual por nome do cliente"),
         data_inicio: z.string().optional().describe("ISO date ex: 2026-01-01"),
         data_fim: z.string().optional().describe("ISO date ex: 2026-03-31"),
-        valor_min: z.number().min(0).optional(),
-        valor_max: z.number().min(0).optional(),
-        limit: z.number().int().min(1).max(100).default(20),
-        offset: z.number().int().min(0).default(0),
+        valor_min: z.coerce.number().min(0).optional(),
+        valor_max: z.coerce.number().min(0).optional(),
+        limit: z.coerce.number().int().min(1).max(100).default(20),
+        offset: z.coerce.number().int().min(0).default(0),
         response_format: z.nativeEnum(ResponseFormat).default(ResponseFormat.MARKDOWN),
       }).strict(),
       annotations: { readOnlyHint: true, destructiveHint: false, idempotentHint: true, openWorldHint: false },
@@ -249,7 +249,7 @@ Args:
       inputSchema: z.object({
         cliente_id: z.string().uuid(),
         titulo: z.string().max(200).optional(),
-        validade_dias: z.number().int().min(1).max(365).default(30),
+        validade_dias: z.coerce.number().int().min(1).max(365).default(30),
         condicoes_pagamento: z.string().max(500).optional(),
         observacoes: z.string().max(2000).optional(),
         desconto_percentual: z.number().min(0).max(100).optional(),
@@ -364,9 +364,10 @@ Args:
     async (params) => {
       try {
         const sb = getUserClient();
+        const adminSb = getAdminClient();
 
-        // Verifica estado atual
-        const { data: atual, error: fetchError } = await sb
+        // Verifica estado atual (admin para evitar filtro RLS)
+        const { data: atual, error: fetchError } = await adminSb
           .from("propostas")
           .select("id, numero, status")
           .eq("id", params.id)
@@ -456,7 +457,7 @@ Obs: Informe proposta_id OU proposta_numero. A proposta é marcada como "enviada
         // Buscar proposta com dados do cliente
         let query = sb
           .from("propostas")
-          .select("id, numero, status, share_token, clientes(nome_fantasia, razao_social, email, contato_nome)");
+          .select("id, numero, status, share_token, clientes(nome_fantasia, razao_social, email)");
 
         if (params.proposta_id) {
           query = query.eq("id", params.proposta_id);
@@ -475,7 +476,6 @@ Obs: Informe proposta_id OU proposta_numero. A proposta é marcada como "enviada
           nome_fantasia?: string;
           razao_social: string;
           email?: string;
-          contato_nome?: string;
         } | null);
 
         const emailDestino = params.destinatario_email ?? cliente?.email;
@@ -515,7 +515,7 @@ Obs: Informe proposta_id OU proposta_numero. A proposta é marcada como "enviada
           body: JSON.stringify({
             proposta_id: proposta.id,
             destinatario_email: emailDestino,
-            destinatario_nome: params.destinatario_nome ?? cliente?.contato_nome,
+            destinatario_nome: params.destinatario_nome ?? cliente?.nome_fantasia ?? cliente?.razao_social,
           }),
         });
 

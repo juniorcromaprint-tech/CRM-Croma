@@ -42,8 +42,8 @@ Args:
         vencendo_de: z.string().optional().describe("ISO date ex: 2026-03-01"),
         apenas_vencidos: z.boolean().optional(),
         forma_pagamento: z.enum(["boleto", "pix", "cartao", "transferencia", "dinheiro"]).optional(),
-        limit: z.number().int().min(1).max(100).default(30),
-        offset: z.number().int().min(0).default(0),
+        limit: z.coerce.number().int().min(1).max(100).default(30),
+        offset: z.coerce.number().int().min(0).default(0),
         response_format: z.nativeEnum(ResponseFormat).default(ResponseFormat.MARKDOWN),
       }).strict(),
       annotations: { readOnlyHint: true, destructiveHint: false, idempotentHint: true, openWorldHint: false },
@@ -167,8 +167,8 @@ Args:
         vencendo_ate: z.string().optional(),
         vencendo_de: z.string().optional(),
         apenas_vencidos: z.boolean().optional(),
-        limit: z.number().int().min(1).max(100).default(30),
-        offset: z.number().int().min(0).default(0),
+        limit: z.coerce.number().int().min(1).max(100).default(30),
+        offset: z.coerce.number().int().min(0).default(0),
         response_format: z.nativeEnum(ResponseFormat).default(ResponseFormat.MARKDOWN),
       }).strict(),
       annotations: { readOnlyHint: true, destructiveHint: false, idempotentHint: true, openWorldHint: false },
@@ -272,7 +272,7 @@ Args:
   - forma_pagamento (string, opcional): boleto|pix|cartao|transferencia|dinheiro`,
       inputSchema: z.object({
         id: z.string().uuid(),
-        valor_pago: z.number().positive(),
+        valor_pago: z.coerce.number().positive(),
         data_pagamento: z.string(),
         forma_pagamento: z.enum(["boleto", "pix", "cartao", "transferencia", "dinheiro"]).optional(),
       }).strict(),
@@ -346,9 +346,9 @@ Args:
   - forma_pagamento (string, opcional): boleto|pix|cartao|transferencia|dinheiro
   - observacoes (string, opcional): Observações`,
       inputSchema: z.object({
-        pedido_id: z.string().uuid(),
+        pedido_id: z.string().uuid().optional(),
         cliente_id: z.string().uuid(),
-        valor_original: z.number().positive(),
+        valor_original: z.coerce.number().positive(),
         data_vencimento: z.string(),
         forma_pagamento: z.enum(["boleto", "pix", "cartao", "transferencia", "dinheiro"]).optional(),
         observacoes: z.string().max(500).optional(),
@@ -384,7 +384,7 @@ Args:
             saldo: params.valor_original,
             data_emissao: new Date().toISOString().split("T")[0],
             data_vencimento: params.data_vencimento,
-            status: "aberto",
+            status: "a_vencer",
             forma_pagamento: params.forma_pagamento || null,
             observacoes: params.observacoes || null,
           })
@@ -427,7 +427,7 @@ Args:
   - forma_pagamento (string, opcional): boleto|pix|cartao|transferencia|dinheiro`,
       inputSchema: z.object({
         id: z.string().uuid(),
-        valor_pago: z.number().positive(),
+        valor_pago: z.coerce.number().positive(),
         data_pagamento: z.string(),
         forma_pagamento: z.enum(["boleto", "pix", "cartao", "transferencia", "dinheiro"]).optional(),
       }).strict(),
@@ -498,7 +498,7 @@ Args:
   - forma_pagamento (string, opcional): boleto|pix|cartao|transferencia|dinheiro
   - observacoes (string, opcional): Observações`,
       inputSchema: z.object({
-        valor_original: z.number().positive(),
+        valor_original: z.coerce.number().positive(),
         data_vencimento: z.string(),
         categoria: z.string().max(100),
         fornecedor_id: z.string().uuid().optional(),
@@ -520,7 +520,7 @@ Args:
             data_emissao: new Date().toISOString().split("T")[0],
             data_vencimento: params.data_vencimento,
             categoria: params.categoria,
-            status: "aberto",
+            status: "a_pagar",
             fornecedor_id: params.fornecedor_id || null,
             numero_titulo: params.numero_titulo || null,
             forma_pagamento: params.forma_pagamento || null,

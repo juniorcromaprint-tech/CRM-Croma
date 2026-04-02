@@ -33,8 +33,8 @@ Args:
         pedido_id: z.string().uuid().optional(),
         status: z.enum(["rascunho", "validando", "apto", "emitindo", "autorizado", "rejeitado", "cancelado", "denegado", "inutilizado", "erro_transmissao"]).optional(),
         tipo_documento: z.enum(["nfe", "nfse"]).optional(),
-        limit: z.number().int().min(1).max(100).default(20),
-        offset: z.number().int().min(0).default(0),
+        limit: z.coerce.number().int().min(1).max(100).default(20),
+        offset: z.coerce.number().int().min(0).default(0),
         response_format: z.nativeEnum(ResponseFormat).default(ResponseFormat.MARKDOWN),
       }).strict(),
       annotations: { readOnlyHint: true, destructiveHint: false, idempotentHint: true, openWorldHint: false },
@@ -48,7 +48,7 @@ Args:
           .select(
             `id, tipo_documento, status, numero, chave_acesso, valor_total,
              data_emissao, data_autorizacao, mensagem_erro, natureza_operacao,
-             pedidos(numero), clientes(razao_social, nome_fantasia)`,
+             pedidos!fiscal_documentos_pedido_id_fkey(numero), clientes(razao_social, nome_fantasia)`,
             { count: "exact" }
           );
 

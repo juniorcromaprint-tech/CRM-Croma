@@ -26,6 +26,8 @@ APP-Campo/dist/
 # Tooling caches
 .dyad/
 .claude/worktrees/
+.claude/settings.local.json
+.mcp.json
 *.local
 tmp/
 logs/

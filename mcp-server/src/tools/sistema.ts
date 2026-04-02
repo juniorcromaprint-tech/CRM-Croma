@@ -68,7 +68,7 @@ estoque_saldos, estoque_movimentos, profiles, fornecedores`,
       inputSchema: z.object({
         sql: z.string().min(10, "Query muito curta").max(5000, "Query muito longa").describe("Query SQL SELECT"),
         descricao: z.string().min(5).max(200).describe("Descrição do que a query faz"),
-        limit_rows: z.number().int().min(1).max(500).default(100),
+        limit_rows: z.coerce.number().int().min(1).max(500).default(100),
         response_format: z.nativeEnum(ResponseFormat).default(ResponseFormat.JSON),
       }).strict(),
       annotations: {

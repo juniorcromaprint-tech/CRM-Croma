@@ -43,7 +43,7 @@ const server = new McpServer({
 registerCrmTools(server);         // 7 ferramentas: clientes, leads + atualizar_status_lead
 registerPropostasTools(server);   // 5 ferramentas: propostas/orçamentos (+ enviar email)
 registerPedidosTools(server);     // 6 ferramentas: pedidos, produção + atualizar_status_pedido + criar_ordem_producao
-registerCampoTools(server);       // 2 ferramentas: instalações
+registerCampoTools(server);       // 7 ferramentas: instalações + jobs campo
 registerFinanceiroTools(server);  // 6 ferramentas: CR, CP, pagamentos
 registerEstoqueTools(server);     // 3 ferramentas: estoque + registrar_movimento
 registerBiTools(server);          // 3 ferramentas: BI e relatórios
@@ -52,7 +52,7 @@ registerFiscalTools(server);      // 3 ferramentas: NF-e
 registerQualidadeTools(server);   // 3 ferramentas: ocorrências de qualidade
 registerAdminTools(server);       // 3 ferramentas: catálogo e precificação
 
-// Total: 43 ferramentas
+// Total: 48 ferramentas
 
 // ─── Validação de credenciais ───────────────────────────────────────────────
 

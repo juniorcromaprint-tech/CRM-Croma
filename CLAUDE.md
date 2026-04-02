@@ -1,6 +1,6 @@
 # CROMA PRINT — CRM/ERP SISTEMA
 
-> **Versão**: 5.4 | **Atualizado**: 2026-03-31 | **Status**: Operacional em Produção — 4 Sprints + 5 bugs E2E corrigidos + GSD ativo + WhatsApp IA v14 com CRM integrado
+> **Versão**: 5.6 | **Atualizado**: 2026-04-01 | **Status**: Operacional em Produção — CROMA 4.0 completo + MCP Server 48 ferramentas + Ponte Cowork→MCP ativa
 
 ---
 
@@ -19,12 +19,16 @@
 **Hierarquia de ferramentas (SEM EXCEÇÕES):**
 
 1. **MCP Server Croma — OBRIGATÓRIO PARA TUDO que envolve dados do negócio**
-   - **Localização**: `mcp-server/` na raiz do projeto (26 ferramentas dedicadas)
-   - **No Claude Code**: ferramentas `croma_*` (ex: `croma_listar_leads`, `croma_cadastrar_cliente`)
-   - **No Cowork**: `mcp__d972dcbc-...__execute_sql` (Supabase MCP) como bridge — mas seguindo a mesma lógica do MCP Server
-   - **Via Composio/RUBE**: `RUBE_MULTI_EXECUTE_TOOL` → `SUPABASE_RUN_READ_ONLY_QUERY` / `SUPABASE_BETA_RUN_SQL_QUERY`
+   - **Localização**: `mcp-server/` na raiz do projeto (**48 ferramentas** — atualizado 2026-04-01)
+   - **No Claude Code (CLI)**: ferramentas `croma_*` diretamente via stdio
+   - **No Cowork (Claude Desktop)**: ferramentas `croma_*` via ponte Desktop Commander:
+     ```
+     mcp__Desktop_Commander__start_process
+     command: C:\Users\Caldera\Claude\CRM-Croma\mcp-server\croma.cmd <tool> {json_args}
+     timeout_ms: 30000 | shell: cmd
+     ```
    - **Ref do projeto Supabase**: `djwjmfgplnqyffdcgdaw`
-   - **Usar para**: leads, clientes, orçamentos, propostas, pedidos, produção, financeiro, estoque, materiais, preços, instalações, BI, dashboards — TUDO
+   - **Usar para**: leads, clientes, orçamentos, propostas, pedidos, produção, financeiro, fiscal, estoque, qualidade, materiais, preços, instalações, BI, dashboards — TUDO
 
 2. **Consultas (leitura)**: executar direto, sem pedir permissão
 3. **Alterações (escrita)**: confirmar com Junior antes de executar
@@ -46,17 +50,20 @@
 - ✅ Operar como um vendedor real usando o ERP, não como chatbot
 - ✅ Usar o motor Mubisys (materiais + markup + regras) para precificação
 
-**Quando o MCP Server Croma (`croma_*`) não estiver disponível (ex: no Cowork), usar `execute_sql` seguindo a MESMA lógica — consultar as mesmas tabelas, respeitar as mesmas regras de negócio.**
+**O MCP Server Croma está disponível em AMBOS os ambientes (CLI e Cowork). Usar `execute_sql` direto no Supabase APENAS para diagnóstico técnico (bugs, triggers, schema).**
 
-### Ferramentas MCP Server Croma (26 total)
+### Ferramentas MCP Server Croma (48 total — atualizado 2026-04-01)
 | Módulo | Ferramentas |
 |---|---|
-| **CRM** | `croma_listar_clientes`, `croma_detalhe_cliente`, `croma_cadastrar_cliente`, `croma_atualizar_cliente`, `croma_listar_leads`, `croma_cadastrar_lead` |
-| **Orçamentos** | `croma_listar_propostas`, `croma_detalhe_proposta`, `croma_criar_proposta`, `croma_atualizar_status_proposta`, + enviar email |
-| **Pedidos** | `croma_listar_pedidos`, `croma_detalhe_pedido`, `croma_listar_ordens_producao`, `croma_atualizar_status_producao` |
-| **Campo** | `croma_listar_instalacoes`, `croma_agendar_instalacao` |
-| **Financeiro** | `croma_listar_contas_receber`, `croma_listar_contas_pagar` |
-| **Estoque** | `croma_consultar_estoque`, `croma_listar_materiais` |
+| **CRM** | `croma_listar_clientes`, `croma_detalhe_cliente`, `croma_cadastrar_cliente`, `croma_atualizar_cliente`, `croma_listar_leads`, `croma_cadastrar_lead`, `croma_atualizar_status_lead` |
+| **Orçamentos** | `croma_listar_propostas`, `croma_detalhe_proposta`, `croma_criar_proposta`, `croma_atualizar_status_proposta`, `croma_enviar_proposta` |
+| **Pedidos** | `croma_listar_pedidos`, `croma_detalhe_pedido`, `croma_atualizar_status_pedido`, `croma_listar_ordens_producao`, `croma_atualizar_status_producao`, `croma_criar_ordem_producao` |
+| **Campo** | `croma_listar_instalacoes`, `croma_agendar_instalacao`, `croma_listar_jobs_campo`, `croma_detalhe_job_campo`, `croma_listar_fotos_job`, `croma_criar_job_campo`, `croma_atualizar_job_campo` |
+| **Financeiro** | `croma_listar_contas_receber`, `croma_listar_contas_pagar`, `croma_criar_conta_receber`, `croma_registrar_pagamento`, `croma_criar_conta_pagar`, `croma_registrar_pagamento_cp` |
+| **Fiscal** | `croma_listar_nfe`, `croma_emitir_nfe`, `croma_consultar_status_nfe` |
+| **Qualidade** | `croma_listar_ocorrencias`, `croma_criar_ocorrencia`, `croma_atualizar_ocorrencia` |
+| **Estoque** | `croma_consultar_estoque`, `croma_listar_materiais`, `croma_registrar_movimento` |
+| **Admin** | `croma_listar_produtos`, `croma_atualizar_preco_material`, `croma_listar_regras_precificacao` |
 | **BI** | `croma_dashboard_executivo`, `croma_alertas_ativos`, `croma_pipeline_comercial` |
 | **Sistema** | `croma_executar_sql` (SELECT only), `croma_health_check` |
 
