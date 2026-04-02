@@ -18,7 +18,7 @@ CROMA 4.0: 5/5 fases concluídas (100%) — Empresa gerida por IA
 MCP Server: 93 ferramentas (expandido 91→93 em 2026-04-02, +2 ferramentas monitoramento consumíveis)
 E2E: 10/10 bugs corrigidos + 1 novo (BUG-FIN-01b) encontrado e corrigido. Regras 11/11. Dados teste limpos.
 Status: EM PRODUÇÃO — HP Latex 365 integrada com monitoramento de consumíveis + nível estimado de tinta
-Last activity: 2026-04-02 (sessão 3 Cowork) — Monitoramento de consumíveis HP Latex: migration 116 (impressora_consumiveis + impressora_recargas + vw_nivel_cartuchos), 2 novas ferramentas MCP (croma_registrar_recarga, croma_nivel_cartuchos), sync script atualizado com coleta ConsumableConfigDyn.xml. Documentação corrigida: tinta é HP original de bag 3L (não paralela). Campo nivel_confiavel para diferenciar cartuchos com/sem medição real.
+Last activity: 2026-04-02 (sessão 4 CLI) — Limpeza geral do repositório: 39 branches claude/* mergeados deletados, 54 .lock files órfãos removidos do .git, worktrees prunados, planning files commitados e pushed (34ac89d). Edge Functions delete-user e delete-job: sem pasta local, funcionam direto no Supabase.
 
 Progress Roadmap v1:  [████████████████████] 100% (20/20) ✅
 Progress CROMA 4.0:   [████████████████████] 100% (5/5 fases)
