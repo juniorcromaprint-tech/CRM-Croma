@@ -124,7 +124,7 @@ export const adminRoutes = (
       </PermissionGuard>
     } />
     <Route path="executivo" element={<PermissionGuard module="admin" action="ver"><LazyPage><DashboardExecutivoPage /></LazyPage></PermissionGuard>} />
-    <Route path="relatorios" element={<PermissionGuard module="admin" action="ver"><LazyPage><RelatoriosPage /></LazyPage></PermissionGuard>} />
-    <Route path="settings" element={<PermissionGuard module="admin" action="ver"><LazyPage><Settings /></LazyPage></PermissionGuard>} />
+    <Route path="relatorios" element={<PermissionGuard module="relatorios" action="ver"><LazyPage><RelatoriosPage /></LazyPage></PermissionGuard>} />
+    <Route path="settings" element={<LazyPage><Settings /></LazyPage>} />
   </>
 );

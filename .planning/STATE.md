@@ -12,13 +12,14 @@ See: docs/plano-ia/01_Estrategia/CROMA_4.0_PLANO_AUTONOMIA_TOTAL.md (CROMA 4.0)
 
 ## Current Position
 
-Phase: Produção — E2E completo, MCP 93 ferramentas, deploy em produção
+Phase: Produção — E2E completo, MCP 93 ferramentas, RBAC implementado, deploy em produção
 Roadmap v1: 20/20 completo (100%) ✅
 CROMA 4.0: 5/5 fases concluídas (100%) — Empresa gerida por IA
 MCP Server: 93 ferramentas (expandido 91→93 em 2026-04-02, +2 ferramentas monitoramento consumíveis)
 E2E: 10/10 bugs corrigidos + 1 novo (BUG-FIN-01b) encontrado e corrigido. Regras 11/11. Dados teste limpos.
-Status: EM PRODUÇÃO — HP Latex 365 integrada com monitoramento de consumíveis + nível estimado de tinta
-Last activity: 2026-04-02 (sessão 4 CLI) — Limpeza geral do repositório: 39 branches claude/* mergeados deletados, 54 .lock files órfãos removidos do .git, worktrees prunados, planning files commitados e pushed (34ac89d). Edge Functions delete-user e delete-job: sem pasta local, funcionam direto no Supabase.
+RBAC: Sistema completo — 9 roles, RLS granular, Edge Function admin-manage-user, auto-registro com aprovação
+Status: EM PRODUÇÃO — RBAC + HP Latex 365 integrada com monitoramento de consumíveis + nível estimado de tinta
+Last activity: 2026-04-04 (sessão Cowork) — RBAC completo: BUG-OP-01 fix (duplicação OPs), AdminUsuariosPage reescrita, Edge Function admin-manage-user deployada, migrations 117 (RLS granular) e 118 (trigger auto-profile) aplicadas, build OK.
 
 Progress Roadmap v1:  [████████████████████] 100% (20/20) ✅
 Progress CROMA 4.0:   [████████████████████] 100% (5/5 fases)
@@ -129,6 +130,12 @@ Progress Requirements: [██████████████████�
   - [2026-04-02]: Scheduled task hp-latex-sync — coleta automática a cada 1h, seg-sex 8-18h. Sem insistência quando impressora em sleep.
   - [2026-04-02]: 10 jobs reais sincronizados: CLOVIS (21,33 m², R$409), EUGENIO (5,98 m², R$114), ML (5,13 m², R$98), ANDRE (0,45 m², R$8), WILSON (0,46 m², R$8). Total: 33,36 m², R$639,35.
   - [2026-04-02]: HP Latex 365 UUID: f7f320c9-baa8-4658-a178-fa67f8de3b9e. SM790 material_id: 1453b2b8-cbd1-453c-ad0d-e16a8c74d27f. 21/22 substratos pendentes de mapeamento para catálogo.
+
+  - [2026-04-04]: BUG-OP-01 FIX — MCP tool pedidos.ts criava OPs duplicadas (trigger 099 + código MCP). Fix: removido código de criação de OP do MCP, agora só lê OPs criadas pelo trigger.
+  - [2026-04-04]: RBAC COMPLETO — 9 roles (admin, diretor, comercial, comercial_senior, financeiro, producao, compras, logistica, instalador). AdminUsuariosPage com CRUD completo. Edge Function admin-manage-user deployada (create_user, update_profile, reset_password, toggle_active).
+  - [2026-04-04]: Migration 117 — RLS granular por perfil: get_user_role(), user_has_module_access(). Policies role-based em contas_receber, contas_pagar, ordens_producao, profiles, clientes, leads, pedidos. Substituem as antigas USING(true).
+  - [2026-04-04]: Migration 118 — Trigger auto-criação de profile: handle_new_user() cria profile com ativo=false, role=null (pendente aprovação admin). handle_auth_user_deleted() cascade delete.
+  - [2026-04-04]: Auto-registro controlado — novos usuários ficam inativos (ativo=false) e sem role (null) até admin aprovar. Tela "Aguardando Aprovação" no ProtectedRoute.
 
 ### Pending Todos
 

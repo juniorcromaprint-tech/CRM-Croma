@@ -36,7 +36,7 @@ const queryClient = new QueryClient({
 });
 
 const ProtectedRoute = ({ children }: { children: React.ReactNode }) => {
-  const { session, isLoading } = useAuth();
+  const { session, isLoading, profile, isPendingApproval } = useAuth();
 
   if (isLoading) {
     return (
@@ -48,6 +48,33 @@ const ProtectedRoute = ({ children }: { children: React.ReactNode }) => {
 
   if (!session) {
     return <Navigate to="/login" replace />;
+  }
+
+  // Usuário inativo: redirecionar para login
+  if (profile && profile.ativo === false) {
+    return <Navigate to="/login" replace />;
+  }
+
+  // Usuário aguardando aprovação
+  if (isPendingApproval) {
+    return (
+      <div className="flex h-screen items-center justify-center bg-slate-50">
+        <div className="bg-white rounded-2xl border border-slate-200 p-12 text-center max-w-md shadow-sm">
+          <div className="inline-flex items-center justify-center w-16 h-16 rounded-full bg-amber-100 mb-4">
+            <Loader2 className="h-8 w-8 text-amber-600 animate-spin" />
+          </div>
+          <h2 className="text-lg font-semibold text-slate-700 mb-2">
+            Aguardando Aprovação
+          </h2>
+          <p className="text-sm text-slate-500 mb-4">
+            Sua conta foi criada com sucesso. Um administrador revisará sua solicitação em breve.
+          </p>
+          <p className="text-xs text-slate-400">
+            Você receberá uma notificação quando sua conta for ativada.
+          </p>
+        </div>
+      </div>
+    );
   }
 
   return <>{children}</>;

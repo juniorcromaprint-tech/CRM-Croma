@@ -499,35 +499,21 @@ Args:
 
         if (error) return errorResult(error);
 
-        // Se aprovado, cria OPs automaticamente (1 por item do pedido)
+        // OPs são criadas automaticamente pelo trigger fn_pedido_aprovado_cria_op (migration 099).
+        // NÃO criar OPs aqui — causava duplicação (BUG-OP-01).
         let opsMsg = "";
         if (params.status === "aprovado") {
           try {
-            const { data: itens } = await sb
-              .from("pedido_itens")
-              .select("id, descricao")
+            const { data: ops } = await sb
+              .from("ordens_producao")
+              .select("id, numero")
               .eq("pedido_id", params.id);
 
-            if (itens && itens.length > 0) {
-              const opsToInsert = itens.map((item) => ({
-                pedido_id: params.id,
-                pedido_item_id: item.id,
-                status: "aguardando_programacao",
-                prioridade: 0,
-                observacoes: `OP automática — ${item.descricao}`,
-              }));
-
-              const { data: ops, error: opsError } = await sb
-                .from("ordens_producao")
-                .insert(opsToInsert)
-                .select("id, numero");
-
-              if (!opsError && ops) {
-                opsMsg = `\n📋 ${ops.length} OP(s) criada(s) automaticamente: ${ops.map(op => op.numero).join(", ")}`;
-              }
+            if (ops && ops.length > 0) {
+              opsMsg = `\n📋 ${ops.length} OP(s) criada(s) pelo trigger: ${ops.map(op => op.numero).join(", ")}`;
             }
           } catch {
-            opsMsg = "\n⚠️ Não foi possível criar OPs automaticamente. Crie manualmente via croma_criar_ordem_producao.";
+            // silêncio — info apenas
           }
         }
 

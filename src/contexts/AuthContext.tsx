@@ -16,6 +16,7 @@ type Profile = {
   first_name: string | null;
   last_name: string | null;
   role: RoleName | null;
+  ativo?: boolean;
 };
 
 type AuthContextType = {
@@ -28,6 +29,10 @@ type AuthContextType = {
   can: (module: Module, action: Action) => boolean;
   /** Módulos acessíveis baseados na role efetiva */
   accessibleModules: string[] | null;
+  /** True se o usuário é admin (role === 'admin') */
+  isAdmin: boolean;
+  /** True se o usuário está aguardando aprovação (role === null) */
+  isPendingApproval: boolean;
 };
 
 const AuthContext = createContext<AuthContextType | undefined>(undefined);
@@ -43,7 +48,7 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
       try {
         const { data, error } = await supabase
           .from('profiles')
-          .select('id, first_name, last_name, role')
+          .select('id, first_name, last_name, role, ativo')
           .eq('id', userId)
           .single();
 
@@ -102,8 +107,18 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
     return getAccessibleModules(effectiveRole);
   }, [effectiveRole]);
 
+  /** True se é admin */
+  const isAdmin = useMemo(() => {
+    return profile?.role === 'admin';
+  }, [profile?.role]);
+
+  /** True se está aguardando aprovação */
+  const isPendingApproval = useMemo(() => {
+    return profile !== null && profile?.role === null;
+  }, [profile]);
+
   return (
-    <AuthContext.Provider value={{ session, user, profile, isLoading, signOut, can, accessibleModules }}>
+    <AuthContext.Provider value={{ session, user, profile, isLoading, signOut, can, accessibleModules, isAdmin, isPendingApproval }}>
       {children}
     </AuthContext.Provider>
   );

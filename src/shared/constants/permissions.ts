@@ -4,6 +4,7 @@
 // ============================================================================
 
 export const MODULES = [
+  'dashboard',
   'comercial',
   'clientes',
   'pedidos',
@@ -14,6 +15,7 @@ export const MODULES = [
   'fiscal',
   'instalacao',
   'qualidade',
+  'relatorios',
   'admin',
 ] as const;
 
@@ -104,6 +106,7 @@ const CRUD_FULL: Action[] = ['ver', 'criar', 'editar', 'excluir'];
  */
 export const ROLE_PERMISSIONS: Record<RoleName, Partial<Record<Module, Action[]>>> = {
   admin: {
+    dashboard: ALL_ACTIONS,
     comercial: ALL_ACTIONS,
     clientes: ALL_ACTIONS,
     pedidos: ALL_ACTIONS,
@@ -114,9 +117,11 @@ export const ROLE_PERMISSIONS: Record<RoleName, Partial<Record<Module, Action[]>
     fiscal: ALL_ACTIONS,
     instalacao: ALL_ACTIONS,
     qualidade: ALL_ACTIONS,
+    relatorios: ALL_ACTIONS,
     admin: ALL_ACTIONS,
   },
   diretor: {
+    dashboard: READ_ACTIONS,
     comercial: [...READ_ACTIONS, 'aprovar'],
     clientes: READ_ACTIONS,
     pedidos: [...READ_ACTIONS, 'aprovar'],
@@ -127,43 +132,53 @@ export const ROLE_PERMISSIONS: Record<RoleName, Partial<Record<Module, Action[]>
     fiscal: READ_ACTIONS,
     instalacao: READ_ACTIONS,
     qualidade: READ_ACTIONS,
+    relatorios: READ_ACTIONS,
     admin: READ_ACTIONS,
   },
   comercial: {
+    dashboard: ['ver'],
     comercial: CRUD_ACTIONS,
     clientes: CRUD_ACTIONS,
     pedidos: ['ver'],
   },
   comercial_senior: {
+    dashboard: ['ver'],
     comercial: [...CRUD_ACTIONS, 'aprovar'],
     clientes: CRUD_FULL,
     pedidos: CRUD_ACTIONS,
     financeiro: ['ver'],
+    relatorios: ['ver', 'exportar'],
   },
   financeiro: {
+    dashboard: ['ver'],
     financeiro: [...CRUD_FULL, 'aprovar', 'exportar'],
     fiscal: CRUD_ACTIONS,
     clientes: ['ver'],
     pedidos: ['ver'],
     comercial: ['ver'],
+    relatorios: ['ver', 'exportar'],
   },
   producao: {
+    dashboard: ['ver'],
     producao: CRUD_ACTIONS,
     estoque: CRUD_ACTIONS,
     pedidos: ['ver'],
     qualidade: CRUD_ACTIONS,
   },
   compras: {
+    dashboard: ['ver'],
     compras: CRUD_FULL,
     estoque: CRUD_ACTIONS,
     financeiro: ['ver'],
   },
   logistica: {
+    dashboard: ['ver'],
     instalacao: CRUD_ACTIONS,
     pedidos: ['ver'],
     producao: ['ver'],
   },
   instalador: {
+    dashboard: ['ver'],
     instalacao: ['ver', 'editar'],
   },
 };

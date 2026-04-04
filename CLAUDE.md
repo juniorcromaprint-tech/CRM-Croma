@@ -1,6 +1,6 @@
 # CROMA PRINT — CRM/ERP SISTEMA
 
-> **Versão**: 5.10 | **Atualizado**: 2026-04-02 | **Status**: Operacional em Produção — CROMA 4.0 completo + MCP Server 93 ferramentas (cobertura 100%) + HP Latex 365 integrada + Monitoramento consumíveis + Ponte Cowork→MCP ativa
+> **Versão**: 5.11 | **Atualizado**: 2026-04-03 | **Status**: Operacional em Produção — CROMA 4.0 completo + MCP Server 93 ferramentas (cobertura 100%) + HP Latex 365 integrada + Monitoramento consumíveis + Ponte Cowork→MCP ativa + Obsidian Vault ativo
 
 ---
 
@@ -392,6 +392,35 @@ src/domains/{dominio}/
 
 ---
 
+## OBSIDIAN VAULT — MEMÓRIA DE LONGO PRAZO
+
+**O vault Obsidian é a memória persistente que conecta TODOS os projetos (Croma, JARVIS, AutoBid).** Localização: `C:\Users\Caldera\Obsidian\JARVIS`
+
+### Como usar
+- **Ler contexto**: antes de tarefas complexas, ler notas relevantes do vault via Desktop Commander
+- **Registrar decisões**: criar nota em `10-Projetos/Croma-Print/decisoes/` usando template
+- **Registrar aprendizados**: criar nota em `10-Projetos/Croma-Print/aprendizados/` usando template
+- **Documentar processos**: criar/atualizar em `30-Conhecimento/Processos/`
+- **Atualizar memory.md**: ao final de sessões significativas, adicionar entrada em `99-Meta/memory.md`
+- **Usar `[[wikilinks]]`** para conectar notas entre si
+
+### Notas-chave do vault para Croma Print
+- `Croma-Print.md` — hub com links para tudo
+- `motor-mubisys.md` — referência de precificação
+- `mcp-server-croma.md` — referência MCP 93 ferramentas
+- `croma-4.0-ia.md` — plano de autonomia IA
+- `fluxo-lead-a-faturamento.md` — SOP do fluxo principal
+
+### Scheduled Task
+- **`jarvis-obsidian-diario`**: seg-sáb 22h — puxa dados MCP, cria daily note, atualiza memory.md
+
+### Relação vault vs .planning/
+- `.planning/` = contexto imediato de sessão (STATE, IDENTITY) — vive no repo Git
+- Vault Obsidian = memória de longo prazo, decisões, aprendizados, estratégia — vive em `C:\Users\Caldera\Obsidian\JARVIS`
+- Os dois coexistem. Não duplicar.
+
+---
+
 ## GSD (GET SHIT DONE) — CONTEXTO ESTRUTURADO
 
 O projeto usa o sistema GSD para manter contexto entre sessões. **SEMPRE leia estes arquivos no início de qualquer tarefa:**
@@ -402,6 +431,7 @@ O projeto usa o sistema GSD para manter contexto entre sessões. **SEMPRE leia e
 | `.planning/STATE.md` | Onde estamos agora, última atividade, blockers | **SEMPRE — segundo arquivo** |
 | `.planning/PROJECT.md` | Visão do projeto, requirements, constraints, decisões | Quando precisar de contexto completo |
 | `.planning/REQUIREMENTS.md` | Requirements checkáveis com IDs (BUG-01, GAP-01, etc.) | Quando planejar ou executar tasks |
+| `Obsidian → 99-Meta/memory.md` | Histórico de sessões, contexto cross-projeto | Quando precisar de memória longa |
 
 ### Regras GSD no Cowork
 1. **Ler IDENTITY.md + STATE.md** antes de qualquer tarefa não-trivial
@@ -409,6 +439,7 @@ O projeto usa o sistema GSD para manter contexto entre sessões. **SEMPRE leia e
 3. **Marcar requirements** como [x] no REQUIREMENTS.md quando completados
 4. **Logar decisões** na tabela Key Decisions do PROJECT.md
 5. **Criar .planning/summaries/YYYY-MM-DD-resumo.md** ao final de sessões produtivas
+6. **Atualizar Obsidian `memory.md`** ao final de sessões produtivas com resumo cross-projeto
 
 ### Diretório .planning/
 ```
