@@ -440,6 +440,11 @@ export default function JobDetail() {
               <p className="text-xs text-slate-500 font-bold uppercase">Local</p>
               <p className="font-bold text-sm text-slate-800">{job.stores?.name}</p>
               <p className="text-xs text-slate-500">{job.stores?.address}</p>
+              {job.stores?.cnpj && (
+                <p className="text-xs text-slate-400 font-mono mt-0.5">
+                  CNPJ: {job.stores.cnpj.replace(/^(\d{2})(\d{3})(\d{3})(\d{4})(\d{2})$/, '$1.$2.$3/$4-$5')}
+                </p>
+              )}
               {(job.stores?.lat && job.stores?.lng) && (
                 <div className="flex gap-2 mt-2 print:hidden">
                   <button
