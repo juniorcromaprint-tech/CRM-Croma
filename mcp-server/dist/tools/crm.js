@@ -335,8 +335,13 @@ Args:
   - email (string, opcional): Novo email
   - classificacao ('A'|'B'|'C'|'D', opcional): Nova classificação
   - segmento (string, opcional): Novo segmento
+  - endereco (string, opcional): Rua/logradouro
+  - numero (string, opcional): Número do endereço
+  - complemento (string, opcional): Complemento (sala, andar, etc)
+  - bairro (string, opcional): Bairro
   - cidade (string, opcional): Nova cidade
   - estado (string, opcional): Nova UF
+  - cep (string, opcional): Novo CEP
   - ativo (boolean, opcional): Ativar/desativar cliente
   - limite_credito (number, opcional): Novo limite de crédito em R$`,
         inputSchema: z.object({
@@ -347,8 +352,13 @@ Args:
             email: z.string().email().optional(),
             classificacao: z.enum(["A", "B", "C", "D"]).optional(),
             segmento: z.string().max(100).optional(),
+            endereco: z.string().max(300).optional(),
+            numero: z.string().max(20).optional(),
+            complemento: z.string().max(100).optional(),
+            bairro: z.string().max(100).optional(),
             cidade: z.string().max(100).optional(),
             estado: z.string().max(2).optional(),
+            cep: z.string().max(9).optional(),
             ativo: z.boolean().optional(),
             limite_credito: z.number().min(0).optional(),
         }).strict(),
@@ -1161,6 +1171,164 @@ Args:
             return {
                 content: [{ type: "text", text }],
                 structuredContent: { count: items.length, nps, media_nota: mediaNota, promotores, detratores, items },
+            };
+        }
+        catch (error) {
+            return errorResult(error);
+        }
+    });
+    // ─── croma_cadastrar_cliente_cnpj ──────────────────────────────────────────
+    server.registerTool("croma_cadastrar_cliente_cnpj", {
+        title: "Cadastrar Cliente por CNPJ",
+        description: `Cadastra um cliente buscando dados automaticamente pelo CNPJ via API pública.
+
+Consulta BrasilAPI/ReceitaWS, preenche razão social, nome fantasia, endereço,
+telefone, email e cadastra o cliente automaticamente.
+
+Use quando o usuário informar apenas o CNPJ para cadastrar um cliente.
+Exemplos: "cadastra cliente CNPJ 77.934.313/0001-41", "novo cliente CNPJ tal".
+
+ATENÇÃO: Ação que modifica dados. Confirme com o usuário antes de executar.
+
+Args:
+  - cnpj (string, obrigatório): CNPJ com 14 dígitos (apenas números)
+  - classificacao ('A'|'B'|'C'|'D', opcional): Classificação (padrão: C)
+  - tipo_cliente (string, opcional): agencia/cliente_final/revenda (padrão: cliente_final)
+  - segmento (string, opcional): Segmento de atuação
+  - observacoes (string, opcional): Observações adicionais`,
+        inputSchema: z.object({
+            cnpj: z.string().describe("CNPJ (com ou sem formatação)"),
+            classificacao: z.enum(["A", "B", "C", "D"]).optional(),
+            tipo_cliente: z.enum(["agencia", "cliente_final", "revenda"]).optional(),
+            segmento: z.string().max(100).optional(),
+            observacoes: z.string().max(500).optional(),
+        }).strict(),
+        annotations: { readOnlyHint: false, destructiveHint: false, idempotentHint: false, openWorldHint: false },
+    }, async (params) => {
+        try {
+            const sb = getUserClient();
+            const adminSb = getAdminClient();
+            // Limpa CNPJ
+            const cnpjDigits = params.cnpj.replace(/\D/g, '');
+            if (cnpjDigits.length !== 14) {
+                return { content: [{ type: "text", text: `❌ CNPJ inválido — deve ter 14 dígitos. Recebido: ${params.cnpj}` }] };
+            }
+            // Verifica duplicidade
+            const formatted = `${cnpjDigits.slice(0, 2)}.${cnpjDigits.slice(2, 5)}.${cnpjDigits.slice(5, 8)}/${cnpjDigits.slice(8, 12)}-${cnpjDigits.slice(12)}`;
+            const { data: existente } = await adminSb
+                .from("clientes")
+                .select("id, razao_social, nome_fantasia")
+                .or(`cnpj.eq.${cnpjDigits},cnpj.eq.${formatted}`)
+                .limit(1);
+            if (existente && existente.length > 0) {
+                const c = existente[0];
+                return {
+                    content: [{
+                            type: "text",
+                            text: `⚠️ Cliente já cadastrado!\n\n- **ID**: \`${c.id}\`\n- **Razão Social**: ${c.razao_social}\n- **Nome Fantasia**: ${c.nome_fantasia ?? "—"}\n\nUse croma_atualizar_cliente para modificar dados.`,
+                        }],
+                };
+            }
+            // Consulta BrasilAPI
+            let dados = {};
+            let fonte = "brasilapi";
+            try {
+                const res = await fetch(`https://brasilapi.com.br/api/cnpj/v1/${cnpjDigits}`);
+                if (res.ok) {
+                    const d = await res.json();
+                    dados = {
+                        razao_social: d.razao_social ?? "",
+                        nome_fantasia: d.nome_fantasia ?? "",
+                        email: d.email ?? "",
+                        telefone: d.ddd_telefone_1 ? `${d.ddd_telefone_1}` : "",
+                        endereco: [d.logradouro, d.numero, d.complemento].filter(Boolean).join(", "),
+                        bairro: d.bairro ?? "",
+                        cidade: d.municipio ?? "",
+                        estado: d.uf ?? "",
+                        cep: (d.cep ?? "").replace(/\D/g, ""),
+                        situacao: d.descricao_situacao_cadastral ?? "",
+                        cnae: d.cnae_fiscal_descricao ?? "",
+                    };
+                }
+            }
+            catch { /* fallback abaixo */ }
+            // Fallback: ReceitaWS
+            if (!dados.razao_social) {
+                try {
+                    const res = await fetch(`https://receitaws.com.br/v1/cnpj/${cnpjDigits}`);
+                    if (res.ok) {
+                        const d = await res.json();
+                        if (d.status !== "ERROR") {
+                            dados = {
+                                razao_social: d.nome ?? "",
+                                nome_fantasia: d.fantasia ?? "",
+                                email: d.email ?? "",
+                                telefone: d.telefone ?? "",
+                                endereco: [d.logradouro, d.numero, d.complemento].filter(Boolean).join(", "),
+                                bairro: d.bairro ?? "",
+                                cidade: d.municipio ?? "",
+                                estado: d.uf ?? "",
+                                cep: (d.cep ?? "").replace(/\D/g, ""),
+                                situacao: d.situacao ?? "",
+                                cnae: d.atividade_principal?.[0]?.text ?? "",
+                            };
+                            fonte = "receitaws";
+                        }
+                    }
+                }
+                catch { /* sem dados */ }
+            }
+            if (!dados.razao_social) {
+                return { content: [{ type: "text", text: `❌ CNPJ ${formatted} não encontrado na Receita Federal. Cadastre manualmente via croma_cadastrar_cliente.` }] };
+            }
+            // Verifica situação cadastral
+            if (dados.situacao && dados.situacao.toUpperCase() !== "ATIVA") {
+                return {
+                    content: [{
+                            type: "text",
+                            text: `⚠️ Empresa com situação cadastral: **${dados.situacao}**\n\n- **Razão Social**: ${dados.razao_social}\n- **CNPJ**: ${formatted}\n\nDeseja cadastrar mesmo assim? Use croma_cadastrar_cliente passando os dados manualmente.`,
+                        }],
+                };
+            }
+            // Cadastra cliente
+            const { data, error } = await sb
+                .from("clientes")
+                .insert({
+                razao_social: dados.razao_social,
+                nome_fantasia: dados.nome_fantasia || null,
+                cnpj: cnpjDigits,
+                email: dados.email || null,
+                telefone: dados.telefone || null,
+                endereco: dados.endereco || null,
+                cidade: dados.cidade || null,
+                estado: dados.estado || null,
+                cep: dados.cep || null,
+                segmento: params.segmento ?? dados.cnae ?? null,
+                classificacao: params.classificacao ?? "C",
+                tipo_cliente: params.tipo_cliente ?? "cliente_final",
+                ativo: true,
+            })
+                .select()
+                .single();
+            if (error)
+                return errorResult(error);
+            const lines = [
+                `✅ Cliente cadastrado com sucesso! (dados via ${fonte})`,
+                "",
+                `- **ID**: \`${data.id}\``,
+                `- **Razão Social**: ${dados.razao_social}`,
+                dados.nome_fantasia ? `- **Nome Fantasia**: ${dados.nome_fantasia}` : "",
+                `- **CNPJ**: ${formatted}`,
+                dados.telefone ? `- **Telefone**: ${dados.telefone}` : "",
+                dados.email ? `- **Email**: ${dados.email}` : "",
+                dados.endereco ? `- **Endereço**: ${dados.endereco}` : "",
+                dados.cidade ? `- **Cidade**: ${dados.cidade}/${dados.estado}` : "",
+                dados.cep ? `- **CEP**: ${dados.cep}` : "",
+                dados.cnae ? `- **CNAE**: ${dados.cnae}` : "",
+            ].filter(Boolean);
+            return {
+                content: [{ type: "text", text: lines.join("\n") }],
+                structuredContent: data,
             };
         }
         catch (error) {

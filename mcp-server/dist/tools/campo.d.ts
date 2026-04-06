@@ -1,6 +1,6 @@
 /**
- * Ferramentas de Instalação / App de Campo
- * Consultar ordens de instalação e agendar novas
+ * Ferramentas de InstalaÃ§Ã£o / App de Campo
+ * Consultar ordens de instalaÃ§Ã£o e agendar novas
  */
 import type { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
 export declare function registerCampoTools(server: McpServer): void;

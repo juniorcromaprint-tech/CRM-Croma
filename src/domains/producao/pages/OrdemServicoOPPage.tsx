@@ -18,6 +18,7 @@ import { OSQRCode } from '../components/os/OSQRCode';
 import { OSActions } from '../components/os/OSActions';
 import { OSPrintLayout } from '../components/os/OSPrintLayout';
 import { OSArquivoProducao } from '../components/os/OSArquivoProducao';
+import { OSAnexosReferencia } from '../components/os/OSAnexosReferencia';
 import { useEmpresaPrincipal } from "@/shared/hooks/useEmpresaPrincipal";
 
 export default function OrdemServicoOPPage() {
@@ -172,6 +173,15 @@ export default function OrdemServicoOPPage() {
             dataPrometida={op.data_prometida}
             cliente={op.cliente}
             observacoes={op.observacoes ?? null}
+          />
+        </div>
+
+        {/* Referencias & Foto do Impresso */}
+        <div className="mt-4">
+          <OSAnexosReferencia
+            pedidoId={op.pedido_id}
+            jobId={null}
+            ordemInstalacaoId={null}
           />
         </div>
 

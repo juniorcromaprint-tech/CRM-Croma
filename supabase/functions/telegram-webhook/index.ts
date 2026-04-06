@@ -5,11 +5,11 @@
 
 import { serve } from 'https://deno.land/std@0.168.0/http/server.ts';
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2';
-import { callOpenRouter } from '../ai-shared/openrouter-provider.ts';
+import { callOpenRouter } from '../ai-shared/anthropic-provider.ts';
 
 // ─── Config ──────────────────────────────────────────────────────────────────
 
-const TELEGRAM_TOKEN = Deno.env.get('TELEGRAM_BOT_TOKEN') || '8750164337:AAH8Diet4zGJddKHq_F2F1JobUA2djisU8s';
+const TELEGRAM_TOKEN = Deno.env.get('TELEGRAM_BOT_TOKEN') || '8645464702:AAGoy9_8uHJB9Bfo4hHQgmKw3bZ26mqSaBo';
 const AUTHORIZED_CHAT_IDS = [1065519625]; // Junior
 const SUPABASE_URL = Deno.env.get('SUPABASE_URL')!;
 const SERVICE_ROLE_KEY = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!;

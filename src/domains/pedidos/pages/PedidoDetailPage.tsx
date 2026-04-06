@@ -1,4 +1,5 @@
 import React, { useState } from 'react'
+import PedidoAnexos from '../components/PedidoAnexos'
 import { useParams, useNavigate } from 'react-router-dom'
 import {
   ArrowLeft, FolderOpen, ExternalLink, Loader2,
@@ -349,6 +350,7 @@ export default function PedidoDetailPage() {
         <TabsList className="rounded-xl">
           <TabsTrigger value="dados" className="rounded-lg">Dados</TabsTrigger>
           <TabsTrigger value="arquivos" className="rounded-lg">📁 Arquivos</TabsTrigger>
+          <TabsTrigger value="referencias" className="rounded-lg">📍 Referencias</TabsTrigger>
         </TabsList>
 
         <TabsContent value="dados" className="mt-4">
@@ -429,6 +431,10 @@ export default function PedidoDetailPage() {
               </div>
             )}
           </div>
+        </TabsContent>
+
+        <TabsContent value="referencias" className="mt-4">
+          <PedidoAnexos pedidoId={pedido.id} jobId={null} />
         </TabsContent>
       </Tabs>
 

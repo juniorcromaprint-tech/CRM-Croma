@@ -10,8 +10,13 @@ const { spawn } = require('child_process');
 const path = require('path');
 
 const toolName = process.argv[2];
-// Join all remaining args in case JSON was split by spaces
-const rawArgs = process.argv.slice(3).join(' ');
+
+// Suporta duas formas de passar JSON:
+// 1. Via variável de ambiente CROMA_ARGS (mais seguro, sem problemas com espaços no CMD)
+//    Uso: set CROMA_ARGS={"busca": "valor com espacos"} && croma.cmd croma_listar_clientes
+// 2. Via argumentos diretos (join de todos os args após o tool name)
+//    Uso: croma.cmd croma_listar_clientes {"busca":"semEspacos"}
+const rawArgs = process.env.CROMA_ARGS || process.argv.slice(3).join(' ');
 let toolArgs = {};
 if (rawArgs.trim()) {
   try {
@@ -19,6 +24,7 @@ if (rawArgs.trim()) {
   } catch (e) {
     console.error('Erro ao parsear argumentos JSON:', e.message);
     console.error('Recebido:', rawArgs);
+    console.error('Dica: use CROMA_ARGS para JSON com espacos: set CROMA_ARGS={"chave": "valor"} && croma.cmd <tool>');
     process.exit(1);
   }
 }
@@ -30,7 +36,8 @@ if (!toolName) {
 
 const serverPath = path.join(__dirname, 'dist', 'index.js');
 
-const server = spawn('node', [serverPath], {
+const nodeExe = process.execPath;  // usa o mesmo node.exe que está rodando este script
+const server = spawn(nodeExe, [serverPath], {
   env: {
     ...process.env,
     SUPABASE_SERVICE_ROLE_KEY: process.env.SUPABASE_SERVICE_ROLE_KEY,

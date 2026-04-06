@@ -460,7 +460,9 @@ Args:
           aguardando_aprovacao: ["aprovado", "cancelado"],
           aprovado: ["em_producao", "cancelado"],
           em_producao: ["produzido", "cancelado"],
-          produzido: ["pronto_entrega"],
+          // produzido → aguardando_instalacao: válido no banco (fn_validar_transicao_status)
+          // para pedidos que já saem da produção direto para instalação (ex: adesivos impressos in-house)
+          produzido: ["pronto_entrega", "aguardando_instalacao", "concluido"],
           pronto_entrega: ["aguardando_instalacao", "entregue"],
           aguardando_instalacao: ["em_instalacao"],
           em_instalacao: ["parcialmente_concluido", "concluido"],

@@ -17,6 +17,7 @@ import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, 
 const JobPhotos = React.lazy(() => import("@/components/job/JobPhotos"));
 const JobVideos = React.lazy(() => import("@/components/job/JobVideos"));
 const JobSignature = React.lazy(() => import("@/components/job/JobSignature"));
+const JobAttachments = React.lazy(() => import("@/components/job/JobAttachments"));
 
 const TabFallback = () => (
   <div className="flex justify-center py-8">
@@ -598,6 +599,10 @@ export default function JobDetail() {
               initialData={JSON.parse(localStorage.getItem(`checklist_${id}`) || "{}")}
               onSave={(data) => localStorage.setItem(`checklist_${id}`, JSON.stringify(data))}
             />
+            <Suspense fallback={<TabFallback />}>
+              <JobAttachments jobId={id!} />
+            </Suspense>
+
             <Tabs defaultValue="photos" className="w-full">
               <TabsList className="grid w-full grid-cols-4 mb-6 rounded-xl p-1 bg-slate-200/50">
                 <TabsTrigger value="photos">Fotos</TabsTrigger>
