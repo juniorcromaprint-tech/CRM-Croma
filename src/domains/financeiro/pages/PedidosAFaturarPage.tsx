@@ -1,4 +1,4 @@
-// ============================================================================
+﻿// ============================================================================
 // PEDIDOS A FATURAR — Croma Print ERP/CRM
 // Lista pedidos em status avançado sem NF-e emitida
 // ============================================================================
@@ -56,7 +56,7 @@ interface PedidoAFaturar {
     razao_social: string | null;
     nome_fantasia: string | null;
   } | null;
-  nfe_documentos: { id: string }[] | null;
+  fiscal_documentos: { id: string }[] | null;
 }
 
 // ─── Hook ────────────────────────────────────────────────────────────────────
@@ -72,13 +72,13 @@ function usePedidosAFaturar() {
   return useQuery<PedidoAFaturar[]>({
     queryKey: ["pedidos-a-faturar"],
     queryFn: async () => {
-      // Busca pedidos em status avançado com join em nfe_documentos
+      // Busca pedidos em status avancado com join em fiscal_documentos
       const { data, error } = await supabase
         .from("pedidos")
         .select(
           `id, numero, status, valor_total, created_at, data_prometida,
            clientes(razao_social, nome_fantasia),
-           nfe_documentos(id)`
+           fiscal_documentos!fiscal_documentos_pedido_id_fkey(id)`
         )
         .in("status", STATUSES_ELEGIVEIS)
         .is("excluido_em", null)
@@ -92,7 +92,7 @@ function usePedidosAFaturar() {
       // Filtra apenas os que não têm NF-e associada
       const semNfe = (data ?? []).filter(
         (p: PedidoAFaturar) =>
-          !p.nfe_documentos || p.nfe_documentos.length === 0
+          !p.fiscal_documentos || p.fiscal_documentos.length === 0
       );
 
       return semNfe as PedidoAFaturar[];
@@ -344,3 +344,4 @@ export default function PedidosAFaturarPage() {
     </div>
   );
 }
+

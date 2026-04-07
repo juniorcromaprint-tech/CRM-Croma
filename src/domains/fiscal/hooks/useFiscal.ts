@@ -9,7 +9,7 @@ export function useFiscalDocumentos(filters?: { status?: string; pedido_id?: str
     queryFn: async () => {
       let query = supabase
         .from('fiscal_documentos')
-        .select(`*, clientes(razao_social, nome_fantasia), pedidos(numero), fiscal_ambientes(nome, tipo), fiscal_series(serie)`)
+        .select(`*, clientes(razao_social, nome_fantasia), pedidos!fiscal_documentos_pedido_id_fkey(numero), fiscal_ambientes(nome, tipo), fiscal_series(serie)`)
         .order('created_at', { ascending: false })
         .limit(200);
       if (filters?.status) query = query.eq('status', filters.status);
@@ -29,7 +29,7 @@ export function useFiscalDocumento(id: string | null) {
     queryFn: async () => {
       const { data, error } = await supabase
         .from('fiscal_documentos')
-        .select(`*, fiscal_documentos_itens(*), fiscal_eventos(*), fiscal_xmls(*), clientes(*), pedidos(numero, status, valor_total), fiscal_ambientes(nome, tipo), fiscal_series(serie), fiscal_certificados(nome, validade_fim)`)
+        .select(`*, fiscal_documentos_itens(*), fiscal_eventos(*), fiscal_xmls(*), clientes(*), pedidos!fiscal_documentos_pedido_id_fkey(numero, status, valor_total), fiscal_ambientes(nome, tipo), fiscal_series(serie), fiscal_certificados(nome, validade_fim)`)
         .eq('id', id!)
         .single();
       if (error) throw error;
@@ -99,7 +99,7 @@ export function useFiscalFila() {
     queryFn: async () => {
       const { data, error } = await supabase
         .from('fiscal_filas_emissao')
-        .select(`*, fiscal_documentos(id, status, valor_total, tipo_documento, clientes(razao_social), pedidos(numero))`)
+        .select(`*, fiscal_documentos(id, status, valor_total, tipo_documento, clientes(razao_social), pedidos!fiscal_documentos_pedido_id_fkey(numero))`)
         .order('created_at', { ascending: false })
         .limit(100);
       if (error) throw error;
