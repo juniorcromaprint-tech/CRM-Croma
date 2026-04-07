@@ -43,6 +43,8 @@ function signNFeXml(xmlNFe, certPem, keyPem, certDerBase64) {
     canonicalizationAlgorithm: 'http://www.w3.org/TR/2001/REC-xml-c14n-20010315',
     signatureAlgorithm: 'http://www.w3.org/2000/09/xmldsig#rsa-sha1',
     privateKey: keyPem,
+    publicCert: certPem,
+    getKeyInfoContent: SignedXml.getKeyInfoContent,
   });
 
   sig.addReference({
@@ -53,9 +55,6 @@ function signNFeXml(xmlNFe, certPem, keyPem, certDerBase64) {
       'http://www.w3.org/TR/2001/REC-xml-c14n-20010315',
     ],
   });
-
-  // xml-crypto v6: usar getKeyInfoContent para incluir X509Certificate
-  sig.getKeyInfoContent = () => `<X509Data><X509Certificate>${certDerBase64}</X509Certificate></X509Data>`;
 
   sig.computeSignature(xmlNFe, {
     location: { reference: "//*[local-name()='NFe']", action: 'append' },
