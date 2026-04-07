@@ -1,5 +1,5 @@
 /**
- * CROMA PRINT ERP - Edge Function: Emitir NF-e v27
+ * CROMA PRINT ERP - Edge Function: Emitir NF-e v28
  *
  * AUTENTICACAO: verify_jwt=false + verificacao manual via /auth/v1/user
  * ASSINATURA: XML assinado internamente com certificado A1 PFX via node-forge
@@ -17,6 +17,28 @@ import { serve } from 'https://deno.land/std@0.168.0/http/server.ts';
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2.38.4';
 // @ts-ignore - node-forge para PFX/assinatura XML
 import forge from 'https://esm.sh/node-forge@1.3.1';
+
+// Normaliza texto para XML SEFAZ: remove acentos e caracteres nao-ASCII
+// SEFAZ rejeita XML com acentos no body (400 Bad Request) mesmo com UTF-8 declarado
+function normalizeText(str: string): string {
+  if (!str) return '';
+  return str
+    .normalize('NFD')
+    .replace(/[\u0300-\u036f]/g, '') // remove diacriticos
+    .replace(/[^\x00-\x7F]/g, '')    // remove qualquer char nao-ASCII restante
+    .replace(/&/g, 'e')               // & vira e (nao pode escapar como &amp; aqui pois ja vai no XML)
+    .trim();
+}
+
+// Escapa caracteres especiais XML alem de normalizar
+function xmlText(str: string): string {
+  return normalizeText(str)
+    .replace(/&/g, '&amp;')
+    .replace(/</g, '&lt;')
+    .replace(/>/g, '&gt;')
+    .replace(/"/g, '&quot;')
+    .replace(/'/g, '&apos;');
+}
 
 const ALLOWED_ORIGINS = [
   'https://crm-croma.vercel.app',
@@ -451,11 +473,11 @@ serve(async (req) => {
 
     const cnpjEmitente = empresa.cnpj?.replace(/\D/g, '') ?? '';
     const emitente = {
-      CNPJ: cnpjEmitente, xNome: empresa.razao_social ?? '',
+      CNPJ: cnpjEmitente, xNome: normalizeText(empresa.razao_social ?? ''),
       IE: empresa.ie?.replace(/\D/g, '') ?? '', CRT: String(empresa.crt ?? 1),
-      xLgr: empresa.logradouro ?? '', nro: empresa.numero_endereco ?? 'S/N',
-      xBairro: empresa.bairro ?? '', cMun: empresa.codigo_municipio_ibge ?? '3550308',
-      xMun: empresa.municipio ?? '', UF: empresa.uf ?? 'SP',
+      xLgr: normalizeText(empresa.logradouro ?? ''), nro: empresa.numero_endereco ?? 'S/N',
+      xBairro: normalizeText(empresa.bairro ?? ''), cMun: empresa.codigo_municipio_ibge ?? '3550308',
+      xMun: normalizeText(empresa.municipio ?? ''), UF: empresa.uf ?? 'SP',
       CEP: empresa.cep?.replace(/\D/g, '') ?? '',
     };
 
@@ -470,7 +492,7 @@ serve(async (req) => {
       NFe: {
         infNFe: {
           ide: {
-            cUF: '35', natOp: doc.natureza_operacao ?? 'Venda de mercadoria',
+            cUF: '35', natOp: normalizeText(doc.natureza_operacao ?? 'Venda de mercadoria'),
             mod: '55', serie: serie.toString(), nNF: numero.toString(),
             dhEmi: new Date().toISOString(), tpNF: '1', idDest: '1',
             cMunFG: emitente.cMun, tpImp: '1', tpEmis: '1',
@@ -490,12 +512,12 @@ serve(async (req) => {
             ...(cliente?.cpf_cnpj?.replace(/\D/g, '').length === 11
               ? { CPF: cliente.cpf_cnpj.replace(/\D/g, '') }
               : { CNPJ: cliente?.cpf_cnpj?.replace(/\D/g, '') ?? '' }),
-            xNome: cliente?.razao_social ?? cliente?.nome_fantasia ?? 'Consumidor Final',
+            xNome: normalizeText(cliente?.razao_social ?? cliente?.nome_fantasia ?? 'Consumidor Final'),
             enderDest: {
-              xLgr: cliente?.endereco ?? '', nro: cliente?.numero ?? 'SN',
-              xBairro: cliente?.bairro ?? '',
+              xLgr: normalizeText(cliente?.endereco ?? ''), nro: cliente?.numero ?? 'SN',
+              xBairro: normalizeText(cliente?.bairro ?? ''),
               cMun: doc.codigo_ibge_municipio_dest ?? '9999999',
-              xMun: cliente?.cidade ?? '', UF: cliente?.estado ?? 'SP',
+              xMun: normalizeText(cliente?.cidade ?? ''), UF: cliente?.estado ?? 'SP',
               CEP: cliente?.cep?.replace(/\D/g, '') ?? '',
               cPais: '1058', xPais: 'Brasil',
             },
@@ -506,7 +528,7 @@ serve(async (req) => {
             '@nItem': (idx + 1).toString(),
             prod: {
               cProd: item.codigo_produto ?? `PROD${idx + 1}`,
-              cEAN: 'SEM GTIN', xProd: item.descricao,
+              cEAN: 'SEM GTIN', xProd: normalizeText(item.descricao),
               NCM: item.ncm?.replace(/\D/g, '') ?? '49119900',
               CFOP: item.cfop ?? '5102', uCom: item.unidade ?? 'UN',
               qCom: item.quantidade?.toString(), vUnCom: item.valor_unitario?.toFixed(2),
@@ -537,7 +559,7 @@ serve(async (req) => {
             },
           },
           transp: { modFrete: '9' },
-          infAdic: { infCpl: doc.informacoes_contribuinte, infAdFisco: doc.informacoes_fisco },
+          infAdic: { infCpl: doc.informacoes_contribuinte ? normalizeText(doc.informacoes_contribuinte) : undefined, infAdFisco: doc.informacoes_fisco ? normalizeText(doc.informacoes_fisco) : undefined },
         },
       },
     };
