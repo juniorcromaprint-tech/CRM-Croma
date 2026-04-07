@@ -54,9 +54,8 @@ function signNFeXml(xmlNFe, certPem, keyPem, certDerBase64) {
     ],
   });
 
-  sig.keyInfoProvider = {
-    getKeyInfo: () => `<X509Data><X509Certificate>${certDerBase64}</X509Certificate></X509Data>`,
-  };
+  // xml-crypto v6: usar getKeyInfoContent para incluir X509Certificate
+  sig.getKeyInfoContent = () => `<X509Data><X509Certificate>${certDerBase64}</X509Certificate></X509Data>`;
 
   sig.computeSignature(xmlNFe, {
     location: { reference: "//*[local-name()='NFe']", action: 'append' },
