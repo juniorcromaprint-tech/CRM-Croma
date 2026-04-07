@@ -1,40 +1,13 @@
 /**
- * CROMA PRINT ERP — Edge Function: Emitir NF-e
+ * CROMA PRINT ERP - Edge Function: Emitir NF-e
  *
- * SEGURANÇA CRÍTICA:
- * - O certificado A1 é processado SOMENTE aqui (backend)
- * - Nunca retorna o conteúdo do certificado ao frontend
- * - Usa SUPABASE_SERVICE_ROLE_KEY para acessar o storage privado
+ * AUTENTICAÇÃO: verify_jwt=false + verificação manual via JWKS público do Supabase.
+ * O Supabase Auth emite tokens ES256 com JWKS — verify_jwt=true usa HS256 e é incompatível.
+ * A verificação correta é via /auth/v1/user (chamada à API de auth), que valida o token
+ * independentemente do algoritmo, usando a sessão ativa no servidor de auth.
  *
- * CONFIGURAÇÃO DO AMBIENTE NF-e:
- * Para habilitar emissão real de NF-e, configure as seguintes variáveis de ambiente
- * no Supabase Dashboard → Project Settings → Edge Functions → Secrets:
- *
- *   NFE_SERVICE_URL      — URL do microserviço nfewizard-io (ex: https://nfe-service.exemplo.com)
- *   NFE_INTERNAL_SECRET  — Secret compartilhado entre esta Edge Function e o nfe-service
- *   NFE_CNPJ_EMITENTE    — CNPJ da Croma Print (somente dígitos)
- *   NFE_RAZAO_SOCIAL     — Razão social da empresa emitente
- *   NFE_UF               — UF do emitente (ex: SP)
- *   NFE_COD_IBGE         — Código IBGE do município emitente (ex: 3550308 para São Paulo)
- *   NFE_ENDERECO         — Logradouro do emitente
- *   NFE_NUMERO           — Número do endereço do emitente
- *   NFE_BAIRRO           — Bairro do emitente
- *   NFE_MUNICIPIO        — Município do emitente
- *   NFE_CEP              — CEP do emitente
- *   NFE_IE               — Inscrição Estadual do emitente
- *   NFE_CRT              — Código do Regime Tributário (1=SN, 3=LP/LR)
- *
- * Enquanto NFE_SERVICE_URL não estiver configurado, a função opera em MODO DEMO:
- * simula autorização bem-sucedida sem transmitir para a SEFAZ.
- *
- * AMBIENTE PADRÃO: homologação (tpAmb=2).
- * O ambiente é controlado pela tabela `fiscal_ambientes` no banco de dados.
- * Somente altere para produção (tpAmb=1) após validação completa em homologação.
- *
- * NOTA MVP:
- * Esta função implementa o fluxo de emissão usando um provider externo
- * (ex: Focus NFe, Nota Fiscal de Serviço, ou SEFAZ diretamente).
- * Para o MVP, implementamos integração com nfewizard-io (API REST).
+ * MODO DEMO: quando NFE_SERVICE_URL não está configurado, simula
+ * autorização bem-sucedida sem transmitir para a SEFAZ.
  */
 
 import { serve } from 'https://deno.land/std@0.168.0/http/server.ts';
@@ -57,6 +30,25 @@ function getCorsHeaders(req: Request): Record<string, string> {
   };
 }
 
+async function verificarAutenticacao(authHeader: string, supabaseUrl: string, anonKey: string): Promise<boolean> {
+  // Valida o token chamando o endpoint de auth do Supabase.
+  // Este endpoint aceita tokens ES256 e HS256, pois verifica via servidor de auth,
+  // não via verificação local de assinatura JWT.
+  try {
+    const resp = await fetch(`${supabaseUrl}/auth/v1/user`, {
+      headers: {
+        'Authorization': authHeader,
+        'apikey': anonKey,
+      },
+    });
+    if (!resp.ok) return false;
+    const user = await resp.json();
+    return !!user?.id;
+  } catch {
+    return false;
+  }
+}
+
 interface EmitirRequest {
   documento_id: string;
 }
@@ -67,31 +59,28 @@ serve(async (req) => {
     return new Response('ok', { headers: corsHeaders });
   }
 
-  // Validar autenticação do usuário
-  const authHeader = req.headers.get('Authorization');
-  if (!authHeader || !authHeader.startsWith('Bearer ')) {
-    return new Response(JSON.stringify({ sucesso: false, mensagem_erro: 'Não autorizado' }), {
-      status: 401,
-      headers: { ...corsHeaders, 'Content-Type': 'application/json' },
-    });
+  const authHeader = req.headers.get('Authorization') ?? '';
+  if (!authHeader.startsWith('Bearer ')) {
+    return new Response(
+      JSON.stringify({ sucesso: false, mensagem_erro: 'Não autorizado' }),
+      { status: 401, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+    );
   }
 
-  // Validar token via endpoint auth/v1/user (fetch direto - compativel com ES256)
   const supabaseUrl = Deno.env.get('SUPABASE_URL') ?? '';
   const anonKey = Deno.env.get('SUPABASE_ANON_KEY') ?? '';
-  const authResp = await fetch(`${supabaseUrl}/auth/v1/user`, {
-    headers: { 'Authorization': authHeader, 'apikey': anonKey },
-  });
-  if (!authResp.ok) {
-    return new Response(JSON.stringify({ sucesso: false, mensagem_erro: 'Token inválido' }), {
-      status: 401,
-      headers: { ...corsHeaders, 'Content-Type': 'application/json' },
-    });
+
+  const autenticado = await verificarAutenticacao(authHeader, supabaseUrl, anonKey);
+  if (!autenticado) {
+    return new Response(
+      JSON.stringify({ sucesso: false, mensagem_erro: 'Token inválido ou sessão expirada' }),
+      { status: 401, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+    );
   }
 
   try {
     const supabaseAdmin = createClient(
-      Deno.env.get('SUPABASE_URL') ?? '',
+      supabaseUrl,
       Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') ?? '',
       { auth: { persistSession: false } }
     );
@@ -106,14 +95,13 @@ serve(async (req) => {
       );
     }
 
-    // Busca documento com todos os dados necessários
     const { data: doc, error: docError } = await supabaseAdmin
       .from('fiscal_documentos')
       .select(`
         *,
         fiscal_documentos_itens(*),
         clientes(*),
-        pedidos(numero, valor_total),
+        pedidos!fiscal_documentos_pedido_id_fkey(numero, valor_total),
         fiscal_ambientes(tipo, endpoint_base, empresa_id, empresas(*)),
         fiscal_series(serie),
         fiscal_certificados(id, nome, arquivo_encriptado_url, senha_secret_ref, cnpj_titular)
@@ -128,21 +116,13 @@ serve(async (req) => {
       );
     }
 
-    // Valida status
     if (!['apto', 'rascunho', 'rejeitado', 'erro_transmissao'].includes(doc.status)) {
       return new Response(
-        JSON.stringify({
-          sucesso: false,
-          mensagem_erro: `Documento com status '${doc.status}' não pode ser emitido`,
-        }),
+        JSON.stringify({ sucesso: false, mensagem_erro: `Documento com status '${doc.status}' não pode ser emitido` }),
         { status: 422, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
       );
     }
 
-    // === VALIDAÇÕES DE NEGÓCIO PRÉ-EMISSÃO ===
-    const errosValidacao: string[] = [];
-
-    // 1. Impedir dupla emissão
     if (doc.status === 'autorizado') {
       return new Response(
         JSON.stringify({ sucesso: false, mensagem_erro: 'NF-e já autorizada — não é possível reemitir' }),
@@ -150,14 +130,15 @@ serve(async (req) => {
       );
     }
 
-    // 2. Cliente com CPF/CNPJ
+    // === VALIDAÇÕES DE NEGÓCIO PRÉ-EMISSÃO ===
+    const errosValidacao: string[] = [];
+
     const clienteVal = doc.clientes;
     const cpfCnpjVal = clienteVal?.cpf_cnpj?.replace(/\D/g, '');
     if (!cpfCnpjVal || (cpfCnpjVal.length !== 11 && cpfCnpjVal.length !== 14)) {
       errosValidacao.push('Cliente sem CPF/CNPJ válido');
     }
 
-    // 3. Itens com NCM e CFOP
     const itensVal = doc.fiscal_documentos_itens ?? [];
     if (itensVal.length === 0) {
       errosValidacao.push('Documento sem itens');
@@ -172,32 +153,25 @@ serve(async (req) => {
       if (!item.descricao) {
         errosValidacao.push(`Item ${idx + 1}: Descrição ausente`);
       }
-    });
-
-    // 4. Série configurada
-    if (!doc.fiscal_series) {
-      errosValidacao.push('Série fiscal não configurada');
-    }
-
-    // 5. Valor total positivo
-    if (!doc.valor_total || doc.valor_total <= 0) {
-      errosValidacao.push('Valor total deve ser maior que zero');
-    }
-
-    // 6. Código IBGE do município do destinatário
-    const codigoIbgeDest = doc.codigo_ibge_municipio_dest;
-    if (!codigoIbgeDest || codigoIbgeDest === '9999999') {
-      errosValidacao.push('Código IBGE do município do destinatário não configurado. Atualize o cadastro do cliente.');
-    }
-
-    // 7. Valores numéricos dos itens
-    for (const item of itensVal) {
       if (!item.valor_unitario || item.valor_unitario <= 0) {
         errosValidacao.push(`Item "${item.descricao}" sem valor unitário válido`);
       }
       if (!item.quantidade || item.quantidade <= 0) {
         errosValidacao.push(`Item "${item.descricao}" sem quantidade válida`);
       }
+    });
+
+    if (!doc.fiscal_series) {
+      errosValidacao.push('Série fiscal não configurada');
+    }
+
+    if (!doc.valor_total || doc.valor_total <= 0) {
+      errosValidacao.push('Valor total deve ser maior que zero');
+    }
+
+    const codigoIbgeDest = doc.codigo_ibge_municipio_dest;
+    if (!codigoIbgeDest || codigoIbgeDest === '9999999') {
+      errosValidacao.push('Código IBGE do município do destinatário não configurado. Atualize o cadastro do cliente.');
     }
 
     if (errosValidacao.length > 0) {
@@ -207,16 +181,10 @@ serve(async (req) => {
         .eq('id', documento_id);
 
       return new Response(
-        JSON.stringify({
-          sucesso: false,
-          status: 'erro_validacao',
-          mensagem_erro: 'Dados fiscais incompletos',
-          erros: errosValidacao,
-        }),
+        JSON.stringify({ sucesso: false, status: 'erro_validacao', mensagem_erro: 'Dados fiscais incompletos', erros: errosValidacao }),
         { status: 422, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
       );
     }
-    // === FIM VALIDAÇÕES ===
 
     // Marca como emitindo
     await supabaseAdmin
@@ -238,11 +206,10 @@ serve(async (req) => {
     const serie = doc.fiscal_series?.serie ?? 1;
     const ambiente = doc.fiscal_ambientes?.tipo ?? 'homologacao';
 
-    // Dados da empresa emitente — lidos do banco (tabela empresas via fiscal_ambientes)
     const empresa = (doc.fiscal_ambientes as any)?.empresas;
     if (!empresa) {
       return new Response(
-        JSON.stringify({ sucesso: false, mensagem_erro: 'Empresa emitente não configurada no ambiente fiscal. Acesse Administração → Empresa.' }),
+        JSON.stringify({ sucesso: false, mensagem_erro: 'Empresa emitente não configurada no ambiente fiscal.' }),
         { status: 422, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
       );
     }
@@ -311,11 +278,6 @@ serve(async (req) => {
               xLgr: cliente?.endereco ?? '',
               nro: cliente?.numero ?? 'SN',
               xBairro: cliente?.bairro ?? '',
-              // O código IBGE do município do destinatário é mapeado pelo frontend
-              // usando src/shared/data/ibge-municipios.ts (getCodigoIBGE) e persistido
-              // no campo `codigo_ibge_municipio` do documento fiscal antes da emissão.
-              // Enquanto o campo não estiver preenchido, usa '9999999' como fallback
-              // (válido apenas para homologação — em produção o código real é obrigatório).
               cMun: doc.codigo_ibge_municipio_dest ?? '9999999',
               xMun: cliente?.cidade ?? '',
               UF: cliente?.estado ?? 'SP',
@@ -345,61 +307,34 @@ serve(async (req) => {
               indTot: '1',
             },
             imposto: {
-              // SIMPLES NACIONAL (CRT=1) usa CSOSN, não CST
               ICMS: {
                 ICMSSN102: {
                   orig: item.origem_mercadoria ?? '0',
                   CSOSN: item.cst_ou_csosn ?? '102',
                 },
               },
-              PIS: {
-                PISOutr: {
-                  CST: '99',
-                  vBC: '0.00',
-                  pPIS: '0.00',
-                  vPIS: '0.00',
-                },
-              },
-              COFINS: {
-                COFINSOutr: {
-                  CST: '99',
-                  vBC: '0.00',
-                  pCOFINS: '0.00',
-                  vCOFINS: '0.00',
-                },
-              },
+              PIS: { PISOutr: { CST: '99', vBC: '0.00', pPIS: '0.00', vPIS: '0.00' } },
+              COFINS: { COFINSOutr: { CST: '99', vBC: '0.00', pCOFINS: '0.00', vCOFINS: '0.00' } },
             },
           })),
           total: {
             ICMSTot: {
-              vBC: '0.00', // SN: base de cálculo ICMS é zero
-              vICMS: '0.00',
-              vICMSDeson: '0.00',
-              vFCPUFDest: '0.00',
-              vICMSUFDest: '0.00',
-              vICMSUFRemet: '0.00',
-              vFCP: '0.00',
-              vBCST: '0.00',
-              vST: '0.00',
-              vFCPST: '0.00',
-              vFCPSTRet: '0.00',
+              vBC: '0.00', vICMS: '0.00', vICMSDeson: '0.00',
+              vFCPUFDest: '0.00', vICMSUFDest: '0.00', vICMSUFRemet: '0.00',
+              vFCP: '0.00', vBCST: '0.00', vST: '0.00',
+              vFCPST: '0.00', vFCPSTRet: '0.00',
               vProd: (doc.valor_produtos ?? 0).toFixed(2),
               vFrete: (doc.valor_frete ?? 0).toFixed(2),
               vSeg: (doc.valor_seguro ?? 0).toFixed(2),
               vDesc: (doc.valor_desconto ?? 0).toFixed(2),
-              vII: '0.00',
-              vIPI: '0.00',
-              vIPIDevol: '0.00',
-              vPIS: '0.00',
-              vCOFINS: '0.00',
+              vII: '0.00', vIPI: '0.00', vIPIDevol: '0.00',
+              vPIS: '0.00', vCOFINS: '0.00',
               vOutro: (doc.valor_outras_despesas ?? 0).toFixed(2),
               vNF: (doc.valor_total ?? 0).toFixed(2),
               vTotTrib: '0.00',
             },
           },
-          transp: {
-            modFrete: '9',
-          },
+          transp: { modFrete: '9' },
           infAdic: {
             infCpl: doc.informacoes_contribuinte,
             infAdFisco: doc.informacoes_fisco,
@@ -408,59 +343,48 @@ serve(async (req) => {
       },
     };
 
-    // Chama o microserviço nfe-service
     const nfeServiceUrl = Deno.env.get('NFE_SERVICE_URL');
     const nfeInternalSecret = Deno.env.get('NFE_INTERNAL_SECRET');
     const nfeProvider = 'nfewizard-io';
-
     let resultado: any;
 
     if (!nfeServiceUrl || !nfeInternalSecret) {
-      // MODO DEMO: simula autorização bem-sucedida quando nfe-service não configurado
+      // MODO DEMO: simula autorização sem transmitir para SEFAZ
       console.log('[fiscal-emitir-nfe] MODO DEMO — NFE_SERVICE_URL não configurado');
       resultado = {
         sucesso: true,
         status: 'autorizado',
-        numero: numero,
-        chave_acesso: `35${new Date().getFullYear().toString().slice(-2)}${cnpjEmitente?.replace(/\D/g, '').padStart(14, '0')}55001${numero.toString().padStart(9, '0')}1`,
-        protocolo: `1${Date.now().toString()}`,
+        numero,
+        chave_acesso: `35${new Date().getFullYear().toString().slice(-2)}${cnpjEmitente.padStart(14, '0')}55001${numero.toString().padStart(9, '0')}1`,
+        protocolo: `1${Date.now()}`,
         recibo: `${Date.now()}`,
         data_autorizacao: new Date().toISOString(),
         xml_autorizado: `<?xml version="1.0"?><nfeProc xmlns="http://www.portalfiscal.inf.br/nfe" versao="4.00"><NFe><infNFe Id="NFe${numero}"/></NFe></nfeProc>`,
         retorno_raw: { status: 'DEMO', numero, ambiente },
       };
     } else {
-      // MODO REAL: envia para o nfe-service (nfewizard-io)
       try {
         const response = await fetch(`${nfeServiceUrl}/api/emitir`, {
           method: 'POST',
-          headers: {
-            'Content-Type': 'application/json',
-            'x-internal-secret': nfeInternalSecret,
-          },
+          headers: { 'Content-Type': 'application/json', 'x-internal-secret': nfeInternalSecret },
           body: JSON.stringify(nfePayload),
         });
-
         const retorno = await response.json();
-
         if (!response.ok || !retorno.sucesso) {
           resultado = {
-            sucesso: false,
-            status: 'erro_transmissao',
+            sucesso: false, status: 'erro_transmissao',
             mensagem_erro: retorno.mensagem_erro ?? `Serviço NF-e retornou ${response.status}`,
             retorno_raw: retorno,
           };
         } else {
-          // Mapear retorno do nfewizard-io para o formato interno
           const r = retorno.retorno;
           const cStat = r?.retEnviNFe?.protNFe?.infProt?.cStat;
           const autorizado = cStat === '100';
           const emProcessamento = cStat === '103';
-
           resultado = {
             sucesso: autorizado,
             status: autorizado ? 'autorizado' : emProcessamento ? 'processando' : 'rejeitado',
-            numero: numero,
+            numero,
             chave_acesso: r?.retEnviNFe?.protNFe?.infProt?.chNFe,
             protocolo: r?.retEnviNFe?.protNFe?.infProt?.nProt,
             recibo: emProcessamento ? r?.retEnviNFe?.infRec?.nRec : undefined,
@@ -472,97 +396,70 @@ serve(async (req) => {
         }
       } catch (serviceErr) {
         resultado = {
-          sucesso: false,
-          status: 'erro_transmissao',
+          sucesso: false, status: 'erro_transmissao',
           mensagem_erro: `Falha ao contactar serviço NF-e: ${String(serviceErr)}`,
           retorno_raw: { error: String(serviceErr) },
         };
       }
     }
 
-    // Atualiza documento com resultado
     if (resultado.sucesso) {
-      await supabaseAdmin
-        .from('fiscal_documentos')
-        .update({
-          status: 'autorizado',
-          numero: resultado.numero,
-          chave_acesso: resultado.chave_acesso,
-          protocolo: resultado.protocolo,
-          recibo: resultado.recibo,
-          data_emissao: new Date().toISOString(),
-          data_autorizacao: resultado.data_autorizacao,
-          retorno_json: resultado.retorno_raw,
-          mensagem_erro: null,
-          updated_at: new Date().toISOString(),
-        })
-        .eq('id', documento_id);
+      await supabaseAdmin.from('fiscal_documentos').update({
+        status: 'autorizado',
+        numero: resultado.numero,
+        chave_acesso: resultado.chave_acesso,
+        protocolo: resultado.protocolo,
+        recibo: resultado.recibo,
+        data_emissao: new Date().toISOString(),
+        data_autorizacao: resultado.data_autorizacao,
+        retorno_json: resultado.retorno_raw,
+        mensagem_erro: null,
+        updated_at: new Date().toISOString(),
+      }).eq('id', documento_id);
 
-      // Salva XML se disponível
       if (resultado.xml_autorizado) {
         try {
-          const xmlContent = typeof resultado.xml_autorizado === 'string'
-            ? new TextEncoder().encode(resultado.xml_autorizado)
-            : resultado.xml_autorizado;
-
+          const xmlBytes = new TextEncoder().encode(resultado.xml_autorizado);
           const xmlPath = `documentos/${documento_id}/nfe_autorizada.xml`;
-          await supabaseAdmin.storage
-            .from('fiscal-xmls')
-            .upload(xmlPath, xmlContent, { contentType: 'application/xml', upsert: true });
-
+          await supabaseAdmin.storage.from('fiscal-xmls')
+            .upload(xmlPath, xmlBytes, { contentType: 'application/xml', upsert: true });
           await supabaseAdmin.from('fiscal_xmls').insert({
             fiscal_documento_id: documento_id,
             tipo_arquivo: 'xml_autorizado',
             storage_path: xmlPath,
-            tamanho_bytes: typeof resultado.xml_autorizado === 'string'
-              ? resultado.xml_autorizado.length
-              : 0,
+            tamanho_bytes: resultado.xml_autorizado.length,
           });
         } catch (storageErr) {
-          // NF-e já autorizada — não falhar a emissão por erro no storage
-          // Logar para recuperação manual posterior
           console.error('[fiscal-emitir-nfe] Erro ao salvar XML no storage:', storageErr);
         }
       }
 
-      // Registra evento de emissão
       await supabaseAdmin.from('fiscal_eventos').insert({
         fiscal_documento_id: documento_id,
-        tipo_evento: 'emissao',
-        status: 'sucesso',
+        tipo_evento: 'emissao', status: 'sucesso',
         protocolo: resultado.protocolo,
         mensagem: 'NF-e autorizada com sucesso',
         payload_retorno: resultado.retorno_raw,
       });
 
-      // Auditoria
       await supabaseAdmin.rpc('fiscal_registrar_auditoria', {
-        p_user_id: null,
-        p_entidade: 'fiscal_documentos',
-        p_entidade_id: documento_id,
-        p_acao: 'emitir_nfe',
-        p_resultado: 'sucesso',
-        p_antes: null,
+        p_user_id: null, p_entidade: 'fiscal_documentos',
+        p_entidade_id: documento_id, p_acao: 'emitir_nfe',
+        p_resultado: 'sucesso', p_antes: null,
         p_depois: { status: 'autorizado', protocolo: resultado.protocolo },
         p_metadados: { ambiente, numero: resultado.numero },
       });
-
     } else {
-      // Rejeição ou erro
-      await supabaseAdmin
-        .from('fiscal_documentos')
-        .update({
-          status: resultado.status === 'rejeitado' ? 'rejeitado' : 'erro_transmissao',
-          mensagem_erro: resultado.mensagem_erro,
-          retorno_json: resultado.retorno_raw,
-          updated_at: new Date().toISOString(),
-        })
-        .eq('id', documento_id);
+      await supabaseAdmin.from('fiscal_documentos').update({
+        status: resultado.status === 'rejeitado' ? 'rejeitado' : 'erro_transmissao',
+        mensagem_erro: resultado.mensagem_erro,
+        retorno_json: resultado.retorno_raw,
+        updated_at: new Date().toISOString(),
+      }).eq('id', documento_id);
 
       await supabaseAdmin.from('fiscal_erros_transmissao').insert({
         fiscal_documento_id: documento_id,
-        provider: nfeProvider,
-        etapa: 'emissao',
+        provider: nfeProvider, etapa: 'emissao',
         codigo_erro: resultado.codigo_erro,
         mensagem_erro: resultado.mensagem_erro ?? 'Erro na emissão',
         payload_resumido: { numero, serie, ambiente },
@@ -570,17 +467,14 @@ serve(async (req) => {
 
       await supabaseAdmin.from('fiscal_eventos').insert({
         fiscal_documento_id: documento_id,
-        tipo_evento: 'emissao',
-        status: 'falha',
+        tipo_evento: 'emissao', status: 'falha',
         mensagem: resultado.mensagem_erro,
         payload_retorno: resultado.retorno_raw,
       });
     }
 
-    return new Response(
-      JSON.stringify(resultado),
-      { status: 200, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
-    );
+    return new Response(JSON.stringify(resultado),
+      { status: 200, headers: { ...corsHeaders, 'Content-Type': 'application/json' } });
 
   } catch (err) {
     console.error('[fiscal-emitir-nfe] Erro:', err);
