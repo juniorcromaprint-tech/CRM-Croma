@@ -76,9 +76,11 @@ export default async function handler(req, res) {
 
   // Autenticação via secret
   const secret = req.headers['x-proxy-secret'];
+  console.log('[sefaz-proxy] secret recebido:', JSON.stringify(secret), '| esperado:', JSON.stringify(PROXY_SECRET));
+  console.log('[sefaz-proxy] todos headers:', JSON.stringify(Object.keys(req.headers)));
   if (secret !== PROXY_SECRET) {
-    console.error('[sefaz-proxy] Unauthorized');
-    return res.status(401).json({ error: 'Unauthorized' });
+    console.error('[sefaz-proxy] Unauthorized - secret nao bate');
+    return res.status(401).json({ error: 'Unauthorized', debug: { received: secret, headers: Object.keys(req.headers) } });
   }
 
   const { soap_envelope, sefaz_url } = req.body || {};
