@@ -75,7 +75,16 @@ export default function FiscalDocumentosPage() {
         .eq('fiscal_documento_id', doc.id).eq('tipo_arquivo', 'xml_autorizado').single();
       if (xmlRecord?.storage_path) {
         const { data: url } = await supabase.storage.from('fiscal-xmls').createSignedUrl(xmlRecord.storage_path, 3600);
-        if (url?.signedUrl) { window.open(url.signedUrl, '_blank'); showSuccess('XML disponível para download!'); }
+        if (url?.signedUrl) {
+          const resp = await fetch(url.signedUrl);
+          const blob = await resp.blob();
+          const a = document.createElement('a');
+          a.href = URL.createObjectURL(blob);
+          a.download = `nfe_${doc.chave_acesso || doc.numero || doc.id}.xml`;
+          document.body.appendChild(a); a.click(); document.body.removeChild(a);
+          URL.revokeObjectURL(a.href);
+          showSuccess('XML baixado com sucesso!');
+        }
         else showError('Erro ao gerar URL do XML');
       } else {
         showError('XML não encontrado. A NF-e pode ter sido emitida sem salvar XML.');

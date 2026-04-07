@@ -230,14 +230,24 @@ export function useGerarDanfe() {
       if (error) throw error;
       const result = data as { ok: boolean; pdf_url?: string; mensagem?: string };
       if (!result.ok) throw new Error(result.mensagem ?? 'Erro ao gerar DANFE');
+      // Download direto via fetch+blob para forcar download real
+      if (result.pdf_url) {
+        try {
+          const resp = await fetch(result.pdf_url);
+          const blob = await resp.blob();
+          const a = document.createElement('a');
+          a.href = URL.createObjectURL(blob);
+          const ext = result.pdf_url.includes('.pdf') ? 'pdf' : 'html';
+          a.download = `danfe_${documentoId}.${ext}`;
+          document.body.appendChild(a); a.click(); document.body.removeChild(a);
+          URL.revokeObjectURL(a.href);
+        } catch { window.open(result.pdf_url, '_blank'); }
+      }
       return result;
     },
-    onSuccess: (data) => {
+    onSuccess: () => {
       qc.invalidateQueries({ queryKey: ['fiscal_documentos'] });
-      if (data.pdf_url) {
-        window.open(data.pdf_url, '_blank');
-        showSuccess('DANFE gerado com sucesso!');
-      }
+      showSuccess('DANFE gerado com sucesso!');
     },
     onError: (err: any) => showError(err.message ?? 'Erro ao gerar DANFE'),
   });
