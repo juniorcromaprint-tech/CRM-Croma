@@ -1,5 +1,5 @@
 /**
- * Vercel Serverless Function - SEFAZ Proxy v3
+ * Vercel Serverless Function - SEFAZ Proxy v4
  * Croma Print - Modulo Fiscal NF-e
  *
  * Motivo: Supabase Edge Runtime (Deno) nao tem CAs ICP-Brasil.
@@ -49,8 +49,18 @@ function sendSoapRequest(urlStr, soapBody, certBase64, certPassword) {
 
     // Adicionar certificado de cliente (mTLS) se fornecido
     if (certBase64 && certPassword) {
-      options.pfx = Buffer.from(certBase64, 'base64');
-      options.passphrase = certPassword;
+      try {
+        // Limpar espacos/quebras de linha do base64 antes de decodificar
+        const certClean = certBase64.replace(/[\s\r\n]/g, '');
+        const pfxBuffer = Buffer.from(certClean, 'base64');
+        console.log(`[sefaz-proxy] PFX buffer size: ${pfxBuffer.length} bytes`);
+        if (pfxBuffer.length < 100) throw new Error(`PFX muito pequeno: ${pfxBuffer.length} bytes`);
+        options.pfx = pfxBuffer;
+        options.passphrase = certPassword;
+      } catch (pfxErr) {
+        console.error('[sefaz-proxy] Erro ao processar PFX:', pfxErr.message);
+        throw new Error('Certificado PFX invalido: ' + pfxErr.message);
+      }
     }
 
     const req = lib.request(options, (res) => {
