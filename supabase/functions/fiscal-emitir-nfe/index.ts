@@ -76,13 +76,13 @@ serve(async (req) => {
     });
   }
 
-  const supabaseAuthCheck = createClient(
-    Deno.env.get('SUPABASE_URL') ?? '',
-    Deno.env.get('SUPABASE_ANON_KEY') ?? '',
-    { global: { headers: { Authorization: authHeader } } }
-  );
-  const { data: { user }, error: authError } = await supabaseAuthCheck.auth.getUser();
-  if (authError || !user) {
+  // Validar token via endpoint auth/v1/user (fetch direto - compativel com ES256)
+  const supabaseUrl = Deno.env.get('SUPABASE_URL') ?? '';
+  const anonKey = Deno.env.get('SUPABASE_ANON_KEY') ?? '';
+  const authResp = await fetch(`${supabaseUrl}/auth/v1/user`, {
+    headers: { 'Authorization': authHeader, 'apikey': anonKey },
+  });
+  if (!authResp.ok) {
     return new Response(JSON.stringify({ sucesso: false, mensagem_erro: 'Token inválido' }), {
       status: 401,
       headers: { ...corsHeaders, 'Content-Type': 'application/json' },
