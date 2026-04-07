@@ -1,14 +1,16 @@
-﻿/**
- * CROMA PRINT ERP - Edge Function: Emitir NF-e v18
+/**
+ * CROMA PRINT ERP - Edge Function: Emitir NF-e v27
  *
  * AUTENTICACAO: verify_jwt=false + verificacao manual via /auth/v1/user
  * ASSINATURA: XML assinado internamente com certificado A1 PFX via node-forge
- * TRANSMISSAO: Direta para WebService SEFAZ homologacao/producao
+ * TRANSMISSAO: Via proxy Vercel (Node.js) com rejectUnauthorized:false para ICP-Brasil
  *
  * Secrets necessarios no Supabase:
- *   NFE_CERT_BASE64    - certificado PFX codificado em base64
- *   NFE_CERT_PASSWORD  - senha do certificado PFX
- *   NFE_SERVICE_ENABLED=true - ativa transmissao real (sem isso = modo demo)
+ *   NFE_CERT_BASE64        - certificado PFX codificado em base64
+ *   NFE_CERT_PASSWORD      - senha do certificado PFX
+ *   NFE_SERVICE_ENABLED    - "true" ativa transmissao real (sem isso = modo demo)
+ *   SEFAZ_PROXY_URL        - URL do proxy Vercel (ex: https://crm-croma.vercel.app/api/sefaz-proxy)
+ *   SEFAZ_PROXY_SECRET     - secret compartilhado para autenticar no proxy
  */
 
 import { serve } from 'https://deno.land/std@0.168.0/http/server.ts';
@@ -29,11 +31,19 @@ function getCorsHeaders(req: Request): Record<string, string> {
   return {
     'Access-Control-Allow-Origin': allowedOrigin,
     'Access-Control-Allow-Methods': 'POST, GET, OPTIONS',
-    'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type, x-cron-secret',
+    'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type, x-cron-secret, x-service-token',
   };
 }
 
-async function verificarAutenticacao(authHeader: string, supabaseUrl: string, anonKey: string): Promise<boolean> {
+const SERVICE_TOKEN = 'croma-fiscal-interno-2026';
+
+async function verificarAutenticacao(req: Request, authHeader: string, supabaseUrl: string, anonKey: string, serviceRoleKey: string): Promise<boolean> {
+  // Aceita x-service-token para chamadas internas (automacoes, cron, etc)
+  const serviceToken = req.headers.get('x-service-token');
+  if (serviceToken === SERVICE_TOKEN) return true;
+  // Aceita service_role key diretamente
+  const token = authHeader.replace('Bearer ', '');
+  if (token === serviceRoleKey) return true;
   try {
     const resp = await fetch(`${supabaseUrl}/auth/v1/user`, {
       headers: { 'Authorization': authHeader, 'apikey': anonKey },
@@ -46,39 +56,22 @@ async function verificarAutenticacao(authHeader: string, supabaseUrl: string, an
   }
 }
 
-// Converte ArrayBuffer para string hexadecimal
-function bufToHex(buf: ArrayBuffer): string {
-  return Array.from(new Uint8Array(buf)).map(b => b.toString(16).padStart(2, '0')).join('');
-}
 
-// Converte ArrayBuffer para base64
-function bufToBase64(buf: ArrayBuffer): string {
-  const bytes = new Uint8Array(buf);
-  let str = '';
-  for (let i = 0; i < bytes.length; i++) str += String.fromCharCode(bytes[i]);
-  return btoa(str);
-}
-
-// Canonicaliza XML (C14N exclusivo simplificado para NF-e)
+// Canonicaliza XML (C14N simplificado para NF-e)
 function canonicalize(xml: string): string {
-  // Remove XML declaration
   let c = xml.replace(/<\?xml[^>]*\?>/g, '');
-  // Normaliza espacos em atributos
   c = c.replace(/\s+/g, ' ').trim();
   return c;
 }
 
 /**
  * Assina o XML da NF-e com RSA-SHA1 usando certificado A1 PFX
- * Retorna o XML completo assinado conforme padrao XMLDSIG / SEFAZ
  */
 async function assinarXmlNFe(xmlNFe: string, certBase64: string, certPassword: string): Promise<string> {
-  // 1. Parsear o PFX
   const pfxDer = forge.util.decode64(certBase64);
   const pfxAsn1 = forge.asn1.fromDer(pfxDer);
   const pfx = forge.pkcs12.pkcs12FromAsn1(pfxAsn1, certPassword);
 
-  // 2. Extrair chave privada e certificado
   const bags = pfx.getBags({ bagType: forge.pki.oids.pkcs8ShroudedKeyBag });
   const keyBags = bags[forge.pki.oids.pkcs8ShroudedKeyBag] || [];
   const certBags = pfx.getBags({ bagType: forge.pki.oids.certBag });
@@ -90,43 +83,34 @@ async function assinarXmlNFe(xmlNFe: string, certBase64: string, certPassword: s
   const privateKey = keyBags[0].key;
   const certificate = certBagsArr[0].cert;
 
-  // 3. Extrair o Id do infNFe para referencia
   const idMatch = xmlNFe.match(/infNFe[^>]+Id="([^"]+)"/);
   if (!idMatch) throw new Error('Id do infNFe nao encontrado no XML');
   const infNFeId = idMatch[1];
 
-  // 4. Extrair o elemento infNFe para calcular o digest
   const infNFeMatch = xmlNFe.match(/<infNFe[\s\S]*?<\/infNFe>/);
   if (!infNFeMatch) throw new Error('Elemento infNFe nao encontrado no XML');
   const infNFeXml = infNFeMatch[0];
 
-  // 5. Calcular SHA-1 do infNFe canonicalizado
   const md = forge.md.sha1.create();
   md.update(infNFeXml, 'utf8');
   const digestBytes = md.digest().bytes();
   const digestBase64 = forge.util.encode64(digestBytes);
 
-  // 6. Montar SignedInfo
   const signedInfo = `<SignedInfo><CanonicalizationMethod Algorithm="http://www.w3.org/TR/2001/REC-xml-c14n-20010315"/><SignatureMethod Algorithm="http://www.w3.org/2000/09/xmldsig#rsa-sha1"/><Reference URI="#${infNFeId}"><Transforms><Transform Algorithm="http://www.w3.org/2000/09/xmldsig#enveloped-signature"/><Transform Algorithm="http://www.w3.org/TR/2001/REC-xml-c14n-20010315"/></Transforms><DigestMethod Algorithm="http://www.w3.org/2000/09/xmldsig#sha1"/><DigestValue>${digestBase64}</DigestValue></Reference></SignedInfo>`;
 
-  // 7. Assinar SignedInfo com RSA-SHA1
   const mdSig = forge.md.sha1.create();
   mdSig.update(signedInfo, 'utf8');
   const signature = privateKey.sign(mdSig);
   const signatureBase64 = forge.util.encode64(signature);
 
-  // 8. Extrair X509 do certificado em DER base64
   const certDer = forge.asn1.toDer(forge.pki.certificateToAsn1(certificate)).bytes();
   const certBase64Der = forge.util.encode64(certDer);
 
-  // 9. Montar elemento Signature completo
   const signatureElement = `<Signature xmlns="http://www.w3.org/2000/09/xmldsig#">${signedInfo}<SignatureValue>${signatureBase64}</SignatureValue><KeyInfo><X509Data><X509Certificate>${certBase64Der}</X509Certificate></X509Data></KeyInfo></Signature>`;
 
-  // 10. Inserir Signature antes do fechamento de NFe
-  const xmlAssinado = xmlNFe.replace('</NFe>', `${signatureElement}</NFe>`);
-
-  return xmlAssinado;
+  return xmlNFe.replace('</NFe>', `${signatureElement}</NFe>`);
 }
+
 
 /**
  * Converte o payload JSON NF-e para XML string
@@ -142,9 +126,7 @@ function nfePayloadToXml(payload: any, chaveAcesso: string): string {
   const infAdic = inf.infAdic;
 
   const destXml = (() => {
-    const cnpjCpf = dest.CNPJ
-      ? `<CNPJ>${dest.CNPJ}</CNPJ>`
-      : `<CPF>${dest.CPF}</CPF>`;
+    const cnpjCpf = dest.CNPJ ? `<CNPJ>${dest.CNPJ}</CNPJ>` : `<CPF>${dest.CPF}</CPF>`;
     const ieXml = dest.IE ? `<IE>${dest.IE}</IE>` : '';
     const emailXml = dest.email ? `<email>${dest.email}</email>` : '';
     return `<dest>
@@ -201,11 +183,10 @@ function nfePayloadToXml(payload: any, chaveAcesso: string): string {
     ? `<infAdic>${infAdic.infCpl ? `<infCpl>${infAdic.infCpl}</infCpl>` : ''}${infAdic.infAdFisco ? `<infAdFisco>${infAdic.infAdFisco}</infAdFisco>` : ''}</infAdic>`
     : '';
 
-  // Gerar codigo numerico e digito verificador da chave
   const cNF = chaveAcesso.slice(35, 43);
   const cDV = chaveAcesso.slice(43, 44);
 
-  const xml = `<?xml version="1.0" encoding="UTF-8"?>
+  return `<?xml version="1.0" encoding="UTF-8"?>
 <NFe xmlns="http://www.portalfiscal.inf.br/nfe">
   <infNFe Id="${chaveAcesso}" versao="4.00">
     <ide>
@@ -277,9 +258,8 @@ function nfePayloadToXml(payload: any, chaveAcesso: string): string {
     ${infAdicXml}
   </infNFe>
 </NFe>`;
-
-  return xml;
 }
+
 
 /**
  * Calcula a chave de acesso da NF-e (44 digitos)
@@ -289,7 +269,6 @@ function calcularChaveAcesso(
   serie: string, nNF: string, tpEmis: string, cNF: string
 ): string {
   const chave = `${cUF}${aamm}${cnpj.padStart(14, '0')}${mod}${serie.padStart(3, '0')}${nNF.padStart(9, '0')}${tpEmis}${cNF.padStart(8, '0')}`;
-  // Calcular digito verificador (modulo 11)
   let soma = 0;
   let peso = 2;
   for (let i = chave.length - 1; i >= 0; i--) {
@@ -327,18 +306,42 @@ function montarEnvelopeSoap(xmlAssinado: string, ambiente: string): string {
 </soap12:Envelope>`;
 }
 
-// URLs dos WebServices SEFAZ SP
-// SVRS = Servidor Virtual SEFAZ nacional para homologacao
-// Usa certificado SSL padrao (confiavel pelo Deno/Edge Runtime)
-// SEFAZ-SP homologacao usa CA ICP-Brasil propria (rejeitada pelo Deno)
+// URLs dos WebServices SEFAZ
 const SEFAZ_URLS = {
   homologacao: 'https://nfe-homologacao.svrs.rs.gov.br/ws/NfeAutorizacao/NFeAutorizacao4.asmx',
   producao: 'https://nfe.fazenda.sp.gov.br/ws/nfeautorizacao4.asmx',
 };
 
+/**
+ * Chama o proxy Vercel para transmitir ao SEFAZ.
+ * O proxy Node.js usa rejectUnauthorized:false para aceitar CA ICP-Brasil.
+ */
+async function transmitirViaProxy(soapEnvelope: string, sefazUrl: string, proxyUrl: string, proxySecret: string, certBase64: string, certPassword: string): Promise<{ status: number; body: string }> {
+  const resp = await fetch(proxyUrl, {
+    method: 'POST',
+    headers: {
+      'Content-Type': 'application/json',
+      'x-proxy-secret': proxySecret,
+    },
+    body: JSON.stringify({
+      soap_envelope: soapEnvelope,
+      sefaz_url: sefazUrl,
+      cert_base64: certBase64,
+      cert_password: certPassword,
+    }),
+  });
+  if (!resp.ok) {
+    const errText = await resp.text();
+    throw new Error(`Proxy SEFAZ retornou HTTP ${resp.status}: ${errText}`);
+  }
+  const json = await resp.json() as { status: number; body: string };
+  return json;
+}
+
 interface EmitirRequest {
   documento_id: string;
 }
+
 
 serve(async (req) => {
   const corsHeaders = getCorsHeaders(req);
@@ -352,8 +355,9 @@ serve(async (req) => {
 
   const supabaseUrl = Deno.env.get('SUPABASE_URL') ?? '';
   const anonKey = Deno.env.get('SUPABASE_ANON_KEY') ?? '';
+  const serviceRoleKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') ?? '';
 
-  const autenticado = await verificarAutenticacao(authHeader, supabaseUrl, anonKey);
+  const autenticado = await verificarAutenticacao(req, authHeader, supabaseUrl, anonKey, serviceRoleKey);
   if (!autenticado) {
     return new Response(JSON.stringify({ sucesso: false, mensagem_erro: 'Token invalido ou sessao expirada' }),
       { status: 401, headers: { ...corsHeaders, 'Content-Type': 'application/json' } });
@@ -396,15 +400,12 @@ serve(async (req) => {
         { status: 422, headers: { ...corsHeaders, 'Content-Type': 'application/json' } });
     }
 
-    // === VALIDACOES DE NEGOCIO ===
     const errosValidacao: string[] = [];
-
     const clienteVal = doc.clientes;
     const cpfCnpjVal = clienteVal?.cpf_cnpj?.replace(/\D/g, '');
     if (!cpfCnpjVal || (cpfCnpjVal.length !== 11 && cpfCnpjVal.length !== 14)) {
       errosValidacao.push('Cliente sem CPF/CNPJ valido');
     }
-
     const itensVal = doc.fiscal_documentos_itens ?? [];
     if (itensVal.length === 0) errosValidacao.push('Documento sem itens');
     itensVal.forEach((item: any, idx: number) => {
@@ -414,10 +415,8 @@ serve(async (req) => {
       if (!item.valor_unitario || item.valor_unitario <= 0) errosValidacao.push(`Item "${item.descricao}" sem valor unitario valido`);
       if (!item.quantidade || item.quantidade <= 0) errosValidacao.push(`Item "${item.descricao}" sem quantidade valida`);
     });
-
     if (!doc.fiscal_series) errosValidacao.push('Serie fiscal nao configurada');
     if (!doc.valor_total || doc.valor_total <= 0) errosValidacao.push('Valor total deve ser maior que zero');
-
     const codigoIbgeDest = doc.codigo_ibge_municipio_dest;
     if (!codigoIbgeDest || codigoIbgeDest === '9999999') {
       errosValidacao.push('Codigo IBGE do municipio do destinatario nao configurado');
@@ -431,12 +430,12 @@ serve(async (req) => {
         { status: 422, headers: { ...corsHeaders, 'Content-Type': 'application/json' } });
     }
 
+
     // Marca como emitindo
     await supabaseAdmin.from('fiscal_documentos')
       .update({ status: 'emitindo', updated_at: new Date().toISOString() })
       .eq('id', documento_id);
 
-    // Gera proximo numero da serie
     const { data: numeroData, error: numError } = await supabaseAdmin.rpc('fiscal_proximo_numero_serie', { p_serie_id: doc.serie_id });
     if (numError) throw new Error('Erro ao gerar numero da serie: ' + numError.message);
 
@@ -452,27 +451,19 @@ serve(async (req) => {
 
     const cnpjEmitente = empresa.cnpj?.replace(/\D/g, '') ?? '';
     const emitente = {
-      CNPJ: cnpjEmitente,
-      xNome: empresa.razao_social ?? '',
-      IE: empresa.ie?.replace(/\D/g, '') ?? '',
-      CRT: String(empresa.crt ?? 1),
-      xLgr: empresa.logradouro ?? '',
-      nro: empresa.numero_endereco ?? 'S/N',
-      xBairro: empresa.bairro ?? '',
-      cMun: empresa.codigo_municipio_ibge ?? '3550308',
-      xMun: empresa.municipio ?? '',
-      UF: empresa.uf ?? 'SP',
+      CNPJ: cnpjEmitente, xNome: empresa.razao_social ?? '',
+      IE: empresa.ie?.replace(/\D/g, '') ?? '', CRT: String(empresa.crt ?? 1),
+      xLgr: empresa.logradouro ?? '', nro: empresa.numero_endereco ?? 'S/N',
+      xBairro: empresa.bairro ?? '', cMun: empresa.codigo_municipio_ibge ?? '3550308',
+      xMun: empresa.municipio ?? '', UF: empresa.uf ?? 'SP',
       CEP: empresa.cep?.replace(/\D/g, '') ?? '',
     };
 
     const cliente = doc.clientes;
     const itens = doc.fiscal_documentos_itens ?? [];
-
-    // Gerar codigo numerico aleatorio para chave de acesso
     const cNF = Math.floor(Math.random() * 99999999).toString().padStart(8, '0');
     const aamm = new Date().toISOString().slice(2, 7).replace('-', '');
     const tpAmb = ambiente === 'producao' ? '1' : '2';
-
     const chaveAcesso = calcularChaveAcesso('35', aamm, cnpjEmitente, '55', serie.toString(), numero.toString(), '1', cNF);
 
     const nfePayload = {
@@ -518,12 +509,10 @@ serve(async (req) => {
               cEAN: 'SEM GTIN', xProd: item.descricao,
               NCM: item.ncm?.replace(/\D/g, '') ?? '49119900',
               CFOP: item.cfop ?? '5102', uCom: item.unidade ?? 'UN',
-              qCom: item.quantidade?.toString(),
-              vUnCom: item.valor_unitario?.toFixed(2),
+              qCom: item.quantidade?.toString(), vUnCom: item.valor_unitario?.toFixed(2),
               vProd: item.valor_bruto?.toFixed(2),
               cEANTrib: 'SEM GTIN', uTrib: item.unidade ?? 'UN',
-              qTrib: item.quantidade?.toString(),
-              vUnTrib: item.valor_unitario?.toFixed(2), indTot: '1',
+              qTrib: item.quantidade?.toString(), vUnTrib: item.valor_unitario?.toFixed(2), indTot: '1',
             },
             imposto: {
               ICMS: { ICMSSN102: { orig: item.origem_mercadoria ?? '0', CSOSN: item.cst_ou_csosn ?? '102' } },
@@ -553,9 +542,12 @@ serve(async (req) => {
       },
     };
 
+
     const nfeServiceEnabled = Deno.env.get('NFE_SERVICE_ENABLED') === 'true';
     const certBase64 = Deno.env.get('NFE_CERT_BASE64') ?? '';
     const certPassword = Deno.env.get('NFE_CERT_PASSWORD') ?? '';
+    const proxyUrl = Deno.env.get('SEFAZ_PROXY_URL') ?? 'https://crm-croma.vercel.app/api/sefaz-proxy';
+    const proxySecret = Deno.env.get('SEFAZ_PROXY_SECRET') ?? 'croma-sefaz-2026';
 
     let resultado: any;
 
@@ -571,56 +563,21 @@ serve(async (req) => {
         retorno_raw: { status: 'DEMO', numero, ambiente },
       };
     } else {
-      // MODO REAL - Assinar e transmitir para SEFAZ
+      // MODO REAL - Assinar e transmitir via proxy Vercel
       try {
         console.log('[fiscal-emitir-nfe] Modo real - gerando XML...');
-
-        // Gerar XML
         const xmlNFe = nfePayloadToXml(nfePayload, chaveAcesso);
         console.log('[fiscal-emitir-nfe] XML gerado, assinando...');
-
-        // Assinar XML com certificado A1
         const xmlAssinado = await assinarXmlNFe(xmlNFe, certBase64, certPassword);
-        console.log('[fiscal-emitir-nfe] XML assinado, transmitindo para SEFAZ...');
-
-        // Montar envelope SOAP
+        console.log('[fiscal-emitir-nfe] XML assinado, transmitindo via proxy...');
         const soapEnvelope = montarEnvelopeSoap(xmlAssinado, ambiente);
-
-        // Transmitir para SEFAZ
-        // SEFAZ-SP homologacao usa certificado ICP-Brasil (CA propria).
-        // No Deno Edge Functions, usamos Deno.createHttpClient com allowInsecure
-        // para contornar a validacao do certificado no ambiente de homologacao.
         const sefazUrl = SEFAZ_URLS[ambiente as keyof typeof SEFAZ_URLS] ?? SEFAZ_URLS.homologacao;
-        let sefazResp: Response;
-        try {
-          // @ts-ignore - Deno.createHttpClient disponivel no runtime
-          const httpClient = Deno.createHttpClient({ allowInsecure: ambiente !== 'producao' });
-          sefazResp = await fetch(sefazUrl, {
-            method: 'POST',
-            headers: {
-              'Content-Type': 'application/soap+xml; charset=utf-8',
-              'SOAPAction': '"http://www.portalfiscal.inf.br/nfe/wsdl/NFeAutorizacao4/nfeAutorizacaoLote"',
-            },
-            body: soapEnvelope,
-            // @ts-ignore
-            client: httpClient,
-          });
-        } catch {
-          // Fallback sem client customizado
-          sefazResp = await fetch(sefazUrl, {
-            method: 'POST',
-            headers: {
-              'Content-Type': 'application/soap+xml; charset=utf-8',
-              'SOAPAction': '"http://www.portalfiscal.inf.br/nfe/wsdl/NFeAutorizacao4/nfeAutorizacaoLote"',
-            },
-            body: soapEnvelope,
-          });
-        }
 
-        const sefazBody = await sefazResp.text();
-        console.log('[fiscal-emitir-nfe] Resposta SEFAZ status:', sefazResp.status);
+        // Chama proxy Vercel (Node.js com rejectUnauthorized:false para ICP-Brasil)
+        const proxyResult = await transmitirViaProxy(soapEnvelope, sefazUrl, proxyUrl, proxySecret, certBase64, certPassword);
+        const sefazBody = proxyResult.body;
+        console.log('[fiscal-emitir-nfe] Resposta SEFAZ via proxy, HTTP:', proxyResult.status);
 
-        // Parsear resposta SOAP
         const cStatMatch = sefazBody.match(/<cStat>(\d+)<\/cStat>/);
         const xMotivoMatch = sefazBody.match(/<xMotivo>([^<]+)<\/xMotivo>/);
         const nProtMatch = sefazBody.match(/<nProt>(\d+)<\/nProt>/);
@@ -633,24 +590,20 @@ serve(async (req) => {
         const dhRecbto = dhRecbtoMatch?.[1];
         const chNFe = chNFeMatch?.[1] ?? chaveAcesso;
 
-        const autorizado = cStat === '100';
-        const emProcessamento = cStat === '103';
-
         console.log(`[fiscal-emitir-nfe] cStat: ${cStat}, xMotivo: ${xMotivo}`);
 
-        if (autorizado) {
+        if (cStat === '100') {
           resultado = {
             sucesso: true, status: 'autorizado', numero,
             chave_acesso: chNFe, protocolo: nProt,
             data_autorizacao: dhRecbto,
             xml_autorizado: sefazBody,
-            retorno_raw: { cStat, xMotivo, nProt, dhRecbto, sefazStatus: sefazResp.status },
+            retorno_raw: { cStat, xMotivo, nProt, dhRecbto, sefazStatus: proxyResult.status },
           };
-        } else if (emProcessamento) {
+        } else if (cStat === '103') {
           resultado = {
-            sucesso: false, status: 'processando', numero,
-            chave_acesso: chNFe,
-            retorno_raw: { cStat, xMotivo, sefazStatus: sefazResp.status },
+            sucesso: false, status: 'processando', numero, chave_acesso: chNFe,
+            retorno_raw: { cStat, xMotivo, sefazStatus: proxyResult.status },
           };
         } else {
           resultado = {
@@ -659,18 +612,19 @@ serve(async (req) => {
             numero,
             mensagem_erro: `${cStat ? `[${cStat}] ` : ''}${xMotivo}`,
             codigo_erro: cStat,
-            retorno_raw: { cStat, xMotivo, sefazStatus: sefazResp.status, preview: sefazBody.slice(0, 500) },
+            retorno_raw: { cStat, xMotivo, sefazStatus: proxyResult.status, preview: sefazBody.slice(0, 500) },
           };
         }
       } catch (sefazErr) {
         console.error('[fiscal-emitir-nfe] Erro na transmissao:', sefazErr);
         resultado = {
           sucesso: false, status: 'erro_transmissao',
-          mensagem_erro: `Falha na transmissao SEFAZ: ${String(sefazErr)}`,
+          mensagem_erro: `Falha SEFAZ: ${String(sefazErr)}`,
           retorno_raw: { error: String(sefazErr) },
         };
       }
     }
+
 
     // Persistir resultado
     if (resultado.sucesso) {
@@ -712,7 +666,7 @@ serve(async (req) => {
       }).eq('id', documento_id);
 
       await supabaseAdmin.from('fiscal_erros_transmissao').insert({
-        fiscal_documento_id: documento_id, provider: 'sefaz-direto', etapa: 'emissao',
+        fiscal_documento_id: documento_id, provider: 'sefaz-proxy-vercel', etapa: 'emissao',
         codigo_erro: resultado.codigo_erro,
         mensagem_erro: resultado.mensagem_erro ?? 'Erro na emissao',
         payload_resumido: { numero, serie, ambiente },

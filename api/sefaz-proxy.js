@@ -1,13 +1,13 @@
 /**
- * Vercel Serverless Function - SEFAZ Proxy
- * Croma Print - Módulo Fiscal NF-e
+ * Vercel Serverless Function - SEFAZ Proxy v2
+ * Croma Print - Modulo Fiscal NF-e
  *
- * Necessário porque o Supabase Edge Runtime (Deno) não tem CAs ICP-Brasil.
- * Node.js faz a chamada ao WebService SEFAZ com rejectUnauthorized: false.
+ * Motivo: Supabase Edge Runtime (Deno) nao tem CAs ICP-Brasil.
+ * Node.js faz mTLS com o certificado A1 PFX do emitente.
  *
- * Endpoint: POST /api/sefaz-proxy
- * Body: { soap_envelope: string, sefaz_url: string }
- * Header: x-proxy-secret: <SEFAZ_PROXY_SECRET>
+ * POST /api/sefaz-proxy
+ * Body: { soap_envelope, sefaz_url, cert_base64, cert_password }
+ * Header: x-proxy-secret
  */
 
 import https from 'https';
@@ -24,10 +24,10 @@ const SEFAZ_WHITELIST = [
   'nfce.fazenda.sp.gov.br',
 ];
 
-function sendSoapRequest(urlStr, soapBody) {
+function sendSoapRequest(urlStr, soapBody, certBase64, certPassword) {
   return new Promise((resolve, reject) => {
     let url;
-    try { url = new URL(urlStr); } catch { return reject(new Error('URL inválida: ' + urlStr)); }
+    try { url = new URL(urlStr); } catch (e) { return reject(new Error('URL invalida: ' + urlStr)); }
 
     const isHttps = url.protocol === 'https:';
     const lib = isHttps ? https : http;
@@ -43,9 +43,15 @@ function sendSoapRequest(urlStr, soapBody) {
         'SOAPAction': '"http://www.portalfiscal.inf.br/nfe/wsdl/NFeAutorizacao4/nfeAutorizacaoLote"',
         'Content-Length': bodyBuffer.length,
       },
-      rejectUnauthorized: false, // Aceita CA ICP-Brasil dos WebServices SEFAZ
+      rejectUnauthorized: false,
       timeout: 30000,
     };
+
+    // Adicionar certificado de cliente (mTLS) se fornecido
+    if (certBase64 && certPassword) {
+      options.pfx = Buffer.from(certBase64, 'base64');
+      options.passphrase = certPassword;
+    }
 
     const req = lib.request(options, (res) => {
       const chunks = [];
@@ -66,42 +72,35 @@ export default async function handler(req, res) {
   res.setHeader('Access-Control-Allow-Headers', 'Content-Type, x-proxy-secret');
 
   if (req.method === 'OPTIONS') return res.status(200).end();
-
-  // Health check
-  if (req.method === 'GET') {
-    return res.status(200).json({ status: 'ok', service: 'sefaz-proxy-croma', ts: new Date().toISOString() });
-  }
-
+  if (req.method === 'GET') return res.status(200).json({ status: 'ok', service: 'sefaz-proxy-croma', ts: new Date().toISOString() });
   if (req.method !== 'POST') return res.status(405).json({ error: 'Method not allowed' });
 
-  // Autenticacao via secret (opcional - seguranca adicional pela whitelist de hosts)
+  // Autenticacao
   const secret = req.headers['x-proxy-secret'];
   if (PROXY_SECRET && PROXY_SECRET !== 'croma-sefaz-2026' && secret !== PROXY_SECRET) {
-    console.error('[sefaz-proxy] Unauthorized');
     return res.status(401).json({ error: 'Unauthorized' });
   }
 
-  const { soap_envelope, sefaz_url } = req.body || {};
+  const { soap_envelope, sefaz_url, cert_base64, cert_password } = req.body || {};
 
   if (!soap_envelope || !sefaz_url) {
-    return res.status(400).json({ error: 'soap_envelope e sefaz_url são obrigatórios' });
+    return res.status(400).json({ error: 'soap_envelope e sefaz_url sao obrigatorios' });
   }
 
-  // Whitelist de hosts SEFAZ
   let urlHost;
   try { urlHost = new URL(sefaz_url).hostname; } catch {
-    return res.status(400).json({ error: 'sefaz_url inválida' });
+    return res.status(400).json({ error: 'sefaz_url invalida' });
   }
   if (!SEFAZ_WHITELIST.includes(urlHost)) {
-    return res.status(403).json({ error: 'Host não permitido: ' + urlHost });
+    return res.status(403).json({ error: 'Host nao permitido: ' + urlHost });
   }
 
   try {
-    console.log(`[sefaz-proxy] → ${sefaz_url}`);
-    const result = await sendSoapRequest(sefaz_url, soap_envelope);
+    console.log(`[sefaz-proxy] -> ${sefaz_url} | cert=${!!cert_base64}`);
+    const result = await sendSoapRequest(sefaz_url, soap_envelope, cert_base64, cert_password);
     const cStat = result.body.match(/<cStat>(\d+)<\/cStat>/)?.[1];
     const xMotivo = result.body.match(/<xMotivo>([^<]+)<\/xMotivo>/)?.[1];
-    console.log(`[sefaz-proxy] ← HTTP ${result.status} | cStat: ${cStat ?? '-'} | ${xMotivo ?? '-'}`);
+    console.log(`[sefaz-proxy] HTTP ${result.status} | cStat:${cStat ?? '-'} | ${xMotivo ?? '-'}`);
     return res.status(200).json({ status: result.status, body: result.body });
   } catch (err) {
     console.error('[sefaz-proxy] Erro:', err.message);
