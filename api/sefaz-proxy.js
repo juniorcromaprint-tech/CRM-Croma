@@ -1,5 +1,5 @@
 /**
- * Vercel Serverless Function - SEFAZ Proxy v2
+ * Vercel Serverless Function - SEFAZ Proxy v3
  * Croma Print - Modulo Fiscal NF-e
  *
  * Motivo: Supabase Edge Runtime (Deno) nao tem CAs ICP-Brasil.
@@ -39,8 +39,8 @@ function sendSoapRequest(urlStr, soapBody, certBase64, certPassword) {
       path: url.pathname + (url.search || ''),
       method: 'POST',
       headers: {
-        'Content-Type': 'application/soap+xml; charset=utf-8',
-        'SOAPAction': '"http://www.portalfiscal.inf.br/nfe/wsdl/NFeAutorizacao4/nfeAutorizacaoLote"',
+        // SOAP 1.2: action vai dentro do Content-Type, NAO como header SOAPAction separado
+        'Content-Type': 'application/soap+xml; charset=utf-8; action="http://www.portalfiscal.inf.br/nfe/wsdl/NFeAutorizacao4/nfeAutorizacaoLote"',
         'Content-Length': bodyBuffer.length,
       },
       rejectUnauthorized: false,
