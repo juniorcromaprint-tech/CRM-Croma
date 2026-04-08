@@ -1,5 +1,6 @@
 import { serve } from 'https://deno.land/std@0.168.0/http/server.ts';
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2.38.4';
+import { gerarDanfeHTMLEdge } from './danfe-generator.ts';
 
 const ALLOWED_ORIGINS = [
   'https://crm-croma.vercel.app',
@@ -118,38 +119,30 @@ serve(async (req) => {
     let pdfPath = '';
 
     if (!nfeServiceUrl || !nfeInternalSecret) {
-      // Modo demo: cria um PDF placeholder simples
-      const numero = doc.numero ?? 'DEMO';
-      const chave = doc.chave_acesso ?? documento_id;
+      // Modo DANFE profissional: gera HTML completo no padrao classico brasileiro
+      // Buscar documento completo com itens, cliente e empresa para gerar DANFE real
+      const { data: docCompleto } = await supabaseAdmin
+        .from('fiscal_documentos')
+        .select(`*, fiscal_documentos_itens(*), clientes(*), fiscal_ambientes(nome, tipo), fiscal_series(serie)`)
+        .eq('id', documento_id)
+        .single();
 
-      // HTML simples que simula DANFE
-      const danfeHtml = `<!DOCTYPE html>
-<html>
-<head><meta charset="utf-8"><title>DANFE - NF-e ${numero}</title>
-<style>body{font-family:Arial;padding:20px;max-width:800px;margin:0 auto}
-.header{background:#1e3a5f;color:white;padding:15px;border-radius:5px;margin-bottom:15px}
-.field{margin:8px 0;padding:8px;background:#f5f5f5;border-radius:3px}
-.label{font-size:11px;color:#666;text-transform:uppercase}
-.value{font-size:14px;font-weight:bold}
-.badge{display:inline-block;background:#22c55e;color:white;padding:3px 10px;border-radius:15px;font-size:12px}
-</style></head>
-<body>
-<div class="header">
-  <h1 style="margin:0">DANFE — Documento Auxiliar da NF-e</h1>
-  <p style="margin:5px 0 0;opacity:.8">Croma Print Comunicação Visual</p>
-</div>
-<div class="field"><div class="label">Número</div><div class="value">${numero}</div></div>
-<div class="field"><div class="label">Chave de Acesso</div><div class="value" style="font-size:11px;font-family:monospace">${chave}</div></div>
-<div class="field"><div class="label">Status</div><div class="value"><span class="badge">AUTORIZADO (DEMO)</span></div></div>
-<div class="field"><div class="label">Data/Hora Emissão</div><div class="value">${new Date().toLocaleString('pt-BR')}</div></div>
-<p style="color:#999;font-size:11px;margin-top:20px;text-align:center">
-  Este é um DANFE de HOMOLOGAÇÃO gerado em modo DEMO.<br>
-  Para produção, configure NFE_PROVIDER_TOKEN com credenciais reais.
-</p>
-</body></html>`;
+      // Buscar dados da empresa emitente
+      const ambienteId = docCompleto?.ambiente_id;
+      let empresa: any = null;
+      if (ambienteId) {
+        const { data: amb } = await supabaseAdmin
+          .from('fiscal_ambientes')
+          .select('empresa_id, empresas(*)')
+          .eq('id', ambienteId)
+          .single();
+        empresa = amb?.empresas;
+      }
+
+      const danfeHtml = gerarDanfeHTMLEdge(docCompleto ?? doc, empresa);
 
       const htmlBytes = new TextEncoder().encode(danfeHtml);
-      pdfPath = `documentos/${documento_id}/danfe_demo.html`;
+      pdfPath = `documentos/${documento_id}/danfe.html`;
 
       await supabaseAdmin.storage
         .from('fiscal-xmls')

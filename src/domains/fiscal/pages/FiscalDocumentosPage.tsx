@@ -17,6 +17,7 @@ import {
 } from 'lucide-react';
 import { useFiscalDocumentos, useEmitirNFe, useCancelarNFe, useGerarDanfe } from '../hooks/useFiscal';
 import { StatusFiscalBadge } from '../components/StatusFiscalBadge';
+import { DanfePreview } from '../components/DanfePreview';
 
 export default function FiscalDocumentosPage() {
   const qc = useQueryClient();
@@ -27,6 +28,7 @@ export default function FiscalDocumentosPage() {
   const [baixandoXml, setBaixandoXml] = useState<string | null>(null);
   const [baixandoPdf, setBaixandoPdf] = useState<string | null>(null);
   const [detalheDoc, setDetalheDoc] = useState<any>(null);
+  const [previewDocId, setPreviewDocId] = useState<string | null>(null);
 
   const { data: documentos = [], isLoading, refetch } = useFiscalDocumentos(
     filterStatus !== 'todos' ? { status: filterStatus } : undefined
@@ -231,6 +233,9 @@ export default function FiscalDocumentosPage() {
                     )}
                     {doc.status === 'autorizado' && (
                       <>
+                        <Button size="sm" variant="outline" className="h-7 px-2" onClick={() => setPreviewDocId(doc.id)} title="Visualizar DANFE">
+                          <Eye className="w-3 h-3" />
+                        </Button>
                         <Button size="sm" variant="outline" className="h-7 px-2" onClick={() => handleBaixarXml(doc)} disabled={baixandoXml === doc.id} title="Baixar XML">
                           {baixandoXml === doc.id ? <Loader2 className="w-3 h-3 animate-spin" /> : <FileDown className="w-3 h-3" />}
                         </Button>
@@ -249,6 +254,13 @@ export default function FiscalDocumentosPage() {
           </TableBody>
         </Table>
       </div>
+
+      {/* DANFE Preview */}
+      <DanfePreview
+        documentoId={previewDocId || ''}
+        open={!!previewDocId}
+        onClose={() => setPreviewDocId(null)}
+      />
 
       {/* Dialog Cancelamento */}
       <Dialog open={!!cancelarDoc} onOpenChange={(o) => { if (!o) { setCancelarDoc(null); setJustificativa(''); } }}>
