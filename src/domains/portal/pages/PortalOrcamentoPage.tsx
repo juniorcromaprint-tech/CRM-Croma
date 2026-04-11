@@ -1,6 +1,7 @@
 // src/domains/portal/pages/PortalOrcamentoPage.tsx
 import { useParams } from 'react-router-dom';
-import { useCallback, useRef, useState } from 'react';
+import { useCallback, useState } from 'react';
+import { supabase } from '@/integrations/supabase/client';
 import { Loader2, AlertTriangle, CalendarClock, TrendingDown, Receipt } from 'lucide-react';
 import { brl } from '@/shared/utils/format';
 import { usePortalProposta, useAprovarProposta } from '../hooks/usePortalProposta';
@@ -22,34 +23,45 @@ export default function PortalOrcamentoPage() {
   const aprovar = useAprovarProposta();
   const { trackClick } = usePortalTracking(token || '');
   const { data: chavePix } = useAdminConfig('chave_pix');
-  const pdfContentRef = useRef<HTMLDivElement>(null);
   const [generatingPdf, setGeneratingPdf] = useState(false);
 
-  // IMPORTANT: All hooks MUST be called before any early returns (React rules of hooks)
+  // Gera PDF via Edge Function no servidor — zero alerta de antivírus
   const handleDownloadPdf = useCallback(async () => {
-    const el = pdfContentRef.current;
-    if (!el) return;
+    if (!token || generatingPdf) return;
     setGeneratingPdf(true);
     try {
-      const html2pdf = (await import('html2pdf.js')).default;
-      const numero = el.getAttribute('data-proposta-numero') || 'proposta';
-      await html2pdf()
-        .set({
-          margin: [10, 10, 10, 10],
-          filename: `${numero}.pdf`,
-          image: { type: 'jpeg', quality: 0.95 },
-          html2canvas: { scale: 2, useCORS: true, scrollY: 0 },
-          jsPDF: { unit: 'mm', format: 'a4', orientation: 'portrait' },
-          pagebreak: { mode: ['avoid-all', 'css', 'legacy'] },
-        })
-        .from(el)
-        .save();
+      const { data: { session } } = await supabase.auth.getSession();
+      const res = await fetch(
+        `${import.meta.env.VITE_SUPABASE_URL}/functions/v1/portal-gerar-pdf`,
+        {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+            'apikey': import.meta.env.VITE_SUPABASE_ANON_KEY,
+            ...(session?.access_token ? { 'Authorization': `Bearer ${session.access_token}` } : {}),
+          },
+          body: JSON.stringify({ token }),
+        }
+      );
+      if (!res.ok) {
+        const err = await res.json().catch(() => ({}));
+        throw new Error(err.error || `Erro ${res.status}`);
+      }
+      const html = await res.text();
+      // Abre em nova aba — o HTML auto-chama window.print() no load
+      const blob = new Blob([html], { type: 'text/html; charset=utf-8' });
+      const url = URL.createObjectURL(blob);
+      const tab = window.open(url, '_blank');
+      // Libera a URL após 30s
+      setTimeout(() => URL.revokeObjectURL(url), 30000);
+      if (!tab) alert('Permita pop-ups para baixar o PDF');
     } catch (err) {
       console.error('Erro ao gerar PDF:', err);
+      alert('Erro ao gerar PDF. Tente novamente.');
     } finally {
       setGeneratingPdf(false);
     }
-  }, []);
+  }, [token, generatingPdf]);
 
   if (isLoading) {
     return (
@@ -105,8 +117,7 @@ export default function PortalOrcamentoPage() {
 
   return (
     <div className="min-h-screen bg-slate-50 flex flex-col">
-      {/* PDF content wrapper - only this part gets captured */}
-      <div ref={pdfContentRef} data-proposta-numero={proposta.numero}>
+      <>
         <PortalHeader
           numero={proposta.numero}
           clienteNome={clienteNome}
@@ -186,9 +197,9 @@ export default function PortalOrcamentoPage() {
             </div>
           )}
         </main>
-      </div>
+      </>
 
-      {/* These sections are OUTSIDE pdfContentRef - won't appear in PDF */}
+      {/* Seções de ação */}
       <div className="max-w-4xl mx-auto w-full px-4 sm:px-6 pb-8 space-y-8">
         {/* File Upload */}
         <PortalFileUpload
