@@ -23,6 +23,10 @@ export default function PortalOrcamentoPage() {
   const { trackClick } = usePortalTracking(token || '');
   const { data: chavePix } = useAdminConfig('chave_pix');
 
+  // IMPORTANT: All hooks MUST be called before any early returns (React rules of hooks)
+  const handleDownloadPdf = useCallback(() => {
+    window.print();
+  }, []);
   if (isLoading) {
     return (
       <div className="min-h-screen bg-slate-50 flex flex-col items-center justify-center gap-3">
@@ -50,7 +54,6 @@ export default function PortalOrcamentoPage() {
       </div>
     );
   }
-
   if (proposta.aprovado_pelo_cliente) {
     return (
       <div className="min-h-screen bg-slate-50 flex flex-col">
@@ -74,11 +77,6 @@ export default function PortalOrcamentoPage() {
   const hoje = new Date();
   const expirada = dataValidade ? dataValidade < hoje : false;
   const diasRestantes = dataValidade ? Math.ceil((dataValidade.getTime() - hoje.getTime()) / 86400000) : null;
-
-  const handleDownloadPdf = useCallback(() => {
-    window.print();
-  }, []);
-
   return (
     <div className="min-h-screen bg-slate-50 flex flex-col">
       <PortalHeader
@@ -103,11 +101,10 @@ export default function PortalOrcamentoPage() {
             <span>
               {expirada
                 ? `Esta proposta expirou em ${dataValidade.toLocaleDateString('pt-BR')}`
-                : `Valida ate ${dataValidade.toLocaleDateString('pt-BR')} (${diasRestantes} dia${diasRestantes !== 1 ? 's' : ''} restante${diasRestantes !== 1 ? 's' : ''})`}
+                : `Válida até ${dataValidade.toLocaleDateString('pt-BR')} (${diasRestantes} dia${diasRestantes !== 1 ? 's' : ''} restante${diasRestantes !== 1 ? 's' : ''})`}
             </span>
           </div>
         )}
-
         {/* Items */}
         <PortalItemList itens={proposta.itens} onItemClick={trackClick} />
 
@@ -131,7 +128,6 @@ export default function PortalOrcamentoPage() {
               </div>
             )}
           </div>
-
           {/* Payment conditions */}
           {proposta.forma_pagamento && (
             <div className="p-5 sm:p-6 border-t border-slate-100">
@@ -156,7 +152,6 @@ export default function PortalOrcamentoPage() {
           token={token || ''}
           clientName={clienteNome}
         />
-
         {/* Observations */}
         {proposta.observacoes && (
           <div className="bg-white rounded-2xl border border-slate-200 p-5 sm:p-6">
