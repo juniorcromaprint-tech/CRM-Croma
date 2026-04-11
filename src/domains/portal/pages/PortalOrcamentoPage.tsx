@@ -1,5 +1,6 @@
 // src/domains/portal/pages/PortalOrcamentoPage.tsx
 import { useParams } from 'react-router-dom';
+import { useCallback } from 'react';
 import { Loader2, AlertTriangle, CalendarClock, TrendingDown, Receipt } from 'lucide-react';
 import { brl } from '@/shared/utils/format';
 import { usePortalProposta, useAprovarProposta } from '../hooks/usePortalProposta';
@@ -74,9 +75,19 @@ export default function PortalOrcamentoPage() {
   const expirada = dataValidade ? dataValidade < hoje : false;
   const diasRestantes = dataValidade ? Math.ceil((dataValidade.getTime() - hoje.getTime()) / 86400000) : null;
 
+  const handleDownloadPdf = useCallback(() => {
+    window.print();
+  }, []);
+
   return (
     <div className="min-h-screen bg-slate-50 flex flex-col">
-      <PortalHeader numero={proposta.numero} clienteNome={clienteNome} />
+      <PortalHeader
+        numero={proposta.numero}
+        clienteNome={clienteNome}
+        empresa={proposta.empresa}
+        cliente={proposta.cliente}
+        onDownloadPdf={handleDownloadPdf}
+      />
 
       <main className="flex-1 max-w-4xl mx-auto w-full px-4 sm:px-6 py-8 space-y-8">
         {/* Validity banner */}

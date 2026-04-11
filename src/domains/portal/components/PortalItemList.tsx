@@ -1,6 +1,6 @@
 // src/domains/portal/components/PortalItemList.tsx
 import { brl } from '@/shared/utils/format';
-import { Package, ChevronRight, Layers } from 'lucide-react';
+import { Package, ChevronRight, Layers, Ruler } from 'lucide-react';
 import type { PortalProposta } from '../services/portal.service';
 
 // ─── Types ───────────────────────────────────────────────────────────────────
@@ -33,6 +33,9 @@ interface DisplayItem {
   quantidade: number;
   valor_unitario: number;
   valor_total: number;
+  largura_cm?: number | null;
+  altura_cm?: number | null;
+  area_m2?: number | null;
   isGroup: boolean;
   // When grouped: the summed total of ALL items in the group
   grupoTotal?: number;
@@ -78,6 +81,9 @@ function buildDisplayItems(itens: PortalItem[]): DisplayItem[] {
         quantidade: item.quantidade,
         valor_unitario: item.valor_unitario,
         valor_total: item.valor_total,
+        largura_cm: item.largura_cm,
+        altura_cm: item.altura_cm,
+        area_m2: item.area_m2,
         isGroup: false,
       });
     }
@@ -140,6 +146,13 @@ export function PortalItemList({ itens, onItemClick }: Props) {
                       )}
                       {!item.isGroup && item.especificacao && (
                         <p className="text-sm text-slate-500 mt-1 line-clamp-2">{item.especificacao}</p>
+                      )}
+                      {!item.isGroup && item.largura_cm && item.altura_cm && (
+                        <p className="text-xs text-slate-400 mt-1 flex items-center gap-1">
+                          <Ruler size={11} />
+                          {(item.largura_cm / 100).toFixed(2)} x {(item.altura_cm / 100).toFixed(2)}m
+                          {item.area_m2 && ` (${item.area_m2.toFixed(2)} m²)`}
+                        </p>
                       )}
                     </div>
                     <ChevronRight size={18} className="text-slate-300 group-hover:text-blue-400 transition-colors flex-shrink-0 mt-1" />

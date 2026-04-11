@@ -68,11 +68,19 @@ serve(async (req) => {
     // Buscar dados da proposta
     const { data: proposta, error: propostaError } = await supabase
       .from('propostas')
-      .select('numero, total, share_token, cliente:clientes(nome_fantasia, razao_social, contato_nome)')
+      .select('numero, status, total, share_token, cliente:clientes(nome_fantasia, razao_social, contato_nome)')
       .eq('id', proposta_id)
       .single();
 
     if (propostaError || !proposta) throw new Error('Proposta não encontrada');
+
+    // Ativar share_token para que o link do portal funcione
+    const updateData: Record<string, unknown> = { share_token_active: true };
+    // Se ainda esta em rascunho, marcar como enviada automaticamente
+    if (proposta.status === 'rascunho') {
+      updateData.status = 'enviada';
+    }
+    await supabase.from('propostas').update(updateData).eq('id', proposta_id);
 
     // Buscar SMTP do vendedor logado (do seu profile)
     const { data: profile } = await supabase

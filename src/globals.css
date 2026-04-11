@@ -144,3 +144,37 @@
     page-break-inside: avoid;
   }
 }
+
+
+/* Portal Proposta - Print Styles (Baixar PDF) */
+@media print {
+  /* Esconder elementos interativos no print */
+  .portal-no-print,
+  button[title="Baixar PDF"],
+  [data-portal-chat],
+  footer {
+    display: none !important;
+  }
+
+  /* Reset da visibilidade para o portal */
+  body.portal-print > * {
+    visibility: visible;
+  }
+
+  /* Garantir que o conteudo do portal apareca */
+  .min-h-screen {
+    min-height: auto !important;
+  }
+
+  /* Remover gradientes pesados no print */
+  .bg-gradient-to-r {
+    background: #1e3a5f !important;
+    -webkit-print-color-adjust: exact;
+    print-color-adjust: exact;
+  }
+
+  /* Cards com borda visivel */
+  .rounded-2xl {
+    border: 1px solid #e2e8f0 !important;
+  }
+}

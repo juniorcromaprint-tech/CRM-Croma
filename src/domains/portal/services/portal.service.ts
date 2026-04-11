@@ -1,6 +1,49 @@
 // src/domains/portal/services/portal.service.ts
 import { supabase } from '@/integrations/supabase/client';
 
+export interface PortalEmpresa {
+  razao_social: string;
+  nome_fantasia: string | null;
+  cnpj: string;
+  ie: string | null;
+  telefone: string | null;
+  logradouro: string | null;
+  numero_endereco: string | null;
+  bairro: string | null;
+  municipio: string | null;
+  uf: string | null;
+  cep: string | null;
+  logo_url: string | null;
+}
+
+export interface PortalCliente {
+  nome_fantasia: string;
+  razao_social: string;
+  contato_nome: string | null;
+  cnpj: string | null;
+  telefone: string | null;
+  email: string | null;
+  cidade: string | null;
+  estado: string | null;
+  cep: string | null;
+  bairro: string | null;
+}
+
+export interface PortalItem {
+  id: string;
+  descricao: string;
+  especificacao: string;
+  quantidade: number;
+  valor_unitario: number;
+  valor_total: number;
+  largura_cm: number | null;
+  altura_cm: number | null;
+  area_m2: number | null;
+  grupo_uniao?: string | null;
+  nome_exibicao?: string | null;
+  item_visivel?: boolean | null;
+}
+
 export interface PortalProposta {
   id: string;
   numero: string;
@@ -16,18 +59,9 @@ export interface PortalProposta {
   data_validade?: string;
   observacoes: string;
   aprovado_pelo_cliente: boolean;
-  cliente: {
-    nome_fantasia: string;
-    contato_nome: string;
-  };
-  itens: Array<{
-    id: string;
-    descricao: string;
-    especificacao: string;
-    quantidade: number;
-    valor_unitario: number;
-    valor_total: number;
-  }>;
+  cliente: PortalCliente;
+  empresa?: PortalEmpresa;
+  itens: PortalItem[];
 }
 
 export async function fetchPropostaByToken(token: string): Promise<PortalProposta> {
@@ -50,6 +84,5 @@ export async function aprovarProposta(
     p_comentario: comentario || null,
   });
   if (error) throw new Error(error.message);
-  // A RPC retorna JSONB: { aprovada: true, pedido_id: uuid }
   return (data as AprovarPropostaResult) ?? { aprovada: true, pedido_id: null };
 }
