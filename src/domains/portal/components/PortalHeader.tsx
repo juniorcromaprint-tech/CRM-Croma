@@ -27,9 +27,10 @@ interface Props {
   empresa?: PortalEmpresa;
   cliente?: PortalCliente;
   onDownloadPdf?: () => void;
+  generatingPdf?: boolean;
 }
 
-export function PortalHeader({ numero, clienteNome, empresa, cliente, onDownloadPdf }: Props) {
+export function PortalHeader({ numero, clienteNome, empresa, cliente, onDownloadPdf, generatingPdf }: Props) {
   const nomeEmpresa = empresa?.nome_fantasia || empresa?.razao_social || 'Croma Print';
   const enderecoEmpresa = empresa
     ? [empresa.logradouro, empresa.numero_endereco].filter(Boolean).join(', ')
@@ -62,11 +63,21 @@ export function PortalHeader({ numero, clienteNome, empresa, cliente, onDownload
             {onDownloadPdf && (
               <button
                 onClick={onDownloadPdf}
-                className="flex items-center gap-2 bg-white/10 backdrop-blur-sm rounded-full px-4 py-2 border border-white/20 hover:bg-white/20 transition-colors cursor-pointer"
+                disabled={generatingPdf}
+                className={`flex items-center gap-2 bg-white/10 backdrop-blur-sm rounded-full px-4 py-2 border border-white/20 transition-colors ${generatingPdf ? 'opacity-60 cursor-wait' : 'hover:bg-white/20 cursor-pointer'}`}
                 title="Baixar PDF"
               >
-                <Download size={14} className="text-blue-300" />
-                <span className="text-sm font-medium text-blue-100 hidden sm:inline">Baixar PDF</span>
+                {generatingPdf ? (
+                  <>
+                    <svg className="animate-spin h-3.5 w-3.5 text-blue-300" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24"><circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" /><path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z" /></svg>
+                    <span className="text-sm font-medium text-blue-100 hidden sm:inline">Gerando PDF...</span>
+                  </>
+                ) : (
+                  <>
+                    <Download size={14} className="text-blue-300" />
+                    <span className="text-sm font-medium text-blue-100 hidden sm:inline">Baixar PDF</span>
+                  </>
+                )}
               </button>
             )}
             <div className="flex items-center gap-2 bg-white/10 backdrop-blur-sm rounded-full px-4 py-2 border border-white/20">

@@ -1,6 +1,6 @@
 // src/domains/portal/pages/PortalOrcamentoPage.tsx
 import { useParams } from 'react-router-dom';
-import { useCallback } from 'react';
+import { useCallback, useRef, useState } from 'react';
 import { Loader2, AlertTriangle, CalendarClock, TrendingDown, Receipt } from 'lucide-react';
 import { brl } from '@/shared/utils/format';
 import { usePortalProposta, useAprovarProposta } from '../hooks/usePortalProposta';
@@ -22,11 +22,35 @@ export default function PortalOrcamentoPage() {
   const aprovar = useAprovarProposta();
   const { trackClick } = usePortalTracking(token || '');
   const { data: chavePix } = useAdminConfig('chave_pix');
+  const pdfContentRef = useRef<HTMLDivElement>(null);
+  const [generatingPdf, setGeneratingPdf] = useState(false);
 
   // IMPORTANT: All hooks MUST be called before any early returns (React rules of hooks)
-  const handleDownloadPdf = useCallback(() => {
-    window.print();
+  const handleDownloadPdf = useCallback(async () => {
+    const el = pdfContentRef.current;
+    if (!el) return;
+    setGeneratingPdf(true);
+    try {
+      const html2pdf = (await import('html2pdf.js')).default;
+      const numero = el.getAttribute('data-proposta-numero') || 'proposta';
+      await html2pdf()
+        .set({
+          margin: [10, 10, 10, 10],
+          filename: `${numero}.pdf`,
+          image: { type: 'jpeg', quality: 0.95 },
+          html2canvas: { scale: 2, useCORS: true, scrollY: 0 },
+          jsPDF: { unit: 'mm', format: 'a4', orientation: 'portrait' },
+          pagebreak: { mode: ['avoid-all', 'css', 'legacy'] },
+        })
+        .from(el)
+        .save();
+    } catch (err) {
+      console.error('Erro ao gerar PDF:', err);
+    } finally {
+      setGeneratingPdf(false);
+    }
   }, []);
+
   if (isLoading) {
     return (
       <div className="min-h-screen bg-slate-50 flex flex-col items-center justify-center gap-3">
@@ -54,6 +78,7 @@ export default function PortalOrcamentoPage() {
       </div>
     );
   }
+
   if (proposta.aprovado_pelo_cliente) {
     return (
       <div className="min-h-screen bg-slate-50 flex flex-col">
@@ -77,88 +102,99 @@ export default function PortalOrcamentoPage() {
   const hoje = new Date();
   const expirada = dataValidade ? dataValidade < hoje : false;
   const diasRestantes = dataValidade ? Math.ceil((dataValidade.getTime() - hoje.getTime()) / 86400000) : null;
+
   return (
     <div className="min-h-screen bg-slate-50 flex flex-col">
-      <PortalHeader
-        numero={proposta.numero}
-        clienteNome={clienteNome}
-        empresa={proposta.empresa}
-        cliente={proposta.cliente}
-        onDownloadPdf={handleDownloadPdf}
-      />
+      {/* PDF content wrapper - only this part gets captured */}
+      <div ref={pdfContentRef} data-proposta-numero={proposta.numero}>
+        <PortalHeader
+          numero={proposta.numero}
+          clienteNome={clienteNome}
+          empresa={proposta.empresa}
+          cliente={proposta.cliente}
+          onDownloadPdf={handleDownloadPdf}
+          generatingPdf={generatingPdf}
+        />
 
-      <main className="flex-1 max-w-4xl mx-auto w-full px-4 sm:px-6 py-8 space-y-8">
-        {/* Validity banner */}
-        {dataValidade && (
-          <div className={`flex items-center gap-3 px-4 py-3 rounded-xl text-sm ${
-            expirada
-              ? 'bg-red-50 border border-red-200 text-red-700'
-              : diasRestantes !== null && diasRestantes <= 3
-                ? 'bg-amber-50 border border-amber-200 text-amber-700'
-                : 'bg-blue-50 border border-blue-200 text-blue-700'
-          }`}>
-            <CalendarClock size={18} className="flex-shrink-0" />
-            <span>
-              {expirada
-                ? `Esta proposta expirou em ${dataValidade.toLocaleDateString('pt-BR')}`
-                : `Válida até ${dataValidade.toLocaleDateString('pt-BR')} (${diasRestantes} dia${diasRestantes !== 1 ? 's' : ''} restante${diasRestantes !== 1 ? 's' : ''})`}
-            </span>
-          </div>
-        )}
-        {/* Items */}
-        <PortalItemList itens={proposta.itens} onItemClick={trackClick} />
-
-        {/* Summary card: total + payment */}
-        <div className="bg-white rounded-2xl border border-slate-200 overflow-hidden">
-          {/* Total */}
-          <div className="bg-gradient-to-r from-blue-600 to-blue-700 p-6 sm:p-8 text-white">
-            <div className="flex items-center justify-between">
-              <div>
-                <p className="text-blue-200 text-sm font-medium mb-1">Valor Total da Proposta</p>
-                <p className="text-3xl sm:text-4xl font-bold tracking-tight">{brl(proposta.valor_total)}</p>
-              </div>
-              <div className="w-12 h-12 rounded-xl bg-white/10 flex items-center justify-center">
-                <Receipt size={24} className="text-white/80" />
-              </div>
+        <main className="flex-1 max-w-4xl mx-auto w-full px-4 sm:px-6 py-8 space-y-8">
+          {/* Validity banner */}
+          {dataValidade && (
+            <div className={`flex items-center gap-3 px-4 py-3 rounded-xl text-sm ${
+              expirada
+                ? 'bg-red-50 border border-red-200 text-red-700'
+                : diasRestantes !== null && diasRestantes <= 3
+                  ? 'bg-amber-50 border border-amber-200 text-amber-700'
+                  : 'bg-blue-50 border border-blue-200 text-blue-700'
+            }`}>
+              <CalendarClock size={18} className="flex-shrink-0" />
+              <span>
+                {expirada
+                  ? `Esta proposta expirou em ${dataValidade.toLocaleDateString('pt-BR')}`
+                  : `Válida até ${dataValidade.toLocaleDateString('pt-BR')} (${diasRestantes} dia${diasRestantes !== 1 ? 's' : ''} restante${diasRestantes !== 1 ? 's' : ''})`}
+              </span>
             </div>
-            {proposta.desconto_percentual > 0 && (
-              <div className="mt-3 flex items-center gap-2 bg-white/10 rounded-lg px-3 py-2 w-fit">
-                <TrendingDown size={14} />
-                <span className="text-sm font-medium">Desconto de {proposta.desconto_percentual}% aplicado</span>
+          )}
+
+          {/* Items */}
+          <PortalItemList itens={proposta.itens} onItemClick={trackClick} />
+
+          {/* Summary card: total + payment */}
+          <div className="bg-white rounded-2xl border border-slate-200 overflow-hidden">
+            {/* Total */}
+            <div className="bg-gradient-to-r from-blue-600 to-blue-700 p-6 sm:p-8 text-white">
+              <div className="flex items-center justify-between">
+                <div>
+                  <p className="text-blue-200 text-sm font-medium mb-1">Valor Total da Proposta</p>
+                  <p className="text-3xl sm:text-4xl font-bold tracking-tight">{brl(proposta.valor_total)}</p>
+                </div>
+                <div className="w-12 h-12 rounded-xl bg-white/10 flex items-center justify-center">
+                  <Receipt size={24} className="text-white/80" />
+                </div>
+              </div>
+              {proposta.desconto_percentual > 0 && (
+                <div className="mt-3 flex items-center gap-2 bg-white/10 rounded-lg px-3 py-2 w-fit">
+                  <TrendingDown size={14} />
+                  <span className="text-sm font-medium">Desconto de {proposta.desconto_percentual}% aplicado</span>
+                </div>
+              )}
+            </div>
+
+            {/* Payment conditions */}
+            {proposta.forma_pagamento && (
+              <div className="p-5 sm:p-6 border-t border-slate-100">
+                <CondicoesPagamentoView
+                  conditions={{
+                    forma_pagamento: proposta.forma_pagamento,
+                    parcelas_count: proposta.parcelas_count,
+                    entrada_percentual: proposta.entrada_percentual,
+                    prazo_dias: proposta.prazo_dias,
+                  }}
+                  valorTotal={proposta.valor_total}
+                />
+                {proposta.forma_pagamento === 'pix' && chavePix && (
+                  <PortalPixInfo chavePix={chavePix} valor={proposta.valor_total ?? 0} />
+                )}
               </div>
             )}
           </div>
-          {/* Payment conditions */}
-          {proposta.forma_pagamento && (
-            <div className="p-5 sm:p-6 border-t border-slate-100">
-              <CondicoesPagamentoView
-                conditions={{
-                  forma_pagamento: proposta.forma_pagamento,
-                  parcelas_count: proposta.parcelas_count,
-                  entrada_percentual: proposta.entrada_percentual,
-                  prazo_dias: proposta.prazo_dias,
-                }}
-                valorTotal={proposta.valor_total}
-              />
-              {proposta.forma_pagamento === 'pix' && chavePix && (
-                <PortalPixInfo chavePix={chavePix} valor={proposta.valor_total ?? 0} />
-              )}
+
+          {/* Observations */}
+          {proposta.observacoes && (
+            <div className="bg-white rounded-2xl border border-slate-200 p-5 sm:p-6">
+              <h4 className="text-sm font-semibold text-slate-700 mb-2">Observações</h4>
+              <p className="text-sm text-slate-500 whitespace-pre-wrap leading-relaxed">{proposta.observacoes}</p>
             </div>
           )}
-        </div>
+        </main>
+      </div>
 
+      {/* These sections are OUTSIDE pdfContentRef - won't appear in PDF */}
+      <div className="max-w-4xl mx-auto w-full px-4 sm:px-6 pb-8 space-y-8">
         {/* File Upload */}
         <PortalFileUpload
           token={token || ''}
           clientName={clienteNome}
         />
-        {/* Observations */}
-        {proposta.observacoes && (
-          <div className="bg-white rounded-2xl border border-slate-200 p-5 sm:p-6">
-            <h4 className="text-sm font-semibold text-slate-700 mb-2">Observações</h4>
-            <p className="text-sm text-slate-500 whitespace-pre-wrap leading-relaxed">{proposta.observacoes}</p>
-          </div>
-        )}
 
         {/* Approval */}
         <PortalApproval
@@ -166,7 +202,7 @@ export default function PortalOrcamentoPage() {
           isLoading={aprovar.isPending}
           disabled={expirada}
         />
-      </main>
+      </div>
 
       <PortalFooter />
 
