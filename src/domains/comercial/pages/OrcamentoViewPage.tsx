@@ -12,6 +12,15 @@ import {
   Send, ChevronDown, ChevronUp, Package, Scissors, Copy, FileDown,
 } from "lucide-react";
 import OrcamentoPDF from "../components/OrcamentoPDF";
+import OrcamentoPDFMulti, { type ModoPDF } from "../components/OrcamentoPDFMulti";
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuLabel,
+  DropdownMenuSeparator,
+  DropdownMenuTrigger,
+} from "@/components/ui/dropdown-menu";
 import { Button } from "@/components/ui/button";
 import { Separator } from "@/components/ui/separator";
 import { Badge } from "@/components/ui/badge";
@@ -144,24 +153,21 @@ export default function OrcamentoViewPage() {
 
   const [pdfLoading, setPdfLoading] = useState(false);
 
+  // Gera PDF classico (layout original completo) - mantido para compatibilidade
   const handleGerarPDF = async () => {
     if (!orc) return;
     setPdfLoading(true);
     try {
-      // Cria container temporário fora da tela
       const container = document.createElement("div");
       container.style.cssText = "position:absolute;left:-9999px;top:0;width:210mm;background:white;";
       document.body.appendChild(container);
 
-      // Renderiza OrcamentoPDF no container
       const orcamentoCompleto = orc as Parameters<typeof OrcamentoPDF>[0]["orcamento"];
       const root = createRoot(container);
       root.render(<OrcamentoPDF orcamento={orcamentoCompleto} nomeEmpresa={nomeEmpresa} />);
 
-      // Aguarda render completo
       await new Promise((r) => setTimeout(r, 300));
 
-      // html2pdf.js via import dinâmico (evita SSR issues)
       const html2pdf = (await import("html2pdf.js")).default;
       await html2pdf()
         .set({
@@ -173,11 +179,52 @@ export default function OrcamentoViewPage() {
         .from(container.firstElementChild as HTMLElement)
         .save();
 
-      // Limpa container
       root.unmount();
       document.body.removeChild(container);
     } catch (err) {
-      // PDF generation failed — loading state handles UX
+      // PDF generation failed - loading state handles UX
+    } finally {
+      setPdfLoading(false);
+    }
+  };
+
+  // Gera PDF multi-modo (cliente / producao / tecnico)
+  const handleGerarPDFMulti = async (modo: ModoPDF) => {
+    if (!orc) return;
+    setPdfLoading(true);
+    try {
+      const container = document.createElement("div");
+      container.style.cssText = "position:absolute;left:-9999px;top:0;width:210mm;background:white;";
+      document.body.appendChild(container);
+
+      const orcamentoMulti = orc as Parameters<typeof OrcamentoPDFMulti>[0]["orcamento"];
+      const root = createRoot(container);
+      root.render(
+        <OrcamentoPDFMulti orcamento={orcamentoMulti} modo={modo} nomeEmpresa={nomeEmpresa} />,
+      );
+
+      await new Promise((r) => setTimeout(r, 300));
+
+      const html2pdf = (await import("html2pdf.js")).default;
+      const filenameMap: Record<ModoPDF, string> = {
+        cliente: `Proposta-${orc.numero}-cliente.pdf`,
+        producao: `OS-${orc.numero}-producao.pdf`,
+        tecnico: `Ficha-${orc.numero}-tecnica.pdf`,
+      };
+      await html2pdf()
+        .set({
+          margin: [10, 10, 10, 10],
+          filename: filenameMap[modo],
+          html2canvas: { scale: 2, useCORS: true, logging: false },
+          jsPDF: { unit: "mm", format: "a4", orientation: "portrait" },
+        })
+        .from(container.firstElementChild as HTMLElement)
+        .save();
+
+      root.unmount();
+      document.body.removeChild(container);
+    } catch (err) {
+      // silent
     } finally {
       setPdfLoading(false);
     }
@@ -243,16 +290,40 @@ export default function OrcamentoViewPage() {
           <p className="text-slate-500 text-sm mt-0.5">{orc.titulo}</p>
         </div>
         <div className="flex items-center gap-2 flex-wrap justify-end">
-          <Button
-            variant="outline" size="sm" className="rounded-xl gap-1.5"
-            onClick={handleGerarPDF}
-            disabled={pdfLoading}
-          >
-            {pdfLoading
-              ? <Loader2 size={14} className="animate-spin" />
-              : <FileDown size={14} />}
-            {pdfLoading ? "Gerando..." : "Baixar PDF"}
-          </Button>
+          <DropdownMenu>
+            <DropdownMenuTrigger asChild>
+              <Button
+                variant="outline" size="sm" className="rounded-xl gap-1.5"
+                disabled={pdfLoading}
+              >
+                {pdfLoading
+                  ? <Loader2 size={14} className="animate-spin" />
+                  : <FileDown size={14} />}
+                {pdfLoading ? "Gerando..." : "Baixar PDF"}
+                <ChevronDown size={12} />
+              </Button>
+            </DropdownMenuTrigger>
+            <DropdownMenuContent align="end" className="w-56 rounded-xl">
+              <DropdownMenuLabel>Escolha o modo</DropdownMenuLabel>
+              <DropdownMenuSeparator />
+              <DropdownMenuItem onClick={() => handleGerarPDFMulti("cliente")}>
+                👥 Modo Cliente
+                <span className="ml-auto text-[10px] text-slate-400">Comercial</span>
+              </DropdownMenuItem>
+              <DropdownMenuItem onClick={() => handleGerarPDFMulti("producao")}>
+                🏭 Modo Produção
+                <span className="ml-auto text-[10px] text-slate-400">Chão de fábrica</span>
+              </DropdownMenuItem>
+              <DropdownMenuItem onClick={() => handleGerarPDFMulti("tecnico")}>
+                🔧 Modo Técnico
+                <span className="ml-auto text-[10px] text-slate-400">Interno</span>
+              </DropdownMenuItem>
+              <DropdownMenuSeparator />
+              <DropdownMenuItem onClick={handleGerarPDF}>
+                📄 Layout clássico completo
+              </DropdownMenuItem>
+            </DropdownMenuContent>
+          </DropdownMenu>
           <Button
             variant="outline" size="sm" className="rounded-xl gap-1.5"
             onClick={handleDuplicar}

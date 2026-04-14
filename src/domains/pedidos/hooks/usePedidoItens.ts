@@ -25,7 +25,15 @@ export interface PedidoItem {
   valor_total: number | null;
   status: PedidoItemStatus;
   arte_url: string | null;
+  arte_preview_url: string | null;
+  arte_nome_original: string | null;
+  arte_tamanho_bytes: number | null;
+  arte_mime: string | null;
+  arte_uploaded_at: string | null;
+  arte_uploaded_by: string | null;
   instrucoes: string | null;
+  largura_cm: number | null;
+  altura_cm: number | null;
   created_at: string;
 }
 
@@ -40,6 +48,12 @@ export interface PedidoItemCreate {
   valor_unitario?: number | null;
   valor_total?: number | null;
   arte_url?: string | null;
+  arte_preview_url?: string | null;
+  arte_nome_original?: string | null;
+  arte_tamanho_bytes?: number | null;
+  arte_mime?: string | null;
+  arte_uploaded_at?: string | null;
+  arte_uploaded_by?: string | null;
   instrucoes?: string | null;
 }
 

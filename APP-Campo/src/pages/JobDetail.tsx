@@ -18,6 +18,7 @@ const JobPhotos = React.lazy(() => import("@/components/job/JobPhotos"));
 const JobVideos = React.lazy(() => import("@/components/job/JobVideos"));
 const JobSignature = React.lazy(() => import("@/components/job/JobSignature"));
 const JobAttachments = React.lazy(() => import("@/components/job/JobAttachments"));
+const JobArtesReferencia = React.lazy(() => import("@/components/job/JobArtesReferencia"));
 
 const TabFallback = () => (
   <div className="flex justify-center py-8">
@@ -599,6 +600,9 @@ export default function JobDetail() {
               initialData={JSON.parse(localStorage.getItem(`checklist_${id}`) || "{}")}
               onSave={(data) => localStorage.setItem(`checklist_${id}`, JSON.stringify(data))}
             />
+            <Suspense fallback={<TabFallback />}>
+              <JobArtesReferencia pedidoId={(job as { pedido_id?: string | null }).pedido_id ?? null} />
+            </Suspense>
             <Suspense fallback={<TabFallback />}>
               <JobAttachments jobId={id!} />
             </Suspense>
