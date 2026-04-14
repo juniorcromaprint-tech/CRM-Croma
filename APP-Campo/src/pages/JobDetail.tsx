@@ -447,22 +447,50 @@ export default function JobDetail() {
                   CNPJ: {job.stores.cnpj.replace(/^(\d{2})(\d{3})(\d{3})(\d{4})(\d{2})$/, '$1.$2.$3/$4-$5')}
                 </p>
               )}
-              {(job.stores?.lat && job.stores?.lng) && (
-                <div className="flex gap-2 mt-2 print:hidden">
-                  <button
-                    onClick={() => window.open(`https://www.google.com/maps/dir/?api=1&destination=${job.stores.lat},${job.stores.lng}`, '_blank')}
-                    className="flex items-center gap-1 text-xs font-bold text-blue-600 bg-blue-50 px-2 py-1 rounded-lg hover:bg-blue-100"
-                  >
-                    <Navigation size={12} /> Maps
-                  </button>
-                  <button
-                    onClick={() => window.open(`https://waze.com/ul?ll=${job.stores.lat},${job.stores.lng}&navigate=yes`, '_blank')}
-                    className="flex items-center gap-1 text-xs font-bold text-purple-600 bg-purple-50 px-2 py-1 rounded-lg hover:bg-purple-100"
-                  >
-                    <ExternalLink size={12} /> Waze
-                  </button>
-                </div>
-              )}
+              {(() => {
+                const hasCoords = job.stores?.lat && job.stores?.lng;
+                const addressParts = [
+                  job.stores?.address,
+                  job.stores?.neighborhood,
+                  job.stores?.state,
+                  job.stores?.zip_code,
+                ].filter(Boolean);
+                const fullAddress = addressParts.join(", ");
+                const hasAddress = fullAddress.length > 0;
+
+                if (!hasCoords && !hasAddress) return null;
+
+                const mapsUrl = hasCoords
+                  ? `https://www.google.com/maps/dir/?api=1&destination=${job.stores.lat},${job.stores.lng}`
+                  : `https://www.google.com/maps/dir/?api=1&destination=${encodeURIComponent(fullAddress)}`;
+                const wazeUrl = hasCoords
+                  ? `https://waze.com/ul?ll=${job.stores.lat},${job.stores.lng}&navigate=yes`
+                  : `https://waze.com/ul?q=${encodeURIComponent(fullAddress)}&navigate=yes`;
+
+                return (
+                  <div className="flex gap-2 mt-2 print:hidden">
+                    <button
+                      onClick={() => window.open(mapsUrl, '_blank')}
+                      className="flex items-center gap-1 text-xs font-bold text-blue-600 bg-blue-50 px-2 py-1 rounded-lg hover:bg-blue-100"
+                      title={hasCoords ? "Navegar por coordenadas GPS" : "Navegar por endereco"}
+                    >
+                      <Navigation size={12} /> Maps
+                    </button>
+                    <button
+                      onClick={() => window.open(wazeUrl, '_blank')}
+                      className="flex items-center gap-1 text-xs font-bold text-purple-600 bg-purple-50 px-2 py-1 rounded-lg hover:bg-purple-100"
+                      title={hasCoords ? "Navegar por coordenadas GPS" : "Navegar por endereco"}
+                    >
+                      <ExternalLink size={12} /> Waze
+                    </button>
+                    {!hasCoords && (
+                      <span className="text-[10px] text-slate-400 self-center italic">
+                        via endereco
+                      </span>
+                    )}
+                  </div>
+                );
+              })()}
             </div>
             <div className="bg-slate-50 p-4 rounded-xl print:bg-transparent print:border print:border-slate-100 print:p-3">
               <p className="text-xs text-slate-500 font-bold uppercase">Data</p>
