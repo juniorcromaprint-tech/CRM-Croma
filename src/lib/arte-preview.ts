@@ -19,9 +19,9 @@ pdfjs.GlobalWorkerOptions.workerSrc = PdfWorker as unknown as string
 
 // Preview eh SO pra "ver o que eh a arte" no App Campo/CRM — arquivo de
 // impressao fica no OneDrive. Entao fica bem enxuto pra carregar rapido
-// no celular: max 1200px no lado maior, quality 0.62 → ~80-200KB por JPG.
-const PREVIEW_MAX_SIZE = 1200 // px no lado maior
-const PREVIEW_QUALITY = 0.62
+// no celular: max 1000px no lado maior, quality 0.55 → ~40-100KB por JPG.
+const PREVIEW_MAX_SIZE = 1000 // px no lado maior
+const PREVIEW_QUALITY = 0.55
 
 export type PreviewResult = {
   /** Blob do preview (image/jpeg) */
