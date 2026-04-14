@@ -3,7 +3,9 @@
  *
  * Lista todos os itens de um pedido com o ArteUploader em cada um.
  * Permite anexar/trocar/remover a arte do item — preview gerado automaticamente
- * (leve, pra visualizacao no App Campo) e original preservado para impressao.
+ * (leve, pra visualizacao no App Campo) e original enviado ao OneDrive.
+ *
+ * Ao substituir ou remover arte: deleta o arquivo antigo do OneDrive (silencioso em erro).
  */
 
 import { Package, Ruler } from 'lucide-react'
@@ -12,9 +14,29 @@ import { usePedidoItens, useUpdatePedidoItem } from '../hooks/usePedidoItens'
 import { supabase } from '@/integrations/supabase/client'
 import { brl } from '@/shared/utils/format'
 import { showError, showSuccess } from '@/utils/toast'
+import type { ArteUploadResult } from '@/hooks/useArteUpload'
 
 type Props = {
   pedidoId: string
+}
+
+const SUPABASE_URL = import.meta.env.VITE_SUPABASE_URL as string
+
+async function deletarArteOneDrive(fileId: string): Promise<void> {
+  try {
+    const { data: { session } } = await supabase.auth.getSession()
+    if (!session?.access_token) return
+    await fetch(`${SUPABASE_URL}/functions/v1/onedrive-delete-file`, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        Authorization: `Bearer ${session.access_token}`,
+      },
+      body: JSON.stringify({ fileId }),
+    })
+  } catch (err) {
+    console.warn('[PedidoItensArtes] falha ao deletar arte antiga do OneDrive:', err)
+  }
 }
 
 export function PedidoItensArtes({ pedidoId }: Props) {
@@ -43,15 +65,16 @@ export function PedidoItensArtes({ pedidoId }: Props) {
 
   async function handleUploaded(
     itemId: string,
-    result: {
-      arte_url: string
-      arte_preview_url: string
-      arte_nome_original: string
-      arte_tamanho_bytes: number
-      arte_mime: string
-    },
+    itemAtualOneDriveId: string | null | undefined,
+    result: ArteUploadResult,
   ) {
     const { data: userData } = await supabase.auth.getUser()
+
+    // Deletar arquivo antigo no OneDrive se existir (silencioso em erro)
+    if (itemAtualOneDriveId) {
+      await deletarArteOneDrive(itemAtualOneDriveId)
+    }
+
     await update.mutateAsync({
       id: itemId,
       arte_url: result.arte_url,
@@ -59,13 +82,19 @@ export function PedidoItensArtes({ pedidoId }: Props) {
       arte_nome_original: result.arte_nome_original,
       arte_tamanho_bytes: result.arte_tamanho_bytes,
       arte_mime: result.arte_mime,
+      arte_onedrive_file_id: result.arte_onedrive_file_id,
       arte_uploaded_at: new Date().toISOString(),
       arte_uploaded_by: userData.user?.id ?? null,
     })
   }
 
-  async function handleRemove(itemId: string) {
+  async function handleRemove(itemId: string, itemOneDriveId: string | null | undefined) {
     try {
+      // Deletar do OneDrive antes de limpar os campos (silencioso em erro)
+      if (itemOneDriveId) {
+        await deletarArteOneDrive(itemOneDriveId)
+      }
+
       await update.mutateAsync({
         id: itemId,
         arte_url: null,
@@ -73,6 +102,7 @@ export function PedidoItensArtes({ pedidoId }: Props) {
         arte_nome_original: null,
         arte_tamanho_bytes: null,
         arte_mime: null,
+        arte_onedrive_file_id: null,
         arte_uploaded_at: null,
         arte_uploaded_by: null,
       })
@@ -92,6 +122,7 @@ export function PedidoItensArtes({ pedidoId }: Props) {
           arte_nome_original: item.arte_nome_original,
           arte_tamanho_bytes: item.arte_tamanho_bytes,
           arte_mime: item.arte_mime,
+          arte_onedrive_file_id: item.arte_onedrive_file_id,
         }
 
         return (
@@ -152,8 +183,8 @@ export function PedidoItensArtes({ pedidoId }: Props) {
                   entityId={item.pedido_id}
                   itemId={item.id}
                   atual={arteAtual}
-                  onUploaded={(result) => handleUploaded(item.id, result)}
-                  onRemove={() => handleRemove(item.id)}
+                  onUploaded={(result) => handleUploaded(item.id, item.arte_onedrive_file_id, result)}
+                  onRemove={() => handleRemove(item.id, item.arte_onedrive_file_id)}
                 />
               </div>
             </div>

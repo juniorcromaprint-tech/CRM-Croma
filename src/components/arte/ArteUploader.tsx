@@ -28,6 +28,7 @@ export type ArteAtual = {
   arte_nome_original?: string | null
   arte_tamanho_bytes?: number | null
   arte_mime?: string | null
+  arte_onedrive_file_id?: string | null // ID do arquivo no OneDrive (usado pra deletar ao substituir)
 }
 
 type ArteUploaderProps = {
@@ -97,11 +98,9 @@ export function ArteUploader({
   const labelProgresso =
     progress.stage === 'gerando_preview'
       ? 'Gerando preview...'
-      : progress.stage === 'enviando_original'
-        ? 'Enviando original...'
-        : progress.stage === 'enviando_preview'
-          ? 'Enviando preview...'
-          : 'Processando...'
+      : progress.stage === 'enviando'
+        ? 'Enviando...'
+        : 'Processando...'
 
   // --- Modo compacto (thumbnail pequeno) ----------------------------------
   if (compact) {

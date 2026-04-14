@@ -29,6 +29,7 @@ export interface PedidoItem {
   arte_nome_original: string | null;
   arte_tamanho_bytes: number | null;
   arte_mime: string | null;
+  arte_onedrive_file_id: string | null;
   arte_uploaded_at: string | null;
   arte_uploaded_by: string | null;
   instrucoes: string | null;
@@ -52,6 +53,7 @@ export interface PedidoItemCreate {
   arte_nome_original?: string | null;
   arte_tamanho_bytes?: number | null;
   arte_mime?: string | null;
+  arte_onedrive_file_id?: string | null;
   arte_uploaded_at?: string | null;
   arte_uploaded_by?: string | null;
   instrucoes?: string | null;
