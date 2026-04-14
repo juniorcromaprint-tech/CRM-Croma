@@ -93,8 +93,28 @@ export default function JobDetail() {
 
   const updateJobMutation = useMutation({
     mutationFn: async (updates: any) => {
-      const { error } = await supabase.from("jobs").update(updates).eq("id", id);
+      // Auto-preenche started_at/finished_at quando o status muda
+      // (evita o bug do timer nao parar quando o usuario muda status pelo dropdown)
+      const finalUpdates: any = { ...updates };
+      if (updates.status && !("started_at" in updates) && !("finished_at" in updates)) {
+        const s = updates.status;
+        if ((s === "Em andamento" || s === "Iniciado") && !job?.started_at) {
+          finalUpdates.started_at = new Date().toISOString();
+        }
+        if (s === "Concluído" && !job?.finished_at) {
+          finalUpdates.finished_at = new Date().toISOString();
+          if (!job?.started_at) finalUpdates.started_at = new Date().toISOString();
+        }
+      }
+      // .select().single() para detectar bloqueio silencioso por RLS
+      const { data, error } = await supabase
+        .from("jobs")
+        .update(finalUpdates)
+        .eq("id", id)
+        .select()
+        .single();
       if (error) throw error;
+      return data;
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["job", id] });

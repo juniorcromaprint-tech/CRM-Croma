@@ -16,6 +16,8 @@ import { supabase } from '@/integrations/supabase/client'
 import { gerarPreviewArte, type PreviewResult } from '@/lib/arte-preview'
 
 const BUCKET = 'job-attachments'
+/** Supabase Storage limita uploads a ~50MB. Acima disso, sobe so o preview. */
+const ORIGINAL_SIZE_LIMIT = 45 * 1024 * 1024 // 45 MB
 
 export type ArteUploadScope = 'pedido' | 'proposta'
 
@@ -74,14 +76,9 @@ export function useArteUpload() {
         const originalPath = `${baseDir}/original_${ts}_${sanitizarNome(file.name)}`
         const previewPath = `${baseDir}/preview_${ts}.jpg`
 
-        setProgress({ stage: 'enviando_original' })
-        const uploadOriginal = supabase.storage
-          .from(BUCKET)
-          .upload(originalPath, file, {
-            cacheControl: '3600',
-            upsert: true,
-            contentType: file.type || `application/${ext}`,
-          })
+        // Se o arquivo original eh muito grande, sobe so o preview
+        // e deixa arte_url vazia (o preview continua servindo pro App Campo)
+        const shouldUploadOriginal = file.size <= ORIGINAL_SIZE_LIMIT
 
         setProgress({ stage: 'enviando_preview' })
         const uploadPreview = supabase.storage
@@ -92,17 +89,36 @@ export function useArteUpload() {
             contentType: 'image/jpeg',
           })
 
-        const [origRes, prevRes] = await Promise.all([uploadOriginal, uploadPreview])
+        let arteUrl = ''
 
-        if (origRes.error) throw origRes.error
-        if (prevRes.error) throw prevRes.error
+        if (shouldUploadOriginal) {
+          setProgress({ stage: 'enviando_original' })
+          const uploadOriginal = supabase.storage
+            .from(BUCKET)
+            .upload(originalPath, file, {
+              cacheControl: '3600',
+              upsert: true,
+              contentType: file.type || `application/${ext}`,
+            })
 
-        const { data: origUrl } = supabase.storage.from(BUCKET).getPublicUrl(originalPath)
+          const [origRes, prevRes] = await Promise.all([uploadOriginal, uploadPreview])
+
+          if (origRes.error) throw origRes.error
+          if (prevRes.error) throw prevRes.error
+
+          const { data: origUrl } = supabase.storage.from(BUCKET).getPublicUrl(originalPath)
+          arteUrl = origUrl.publicUrl
+        } else {
+          // Apenas preview (original fica fora do Storage por ser > 45MB)
+          const prevRes = await uploadPreview
+          if (prevRes.error) throw prevRes.error
+        }
+
         const { data: prevUrl } = supabase.storage.from(BUCKET).getPublicUrl(previewPath)
 
         setProgress({ stage: 'concluido' })
         return {
-          arte_url: origUrl.publicUrl,
+          arte_url: arteUrl,
           arte_preview_url: prevUrl.publicUrl,
           arte_nome_original: file.name,
           arte_tamanho_bytes: file.size,
