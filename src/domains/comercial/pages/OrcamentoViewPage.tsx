@@ -13,6 +13,7 @@ import {
 } from "lucide-react";
 import OrcamentoPDF from "../components/OrcamentoPDF";
 import OrcamentoPDFMulti, { type ModoPDF } from "../components/OrcamentoPDFMulti";
+import { enriquecerOrcamentoParaPDF } from "../services/orcamento-pdf-enrich.service";
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -198,9 +199,23 @@ export default function OrcamentoViewPage() {
       document.body.appendChild(container);
 
       const orcamentoMulti = orc as Parameters<typeof OrcamentoPDFMulti>[0]["orcamento"];
+      // Enriquece apenas para modos que precisam dos dados extras (producao/tecnico)
+      const enriched = modo !== "cliente"
+        ? await enriquecerOrcamentoParaPDF({
+            id: orc.id,
+            vendedor_id: (orc as any).vendedor_id ?? null,
+            total: orc.total ?? 0,
+            itens: orc.itens.map((i: any) => ({ id: i.id })),
+          }).catch(() => null)
+        : null;
       const root = createRoot(container);
       root.render(
-        <OrcamentoPDFMulti orcamento={orcamentoMulti} modo={modo} nomeEmpresa={nomeEmpresa} />,
+        <OrcamentoPDFMulti
+          orcamento={orcamentoMulti}
+          modo={modo}
+          nomeEmpresa={nomeEmpresa}
+          enriched={enriched}
+        />,
       );
 
       await new Promise((r) => setTimeout(r, 300));

@@ -20,6 +20,8 @@ import type {
   OrcamentoItemAcabamento,
   OrcamentoServico,
 } from "../services/orcamento.service";
+import type { OrcamentoEnriquecidoPDF } from "../services/orcamento-pdf-enrich.service";
+import { formatMinutos } from "../services/orcamento-pdf-enrich.service";
 
 export type ModoPDF = "cliente" | "producao" | "tecnico";
 
@@ -41,6 +43,10 @@ interface Props {
   };
   modo: ModoPDF;
   nomeEmpresa?: string;
+  /** Dados extras carregados via enriquecerOrcamentoParaPDF (V2).
+   *  Quando fornecido, modo 'producao' mostra tempos reais por item e
+   *  modo 'tecnico' mostra valores de comissao em R$ + comissao externa. */
+  enriched?: OrcamentoEnriquecidoPDF | null;
 }
 
 const MODO_CONFIG: Record<
@@ -85,6 +91,7 @@ export default function OrcamentoPDFMulti({
   orcamento,
   modo,
   nomeEmpresa = "Croma Print Comunicacao Visual",
+  enriched = null,
 }: Props) {
   const cfg = MODO_CONFIG[modo];
   const subtotal = calcSubtotal(orcamento.itens);
@@ -159,9 +166,41 @@ export default function OrcamentoPDFMulti({
       <section style={{ marginTop: 18 }}>
         <h2 style={{ fontSize: "11pt", color: "#334155", marginBottom: 6 }}>Itens</h2>
         {modo === "cliente" && <TabelaItensCliente itens={orcamento.itens} />}
-        {modo === "producao" && <TabelaItensProducao itens={orcamento.itens} />}
+        {modo === "producao" && <TabelaItensProducao itens={orcamento.itens} enriched={enriched} />}
         {modo === "tecnico" && <TabelaItensTecnico itens={orcamento.itens} />}
       </section>
+
+      {/* TEMPO DE PRODUCAO — so producao, quando enriched */}
+      {modo === "producao" && enriched && enriched.tempo_producao_total_min > 0 && (
+        <section style={{ marginTop: 14 }}>
+          <h2 style={{ fontSize: "11pt", color: "#334155", marginBottom: 6 }}>Tempo estimado de produção</h2>
+          <table style={{ fontSize: "9pt" }}>
+            <thead>
+              <tr>
+                <th>Etapa</th>
+                <th style={{ textAlign: "right", width: 140 }}>Tempo</th>
+              </tr>
+            </thead>
+            <tbody>
+              {Object.entries(enriched.tempo_por_etapa).map(([etapa, min]) => (
+                <tr key={etapa}>
+                  <td>{etapa}</td>
+                  <td style={{ textAlign: "right" }}>{formatMinutos(min)}</td>
+                </tr>
+              ))}
+              <tr>
+                <td style={{ fontWeight: 700, borderTop: `2px solid ${cfg.cor}`, color: cfg.cor }}>Total</td>
+                <td style={{
+                  textAlign: "right", fontWeight: 700,
+                  borderTop: `2px solid ${cfg.cor}`, color: cfg.cor,
+                }}>
+                  {formatMinutos(enriched.tempo_producao_total_min)}
+                </td>
+              </tr>
+            </tbody>
+          </table>
+        </section>
+      )}
 
       {/* TOTAL — so cliente e tecnico */}
       {(modo === "cliente" || modo === "tecnico") && (
@@ -210,17 +249,43 @@ export default function OrcamentoPDFMulti({
       {/* COMISSAO + FORMA PAGTO — so tecnico */}
       {modo === "tecnico" && (
         <section style={{ marginTop: 16 }}>
-          <h2 style={{ fontSize: "11pt", color: "#334155", marginBottom: 6 }}>Informacoes internas</h2>
+          <h2 style={{ fontSize: "11pt", color: "#334155", marginBottom: 6 }}>Informações internas</h2>
           <table>
             <tbody>
               <tr>
                 <td style={{ width: "40%", color: "#64748b" }}>Vendedor</td>
-                <td>{orcamento.vendedor_nome || "—"}</td>
+                <td>{enriched?.vendedor_nome || orcamento.vendedor_nome || "—"}</td>
               </tr>
-              {orcamento.vendedor_comissao_pct != null && (
+              {(enriched?.vendedor_comissao_pct ?? orcamento.vendedor_comissao_pct) != null && (
                 <tr>
-                  <td style={{ color: "#64748b" }}>Comissao</td>
-                  <td>{orcamento.vendedor_comissao_pct}%</td>
+                  <td style={{ color: "#64748b" }}>Comissão vendedor</td>
+                  <td>
+                    {enriched?.vendedor_comissao_pct ?? orcamento.vendedor_comissao_pct}%
+                    {enriched?.vendedor_comissao_valor != null && (
+                      <span style={{ color: "#64748b", marginLeft: 8 }}>
+                        ({brl(enriched.vendedor_comissao_valor)})
+                      </span>
+                    )}
+                  </td>
+                </tr>
+              )}
+              {enriched?.comissao_externa_pct != null && enriched.comissao_externa_pct > 0 && (
+                <tr>
+                  <td style={{ color: "#64748b" }}>Comissão externa</td>
+                  <td>
+                    {enriched.comissao_externa_nome ? `${enriched.comissao_externa_nome} — ` : ""}
+                    {enriched.comissao_externa_pct}%
+                    {enriched.comissao_externa_valor != null && (
+                      <span style={{ color: "#64748b", marginLeft: 8 }}>
+                        ({brl(enriched.comissao_externa_valor)})
+                      </span>
+                    )}
+                    {enriched.absorver_comissao && (
+                      <span style={{ marginLeft: 8, color: "#b45309", fontSize: "8pt" }}>
+                        · absorvida pela Croma
+                      </span>
+                    )}
+                  </td>
                 </tr>
               )}
               {orcamento.forma_pagamento && (
@@ -231,8 +296,14 @@ export default function OrcamentoPDFMulti({
               )}
               {orcamento.condicoes_pagamento && (
                 <tr>
-                  <td style={{ color: "#64748b" }}>Condicoes</td>
+                  <td style={{ color: "#64748b" }}>Condições</td>
                   <td>{orcamento.condicoes_pagamento}</td>
+                </tr>
+              )}
+              {enriched?.tempo_producao_total_min != null && enriched.tempo_producao_total_min > 0 && (
+                <tr>
+                  <td style={{ color: "#64748b" }}>Tempo estimado de produção</td>
+                  <td>{formatMinutos(enriched.tempo_producao_total_min)}</td>
                 </tr>
               )}
             </tbody>
@@ -338,62 +409,95 @@ function TabelaItensCliente({ itens }: { itens: ItemExtendido[] }) {
   );
 }
 
-function TabelaItensProducao({ itens }: { itens: ItemExtendido[] }) {
+function TabelaItensProducao({
+  itens,
+  enriched,
+}: {
+  itens: ItemExtendido[];
+  enriched: OrcamentoEnriquecidoPDF | null;
+}) {
+  const hasProcessos = enriched && Object.keys(enriched.processos_por_item).length > 0;
   return (
     <table>
       <thead>
         <tr>
           <th style={{ width: "90px" }}>Imagem</th>
-          <th>Item & Especificacao tecnica</th>
+          <th>Item & Especificação técnica</th>
           <th style={{ width: "100px" }}>Medidas</th>
           <th style={{ width: "60px", textAlign: "center" }}>Qtd</th>
           <th style={{ width: "60px", textAlign: "center" }}>m²</th>
+          {hasProcessos && (
+            <th style={{ width: "80px", textAlign: "right" }}>Tempo</th>
+          )}
         </tr>
       </thead>
       <tbody>
-        {itens.map((item) => (
-          <tr key={item.id}>
-            <td><ThumbArte item={item} /></td>
-            <td>
-              <strong>{item.descricao}</strong>
-              {item.especificacao && (
-                <div style={{ color: "#475569", fontSize: "8pt" }}>{item.especificacao}</div>
-              )}
-              {item.materiais && item.materiais.length > 0 && (
-                <div style={{ marginTop: 6 }}>
-                  <div style={{ fontSize: "8pt", fontWeight: 600, color: "#64748b", textTransform: "uppercase" }}>
-                    Materia-prima
+        {itens.map((item) => {
+          const processos = enriched?.processos_por_item[item.id] ?? [];
+          const tempoItem = processos.reduce((sum, p) => sum + (p.tempo_minutos || 0), 0);
+          return (
+            <tr key={item.id}>
+              <td><ThumbArte item={item} /></td>
+              <td>
+                <strong>{item.descricao}</strong>
+                {item.especificacao && (
+                  <div style={{ color: "#475569", fontSize: "8pt" }}>{item.especificacao}</div>
+                )}
+                {item.materiais && item.materiais.length > 0 && (
+                  <div style={{ marginTop: 6 }}>
+                    <div style={{ fontSize: "8pt", fontWeight: 600, color: "#64748b", textTransform: "uppercase" }}>
+                      Matéria-prima
+                    </div>
+                    <ul style={{ margin: "3px 0", paddingLeft: 16, fontSize: "8pt", color: "#475569" }}>
+                      {item.materiais.map((m) => (
+                        <li key={m.id}>
+                          {(m as any).material_nome || (m as any).nome || "Material"}
+                          {(m as any).quantidade ? ` — ${(m as any).quantidade} ${(m as any).unidade || ""}` : ""}
+                        </li>
+                      ))}
+                    </ul>
                   </div>
-                  <ul style={{ margin: "3px 0", paddingLeft: 16, fontSize: "8pt", color: "#475569" }}>
-                    {item.materiais.map((m) => (
-                      <li key={m.id}>
-                        {(m as any).material_nome || (m as any).nome || "Material"}
-                        {(m as any).quantidade ? ` — ${(m as any).quantidade} ${(m as any).unidade || ""}` : ""}
-                      </li>
-                    ))}
-                  </ul>
-                </div>
-              )}
-              {item.acabamentos && item.acabamentos.length > 0 && (
-                <div style={{ marginTop: 4 }}>
-                  <div style={{ fontSize: "8pt", fontWeight: 600, color: "#64748b", textTransform: "uppercase" }}>
-                    Acabamentos
+                )}
+                {item.acabamentos && item.acabamentos.length > 0 && (
+                  <div style={{ marginTop: 4 }}>
+                    <div style={{ fontSize: "8pt", fontWeight: 600, color: "#64748b", textTransform: "uppercase" }}>
+                      Acabamentos
+                    </div>
+                    <ul style={{ margin: "3px 0", paddingLeft: 16, fontSize: "8pt", color: "#475569" }}>
+                      {item.acabamentos.map((a) => (
+                        <li key={a.id}>
+                          {(a as any).acabamento_nome || (a as any).nome || "Acabamento"}
+                        </li>
+                      ))}
+                    </ul>
                   </div>
-                  <ul style={{ margin: "3px 0", paddingLeft: 16, fontSize: "8pt", color: "#475569" }}>
-                    {item.acabamentos.map((a) => (
-                      <li key={a.id}>
-                        {(a as any).acabamento_nome || (a as any).nome || "Acabamento"}
-                      </li>
-                    ))}
-                  </ul>
-                </div>
+                )}
+                {processos.length > 0 && (
+                  <div style={{ marginTop: 4 }}>
+                    <div style={{ fontSize: "8pt", fontWeight: 600, color: "#64748b", textTransform: "uppercase" }}>
+                      Processos
+                    </div>
+                    <ul style={{ margin: "3px 0", paddingLeft: 16, fontSize: "8pt", color: "#475569" }}>
+                      {processos.map((p, idx) => (
+                        <li key={`${item.id}-${idx}`}>
+                          {p.etapa} — {formatMinutos(p.tempo_minutos)}
+                        </li>
+                      ))}
+                    </ul>
+                  </div>
+                )}
+              </td>
+              <td>{formatDimensoes(item)}</td>
+              <td style={{ textAlign: "center" }}>{item.quantidade}</td>
+              <td style={{ textAlign: "center" }}>{item.area_m2 ? item.area_m2.toFixed(2) : "—"}</td>
+              {hasProcessos && (
+                <td style={{ textAlign: "right", fontWeight: 600 }}>
+                  {tempoItem > 0 ? formatMinutos(tempoItem) : "—"}
+                </td>
               )}
-            </td>
-            <td>{formatDimensoes(item)}</td>
-            <td style={{ textAlign: "center" }}>{item.quantidade}</td>
-            <td style={{ textAlign: "center" }}>{item.area_m2 ? item.area_m2.toFixed(2) : "—"}</td>
-          </tr>
-        ))}
+            </tr>
+          );
+        })}
       </tbody>
     </table>
   );
