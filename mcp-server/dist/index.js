@@ -32,6 +32,7 @@ import { registerAdminTools } from "./tools/admin.js";
 import { registerImpressoraTools } from "./tools/impressora.js";
 import { registerFornecedoresTools } from "./tools/fornecedores.js";
 import { registerComprasTools } from "./tools/compras.js";
+import { registerPropostasAnexosTools } from "./tools/propostas-anexos.js";
 // ─── Inicialização do servidor ──────────────────────────────────────────────
 const server = new McpServer({
     name: "croma-mcp-server",
@@ -52,7 +53,8 @@ registerAdminTools(server); // 3+7 ferramentas: catálogo, precificação, máqu
 registerImpressoraTools(server); // 8 ferramentas: HP Latex 365 — jobs, resumo, vincular, registrar, custo_real, mapear_substrato, registrar_recarga, nivel_cartuchos
 registerFornecedoresTools(server); // 5 ferramentas: listar, detalhe, cadastrar, atualizar, historico_compras
 registerComprasTools(server); // 5 ferramentas: listar, detalhe, criar, atualizar_status, registrar_recebimento
-// Total: 93 ferramentas
+registerPropostasAnexosTools(server); // 3 ferramentas: listar_anexos, anexar_arquivo_url, remover_anexo (Claudete via MCP)
+// Total: 96 ferramentas
 // ─── Validação de credenciais ───────────────────────────────────────────────
 function validateCredentials() {
     if (!process.env.SUPABASE_SERVICE_ROLE_KEY) {
@@ -83,7 +85,7 @@ async function main() {
     // Inicia o servidor via stdio (comunicação com Claude)
     const transport = new StdioServerTransport();
     await server.connect(transport);
-    process.stderr.write(`[croma-mcp] 🚀 Servidor Croma MCP iniciado (93 ferramentas)\n`);
+    process.stderr.write(`[croma-mcp] 🚀 Servidor Croma MCP iniciado (96 ferramentas)\n`);
 }
 main().catch((err) => {
     process.stderr.write(`[croma-mcp] Erro fatal: ${err instanceof Error ? err.message : String(err)}\n`);

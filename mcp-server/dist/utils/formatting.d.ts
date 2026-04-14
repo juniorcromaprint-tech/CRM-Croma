@@ -1,6 +1,6 @@
 /**
- * Utilitários de formatação para respostas do MCP
- * Formata valores monetários, datas e status em português
+ * Utilitários de formatacao para respostas do MCP
+ * Formata valores monetários, datas e status em portugues
  */
 /**
  * Formata valor monetário em BRL

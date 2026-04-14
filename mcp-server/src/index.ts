@@ -33,6 +33,7 @@ import { registerAdminTools } from "./tools/admin.js";
 import { registerImpressoraTools } from "./tools/impressora.js";
 import { registerFornecedoresTools } from "./tools/fornecedores.js";
 import { registerComprasTools } from "./tools/compras.js";
+import { registerPropostasAnexosTools } from "./tools/propostas-anexos.js";
 
 // ─── Inicialização do servidor ──────────────────────────────────────────────
 
@@ -57,8 +58,9 @@ registerAdminTools(server);       // 3+7 ferramentas: catálogo, precificação,
 registerImpressoraTools(server);  // 8 ferramentas: HP Latex 365 — jobs, resumo, vincular, registrar, custo_real, mapear_substrato, registrar_recarga, nivel_cartuchos
 registerFornecedoresTools(server); // 5 ferramentas: listar, detalhe, cadastrar, atualizar, historico_compras
 registerComprasTools(server);      // 5 ferramentas: listar, detalhe, criar, atualizar_status, registrar_recebimento
+registerPropostasAnexosTools(server); // 3 ferramentas: listar_anexos, anexar_arquivo_url, remover_anexo (Claudete via MCP)
 
-// Total: 93 ferramentas
+// Total: 96 ferramentas
 
 // ─── Validação de credenciais ───────────────────────────────────────────────
 
@@ -97,7 +99,7 @@ async function main(): Promise<void> {
   const transport = new StdioServerTransport();
   await server.connect(transport);
 
-  process.stderr.write(`[croma-mcp] 🚀 Servidor Croma MCP iniciado (93 ferramentas)\n`);
+  process.stderr.write(`[croma-mcp] 🚀 Servidor Croma MCP iniciado (96 ferramentas)\n`);
 }
 
 main().catch((err) => {
