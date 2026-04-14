@@ -40,6 +40,11 @@ export interface Pedido {
   created_at: string;
   updated_at: string;
   version: number;
+  // Origem externa (pedido espelhado de sistema externo — ex: Mubisys)
+  origem_externa?: string | null;
+  skip_auto_cr?: boolean;
+  skip_auto_op?: boolean;
+  skip_auto_comissao?: boolean;
   // joins
   clientes?: { nome_fantasia: string | null; razao_social: string } | null;
   pedido_itens?: { count: number }[] | null;
@@ -54,6 +59,12 @@ export interface PedidoCreate {
   data_prometida?: string | null;
   valor_total?: number;
   observacoes?: string | null;
+  /** Marca pedido como espelhado de sistema externo (ex: 'mubisys').
+   *  Quando preenchido, trigger BEFORE INSERT liga skip_auto_cr/op/comissao. */
+  origem_externa?: string | null;
+  skip_auto_cr?: boolean;
+  skip_auto_op?: boolean;
+  skip_auto_comissao?: boolean;
 }
 
 export interface PedidoUpdate extends Partial<PedidoCreate> {

@@ -281,6 +281,14 @@ export default function PedidoDetailPage() {
           <div className="flex items-center gap-3">
             <h1 className="text-2xl font-bold text-slate-800">{pedido.numero}</h1>
             <span className={`text-xs font-medium px-2.5 py-1 rounded-full ${sc.cls}`}>{sc.label}</span>
+            {pedido.origem_externa && (
+              <span
+                title={`Pedido espelhado de ${pedido.origem_externa}. CR, OP e comissão não foram geradas automaticamente.`}
+                className="text-xs font-medium px-2.5 py-1 rounded-full bg-violet-100 text-violet-700 border border-violet-200"
+              >
+                Espelhado ({pedido.origem_externa})
+              </span>
+            )}
           </div>
           <p className="text-slate-500 mt-0.5">{clienteNome}</p>
         </div>
