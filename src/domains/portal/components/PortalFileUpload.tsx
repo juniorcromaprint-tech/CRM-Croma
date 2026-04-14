@@ -13,6 +13,7 @@ interface FileState {
   file: File;
   status: 'pending' | 'uploading' | 'done' | 'error';
   error?: string;
+  previewUrl?: string | null;
 }
 
 function formatFileSize(bytes: number): string {
@@ -37,8 +38,10 @@ export function PortalFileUpload({ token, clientName }: Props) {
       if (item.status === 'error') continue;
       setFiles(prev => prev.map(f => f.file === item.file ? { ...f, status: 'uploading' } : f));
       try {
-        await uploadFileToPortal({ token, file: item.file, clientName });
-        setFiles(prev => prev.map(f => f.file === item.file ? { ...f, status: 'done' } : f));
+        const result = await uploadFileToPortal({ token, file: item.file, clientName });
+        setFiles(prev => prev.map(f =>
+          f.file === item.file ? { ...f, status: 'done', previewUrl: result.previewUrl ?? null } : f
+        ));
       } catch (err: unknown) {
         const msg = err instanceof Error ? err.message : 'Erro desconhecido';
         setFiles(prev => prev.map(f => f.file === item.file ? { ...f, status: 'error', error: msg } : f));
@@ -104,19 +107,31 @@ export function PortalFileUpload({ token, clientName }: Props) {
         <div className="mt-4 space-y-2">
           {files.map((f, i) => (
             <div key={i} className="flex items-center gap-3 bg-slate-50 rounded-xl p-3 text-sm">
-              <div className={`w-8 h-8 rounded-lg flex items-center justify-center flex-shrink-0 ${
-                f.status === 'done' ? 'bg-green-100' : f.status === 'error' ? 'bg-red-100' : 'bg-slate-100'
-              }`}>
-                {f.status === 'done' ? (
-                  <CheckCircle2 size={16} className="text-green-600" />
-                ) : f.status === 'uploading' ? (
-                  <Loader2 size={16} className="animate-spin text-blue-500" />
-                ) : f.status === 'error' ? (
-                  <X size={16} className="text-red-500" />
-                ) : (
-                  <FileIcon size={16} className="text-slate-400" />
-                )}
-              </div>
+              {f.status === 'done' && f.previewUrl ? (
+                <a
+                  href={f.previewUrl}
+                  target="_blank"
+                  rel="noreferrer"
+                  className="w-12 h-12 rounded-lg overflow-hidden flex-shrink-0 bg-white border border-slate-200 hover:ring-2 hover:ring-blue-300 transition-shadow"
+                  title="Abrir prévia"
+                >
+                  <img src={f.previewUrl} alt={f.file.name} className="w-full h-full object-cover" />
+                </a>
+              ) : (
+                <div className={`w-8 h-8 rounded-lg flex items-center justify-center flex-shrink-0 ${
+                  f.status === 'done' ? 'bg-green-100' : f.status === 'error' ? 'bg-red-100' : 'bg-slate-100'
+                }`}>
+                  {f.status === 'done' ? (
+                    <CheckCircle2 size={16} className="text-green-600" />
+                  ) : f.status === 'uploading' ? (
+                    <Loader2 size={16} className="animate-spin text-blue-500" />
+                  ) : f.status === 'error' ? (
+                    <X size={16} className="text-red-500" />
+                  ) : (
+                    <FileIcon size={16} className="text-slate-400" />
+                  )}
+                </div>
+              )}
               <div className="flex-1 min-w-0">
                 <p className="truncate font-medium text-slate-700">{f.file.name}</p>
                 <p className="text-xs text-slate-400">
