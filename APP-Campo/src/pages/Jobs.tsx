@@ -14,6 +14,7 @@ import { useInView } from "react-intersection-observer";
 import { useAuth } from "@/contexts/AuthContext";
 import * as XLSX from 'xlsx';
 import { showSuccess, showError } from "@/utils/toast";
+import { formatDate } from "@/utils/format";
 import {
   AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent,
   AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle,
@@ -221,7 +222,7 @@ export default function Jobs() {
         
         return {
           'OS': job.os_number,
-          'Data Conclusão': new Date(job.created_at).toLocaleDateString('pt-BR'),
+          'Data Conclusão': formatDate(job.created_at),
           'Marca': store?.brand || '',
           'Código Loja': store?.code || '',
           'Nome Loja': store?.name || '',
@@ -468,7 +469,7 @@ export default function Jobs() {
                           </span>
                           <span className="flex items-center gap-1">
                             <Calendar size={14} />
-                            {new Date(job.scheduled_date || job.created_at).toLocaleDateString('pt-BR')}
+                            {formatDate(job.scheduled_date || job.created_at)}
                           </span>
                           {job.profiles && (
                             <span className="flex items-center gap-1 text-blue-600 bg-blue-50 px-2 py-0.5 rounded-md border border-blue-100">

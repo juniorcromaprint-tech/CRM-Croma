@@ -9,6 +9,10 @@ import {
   Clock, Timer, Tag,
 } from "lucide-react";
 import { showError } from "@/utils/toast";
+import {
+  formatDate as _formatDate,
+  formatDateTime as _formatDateTime,
+} from "@/utils/format";
 
 const STATUS_COLORS: Record<string, string> = {
   "Concluído": "bg-green-100 text-green-800",
@@ -159,21 +163,9 @@ export default function BillingReport() {
     avgMinutesPerJob,
   };
 
-  const formatDate = (d: string | null) => {
-    if (!d) return "—";
-    return new Date(d + "T12:00:00").toLocaleDateString("pt-BR");
-  };
-
-  const formatDateTime = (d: string | null) => {
-    if (!d) return "—";
-    return new Date(d).toLocaleString("pt-BR", {
-      day: "2-digit",
-      month: "2-digit",
-      year: "numeric",
-      hour: "2-digit",
-      minute: "2-digit",
-    });
-  };
+  // Wrappers locais para preservar o fallback "—" em valores vazios.
+  const formatDate = (d: string | null) => _formatDate(d) || "—";
+  const formatDateTime = (d: string | null) => _formatDateTime(d) || "—";
 
   const periodLabel = () => {
     if (!startDate || !endDate) return "";
@@ -582,7 +574,7 @@ export default function BillingReport() {
                 <p className="text-lg font-bold text-blue-600">Relatório de Instalações</p>
                 <p className="text-slate-600 font-medium">{periodLabel()}</p>
                 <p className="text-xs text-slate-400 mt-1">
-                  Gerado em {new Date().toLocaleDateString("pt-BR")}
+                  Gerado em {_formatDate(new Date())}
                 </p>
               </div>
             </div>
@@ -720,7 +712,7 @@ export default function BillingReport() {
           })}
 
           <div className="border-t border-slate-200 pt-4 text-center text-xs text-slate-400">
-            Relatório gerado pelo sistema Cromaprint • {new Date().toLocaleDateString("pt-BR")}
+            Relatório gerado pelo sistema Cromaprint • {_formatDate(new Date())}
           </div>
         </div>
       )}

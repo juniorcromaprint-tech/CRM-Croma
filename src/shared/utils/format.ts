@@ -63,12 +63,23 @@ export function pctRaw(value: number, total: number): number {
 // ---------------------------------------------------------------------------
 // DATA
 // ---------------------------------------------------------------------------
+//
+// REGRA DE TIMEZONE — IMPORTANTE
+// -----------------------------------------------------------------------------
+// Campos `date` puro do Postgres (ex.: scheduled_date, data_entrega,
+// data_vencimento) chegam como string "YYYY-MM-DD". Se forem passados direto
+// para `new Date(string)`, o JavaScript interpreta como UTC 00:00 — em SP
+// (UTC-3) isso vira o dia anterior às 21h e renderiza com -1 dia ("bug do
+// fuso horário"). Por isso `formatDate` quebra a string manualmente quando
+// detecta o padrão DATE puro e só entra no caminho de `Date` real para
+// timestamps com hora (que aí sim devem ser convertidos para o TZ local).
+//
+// Use `formatDate` para qualquer campo `date` ou `timestamptz`.
+// Use `formatDateTime` quando quiser exibir hora (sempre converte para
+// o timezone local — só faz sentido para timestamps).
+// -----------------------------------------------------------------------------
 
-const dateFormatter = new Intl.DateTimeFormat('pt-BR', {
-  day: '2-digit',
-  month: '2-digit',
-  year: 'numeric',
-});
+const DATE_ONLY_REGEX = /^\d{4}-\d{2}-\d{2}$/;
 
 const dateTimeFormatter = new Intl.DateTimeFormat('pt-BR', {
   day: '2-digit',
@@ -78,30 +89,71 @@ const dateTimeFormatter = new Intl.DateTimeFormat('pt-BR', {
   minute: '2-digit',
 });
 
-function toDate(date: string | Date): Date {
-  return typeof date === 'string' ? new Date(date) : date;
-}
+const dateFormatterFromDate = new Intl.DateTimeFormat('pt-BR', {
+  day: '2-digit',
+  month: '2-digit',
+  year: 'numeric',
+});
 
 /**
- * Formata data: 09/03/2026
+ * Formata data como dd/MM/yyyy.
+ *
+ * - Se `date` for string DATE puro ("YYYY-MM-DD"), formata sem passar por
+ *   `new Date()` para evitar shift de timezone (-1 dia em fusos negativos).
+ * - Se for timestamp ISO com hora ("YYYY-MM-DDTHH:mm:ss[Z|±hh:mm]"), faz parse
+ *   normal e formata no timezone local.
+ * - Se for `Date`, formata direto.
+ * - Se vazio/null/undefined/inválido, retorna string vazia.
  */
-export function formatDate(date: string | Date): string {
-  return dateFormatter.format(toDate(date));
+export function formatDate(date: string | Date | null | undefined): string {
+  if (date === null || date === undefined || date === '') return '';
+
+  if (typeof date === 'string') {
+    if (DATE_ONLY_REGEX.test(date)) {
+      const [y, m, d] = date.split('-');
+      const month = Number(m);
+      const day = Number(d);
+      // Valida mês 1-12 e dia 1-31 (não verifica dias por mês — Postgres já valida na escrita)
+      if (month < 1 || month > 12 || day < 1 || day > 31) return '';
+      return `${d}/${m}/${y}`;
+    }
+    const parsed = new Date(date);
+    if (Number.isNaN(parsed.getTime())) return '';
+    return dateFormatterFromDate.format(parsed);
+  }
+
+  if (Number.isNaN(date.getTime())) return '';
+  return dateFormatterFromDate.format(date);
 }
 
 /**
- * Formata data e hora: 09/03/2026 14:30
+ * Formata data e hora: 09/03/2026 14:30 — sempre converte para o timezone
+ * local. Use APENAS para timestamps; para campos `date` puro use `formatDate`.
+ *
+ * Aceita string ISO, Date ou null/undefined (devolve vazio).
  */
-export function formatDateTime(date: string | Date): string {
-  return dateTimeFormatter.format(toDate(date));
+export function formatDateTime(date: string | Date | null | undefined): string {
+  if (date === null || date === undefined || date === '') return '';
+  const parsed = typeof date === 'string' ? new Date(date) : date;
+  if (Number.isNaN(parsed.getTime())) return '';
+  return dateTimeFormatter.format(parsed);
 }
 
 /**
- * Formata data relativa: "há 2 dias", "hoje", "amanhã", "há 3 horas"
+ * Formata data relativa: "há 2 dias", "hoje", "amanhã", "há 3 horas".
+ *
+ * Para campos DATE puro, ancoramos no meio-dia local para evitar que o
+ * valor seja interpretado como UTC 00:00 (que daria -1 dia em SP).
  */
 export function formatDateRelative(date: string | Date): string {
   const now = new Date();
-  const target = toDate(date);
+  let target: Date;
+  if (typeof date === 'string' && DATE_ONLY_REGEX.test(date)) {
+    const [y, m, d] = date.split('-').map(Number);
+    target = new Date(y, m - 1, d, 12, 0, 0);
+  } else {
+    target = typeof date === 'string' ? new Date(date) : date;
+  }
   const diffMs = now.getTime() - target.getTime();
   const diffSeconds = Math.floor(diffMs / 1000);
   const diffMinutes = Math.floor(diffSeconds / 60);

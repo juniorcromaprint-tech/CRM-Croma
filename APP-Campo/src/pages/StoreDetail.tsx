@@ -8,6 +8,7 @@ import {
   CheckCircle2, Clock, XCircle, Edit, ExternalLink, Plus, Navigation, Loader2, Zap
 } from "lucide-react";
 import { showSuccess, showError } from "@/utils/toast";
+import { formatDate } from "@/utils/format";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import StoreFormSheet from "@/components/StoreFormSheet";
@@ -79,15 +80,6 @@ export default function StoreDetail() {
       return data;
     }
   });
-
-  const formatDate = (dateString: string) => {
-    if (!dateString) return "Data não informada";
-    return new Intl.DateTimeFormat('pt-BR', {
-      day: '2-digit',
-      month: '2-digit',
-      year: 'numeric'
-    }).format(new Date(dateString));
-  };
 
   const getStatusColor = (status: string) => {
     switch (status?.toLowerCase()) {
