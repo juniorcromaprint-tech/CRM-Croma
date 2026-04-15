@@ -109,7 +109,7 @@ async function uploadFile(
     formData.append('fileSha256', sha256);
     if (previewUrl) formData.append('previewUrl', previewUrl);
 
-    const supabaseUrl = (supabase as any).supabaseUrl as string;
+    const supabaseUrl = import.meta.env.VITE_SUPABASE_URL as string;
     const res = await fetch(
       `${supabaseUrl}/functions/v1/onedrive-upload-interno`,
       {
@@ -226,7 +226,7 @@ export function useAttachmentsUpload(): UseAttachmentsUpload {
     for (let i = 0; i < slots; i++) {
       runNextRef.current();
     }
-  }, [updateItem]);
+  }, []);
 
   const retryItem = useCallback((itemId: string) => {
     setItems((prev) => {

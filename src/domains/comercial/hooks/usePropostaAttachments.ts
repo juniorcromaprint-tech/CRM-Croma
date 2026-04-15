@@ -51,7 +51,7 @@ export function useDeletePropostaAttachment() {
       const { data: { session } } = await supabase.auth.getSession();
       if (!session?.access_token) throw new Error('Sessao expirada');
 
-      const supabaseUrl = (supabase as any).supabaseUrl as string;
+      const supabaseUrl = import.meta.env.VITE_SUPABASE_URL as string;
       const res = await fetch(
         `${supabaseUrl}/functions/v1/proposta-attachment-delete`,
         {

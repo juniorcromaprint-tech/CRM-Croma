@@ -224,10 +224,13 @@ serve(async (req) => {
     }
 
     // Scope check para proposta: vendedor so acessa proposta propria ou role elevada
+    // Propostas com vendedor_id NULL sao aceitas por qualquer role autorizada (sem dono especifico)
     if (scope === 'proposta') {
       const isElevated = ['admin', 'diretor', 'comercial_senior'].includes(profile.role!);
-      const isOwnProposta = (entity as any).vendedor_id === user.id;
-      if (!isElevated && !isOwnProposta) {
+      const vendedorId = (entity as any).vendedor_id;
+      const isOwnProposta = vendedorId === user.id;
+      const semDono = vendedorId === null || vendedorId === undefined;
+      if (!isElevated && !isOwnProposta && !semDono) {
         return new Response(
           JSON.stringify({ error: 'Sem permissao para anexar arquivo nesta proposta' }),
           { status: 403, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }

@@ -21,6 +21,7 @@ import {
   type PropostaAttachment,
 } from '../hooks/usePropostaAttachments';
 import { useAttachmentsUpload, type AttachmentUploadItem } from '@/hooks/useAttachmentsUpload';
+import { useAuth } from '@/contexts/AuthContext';
 
 type Props = {
   propostaId: string;
@@ -135,10 +136,14 @@ function AttachmentCard({
   attachment,
   readOnly,
   onDelete,
+  currentUserId,
+  currentUserRole,
 }: {
   attachment: PropostaAttachment;
   readOnly: boolean;
   onDelete: (id: string) => void;
+  currentUserId: string | null;
+  currentUserRole: string | null;
 }) {
   const [confirmOpen, setConfirmOpen] = useState(false);
   const [deleting, setDeleting] = useState(false);
@@ -146,6 +151,14 @@ function AttachmentCard({
 
   const ext = attachment.nome_arquivo.split('.').pop()?.toLowerCase() ?? '';
   const isByCliente = attachment.uploaded_by_type === 'cliente';
+
+  // Permissao de delete (mesma logica da edge proposta-attachment-delete)
+  const isAdmin = ['admin', 'diretor', 'comercial_senior'].includes(currentUserRole ?? '');
+  const isOwnUpload = attachment.uploaded_by_user_id === currentUserId;
+  const canDelete = !readOnly && (
+    isAdmin ||
+    (!isByCliente && isOwnUpload)
+  );
 
   const handleDelete = async (e: React.MouseEvent) => {
     e.preventDefault(); // regra obrigatoria: AlertDialogAction com async
@@ -206,7 +219,7 @@ function AttachmentCard({
             </a>
           </Button>
         )}
-        {!readOnly && (
+        {canDelete && (
           <>
             <Button
               size="sm"
@@ -255,6 +268,9 @@ function AttachmentCard({
 // =================== componente principal ===================
 
 export function PropostaAttachmentsSection({ propostaId, readOnly = false }: Props) {
+  const { profile, session } = useAuth();
+  const currentUserId = session?.user?.id ?? null;
+  const currentUserRole = profile?.role ?? null;
   const { data: attachments = [], isLoading, refetch } = usePropostaAttachments(propostaId);
   const { items: uploadItems, addFiles, retryItem, removeFromQueue, clear, isUploading } = useAttachmentsUpload();
   const dropzoneRef = useRef<HTMLDivElement>(null);
@@ -370,6 +386,8 @@ export function PropostaAttachmentsSection({ propostaId, readOnly = false }: Pro
               attachment={att}
               readOnly={readOnly}
               onDelete={(id) => {}}
+              currentUserId={currentUserId}
+              currentUserRole={currentUserRole}
             />
           ))}
         </div>
