@@ -1,7 +1,7 @@
 // supabase/functions/onedrive-upload-interno/index.ts
 // Upload de artes do vendedor interno -> OneDrive via Microsoft Graph API
 // Auth via JWT (Bearer token do usuario logado no ERP)
-// v1 (2026-04-14): baseado em onedrive-upload-proposta v13
+// v2 (2026-04-14): scope check, SHA-256 dedup, INSERT transacional em proposta_attachments
 import { serve } from 'https://deno.land/std@0.168.0/http/server.ts';
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2';
 
@@ -15,6 +15,7 @@ const ALLOWED_ORIGINS = [
 const TOKEN_URL = 'https://login.microsoftonline.com/consumers/oauth2/v2.0/token';
 const GRAPH_BASE = 'https://graph.microsoft.com/v1.0';
 const MAX_SIMPLE_UPLOAD = 4 * 1024 * 1024; // 4MB
+const MAX_FILE_SIZE = 150 * 1024 * 1024;   // 150MB
 
 function getCorsHeaders(req: Request): Record<string, string> {
   const origin = req.headers.get('Origin') || '';
@@ -115,6 +116,13 @@ async function uploadLargeFile(
   return { id: info.id || '', webUrl: info.webUrl || '' };
 }
 
+async function deleteOneDriveFile(token: string, fileId: string): Promise<void> {
+  await fetch(`${GRAPH_BASE}/me/drive/items/${fileId}`, {
+    method: 'DELETE',
+    headers: { Authorization: `Bearer ${token}` },
+  }).catch(() => {});
+}
+
 serve(async (req) => {
   const corsHeaders = getCorsHeaders(req);
   if (req.method === 'OPTIONS') return new Response(null, { headers: corsHeaders });
@@ -175,6 +183,8 @@ serve(async (req) => {
     const file = formData.get('file') as File | null;
     const scope = formData.get('scope') as string | null; // 'pedido' | 'proposta'
     const entityId = formData.get('entityId') as string | null; // UUID
+    const previewUrl = (formData.get('previewUrl') as string | null) || null;
+    const fileSha256 = (formData.get('fileSha256') as string | null) || null;
 
     if (!file || !scope || !entityId) {
       return new Response(JSON.stringify({ error: 'file, scope e entityId sao obrigatorios' }), {
@@ -187,11 +197,23 @@ serve(async (req) => {
       });
     }
 
-    // Buscar entity dinamico
+    // Limite de tamanho: 150MB
+    if (file.size > MAX_FILE_SIZE) {
+      return new Response(
+        JSON.stringify({ error: `Arquivo muito grande. Limite: 150MB. Tamanho recebido: ${(file.size / 1024 / 1024).toFixed(1)}MB` }),
+        { status: 413, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+      );
+    }
+
+    // Buscar entity + checar escopo de permissao (scope=proposta precisa checar vendedor_id)
     const tabela = scope === 'pedido' ? 'pedidos' : 'propostas';
+    const selectQuery = scope === 'proposta'
+      ? 'id, numero, vendedor_id, cliente:clientes(id, nome_fantasia)'
+      : 'id, numero, cliente:clientes(nome_fantasia)';
+
     const { data: entity, error: entityError } = await supabase
       .from(tabela)
-      .select('id, numero, cliente:clientes(nome_fantasia)')
+      .select(selectQuery)
       .eq('id', entityId)
       .maybeSingle();
 
@@ -201,13 +223,72 @@ serve(async (req) => {
       });
     }
 
+    // Scope check para proposta: vendedor so acessa proposta propria ou role elevada
+    if (scope === 'proposta') {
+      const isElevated = ['admin', 'diretor', 'comercial_senior'].includes(profile.role!);
+      const isOwnProposta = (entity as any).vendedor_id === user.id;
+      if (!isElevated && !isOwnProposta) {
+        return new Response(
+          JSON.stringify({ error: 'Sem permissao para anexar arquivo nesta proposta' }),
+          { status: 403, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+        );
+      }
+    }
+
+    // Dedup por SHA-256 (se veio hash do frontend)
+    if (scope === 'proposta' && fileSha256 && /^[0-9a-f]{64}$/i.test(fileSha256)) {
+      const { data: existente } = await supabase
+        .from('proposta_attachments')
+        .select('id, nome_arquivo')
+        .eq('proposta_id', entityId)
+        .eq('file_sha256', fileSha256.toLowerCase())
+        .is('deleted_at', null)
+        .maybeSingle();
+
+      if (existente) {
+        return new Response(
+          JSON.stringify({
+            error: 'Arquivo identico ja anexado nesta proposta',
+            duplicate_of: existente.id,
+            duplicate_name: existente.nome_arquivo,
+          }),
+          { status: 409, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+        );
+      }
+    }
+
+    // Checar limite de 50 arquivos por proposta
+    if (scope === 'proposta') {
+      const { count } = await supabase
+        .from('proposta_attachments')
+        .select('id', { count: 'exact', head: true })
+        .eq('proposta_id', entityId)
+        .is('deleted_at', null);
+
+      if ((count ?? 0) >= 50) {
+        return new Response(
+          JSON.stringify({ error: 'Limite de 50 arquivos por proposta atingido' }),
+          { status: 422, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+        );
+      }
+    }
+
+    // Montar path OneDrive
     const nomeCliente = (entity.cliente as any)?.nome_fantasia || 'cliente';
     const safeCliente = sanitizeName(nomeCliente);
     const safeFileName = sanitizeName(file.name);
-    const numeroEntity = entity.numero ?? entityId;
-    const targetPath = `Croma/Clientes/${safeCliente}/${numeroEntity}_${safeFileName}`;
+    const numeroEntity = (entity as any).numero ?? entityId;
+    let targetPath: string;
 
-    console.log(`[onedrive-upload-interno v1] ${file.name} -> ${targetPath} (${file.size} bytes) by ${uploadedByName}`);
+    if (scope === 'proposta') {
+      const clienteId = (entity.cliente as any)?.id as string | undefined;
+      const clienteIdCurto = clienteId ? clienteId.slice(0, 8) : 'sem-id';
+      targetPath = `Croma/Clientes/${clienteIdCurto}_${safeCliente}/${numeroEntity}/${Date.now()}_${safeFileName}`;
+    } else {
+      targetPath = `Croma/Clientes/${safeCliente}/${numeroEntity}_${safeFileName}`;
+    }
+
+    console.log(`[onedrive-upload-interno v2] ${file.name} -> ${targetPath} (${file.size} bytes) by ${uploadedByName} scope=${scope}`);
 
     const accessToken = await getAccessToken();
     const fileBytes = new Uint8Array(await file.arrayBuffer());
@@ -218,20 +299,55 @@ serve(async (req) => {
       uploadResult = await uploadLargeFile(accessToken, targetPath, fileBytes);
     }
 
-    console.log(`[onedrive-upload-interno] OK fileId=${uploadResult.id}`);
+    console.log(`[onedrive-upload-interno v2] upload OK fileId=${uploadResult.id}`);
 
-    // Nao escrevemos em pedido_itens aqui — responsabilidade do frontend
+    // Se scope=proposta: INSERT transacional em proposta_attachments
+    let attachmentId: string | null = null;
+    if (scope === 'proposta') {
+      const { data: attachment, error: attErr } = await supabase
+        .from('proposta_attachments')
+        .insert({
+          proposta_id: entityId,
+          nome_arquivo: file.name,
+          tipo_mime: file.type || 'application/octet-stream',
+          tamanho_bytes: file.size,
+          onedrive_file_id: uploadResult.id,
+          onedrive_file_url: uploadResult.webUrl,
+          preview_url: previewUrl,
+          file_sha256: fileSha256 ? fileSha256.toLowerCase() : null,
+          uploaded_by_type: 'vendedor', // HARDCODED — nunca aceitar do frontend
+          uploaded_by_name: uploadedByName,
+          uploaded_by_user_id: user.id,
+        })
+        .select('id')
+        .single();
+
+      if (attErr) {
+        // Rollback: deleta arquivo do OneDrive antes de retornar erro
+        console.error(`[onedrive-upload-interno v2] INSERT falhou, revertendo OneDrive: ${attErr.message}`);
+        await deleteOneDriveFile(accessToken, uploadResult.id);
+        return new Response(
+          JSON.stringify({ error: 'Falha ao registrar anexo. Upload revertido.' }),
+          { status: 500, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+        );
+      }
+
+      attachmentId = attachment.id;
+      console.log(`[onedrive-upload-interno v2] attachment registered id=${attachmentId}`);
+    }
+
     return new Response(
       JSON.stringify({
         fileId: uploadResult.id,
         webUrl: uploadResult.webUrl,
         uploadedByName,
+        attachmentId, // null para scope=pedido, UUID para scope=proposta
       }),
       { headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
     );
   } catch (err) {
     const msg = (err as Error).message || 'Erro interno';
-    console.error('[onedrive-upload-interno] ERRO:', msg);
+    console.error('[onedrive-upload-interno v2] ERRO:', msg);
     let userMessage = 'Erro interno no servidor';
     if (msg.includes('Token exchange')) userMessage = 'Servico de upload temporariamente indisponivel';
     if (msg.includes('Upload falhou')) userMessage = 'Falha ao enviar arquivo para o armazenamento';
