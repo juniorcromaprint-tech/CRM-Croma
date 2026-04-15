@@ -49,7 +49,8 @@ Args:
                 .select(`id, numero_titulo, valor_original, valor_pago, saldo, data_vencimento,
              data_pagamento, status, forma_pagamento, observacoes, created_at,
              clientes!inner(id, razao_social, nome_fantasia),
-             pedidos(numero)`, { count: "exact" });
+             pedidos(numero)`, { count: "exact" })
+                .is("excluido_em", null); // ignora CRs soft-deletadas (ex: espelhadas do Mubisys)
             if (params.status)
                 query = query.eq("status", params.status);
             if (params.cliente_id)
@@ -79,7 +80,7 @@ Args:
             const response = buildPaginatedResponse(items, total, params.offset, params.limit);
             // Totalizadores
             const totalAberto = items
-                .filter(i => ["aberto", "parcial", "vencido"].includes(i.status))
+                .filter(i => ["aberto", "a_vencer", "parcial", "vencido"].includes(i.status))
                 .reduce((sum, i) => sum + (i.saldo ?? i.valor_original), 0);
             const totalPago = items
                 .filter(i => i.status === "pago")
