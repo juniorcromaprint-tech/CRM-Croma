@@ -7,6 +7,7 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Textarea } from "@/components/ui/textarea";
 import { Input } from "@/components/ui/input";
 import { showSuccess, showError } from "@/utils/toast";
+import { formatDate } from "@/utils/format";
 import { CromaLogo, CromaLogoFallback } from "@/components/Layout";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
@@ -251,7 +252,7 @@ export default function JobDetail() {
 
   const handleWhatsAppShare = () => {
     if (!job) return;
-    const formattedDate = job.scheduled_date ? new Date(job.scheduled_date).toLocaleDateString("pt-BR") : "Sem data";
+    const formattedDate = job.scheduled_date ? formatDate(job.scheduled_date) : "Sem data";
     const clientName = job.stores?.name || "Não informado";
     const text = `Olá! Segue o status da *Ordem de Serviço* da Cromaprint:%0A%0A*OS:* ${job.os_number}%0A*Cliente:* ${clientName}%0A*Data:* ${formattedDate}%0A*Serviço:* ${job.type}%0A*Status:* ${job.status}`;
     window.open(`https://wa.me/?text=${text}`, "_blank");
@@ -262,7 +263,7 @@ export default function JobDetail() {
     const originalTitle = document.title;
     const clientName = job.stores?.brand || "Cliente";
     const storeCode = job.stores?.code ? `Cod ${job.stores.code}` : "SemCod";
-    const dateStr = job.scheduled_date ? new Date(job.scheduled_date).toLocaleDateString("pt-BR").replace(/\//g, "-") : "sem-data";
+    const dateStr = job.scheduled_date ? formatDate(job.scheduled_date).replace(/\//g, "-") : "sem-data";
     const osNumber = `OS ${job.os_number || "SemNumero"}`;
 
     document.title = `${clientName} - ${storeCode} - ${dateStr} - ${osNumber}`;
@@ -277,7 +278,7 @@ export default function JobDetail() {
 
     const clientName = job.stores?.brand || "Cliente";
     const storeCode = job.stores?.code ? `Cod${job.stores.code}` : "";
-    const dateStr = job.scheduled_date ? new Date(job.scheduled_date).toLocaleDateString("pt-BR").replace(/\//g, "-") : "sem-data";
+    const dateStr = job.scheduled_date ? formatDate(job.scheduled_date).replace(/\//g, "-") : "sem-data";
     const fileName = `Relatorio_${clientName}${storeCode ? "_" + storeCode : ""}_${dateStr}_OS${job.os_number || ""}.pdf`.replace(/\s+/g, "_");
 
     setIsGeneratingPDF(true);
@@ -298,7 +299,7 @@ export default function JobDetail() {
       const pdfBlob: Blob = await html2pdf().set(opt).from(printSectionRef.current).outputPdf("blob");
       const pdfFile = new File([pdfBlob], fileName, { type: "application/pdf" });
 
-      const formattedDate = new Date(job.scheduled_date).toLocaleDateString("pt-BR");
+      const formattedDate = formatDate(job.scheduled_date);
       const shareText = `Olá! Segue o relatório de instalação da *Cromaprint*.\n\n*OS:* ${job.os_number}\n*Cliente:* ${job.stores?.name || "Não informado"}\n*Marca:* ${job.stores?.brand || ""}\n*Data:* ${formattedDate}\n*Serviço:* ${job.type}\n*Status:* ${job.status}${job.notes ? `\n\n*Relatório:* ${job.notes}` : ""}`;
 
       if (navigator.canShare && navigator.canShare({ files: [pdfFile] })) {
@@ -426,7 +427,7 @@ export default function JobDetail() {
           </div>
           <div className="text-right">
             <p className="text-sm font-bold text-blue-600">OS: {job.os_number}</p>
-            <p className="text-xs text-slate-500">Gerado em: {new Date().toLocaleDateString("pt-BR")}</p>
+            <p className="text-xs text-slate-500">Gerado em: {formatDate(new Date())}</p>
           </div>
         </div>
       </div>
@@ -514,7 +515,7 @@ export default function JobDetail() {
             </div>
             <div className="bg-slate-50 p-4 rounded-xl print:bg-transparent print:border print:border-slate-100 print:p-3">
               <p className="text-xs text-slate-500 font-bold uppercase">Data</p>
-              <p className="font-bold text-sm text-slate-800">{new Date(job.scheduled_date).toLocaleDateString("pt-BR")}</p>
+              <p className="font-bold text-sm text-slate-800">{formatDate(job.scheduled_date)}</p>
             </div>
             <div className="bg-slate-50 p-4 rounded-xl print:bg-transparent print:border print:border-slate-100 print:p-3">
               <p className="text-xs text-slate-500 font-bold uppercase">Instalador</p>
@@ -555,7 +556,7 @@ export default function JobDetail() {
                             <p className="font-bold text-sm text-slate-800">
                               {new Date(job.started_at).toLocaleTimeString("pt-BR", { hour: "2-digit", minute: "2-digit" })}
                             </p>
-                            <p className="text-[10px] text-slate-500">{new Date(job.started_at).toLocaleDateString("pt-BR")}</p>
+                            <p className="text-[10px] text-slate-500">{formatDate(job.started_at)}</p>
                           </div>
                           {job.finished_at && (
                             <>
@@ -565,7 +566,7 @@ export default function JobDetail() {
                                 <p className="font-bold text-sm text-slate-800">
                                   {new Date(job.finished_at).toLocaleTimeString("pt-BR", { hour: "2-digit", minute: "2-digit" })}
                                 </p>
-                                <p className="text-[10px] text-slate-500">{new Date(job.finished_at).toLocaleDateString("pt-BR")}</p>
+                                <p className="text-[10px] text-slate-500">{formatDate(job.finished_at)}</p>
                               </div>
                             </>
                           )}
