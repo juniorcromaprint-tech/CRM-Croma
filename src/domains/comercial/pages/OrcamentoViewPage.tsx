@@ -49,6 +49,7 @@ import { TrackingPanel } from '../components/TrackingPanel';
 import { SharePropostaModal } from '../components/SharePropostaModal';
 import { CondicoesPagamentoView } from '../components/CondicoesPagamentoView';
 import { useEmpresaPrincipal } from "@/shared/hooks/useEmpresaPrincipal";
+import { PropostaAttachmentsSection } from "../components/PropostaAttachmentsSection";
 
 const STATUS_CONFIG: Record<OrcamentoStatus, { label: string; cls: string }> = {
   rascunho:   { label: "Rascunho",   cls: "bg-slate-100 text-slate-600" },
@@ -709,6 +710,13 @@ export default function OrcamentoViewPage() {
       {/* ══════════ TRACKING + PAYMENT (hidden on print) ══════════ */}
       <div className="print:hidden space-y-4">
         {(orc as any).forma_pagamento && (
+
+      {/* Arquivos da arte */}
+      {id && (
+        <div className="bg-white rounded-2xl border border-slate-200 p-6">
+          <PropostaAttachmentsSection propostaId={id} readOnly />
+        </div>
+      )}
           <CondicoesPagamentoView
             conditions={{
               forma_pagamento: (orc as any).forma_pagamento,

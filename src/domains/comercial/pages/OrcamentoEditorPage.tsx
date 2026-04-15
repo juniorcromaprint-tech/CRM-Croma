@@ -61,6 +61,7 @@ import { supabase } from "@/integrations/supabase/client";
 import type { AIResponse } from '@/domains/ai/types/ai.types';
 
 import type { ItemEditorState } from "../hooks/useItemEditor";
+import { PropostaAttachmentsSection } from "../components/PropostaAttachmentsSection";
 
 // ─── Step definitions ────────────────────────────────────────────────────────
 
@@ -1428,6 +1429,18 @@ export default function OrcamentoEditorPage() {
               </div>
             </CardContent>
           )}
+        </Card>
+      )}
+
+      {/* ══════════ ARQUIVOS DA ARTE ══════════ */}
+      {id && !isNew && (
+        <Card className="rounded-2xl border border-slate-200">
+          <CardHeader className="pb-2 pt-4 px-6">
+            <CardTitle className="text-base font-semibold text-slate-700">Arquivos da arte</CardTitle>
+          </CardHeader>
+          <CardContent className="px-6 pb-6">
+            <PropostaAttachmentsSection propostaId={id} />
+          </CardContent>
         </Card>
       )}
 
