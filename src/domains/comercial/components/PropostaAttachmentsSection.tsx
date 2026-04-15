@@ -109,7 +109,7 @@ function UploadQueueItem({
           size="sm"
           variant="ghost"
           className="h-7 px-2 text-xs"
-          onClick={() => addFiles([item.file], propostaId)}
+          onClick={() => onRetry(item.id)}
           title="Tentar novamente"
         >
           <RefreshCw size={12} className="mr-1" />
@@ -256,7 +256,7 @@ function AttachmentCard({
 
 export function PropostaAttachmentsSection({ propostaId, readOnly = false }: Props) {
   const { data: attachments = [], isLoading, refetch } = usePropostaAttachments(propostaId);
-  const { items: uploadItems, addFiles, removeFromQueue, clear, isUploading } = useAttachmentsUpload();
+  const { items: uploadItems, addFiles, retryItem, removeFromQueue, clear, isUploading } = useAttachmentsUpload();
   const dropzoneRef = useRef<HTMLDivElement>(null);
   const [dragging, setDragging] = useState(false);
 
@@ -348,7 +348,7 @@ export function PropostaAttachmentsSection({ propostaId, readOnly = false }: Pro
             <UploadQueueItem
               key={item.id}
               item={item}
-              onRetry={(id) => {}} // retry via addFiles
+              onRetry={retryItem}
               onRemove={removeFromQueue}
               propostaId={propostaId}
               addFiles={addFiles}

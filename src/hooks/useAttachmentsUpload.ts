@@ -1,6 +1,6 @@
 // src/hooks/useAttachmentsUpload.ts
 // Hook para upload de multiplos anexos com concorrencia limitada (3), SHA-256 dedup e retry
-// v1 (2026-04-14) — para PropostaAttachmentsSection
+// v2 (2026-04-14) — fila armazena file+propostaId diretamente (sem busca frágil por state)
 import { useState, useRef, useCallback } from 'react';
 import { supabase } from '@/integrations/supabase/client';
 
@@ -13,7 +13,7 @@ const ALLOWED_EXTENSIONS = [
   'psd', 'webp', 'zip', 'rar',
 ];
 
-const PREVIEW_EXTENSIONS = ['jpg', 'jpeg', 'png', 'webp', 'pdf'];
+const PREVIEW_EXTENSIONS = ['jpg', 'jpeg', 'png', 'webp'];
 
 export type AttachmentUploadStatus =
   | 'pending'
@@ -27,12 +27,13 @@ export type AttachmentUploadStatus =
 export type AttachmentUploadItem = {
   id: string;           // uuid local para key React
   file: File;
+  propostaId: string;   // guardado para retry
   status: AttachmentUploadStatus;
   error?: string;
-  attachmentId?: string; // id no banco (proposta_attachments)
+  attachmentId?: string;
   webUrl?: string;
   previewUrl?: string | null;
-  duplicateOf?: string;  // id do anexo existente (409)
+  duplicateOf?: string;
   sha256?: string;
 };
 
@@ -43,6 +44,13 @@ export type UseAttachmentsUpload = {
   removeFromQueue: (itemId: string) => void;
   clear: () => void;
   isUploading: boolean;
+};
+
+// Fila interna: armazena file + propostaId diretamente para evitar busca frágil por state
+type QueueEntry = {
+  itemId: string;
+  file: File;
+  propostaId: string;
 };
 
 function generateId(): string {
@@ -75,26 +83,27 @@ async function generatePreviewUrl(file: File): Promise<string | null> {
 }
 
 async function uploadFile(
-  item: AttachmentUploadItem,
+  itemId: string,
+  file: File,
   propostaId: string,
   jwtToken: string,
   onUpdate: (id: string, update: Partial<AttachmentUploadItem>) => void
 ): Promise<void> {
   try {
     // Stage 1: SHA-256
-    onUpdate(item.id, { status: 'computing_hash' });
-    const sha256 = await computeSha256(item.file);
-    onUpdate(item.id, { sha256 });
+    onUpdate(itemId, { status: 'computing_hash' });
+    const sha256 = await computeSha256(file);
+    onUpdate(itemId, { sha256 });
 
-    // Stage 2: preview (se aplicavel)
-    onUpdate(item.id, { status: 'generating_preview' });
-    const previewUrl = await generatePreviewUrl(item.file);
+    // Stage 2: preview (somente imagens)
+    onUpdate(itemId, { status: 'generating_preview' });
+    const previewUrl = await generatePreviewUrl(file);
 
     // Stage 3: upload
-    onUpdate(item.id, { status: 'uploading', previewUrl });
+    onUpdate(itemId, { status: 'uploading', previewUrl });
 
     const formData = new FormData();
-    formData.append('file', item.file);
+    formData.append('file', file);
     formData.append('scope', 'proposta');
     formData.append('entityId', propostaId);
     formData.append('fileSha256', sha256);
@@ -113,7 +122,7 @@ async function uploadFile(
     const json = await res.json();
 
     if (res.status === 409) {
-      onUpdate(item.id, {
+      onUpdate(itemId, {
         status: 'duplicate',
         duplicateOf: json.duplicate_of,
         error: `Arquivo identico ja existe: "${json.duplicate_name}"`,
@@ -122,21 +131,21 @@ async function uploadFile(
     }
 
     if (!res.ok) {
-      onUpdate(item.id, {
+      onUpdate(itemId, {
         status: 'error',
         error: json.error ?? `Erro ${res.status}`,
       });
       return;
     }
 
-    onUpdate(item.id, {
+    onUpdate(itemId, {
       status: 'done',
       attachmentId: json.attachmentId,
       webUrl: json.webUrl,
       previewUrl: previewUrl ?? null,
     });
   } catch (err) {
-    onUpdate(item.id, {
+    onUpdate(itemId, {
       status: 'error',
       error: (err as Error).message ?? 'Falha no upload',
     });
@@ -145,8 +154,7 @@ async function uploadFile(
 
 export function useAttachmentsUpload(): UseAttachmentsUpload {
   const [items, setItems] = useState<AttachmentUploadItem[]>([]);
-  const isUploadingRef = useRef(false);
-  const queueRef = useRef<{ itemId: string; propostaId: string }[]>([]);
+  const queueRef = useRef<QueueEntry[]>([]);
   const activeCountRef = useRef(0);
   const jwtTokenRef = useRef<string | null>(null);
 
@@ -156,118 +164,87 @@ export function useAttachmentsUpload(): UseAttachmentsUpload {
     );
   }, []);
 
-  const runNext = useCallback(async () => {
+  // runNext precisa de referencia estável — usamos useRef para evitar stale closure
+  const runNextRef = useRef<() => Promise<void>>(async () => {});
+
+  runNextRef.current = async () => {
     if (activeCountRef.current >= CONCURRENCY) return;
-    if (queueRef.current.length === 0) {
-      if (activeCountRef.current === 0) {
-        isUploadingRef.current = false;
-        setItems((prev) => [...prev]); // trigger re-render pra isUploading
-      }
-      return;
-    }
+    if (queueRef.current.length === 0) return;
 
     const next = queueRef.current.shift()!;
     activeCountRef.current++;
 
-    // Pegar o item atualizado do state
-    let currentItem: AttachmentUploadItem | undefined;
-    setItems((prev) => {
-      currentItem = prev.find((it) => it.id === next.itemId);
-      return prev;
-    });
-
-    // Aguardar proximo tick para ter currentItem
-    await new Promise((r) => setTimeout(r, 0));
-
-    // Ler item diretamente
-    const itemSnapshot = currentItem;
-    if (!itemSnapshot) {
-      activeCountRef.current--;
-      runNext();
-      return;
-    }
-
-    // Obter JWT
+    // Obter JWT (cache por sessao)
     if (!jwtTokenRef.current) {
       const { data: { session } } = await supabase.auth.getSession();
       jwtTokenRef.current = session?.access_token ?? null;
     }
+
     if (!jwtTokenRef.current) {
       updateItem(next.itemId, { status: 'error', error: 'Sessao expirada. Faca login novamente.' });
       activeCountRef.current--;
-      runNext();
+      runNextRef.current();
       return;
     }
 
-    await uploadFile(itemSnapshot, next.propostaId, jwtTokenRef.current, updateItem);
+    await uploadFile(next.itemId, next.file, next.propostaId, jwtTokenRef.current, updateItem);
     activeCountRef.current--;
-    runNext();
-  }, [updateItem]);
+
+    // Disparar proximo sem recursão infinita
+    setTimeout(() => runNextRef.current(), 0);
+  };
 
   const addFiles = useCallback((files: File[], propostaId: string) => {
     const newItems: AttachmentUploadItem[] = [];
+    const newQueue: QueueEntry[] = [];
+
     for (const file of files) {
       const ext = getExtension(file.name);
+      const id = generateId();
+
       if (!ALLOWED_EXTENSIONS.includes(ext)) {
-        newItems.push({
-          id: generateId(),
-          file,
-          status: 'error',
-          error: `Extensao .${ext} nao permitida`,
-        });
+        newItems.push({ id, file, propostaId, status: 'error', error: `Extensao .${ext} nao permitida` });
         continue;
       }
       if (file.size > MAX_FILE_SIZE) {
         newItems.push({
-          id: generateId(),
-          file,
-          status: 'error',
+          id, file, propostaId, status: 'error',
           error: `Arquivo muito grande (max 150MB). Tamanho: ${(file.size / 1024 / 1024).toFixed(1)}MB`,
         });
         continue;
       }
-      newItems.push({
-        id: generateId(),
-        file,
-        status: 'pending',
-      });
+
+      newItems.push({ id, file, propostaId, status: 'pending' });
+      newQueue.push({ itemId: id, file, propostaId });
     }
 
     setItems((prev) => [...prev, ...newItems]);
+    queueRef.current.push(...newQueue);
 
-    // Enfileirar apenas os validos
-    for (const item of newItems) {
-      if (item.status === 'pending') {
-        queueRef.current.push({ itemId: item.id, propostaId });
-      }
+    // Iniciar ate CONCURRENCY workers em paralelo
+    const slots = Math.min(CONCURRENCY - activeCountRef.current, newQueue.length);
+    for (let i = 0; i < slots; i++) {
+      runNextRef.current();
     }
-
-    if (!isUploadingRef.current && queueRef.current.length > 0) {
-      isUploadingRef.current = true;
-      // Iniciar ate CONCURRENCY uploads em paralelo
-      for (let i = 0; i < CONCURRENCY; i++) runNext();
-    }
-  }, [runNext]);
+  }, [updateItem]);
 
   const retryItem = useCallback((itemId: string) => {
-    let propostaId = '';
     setItems((prev) => {
       const item = prev.find((it) => it.id === itemId);
-      if (!item) return prev;
-      // Precisamos do propostaId — guardamos no item via closure na addFiles
-      // Como nao guardamos, precisamos de outra abordagem
-      // Solucao: guardar propostaId no item
+      if (!item || !['error', 'duplicate'].includes(item.status)) return prev;
+
+      // Re-enfileirar
+      queueRef.current.push({ itemId: item.id, file: item.file, propostaId: item.propostaId });
+
+      // Disparar se houver slot livre
+      setTimeout(() => runNextRef.current(), 0);
+
       return prev.map((it) =>
         it.id === itemId
-          ? { ...it, status: 'pending', error: undefined, duplicateOf: undefined, sha256: undefined }
+          ? { ...it, status: 'pending' as const, error: undefined, duplicateOf: undefined, sha256: undefined }
           : it
       );
     });
-
-    // Buscar propostaId do queueRef ou items — precisa de ajuste
-    // Por enquanto: retry vai funcionar se o componente chama addFiles([item.file], propostaId)
-    // O retryItem aqui eh uma api de conveniencia — o componente deve chamar addFiles novamente
-    console.warn('[useAttachmentsUpload] retryItem: use addFiles([file], propostaId) para retry correto');
   }, []);
 
   const removeFromQueue = useCallback((itemId: string) => {
@@ -277,13 +254,12 @@ export function useAttachmentsUpload(): UseAttachmentsUpload {
 
   const clear = useCallback(() => {
     queueRef.current = [];
-    setItems([]);
-    isUploadingRef.current = false;
     activeCountRef.current = 0;
+    setItems([]);
   }, []);
 
   const isUploading = items.some(
-    (it) => it.status === 'pending' || it.status === 'computing_hash' || it.status === 'generating_preview' || it.status === 'uploading'
+    (it) => ['pending', 'computing_hash', 'generating_preview', 'uploading'].includes(it.status)
   );
 
   return { items, addFiles, retryItem, removeFromQueue, clear, isUploading };
