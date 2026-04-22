@@ -167,8 +167,36 @@ export default function Jobs() {
   // Mutação para excluir OS via Edge Function (contorna RLS, mobile-safe)
   const deleteJobMutation = useMutation({
     mutationFn: async (jobId: string) => {
-      const { data, error } = await supabase.functions.invoke('delete-job', { body: { jobId } });
-      if (error) throw error;
+      // Garante que temos uma sessão fresca antes de chamar a Edge Function
+      const { data: sessionData } = await supabase.auth.getSession();
+      const accessToken = sessionData.session?.access_token;
+
+      if (!accessToken) {
+        throw new Error("Sessão expirada. Faça login novamente.");
+      }
+
+      // Passa o JWT explicitamente no header Authorization (mobile-safe: evita
+      // problemas de sessão stale no PWA quando o app fica tempo em background)
+      const { data, error } = await supabase.functions.invoke('delete-job', {
+        body: { jobId },
+        headers: { Authorization: `Bearer ${accessToken}` },
+      });
+
+      if (error) {
+        // error pode vir do fetch (FunctionsFetchError) ou do Supabase (FunctionsHttpError)
+        // FunctionsHttpError tem `context.json()` para pegar o body de resposta
+        let details = error.message || "Erro ao chamar delete-job";
+        try {
+          const ctx: any = (error as any).context;
+          if (ctx?.json) {
+            const parsed = await ctx.json();
+            if (parsed?.error) details = parsed.error;
+          }
+        } catch {
+          // ignora falha ao parsear body do erro
+        }
+        throw new Error(details);
+      }
       if (data?.error) throw new Error(data.error);
       return data;
     },
