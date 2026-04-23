@@ -35,6 +35,34 @@ export interface ProcessoItemPDF {
   ordem: number;
 }
 
+export interface ClientePDF {
+  razao_social: string | null;
+  nome_fantasia: string | null;
+  cnpj: string | null;
+  inscricao_estadual: string | null;
+  email: string | null;
+  telefone: string | null;
+  contato_financeiro: string | null;
+  endereco: string | null;
+  numero: string | null;
+  complemento: string | null;
+  bairro: string | null;
+  cidade: string | null;
+  estado: string | null;
+  cep: string | null;
+}
+
+/** Informação de local de instalação / referência de loja extraída das observações */
+export interface LocalInstalacaoPDF {
+  referencia: string | null;
+  responsavel: string | null;
+  endereco_completo: string | null;
+  marca: string | null;
+  contato_nome: string | null;
+  contato_telefone: string | null;
+  condicoes_locais: string | null;
+}
+
 export interface OrcamentoEnriquecidoPDF {
   vendedor_nome: string | null;
   vendedor_comissao_pct: number | null;
@@ -49,6 +77,111 @@ export interface OrcamentoEnriquecidoPDF {
   tempo_producao_total_min: number;
   /** Tempo total agregado por etapa */
   tempo_por_etapa: Record<string, number>;
+  /** Cliente completo (endereço, contato, IE) */
+  cliente: ClientePDF | null;
+  /** Local de instalação parseado das observações */
+  local_instalacao: LocalInstalacaoPDF | null;
+  /** Observações sem a parte de local de instalação (limpo para exibir) */
+  observacoes_limpas: string | null;
+}
+
+/**
+ * Parseia o campo observacoes de uma proposta procurando seções
+ * "LOCAL DE INSTALAÇÃO", "Ref.:" / "Ref:", "Responsável local:", "CONDIÇÕES:" etc.
+ * Retorna dados estruturados + o texto limpo (sem essas seções estruturadas).
+ */
+export function parseObservacoesInstalacao(
+  observacoes: string | null | undefined,
+): { local: LocalInstalacaoPDF | null; limpas: string | null } {
+  if (!observacoes || !observacoes.trim()) return { local: null, limpas: null };
+
+  const texto = observacoes.replace(/\r\n/g, '\n');
+  const local: LocalInstalacaoPDF = {
+    referencia: null,
+    responsavel: null,
+    endereco_completo: null,
+    marca: null,
+    contato_nome: null,
+    contato_telefone: null,
+    condicoes_locais: null,
+  };
+  const linhasRestantes: string[] = [];
+  const linhas = texto.split('\n');
+
+  let bloco: 'local' | 'condicoes' | null = null;
+  let localBuf: string[] = [];
+  let condicoesBuf: string[] = [];
+
+  for (let i = 0; i < linhas.length; i++) {
+    const raw = linhas[i];
+    const linha = raw.trim();
+    const baixo = linha.toLowerCase();
+
+    // Marcadores de início de bloco
+    if (/^local de instala[cç][aã]o:?$/i.test(linha)) {
+      bloco = 'local';
+      continue;
+    }
+    if (/^condi[cç][oõ]es:?$/i.test(linha)) {
+      bloco = 'condicoes';
+      continue;
+    }
+    if (/^escopo:?$/i.test(linha)) {
+      // bloco escopo já está representado nos itens — ignorar o bloco do texto
+      bloco = null;
+      continue;
+    }
+
+    // Ref.:
+    if (/^ref\.?:\s*/i.test(linha)) {
+      local.referencia = linha.replace(/^ref\.?:\s*/i, '').trim() || null;
+      continue;
+    }
+
+    // Contato <Marca>: Nome — telefone  (ex: "Contato Beira Rio: Larissa — (51) 3584-2200")
+    const mContato = linha.match(/^contato\s+(.+?):\s*(.+)$/i);
+    if (mContato) {
+      const partes = mContato[2].split(/\s*[—\-]\s*/);
+      local.marca = (local.marca || mContato[1]).trim();
+      local.contato_nome = (partes[0] || '').trim() || null;
+      local.contato_telefone = (partes[1] || '').trim() || null;
+      continue;
+    }
+
+    if (/^respons[aá]vel\s+local:?\s*/i.test(linha)) {
+      local.responsavel = linha.replace(/^respons[aá]vel\s+local:?\s*/i, '').trim() || null;
+      continue;
+    }
+
+    if (/^faturamento:/i.test(linha) || /^instala[cç][aã]o:/i.test(baixo)) {
+      // Linhas informativas de faturamento/instalação — mantemos em observações limpas
+      linhasRestantes.push(raw);
+      bloco = null;
+      continue;
+    }
+
+    if (bloco === 'local') {
+      if (linha) localBuf.push(linha);
+      continue;
+    }
+    if (bloco === 'condicoes') {
+      if (linha) condicoesBuf.push(linha);
+      continue;
+    }
+
+    linhasRestantes.push(raw);
+  }
+
+  if (localBuf.length > 0) {
+    local.endereco_completo = localBuf.join(' ').replace(/\s+/g, ' ').trim();
+  }
+  if (condicoesBuf.length > 0) {
+    local.condicoes_locais = condicoesBuf.join(' ').replace(/\s+/g, ' ').trim();
+  }
+
+  const temAlgumaCoisa = Object.values(local).some((v) => v != null && v !== '');
+  const limpas = linhasRestantes.join('\n').trim() || null;
+  return { local: temAlgumaCoisa ? local : null, limpas };
 }
 
 export async function enriquecerOrcamentoParaPDF(orc: {
@@ -56,6 +189,8 @@ export async function enriquecerOrcamentoParaPDF(orc: {
   vendedor_id: string | null;
   total: number;
   itens: { id: string }[];
+  cliente_id?: string | null;
+  observacoes?: string | null;
 }): Promise<OrcamentoEnriquecidoPDF> {
   const result: OrcamentoEnriquecidoPDF = {
     vendedor_nome: null,
@@ -68,12 +203,15 @@ export async function enriquecerOrcamentoParaPDF(orc: {
     processos_por_item: {},
     tempo_producao_total_min: 0,
     tempo_por_etapa: {},
+    cliente: null,
+    local_instalacao: null,
+    observacoes_limpas: null,
   };
 
   // 1) Buscar propostas com dados de comissao + vendedor profile
   const { data: proposta } = await supabase
     .from('propostas')
-    .select('vendedor_id, comissao_externa_pct, comissionado_externo_id, absorver_comissao, total')
+    .select('vendedor_id, comissao_externa_pct, comissionado_externo_id, absorver_comissao, total, cliente_id, observacoes')
     .eq('id', orc.id)
     .maybeSingle();
 
@@ -81,6 +219,27 @@ export async function enriquecerOrcamentoParaPDF(orc: {
     result.absorver_comissao = !!proposta.absorver_comissao;
     result.comissao_externa_pct = proposta.comissao_externa_pct ?? null;
   }
+
+  // 1.1) Cliente completo (endereço, contato, IE)
+  const clienteId = orc.cliente_id ?? proposta?.cliente_id ?? null;
+  if (clienteId) {
+    const { data: cli } = await supabase
+      .from('clientes')
+      .select(
+        'razao_social, nome_fantasia, cnpj, inscricao_estadual, email, telefone, contato_financeiro, endereco, numero, complemento, bairro, cidade, estado, cep',
+      )
+      .eq('id', clienteId)
+      .maybeSingle();
+    if (cli) {
+      result.cliente = cli as ClientePDF;
+    }
+  }
+
+  // 1.2) Parse de observações → local de instalação
+  const observacoesFonte = orc.observacoes ?? proposta?.observacoes ?? null;
+  const parsed = parseObservacoesInstalacao(observacoesFonte);
+  result.local_instalacao = parsed.local;
+  result.observacoes_limpas = parsed.limpas;
 
   // 2) Nome do vendedor (via profiles)
   if (orc.vendedor_id) {

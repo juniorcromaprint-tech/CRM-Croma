@@ -200,15 +200,15 @@ export default function OrcamentoViewPage() {
       document.body.appendChild(container);
 
       const orcamentoMulti = orc as Parameters<typeof OrcamentoPDFMulti>[0]["orcamento"];
-      // Enriquece apenas para modos que precisam dos dados extras (producao/tecnico)
-      const enriched = modo !== "cliente"
-        ? await enriquecerOrcamentoParaPDF({
-            id: orc.id,
-            vendedor_id: (orc as any).vendedor_id ?? null,
-            total: orc.total ?? 0,
-            itens: orc.itens.map((i: any) => ({ id: i.id })),
-          }).catch(() => null)
-        : null;
+      // Enriquece sempre — o PDF cliente também usa enriched.cliente e enriched.local_instalacao
+      const enriched = await enriquecerOrcamentoParaPDF({
+        id: orc.id,
+        vendedor_id: (orc as any).vendedor_id ?? null,
+        total: orc.total ?? 0,
+        itens: orc.itens.map((i: any) => ({ id: i.id })),
+        cliente_id: (orc as any).cliente_id ?? null,
+        observacoes: (orc as any).observacoes ?? null,
+      }).catch(() => null);
       const root = createRoot(container);
       root.render(
         <OrcamentoPDFMulti
