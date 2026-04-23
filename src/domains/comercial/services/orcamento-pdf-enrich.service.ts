@@ -81,8 +81,12 @@ export interface OrcamentoEnriquecidoPDF {
   cliente: ClientePDF | null;
   /** Local de instalação parseado das observações */
   local_instalacao: LocalInstalacaoPDF | null;
-  /** Observações sem a parte de local de instalação (limpo para exibir) */
+  /** Observações sem a parte de local de instalação e sem linhas internas (seguro para exibir ao cliente) */
   observacoes_limpas: string | null;
+  /** Linhas internas extraídas das observações (Faturamento:, Criar ordem_, etc.) — NÃO exibir ao cliente */
+  observacoes_internas_raw: string | null;
+  /** observacoes_internas salvo no banco (campo dedicado) — NÃO exibir ao cliente */
+  observacoes_internas_db: string | null;
 }
 
 /**
@@ -92,8 +96,8 @@ export interface OrcamentoEnriquecidoPDF {
  */
 export function parseObservacoesInstalacao(
   observacoes: string | null | undefined,
-): { local: LocalInstalacaoPDF | null; limpas: string | null } {
-  if (!observacoes || !observacoes.trim()) return { local: null, limpas: null };
+): { local: LocalInstalacaoPDF | null; limpas: string | null; internais: string | null } {
+  if (!observacoes || !observacoes.trim()) return { local: null, limpas: null, internais: null };
 
   const texto = observacoes.replace(/\r\n/g, '\n');
   const local: LocalInstalacaoPDF = {
@@ -106,6 +110,7 @@ export function parseObservacoesInstalacao(
     condicoes_locais: null,
   };
   const linhasRestantes: string[] = [];
+  const linhasInternas: string[] = [];
   const linhas = texto.split('\n');
 
   let bloco: 'local' | 'condicoes' | null = null;
@@ -141,10 +146,12 @@ export function parseObservacoesInstalacao(
     // Contato <Marca>: Nome — telefone  (ex: "Contato Beira Rio: Larissa — (51) 3584-2200")
     const mContato = linha.match(/^contato\s+(.+?):\s*(.+)$/i);
     if (mContato) {
-      const partes = mContato[2].split(/\s*[—\-]\s*/);
+      // Split apenas em em-dash (—) ou en-dash (–) rodeados de espaço — nunca em hífen curto (-)
+      // para não quebrar telefones como (51) 3584-2200
+      const partes = mContato[2].split(/\s+[—–]\s+/);
       local.marca = (local.marca || mContato[1]).trim();
       local.contato_nome = (partes[0] || '').trim() || null;
-      local.contato_telefone = (partes[1] || '').trim() || null;
+      local.contato_telefone = (partes.slice(1).join(' — ') || '').trim() || null;
       continue;
     }
 
@@ -153,9 +160,9 @@ export function parseObservacoesInstalacao(
       continue;
     }
 
-    if (/^faturamento:/i.test(linha) || /^instala[cç][aã]o:/i.test(baixo)) {
-      // Linhas informativas de faturamento/instalação — mantemos em observações limpas
-      linhasRestantes.push(raw);
+    if (/^faturamento:/i.test(linha) || /^instala[cç][aã]o:/i.test(baixo) || /^criar ordem_/i.test(linha)) {
+      // Linhas internas (faturamento, instrução de OP, etc.) — NÃO vão ao cliente
+      linhasInternas.push(raw);
       bloco = null;
       continue;
     }
@@ -181,7 +188,8 @@ export function parseObservacoesInstalacao(
 
   const temAlgumaCoisa = Object.values(local).some((v) => v != null && v !== '');
   const limpas = linhasRestantes.join('\n').trim() || null;
-  return { local: temAlgumaCoisa ? local : null, limpas };
+  const internais = linhasInternas.join('\n').trim() || null;
+  return { local: temAlgumaCoisa ? local : null, limpas, internais };
 }
 
 export async function enriquecerOrcamentoParaPDF(orc: {
@@ -206,18 +214,22 @@ export async function enriquecerOrcamentoParaPDF(orc: {
     cliente: null,
     local_instalacao: null,
     observacoes_limpas: null,
+    observacoes_internas_raw: null,
+    observacoes_internas_db: null,
   };
 
-  // 1) Buscar propostas com dados de comissao + vendedor profile
+  // 1) Buscar propostas com dados de comissao + vendedor profile + observacoes_internas
   const { data: proposta } = await supabase
     .from('propostas')
-    .select('vendedor_id, comissao_externa_pct, comissionado_externo_id, absorver_comissao, total, cliente_id, observacoes')
+    .select('vendedor_id, comissao_externa_pct, comissionado_externo_id, absorver_comissao, total, cliente_id, observacoes, observacoes_internas')
     .eq('id', orc.id)
     .maybeSingle();
 
   if (proposta) {
     result.absorver_comissao = !!proposta.absorver_comissao;
     result.comissao_externa_pct = proposta.comissao_externa_pct ?? null;
+    // Campo dedicado de observações internas (migration 131)
+    result.observacoes_internas_db = (proposta as any).observacoes_internas ?? null;
   }
 
   // 1.1) Cliente completo (endereço, contato, IE)
@@ -235,11 +247,12 @@ export async function enriquecerOrcamentoParaPDF(orc: {
     }
   }
 
-  // 1.2) Parse de observações → local de instalação
+  // 1.2) Parse de observações → local de instalação + separação de linhas internas
   const observacoesFonte = orc.observacoes ?? proposta?.observacoes ?? null;
   const parsed = parseObservacoesInstalacao(observacoesFonte);
   result.local_instalacao = parsed.local;
   result.observacoes_limpas = parsed.limpas;
+  result.observacoes_internas_raw = parsed.internais;
 
   // 2) Nome do vendedor (via profiles)
   if (orc.vendedor_id) {
@@ -308,11 +321,11 @@ export async function enriquecerOrcamentoParaPDF(orc: {
   return result;
 }
 
-/** Formata minutos como "X h Ymin" */
+/** Formata minutos em horas e minutos legíveis (ex: "1h 30min", "45min") */
 export function formatMinutos(min: number): string {
-  if (!min || min <= 0) return '—';
+  if (min <= 0) return "—";
   const h = Math.floor(min / 60);
-  const m = Math.round(min % 60);
+  const m = min % 60;
   if (h === 0) return `${m}min`;
   if (m === 0) return `${h}h`;
   return `${h}h ${m}min`;

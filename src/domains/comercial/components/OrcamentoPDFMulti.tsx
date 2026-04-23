@@ -36,6 +36,85 @@ import { formatMinutos } from "../services/orcamento-pdf-enrich.service";
 
 export type ModoPDF = "cliente" | "producao" | "tecnico";
 
+// ─── Termos e condições padrão (modo cliente) ────────────────────────────────
+const TERMOS_PROPOSTA_DEFAULT = [
+  {
+    titulo: "PRAZO DE ARTE",
+    texto:
+      "Arte final entregue em até 2 dias úteis após a aprovação da proposta. Revisões inclusas: até 2 (duas). Revisões adicionais cobradas à parte.",
+  },
+  {
+    titulo: "PRAZO DE PRODUÇÃO",
+    texto:
+      "Conforme indicado na proposta, contado a partir da aprovação da arte final pelo cliente. Atrasos causados por pendência de aprovação, envio de material ou alterações de escopo prorrogam o prazo proporcionalmente.",
+  },
+  {
+    titulo: "GARANTIA",
+    texto:
+      "90 (noventa) dias contra defeitos de fabricação, contados a partir da instalação ou entrega. Não cobre danos por má utilização, vandalismo, acidentes, intempéries ou desgaste natural.",
+  },
+  {
+    titulo: "INSTALAÇÃO",
+    texto:
+      "Escopo conforme descrito nesta proposta. Obras extras (elétrica, reforço estrutural, obra civil, equipamentos especiais) serão cobradas mediante aditivo contratual.",
+  },
+  {
+    titulo: "CANCELAMENTO",
+    texto:
+      "Após a aprovação, o valor não é reembolsável caso a arte já tenha sido iniciada ou material comprado. Cancelamentos antes da produção estão sujeitos a taxa administrativa.",
+  },
+  {
+    titulo: "FORO",
+    texto:
+      "Fica eleito o foro da Comarca de São Paulo/SP para dirimir quaisquer questões oriundas desta proposta.",
+  },
+];
+
+// ─── Escopo automático quando vazio ─────────────────────────────────────────
+function extrairTipoProduto(desc: string): string | null {
+  const lower = (desc || "").toLowerCase();
+  if (/adesivo blackout/.test(lower)) return "adesivo blackout";
+  if (/adesivo/.test(lower)) return "adesivo";
+  if (/banner/.test(lower)) return "banner";
+  if (/placa|chapa ps|acm/.test(lower)) return "placa";
+  if (/lona/.test(lower)) return "lona";
+  if (/fachada/.test(lower)) return "fachada";
+  if (/instalação|instalacao/.test(lower)) return null; // serviço
+  return null;
+}
+
+function gerarEscopoAuto(
+  orc: { itens: ItemExtendido[]; cliente_nome_snapshot?: string | null },
+  enriched: OrcamentoEnriquecidoPDF | null,
+): string {
+  const clienteNome =
+    enriched?.cliente?.nome_fantasia ||
+    enriched?.cliente?.razao_social ||
+    orc.cliente_nome_snapshot ||
+    "cliente";
+  const local = enriched?.local_instalacao;
+  const marca = local?.marca;
+  const ref = local?.referencia;
+  const endereco = local?.endereco_completo;
+
+  const tipos = Array.from(
+    new Set(
+      (orc.itens || [])
+        .map((i) => extrairTipoProduto(i.descricao || ""))
+        .filter((t): t is string => t !== null),
+    ),
+  );
+  const listaItens = tipos.length > 0 ? tipos.join(", ") : "materiais de comunicação visual";
+
+  let escopo = `Fornecimento de ${listaItens}`;
+  if (marca) escopo += ` para a marca ${marca}`;
+  else escopo += ` para ${clienteNome}`;
+  if (ref) escopo += ` — ${ref}`;
+  if (endereco) escopo += `. Instalação no endereço: ${endereco}`;
+  escopo += ".";
+  return escopo;
+}
+
 type ItemExtendido = OrcamentoItem & {
   materiais?: OrcamentoItemMaterial[];
   acabamentos?: OrcamentoItemAcabamento[];
@@ -141,6 +220,18 @@ function resolveEnderecoCliente(
   return pedacos.length > 0 ? pedacos.join(" · ") : null;
 }
 
+function calcValidadeAte(dataBase: string | null | undefined, dias: number): string {
+  if (!dataBase) return `${dias} dias`;
+  try {
+    const d = new Date(dataBase);
+    if (isNaN(d.getTime())) return `${dias} dias`;
+    d.setDate(d.getDate() + dias);
+    return formatDate(d.toISOString());
+  } catch {
+    return `${dias} dias`;
+  }
+}
+
 function calcSubtotalItens(itens: ItemExtendido[]): number {
   return itens.reduce((sum, i) => sum + (i.valor_total || 0), 0);
 }
@@ -180,9 +271,17 @@ function formatQtdComUnidade(item: ItemExtendido): string {
   const qtd = Number(item.quantidade || 0);
   const unidade = (item.unidade || "un").trim();
   const u = unidade.toLowerCase();
-  if (u === "m²" || u === "m2") return `${formatNumber(qtd)} m²`;
-  // qtd inteira vs decimal
+  const temArea = Number(item.area_m2 || 0) > 0;
+
+  // Produto fabricado por área: mostrar "1 peça" / "N peças"
+  if (temArea && (u === "m²" || u === "m2")) {
+    const qtdPecas = Math.round(qtd) || 1;
+    return qtdPecas === 1 ? "1 peça" : `${qtdPecas} peças`;
+  }
+
+  // Quantidade inteira — exibir sem decimais
   if (Number.isInteger(qtd)) return `${qtd} ${unidade}`;
+
   return `${formatNumber(qtd)} ${unidade}`;
 }
 
@@ -292,6 +391,8 @@ export default function OrcamentoPDFMulti({
           border-radius: 6px;
           padding: 8px 11px;
           margin-top: 6px;
+          break-inside: avoid;
+          page-break-inside: avoid;
         }
         .orcamento-pdf-multi .kv {
           display: grid;
@@ -335,6 +436,12 @@ export default function OrcamentoPDFMulti({
           border-top: 1px solid #e2e8f0;
           font-size: 7.6pt; color: #64748b; text-align: center;
           line-height: 1.4;
+          break-inside: avoid;
+          page-break-inside: avoid;
+        }
+        .orcamento-pdf-multi .secao-bloco {
+          break-inside: avoid;
+          page-break-inside: avoid;
         }
         .orcamento-pdf-multi .badge-interno {
           display: inline-block;
@@ -480,15 +587,21 @@ export default function OrcamentoPDFMulti({
         </>
       )}
 
-      {/* ═══════════ DESCRIÇÃO (apenas cliente) ═══════════ */}
-      {modo === "cliente" && orcamento.descricao && orcamento.descricao.trim() && (
-        <>
-          <h2 className="secao-titulo">Escopo da Proposta</h2>
-          <p style={{ fontSize: "8.8pt", color: "#334155", whiteSpace: "pre-line" }}>
-            {orcamento.descricao}
-          </p>
-        </>
-      )}
+      {/* ═══════════ DESCRIÇÃO / ESCOPO (apenas cliente) ═══════════ */}
+      {modo === "cliente" && (() => {
+        const descVazia = !orcamento.descricao?.trim() || /^(conforme solicitado|segue cota[çc][aã]o)/i.test(orcamento.descricao.trim());
+        const textoEscopo = descVazia
+          ? gerarEscopoAuto(orcamento, enriched)
+          : orcamento.descricao!;
+        return (
+          <div className="secao-bloco">
+            <h2 className="secao-titulo">Escopo da Proposta</h2>
+            <p style={{ fontSize: "8.8pt", color: "#334155", whiteSpace: "pre-line" }}>
+              {textoEscopo}
+            </p>
+          </div>
+        );
+      })()}
 
       {/* ═══════════ ITENS ═══════════ */}
       <h2 className="secao-titulo">
@@ -545,30 +658,31 @@ export default function OrcamentoPDFMulti({
 
       {/* ═══════════ TOTAIS ═══════════ */}
       {(modo === "cliente" || modo === "tecnico") && (
-        <section style={{ marginTop: 10 }}>
+        <section style={{ marginTop: 10, breakInside: "avoid", pageBreakInside: "avoid" }}>
           <div style={{ display: "flex", justifyContent: "flex-end" }}>
             <div style={{ width: "60%" }}>
-              <table style={{ fontSize: "9pt" }}>
-                <colgroup>
-                  <col />
-                  <col style={{ width: "40%" }} />
-                </colgroup>
-                <tbody>
-                  <tr>
-                    <td style={{ textAlign: "right", color: "#64748b", borderBottom: "none" }}>
-                      Subtotal
-                    </td>
-                    <td
-                      style={{
-                        textAlign: "right",
-                        fontWeight: 600,
-                        borderBottom: "none",
-                      }}
-                    >
-                      {brl(subtotal)}
-                    </td>
-                  </tr>
-                  {desconto > 0 && (
+              {/* Mostrar subtotal apenas quando há ajustes (desconto, frete, acréscimo) */}
+              {desconto > 0 && (
+                <table style={{ fontSize: "9pt" }}>
+                  <colgroup>
+                    <col />
+                    <col style={{ width: "40%" }} />
+                  </colgroup>
+                  <tbody>
+                    <tr>
+                      <td style={{ textAlign: "right", color: "#64748b", borderBottom: "none" }}>
+                        Subtotal
+                      </td>
+                      <td
+                        style={{
+                          textAlign: "right",
+                          fontWeight: 600,
+                          borderBottom: "none",
+                        }}
+                      >
+                        {brl(subtotal)}
+                      </td>
+                    </tr>
                     <tr>
                       <td
                         style={{
@@ -592,9 +706,9 @@ export default function OrcamentoPDFMulti({
                         − {brl(desconto)}
                       </td>
                     </tr>
-                  )}
-                </tbody>
-              </table>
+                  </tbody>
+                </table>
+              )}
               <div className="total-box">
                 <span style={{ fontSize: "10pt", fontWeight: 600, letterSpacing: "0.02em" }}>
                   TOTAL GERAL
@@ -608,15 +722,15 @@ export default function OrcamentoPDFMulti({
 
       {/* ═══════════ CONDIÇÕES DE PAGAMENTO (cliente) ═══════════ */}
       {modo === "cliente" && (
-        <>
+        <div className="secao-bloco">
           <h2 className="secao-titulo">Condições Comerciais</h2>
           <CondicoesClienteCard orcamento={orcamento} local={local} />
-        </>
+        </div>
       )}
 
       {/* ═══════════ DADOS DE PAGAMENTO (cliente) ═══════════ */}
       {modo === "cliente" && (
-        <>
+        <div className="secao-bloco">
           <h2 className="secao-titulo">Dados para Pagamento</h2>
           <div className="card" style={{ background: "#eef2ff", borderLeftColor: "#4338ca" }}>
             <dl className="kv">
@@ -630,12 +744,12 @@ export default function OrcamentoPDFMulti({
               <dd>PIX, transferência bancária ou boleto</dd>
             </dl>
           </div>
-        </>
+        </div>
       )}
 
-      {/* ═══════════ OBSERVAÇÕES (cliente) ═══════════ */}
+      {/* ═══════════ OBSERVAÇÕES (cliente — apenas linhas limpas) ═══════════ */}
       {modo === "cliente" && obsLimpas && (
-        <>
+        <div className="secao-bloco">
           <h2 className="secao-titulo">Observações</h2>
           <p
             style={{
@@ -647,7 +761,7 @@ export default function OrcamentoPDFMulti({
           >
             {obsLimpas}
           </p>
-        </>
+        </div>
       )}
 
       {/* ═══════════ PRODUÇÃO: OS específica ═══════════ */}
@@ -670,6 +784,36 @@ export default function OrcamentoPDFMulti({
           total={total}
           cor={cfg.cor}
         />
+      )}
+
+      {/* ═══════════ APROVAÇÃO DA PROPOSTA + QR (cliente) ═══════════ */}
+      {modo === "cliente" && (
+        <BlocoAprovacao
+          orcamento={orcamento}
+          cor={cfg.cor}
+        />
+      )}
+
+      {/* ═══════════ TERMOS E CONDIÇÕES (cliente) ═══════════ */}
+      {modo === "cliente" && (
+        <div className="secao-bloco" style={{ marginTop: 14 }}>
+          <h2 className="secao-titulo">Termos e Condições</h2>
+          <ol
+            style={{
+              paddingLeft: 16,
+              margin: 0,
+              color: "#475569",
+              lineHeight: 1.5,
+              fontSize: "8.2pt",
+            }}
+          >
+            {TERMOS_PROPOSTA_DEFAULT.map((t, i) => (
+              <li key={i} style={{ marginBottom: 4 }}>
+                <strong style={{ color: "#1e293b" }}>{t.titulo}:</strong> {t.texto}
+              </li>
+            ))}
+          </ol>
+        </div>
       )}
 
       {/* ═══════════ FOOTER ═══════════ */}
@@ -758,7 +902,8 @@ function Header({
           Emitida em {formatDate(orcamento.created_at)}
           {modo === "cliente" && orcamento.validade_dias && (
             <>
-              <br />Válida por {orcamento.validade_dias} dias
+              <br />Válida até {calcValidadeAte(orcamento.created_at, orcamento.validade_dias)}{" "}
+              <span style={{ color: "#94a3b8" }}>({orcamento.validade_dias} dias)</span>
             </>
           )}
         </div>
@@ -790,11 +935,14 @@ function TabelaItensCliente({
   itens: ItemExtendido[];
   cor: string;
 }) {
+  // Coluna Arte só aparece se ao menos 1 item tiver arte
+  const hasAnyArte = itens.some((i) => i.arte_preview_url || i.arte_url);
+
   return (
     <table>
       <colgroup>
-        <col style={{ width: "12%" }} />
-        <col style={{ width: "42%" }} />
+        {hasAnyArte && <col style={{ width: "12%" }} />}
+        <col style={{ width: hasAnyArte ? "42%" : "54%" }} />
         <col style={{ width: "14%" }} />
         <col style={{ width: "11%" }} />
         <col style={{ width: "10%" }} />
@@ -802,7 +950,7 @@ function TabelaItensCliente({
       </colgroup>
       <thead>
         <tr>
-          <th>Arte</th>
+          {hasAnyArte && <th>Arte</th>}
           <th>Descrição</th>
           <th>Medida</th>
           <th style={{ textAlign: "center" }}>Qtd</th>
@@ -815,9 +963,13 @@ function TabelaItensCliente({
           const dim = formatDimensoesMetros(item);
           return (
             <tr key={item.id}>
-              <td>
-                <ThumbArte item={item} />
-              </td>
+              {hasAnyArte && (
+                <td>
+                  {(item.arte_preview_url || item.arte_url)
+                    ? <ThumbArte item={item} />
+                    : null /* célula vazia — sem thumb quando não tem arte */}
+                </td>
+              )}
               <td>
                 <div style={{ fontWeight: 600, color: "#0f172a", fontSize: "8.8pt" }}>
                   {item.nome_exibicao || item.descricao}
@@ -1085,7 +1237,7 @@ function CondicoesClienteCard({
           <>
             <dt>Condições</dt>
             <dd>
-              <strong>{cond}</strong>
+              <strong>{formatCondicoesPagamento(cond)}</strong>
             </dd>
           </>
         )}
@@ -1126,6 +1278,103 @@ function labelFormaPagamento(f: string): string {
   if (k === "transferencia" || k === "transferência") return "Transferência bancária";
   if (k === "dinheiro") return "Dinheiro";
   return f;
+}
+
+function formatCondicoesPagamento(cond: string): string {
+  // Se menciona boleto/prazo sem âncora explícita, adicionar
+  const lower = cond.toLowerCase();
+  const temAncora = /aprova[çc][aã]o|faturamento|emiss[aã]o|data da nota/i.test(cond);
+  if (!temAncora && /boleto|\d+\s*dias/i.test(lower)) {
+    return `${cond} (contados a partir da aprovação da proposta)`;
+  }
+  return cond;
+}
+
+// ── Bloco de Aprovação (modo cliente) ──
+function BlocoAprovacao({
+  orcamento,
+  cor,
+}: {
+  orcamento: Props["orcamento"] & { portal_token?: string | null };
+  cor: string;
+}) {
+  // QR code via API pública — sem dependência npm, funciona em html2pdf
+  const portalToken = (orcamento as any).portal_token || orcamento.id;
+  const portalUrl = `https://crm-croma.vercel.app/p/${portalToken}`;
+  const qrUrl = `https://api.qrserver.com/v1/create-qr-code/?size=100x100&margin=2&data=${encodeURIComponent(portalUrl)}`;
+
+  const labelStyle: React.CSSProperties = {
+    color: "#64748b",
+    fontWeight: 500,
+    fontSize: "8.4pt",
+    display: "inline-block",
+    width: 90,
+  };
+  const linhaStyle: React.CSSProperties = {
+    borderBottom: `1px solid ${cor}`,
+    display: "inline-block",
+    marginLeft: 8,
+    height: 18,
+    verticalAlign: "bottom",
+  };
+
+  return (
+    <div
+      className="secao-bloco"
+      style={{
+        marginTop: 18,
+        padding: "12px 14px",
+        background: "#f8fafc",
+        border: "1px solid #e2e8f0",
+        borderRadius: 6,
+      }}
+    >
+      <h2 className="secao-titulo" style={{ marginTop: 0 }}>
+        Aprovação da Proposta
+      </h2>
+      <div style={{ display: "flex", gap: 20, alignItems: "flex-start" }}>
+        <div style={{ flex: 1 }}>
+          <p
+            style={{
+              fontSize: "8.6pt",
+              color: "#475569",
+              marginBottom: 14,
+              lineHeight: 1.5,
+            }}
+          >
+            Ao assinar abaixo, o cliente aprova o escopo e valores desta proposta
+            e autoriza o início da produção pela Croma Print.
+          </p>
+          <div style={{ marginBottom: 10 }}>
+            <span style={labelStyle}>Data:</span>
+            <span style={{ ...linhaStyle, width: 90 }}>&nbsp;</span>
+          </div>
+          <div style={{ marginBottom: 10 }}>
+            <span style={labelStyle}>Nome:</span>
+            <span style={{ ...linhaStyle, width: 260 }}>&nbsp;</span>
+          </div>
+          <div style={{ marginBottom: 10 }}>
+            <span style={labelStyle}>CPF/CNPJ:</span>
+            <span style={{ ...linhaStyle, width: 210 }}>&nbsp;</span>
+          </div>
+          <div style={{ marginBottom: 4 }}>
+            <span style={labelStyle}>Assinatura:</span>
+            <span style={{ ...linhaStyle, width: 230, height: 36 }}>&nbsp;</span>
+          </div>
+        </div>
+        <div style={{ textAlign: "center", fontSize: "8pt", color: "#64748b", minWidth: 110 }}>
+          <img
+            src={qrUrl}
+            alt="QR aprovação digital"
+            style={{ width: 90, height: 90, display: "block", margin: "0 auto 4px" }}
+            crossOrigin="anonymous"
+          />
+          <div>Aprove digitalmente</div>
+          <div>escaneando este QR</div>
+        </div>
+      </div>
+    </div>
+  );
 }
 
 // ── Extras do modo PRODUÇÃO ──
@@ -1254,18 +1503,25 @@ function ProducaoExtras({
         </ul>
       </div>
 
-      {(orcamento.observacoes || enriched?.observacoes_limpas) && (
+      {(enriched?.observacoes_limpas || enriched?.observacoes_internas_raw || enriched?.observacoes_internas_db || orcamento.observacoes) && (
         <>
           <h2 className="secao-titulo">Observações internas</h2>
-          <p
-            style={{
-              fontSize: "8.4pt",
-              color: "#334155",
-              whiteSpace: "pre-line",
-            }}
-          >
-            {enriched?.observacoes_limpas || orcamento.observacoes}
-          </p>
+          {enriched?.observacoes_limpas && (
+            <p style={{ fontSize: "8.4pt", color: "#334155", whiteSpace: "pre-line" }}>
+              {enriched.observacoes_limpas}
+            </p>
+          )}
+          {(enriched?.observacoes_internas_raw || enriched?.observacoes_internas_db) && (
+            <div className="warn" style={{ marginTop: 6 }}>
+              <strong>Notas internas:</strong>{" "}
+              {enriched.observacoes_internas_db || enriched.observacoes_internas_raw}
+            </div>
+          )}
+          {!enriched && orcamento.observacoes && (
+            <p style={{ fontSize: "8.4pt", color: "#334155", whiteSpace: "pre-line" }}>
+              {orcamento.observacoes}
+            </p>
+          )}
         </>
       )}
     </>
@@ -1410,46 +1666,25 @@ function FichaTecnicaExtras({
                 </dd>
               </>
             )}
-          {orcamento.forma_pagamento && (
-            <>
-              <dt>Forma de pagamento</dt>
-              <dd>{labelFormaPagamento(orcamento.forma_pagamento)}</dd>
-            </>
-          )}
           {orcamento.condicoes_pagamento && (
             <>
               <dt>Condições</dt>
               <dd>{orcamento.condicoes_pagamento}</dd>
             </>
           )}
-          {enriched?.tempo_producao_total_min != null &&
-            enriched.tempo_producao_total_min > 0 && (
-              <>
-                <dt>Tempo de produção</dt>
-                <dd>{formatMinutos(enriched.tempo_producao_total_min)}</dd>
-              </>
-            )}
-          <dt>Subtotal</dt>
-          <dd>{brl(subtotal)}</dd>
-          <dt>Total final</dt>
-          <dd style={{ fontWeight: 700, color: cor }}>{brl(total)}</dd>
+          {orcamento.forma_pagamento && (
+            <>
+              <dt>Forma de pagamento</dt>
+              <dd>
+                {labelFormaPagamento(orcamento.forma_pagamento)}
+                {orcamento.parcelas_count && orcamento.parcelas_count > 1
+                  ? ` em ${orcamento.parcelas_count}x`
+                  : ""}
+              </dd>
+            </>
+          )}
         </dl>
       </div>
-
-      {(orcamento.observacoes || enriched?.observacoes_limpas) && (
-        <>
-          <h2 className="secao-titulo">Observações internas</h2>
-          <p
-            style={{
-              fontSize: "8.4pt",
-              color: "#334155",
-              whiteSpace: "pre-line",
-            }}
-          >
-            {enriched?.observacoes_limpas || orcamento.observacoes}
-          </p>
-        </>
-      )}
     </>
   );
 }
