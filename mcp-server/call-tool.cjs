@@ -9,6 +9,12 @@
 const { spawn } = require('child_process');
 const path = require('path');
 
+// Forca stdout do processo atual para UTF-8 (evita conversao de codepage no Windows)
+if (process.stdout.isTTY === false || !process.stdout.isTTY) {
+  // Pipe mode: garante que Buffer UTF-8 seja escrito sem conversao
+  process.stdout.setDefaultEncoding('utf8');
+}
+
 const toolName = process.argv[2];
 
 // Suporta duas formas de passar JSON:
@@ -47,11 +53,17 @@ const server = spawn(nodeExe, [serverPath], {
   stdio: ['pipe', 'pipe', 'pipe'],
 });
 
-let stdout = '';
+// Acumula bytes brutos — NAO converte para string ainda (evita corrupcao de encoding)
+let stdoutBuf = Buffer.alloc(0);
 
 server.stdout.on('data', (data) => {
-  stdout += data.toString();
-  const lines = stdout.split('\n');
+  // data e um Buffer — acumula como bytes
+  stdoutBuf = Buffer.concat([stdoutBuf, data]);
+  
+  // Decodifica como UTF-8 para checar se chegou o JSON completo
+  const text = stdoutBuf.toString('utf8');
+  const lines = text.split('\n');
+  
   for (const line of lines) {
     if (line.trim().startsWith('{')) {
       try {
@@ -59,10 +71,14 @@ server.stdout.on('data', (data) => {
         if (parsed.id === 2) {
           if (parsed.result && parsed.result.content) {
             for (const c of parsed.result.content) {
-              if (c.type === 'text') console.log(c.text);
+              if (c.type === 'text') {
+                // c.text e uma string JS (UTF-16 internamente) — escreve como UTF-8 no pipe
+                const outBuf = Buffer.from(c.text + '\n', 'utf8');
+                process.stdout.write(outBuf);
+              }
             }
           } else if (parsed.error) {
-            console.error('ERROR:', JSON.stringify(parsed.error));
+            process.stderr.write('ERROR: ' + JSON.stringify(parsed.error) + '\n');
           }
           server.kill();
           process.exit(0);
@@ -93,7 +109,7 @@ setTimeout(() => {
 }, 1000);
 
 setTimeout(() => {
-  console.error('Timeout after 30s');
+  process.stderr.write('Timeout after 30s\n');
   server.kill();
   process.exit(1);
 }, 30000);

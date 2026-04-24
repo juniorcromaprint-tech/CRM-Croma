@@ -380,6 +380,222 @@ Args:
             return errorResult(error);
         }
     });
+    // ─── croma_editar_proposta ────────────────────────────────────────────────
+    server.registerTool("croma_editar_proposta", {
+        title: "Editar Proposta",
+        description: `Edita uma proposta/orçamento existente (somente em status "rascunho" ou "em_revisao").
+
+Permite alterar dados da proposta e/ou seus itens em uma única chamada.
+
+ATENÇÃO: Ação que modifica dados. Confirme com o usuário antes de executar.
+
+Args:
+  - id (string, obrigatório): UUID da proposta
+  - titulo (string, opcional): Novo título
+  - validade_dias (number, opcional): Nova validade em dias
+  - condicoes_pagamento (string, opcional): Novas condições de pagamento
+  - observacoes (string, opcional): Novas observações
+  - desconto_percentual (number, opcional): Novo desconto global (0-100)
+  - itens_atualizar (array, opcional): Itens existentes para atualizar
+    - item_id (string): UUID do item
+    - descricao (string, opcional): Nova descrição
+    - quantidade (number, opcional): Nova quantidade
+    - valor_unitario (number, opcional): Novo valor unitário
+    - largura_cm (number, opcional): Nova largura
+    - altura_cm (number, opcional): Nova altura
+    - material_descricao (string, opcional): Nova descrição do material
+  - itens_adicionar (array, opcional): Novos itens para adicionar
+    - descricao (string): Descrição
+    - quantidade (number): Quantidade
+    - valor_unitario (number): Valor unitário
+    - largura_cm (number, opcional): Largura
+    - altura_cm (number, opcional): Altura
+    - material_descricao (string, opcional): Descrição do material
+  - itens_remover (array de UUIDs, opcional): IDs dos itens a remover`,
+        inputSchema: z.object({
+            id: z.string().uuid().describe("UUID da proposta"),
+            titulo: z.string().max(200).optional(),
+            validade_dias: z.coerce.number().int().min(1).max(365).optional(),
+            condicoes_pagamento: z.string().max(500).optional(),
+            observacoes: z.string().max(2000).optional(),
+            desconto_percentual: z.number().min(0).max(100).optional(),
+            itens_atualizar: z.preprocess((val) => typeof val === "string" ? JSON.parse(val) : val, z.array(z.object({
+                item_id: z.string().uuid(),
+                descricao: z.string().max(300).optional(),
+                quantidade: z.number().positive().optional(),
+                valor_unitario: z.number().min(0).optional(),
+                largura_cm: z.number().positive().optional(),
+                altura_cm: z.number().positive().optional(),
+                material_descricao: z.string().max(200).optional(),
+            })).optional()),
+            itens_adicionar: z.preprocess((val) => typeof val === "string" ? JSON.parse(val) : val, z.array(z.object({
+                descricao: z.string().min(1).max(300),
+                quantidade: z.number().positive(),
+                valor_unitario: z.number().min(0),
+                largura_cm: z.number().positive().optional(),
+                altura_cm: z.number().positive().optional(),
+                material_descricao: z.string().max(200).optional(),
+            })).optional()),
+            itens_remover: z.preprocess((val) => typeof val === "string" ? JSON.parse(val) : val, z.array(z.string().uuid()).optional()),
+        }).strict(),
+        annotations: { readOnlyHint: false, destructiveHint: false, idempotentHint: false, openWorldHint: false },
+    }, async (params) => {
+        try {
+            const sb = getUserClient();
+            const adminSb = getAdminClient();
+            // Verifica se proposta existe e pode ser editada
+            const { data: proposta, error: fetchError } = await adminSb
+                .from("propostas")
+                .select("id, numero, status, clientes(razao_social, nome_fantasia)")
+                .eq("id", params.id)
+                .single();
+            if (fetchError)
+                return errorResult(fetchError);
+            if (!proposta)
+                return { content: [{ type: "text", text: `❌ Proposta não encontrada: ${params.id}` }] };
+            const statusEditaveis = ["rascunho", "em_revisao"];
+            if (!statusEditaveis.includes(proposta.status)) {
+                return {
+                    content: [{
+                            type: "text",
+                            text: `❌ Proposta **${proposta.numero}** está com status **${formatStatus(proposta.status)}** e não pode ser editada.\nApenas propostas em "Rascunho" ou "Em Revisão" podem ser editadas.`,
+                        }],
+                };
+            }
+            const alteracoes = [];
+            // 1. Atualizar dados da proposta
+            const propostaUpdate = {};
+            if (params.titulo !== undefined) {
+                propostaUpdate.titulo = params.titulo;
+                alteracoes.push(`Título → "${params.titulo}"`);
+            }
+            if (params.validade_dias !== undefined) {
+                const novaValidade = new Date();
+                novaValidade.setDate(novaValidade.getDate() + params.validade_dias);
+                propostaUpdate.validade = novaValidade.toISOString();
+                alteracoes.push(`Validade → ${params.validade_dias} dias`);
+            }
+            if (params.condicoes_pagamento !== undefined) {
+                propostaUpdate.condicoes_pagamento = params.condicoes_pagamento;
+                alteracoes.push("Condições de pagamento atualizadas");
+            }
+            if (params.observacoes !== undefined) {
+                propostaUpdate.observacoes = params.observacoes;
+                alteracoes.push("Observações atualizadas");
+            }
+            if (params.desconto_percentual !== undefined) {
+                propostaUpdate.desconto_percentual = params.desconto_percentual;
+                alteracoes.push(`Desconto → ${params.desconto_percentual}%`);
+            }
+            if (Object.keys(propostaUpdate).length > 0) {
+                propostaUpdate.updated_at = new Date().toISOString();
+                const { error } = await sb.from("propostas").update(propostaUpdate).eq("id", params.id);
+                if (error)
+                    return errorResult(error);
+            }
+            // 2. Atualizar itens existentes
+            if (params.itens_atualizar && params.itens_atualizar.length > 0) {
+                for (const item of params.itens_atualizar) {
+                    const itemUpdate = {};
+                    if (item.descricao !== undefined)
+                        itemUpdate.descricao = item.descricao;
+                    if (item.quantidade !== undefined)
+                        itemUpdate.quantidade = item.quantidade;
+                    if (item.valor_unitario !== undefined)
+                        itemUpdate.valor_unitario = item.valor_unitario;
+                    if (item.largura_cm !== undefined)
+                        itemUpdate.largura_cm = item.largura_cm;
+                    if (item.altura_cm !== undefined)
+                        itemUpdate.altura_cm = item.altura_cm;
+                    if (item.material_descricao !== undefined)
+                        itemUpdate.material_descricao = item.material_descricao;
+                    if (Object.keys(itemUpdate).length > 0) {
+                        // Recalcular subtotal se quantidade ou valor mudou
+                        if (item.quantidade !== undefined || item.valor_unitario !== undefined) {
+                            const { data: itemAtual } = await adminSb
+                                .from("proposta_itens")
+                                .select("quantidade, valor_unitario")
+                                .eq("id", item.item_id)
+                                .single();
+                            const qty = item.quantidade ?? itemAtual?.quantidade ?? 1;
+                            const price = item.valor_unitario ?? itemAtual?.valor_unitario ?? 0;
+                            itemUpdate.subtotal = qty * price;
+                        }
+                        const { error } = await sb.from("proposta_itens").update(itemUpdate).eq("id", item.item_id).eq("proposta_id", params.id);
+                        if (error)
+                            return errorResult(error);
+                        alteracoes.push(`Item ${item.item_id.slice(0, 8)}… atualizado`);
+                    }
+                }
+            }
+            // 3. Adicionar novos itens
+            if (params.itens_adicionar && params.itens_adicionar.length > 0) {
+                // Buscar maior ordem atual
+                const { data: maxOrdem } = await adminSb
+                    .from("proposta_itens")
+                    .select("ordem")
+                    .eq("proposta_id", params.id)
+                    .order("ordem", { ascending: false })
+                    .limit(1)
+                    .single();
+                let nextOrdem = (maxOrdem?.ordem ?? 0) + 1;
+                const novosItens = params.itens_adicionar.map((item) => ({
+                    proposta_id: params.id,
+                    descricao: item.descricao,
+                    quantidade: item.quantidade,
+                    valor_unitario: item.valor_unitario,
+                    subtotal: item.quantidade * item.valor_unitario,
+                    largura_cm: item.largura_cm ?? null,
+                    altura_cm: item.altura_cm ?? null,
+                    material_descricao: item.material_descricao ?? null,
+                    ordem: nextOrdem++,
+                }));
+                const { error } = await sb.from("proposta_itens").insert(novosItens).select();
+                if (error)
+                    return errorResult(error);
+                alteracoes.push(`${novosItens.length} item(ns) adicionado(s)`);
+            }
+            // 4. Remover itens
+            if (params.itens_remover && params.itens_remover.length > 0) {
+                const { error } = await sb
+                    .from("proposta_itens")
+                    .delete()
+                    .in("id", params.itens_remover)
+                    .eq("proposta_id", params.id);
+                if (error)
+                    return errorResult(error);
+                alteracoes.push(`${params.itens_remover.length} item(ns) removido(s)`);
+            }
+            // 5. Recalcular totais da proposta
+            const { data: todosItens } = await adminSb
+                .from("proposta_itens")
+                .select("subtotal")
+                .eq("proposta_id", params.id);
+            const subtotal = (todosItens ?? []).reduce((sum, i) => sum + (Number(i.subtotal) || 0), 0);
+            const desconto = params.desconto_percentual ?? 0;
+            const total = subtotal * (1 - desconto / 100);
+            await sb.from("propostas").update({ subtotal, total, updated_at: new Date().toISOString() }).eq("id", params.id);
+            const cliente = proposta.clientes;
+            const nomeCliente = cliente?.nome_fantasia ?? cliente?.razao_social ?? "Cliente";
+            return {
+                content: [{
+                        type: "text",
+                        text: [
+                            `✅ Proposta **${proposta.numero}** editada com sucesso!`,
+                            ``,
+                            `- **Cliente**: ${nomeCliente}`,
+                            `- **Subtotal**: ${formatBRL(subtotal)}`,
+                            `- **Total**: ${formatBRL(total)}`,
+                            `- **Alterações**: ${alteracoes.length > 0 ? alteracoes.join("; ") : "nenhuma"}`,
+                        ].join("\n"),
+                    }],
+                structuredContent: { proposta_id: params.id, numero: proposta.numero, subtotal, total, alteracoes },
+            };
+        }
+        catch (error) {
+            return errorResult(error);
+        }
+    });
     // ─── croma_enviar_proposta ────────────────────────────────────────────────
     server.registerTool("croma_enviar_proposta", {
         title: "Enviar Proposta por Email",

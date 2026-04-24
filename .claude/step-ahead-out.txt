@@ -1,0 +1,3 @@
+16525c2 ﻿feat(pdf): refaz 3 modos de PDF da proposta (cliente/producao/tecnico) no estilo Mubisys+
+b0edcdb fix(campo): delete-job robustez auth + Bearer token explicito no invoke
+e427643 fix(mcp/financeiro): listar_contas_receber ignora soft-deleted e soma status a_vencer

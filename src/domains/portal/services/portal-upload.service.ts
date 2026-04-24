@@ -40,13 +40,11 @@ async function generateAndUploadPreview(file: File, token: string): Promise<stri
         upsert: false,
       });
     if (uploadErr) {
-      console.warn('[portal-upload] preview upload falhou:', uploadErr.message);
       return null;
     }
     const { data } = supabase.storage.from(PREVIEW_BUCKET).getPublicUrl(path);
     return data.publicUrl;
-  } catch (err) {
-    console.warn('[portal-upload] gerarPreviewArte falhou:', err instanceof Error ? err.message : err);
+  } catch {
     return null;
   }
 }

@@ -169,5 +169,5 @@ export async function gerarComissao(pedidoId: string): Promise<void> {
   }).select().single();
 
   // Não lança erro — comissão é side-effect, não bloqueia o fluxo
-  if (insErr) console.warn('Falha ao gerar comissão:', insErr.message);
+  if (insErr) return;
 }

@@ -13,6 +13,7 @@ interface Props {
 interface ViewData {
   id: string;
   session_id: string;
+  ip_address: string | null;
   device_type: string;
   browser: string;
   duration_seconds: number;
@@ -150,6 +151,7 @@ export function TrackingPanel({ propostaId }: Props) {
               <DeviceIcon type={v.device_type} />
               <span>{v.browser}</span>
               {v.geo_city && <span>• {v.geo_city}/{v.geo_region}</span>}
+              {v.ip_address && <span className="text-slate-400 font-mono text-[10px]">({v.ip_address})</span>}
               <span className="ml-auto">{formatDistanceToNow(new Date(v.created_at), { addSuffix: true, locale: ptBR })}</span>
             </div>
           ))}

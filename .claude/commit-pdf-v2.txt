@@ -1,0 +1,26 @@
+fix(pdf): 12 melhorias PDF proposta v2 — P0+P1+P2 completo
+
+P0 — blockers:
+- Fix regex telefone truncado (split so em em-dash, nao hifen do telefone)
+- Footer com break-inside avoid em todas as paginas
+- Todas as secoes com pageBreakInside avoid (card, secao-bloco, totais)
+- Campo observacoes_internas separado via migration 131
+- PDF cliente filtra linhas internas (Faturamento:, Criar ordem_, etc.)
+- PDF producao/tecnico mostra observacoes_internas_raw + db
+
+P1 — layout:
+- Coluna ARTE so aparece se ao menos 1 item tem arte (condicional)
+- formatQtdComUnidade: produtos com area em m2 mostram "1 peca" nao "2,80 un"
+- Subtotal oculto quando igual ao total (sem descontos/ajustes)
+- Validade com data absoluta: "Valida ate DD/MM/YYYY (30 dias)"
+- Condicoes de pagamento: ancora "(contados a partir da aprovacao)" quando boleto
+
+P2 — polish:
+- Bloco APROVACAO DA PROPOSTA com 4 linhas para assinatura + QR code do portal
+- Secao TERMOS E CONDICOES com 6 itens padrao (arte, prazo, garantia, etc.)
+- Escopo auto-gerado quando campo vazio ou texto generico (conforme solicitado...)
+
+Migration 131: ADD COLUMN observacoes_internas em propostas (aplicada em prod)
+Arquivos afetados: OrcamentoPDFMulti.tsx, orcamento-pdf-enrich.service.ts
+
+Co-Authored-By: Claude Sonnet 4.6 <noreply@anthropic.com>

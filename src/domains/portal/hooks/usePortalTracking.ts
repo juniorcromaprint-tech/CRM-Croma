@@ -54,6 +54,7 @@ export function usePortalTracking(token: string) {
           token,
           sessionId: getOrCreateSessionId(),
           ...device,
+          ipAddress: geo?.ip,
           geoCity: geo?.city,
           geoRegion: geo?.region,
           geoCountry: geo?.country,

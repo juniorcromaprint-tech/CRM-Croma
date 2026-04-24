@@ -1,0 +1,32 @@
+warning: in the working copy of '.claude/commit-msg.txt', LF will be replaced by CRLF the next time Git touches it
+warning: in the working copy of '.claude/deploy-merge-main.ps1', LF will be replaced by CRLF the next time Git touches it
+warning: in the working copy of '.claude/deploy-out.txt', LF will be replaced by CRLF the next time Git touches it
+warning: in the working copy of '.claude/deploy-pdf-fix.ps1', LF will be replaced by CRLF the next time Git touches it
+warning: in the working copy of '.claude/gh-auth-err.txt', LF will be replaced by CRLF the next time Git touches it
+warning: in the working copy of '.claude/step-branch-now-out.txt', LF will be replaced by CRLF the next time Git touches it
+warning: in the working copy of '.claude/step-commit-out.txt', LF will be replaced by CRLF the next time Git touches it
+warning: in the working copy of '.claude/step-final-out.txt', LF will be replaced by CRLF the next time Git touches it
+warning: in the working copy of '.claude/step-log-branch-out.txt', LF will be replaced by CRLF the next time Git touches it
+warning: in the working copy of '.claude/step-push-err.txt', LF will be replaced by CRLF the next time Git touches it
+warning: in the working copy of '.claude/step-stash-err.txt', LF will be replaced by CRLF the next time Git touches it
+warning: in the working copy of '.claude/step-status1-out.txt', LF will be replaced by CRLF the next time Git touches it
+warning: in the working copy of '.claude/step-status2-out.txt', LF will be replaced by CRLF the next time Git touches it
+warning: in the working copy of '.gitignore', LF will be replaced by CRLF the next time Git touches it
+warning: in the working copy of '.planning/REQUIREMENTS.md', LF will be replaced by CRLF the next time Git touches it
+warning: in the working copy of '.planning/STATE.md', LF will be replaced by CRLF the next time Git touches it
+warning: in the working copy of 'croma_plotter_sync.py', LF will be replaced by CRLF the next time Git touches it
+warning: in the working copy of 'mcp-server/call-tool.cjs', LF will be replaced by CRLF the next time Git touches it
+warning: in the working copy of 'mcp-server/dist/tools/financeiro.js', LF will be replaced by CRLF the next time Git touches it
+warning: in the working copy of 'src/domains/agent/services/leadDiscoveryService.ts', LF will be replaced by CRLF the next time Git touches it
+warning: in the working copy of 'src/domains/financeiro/services/financeiro-automation.service.ts', LF will be replaced by CRLF the next time Git touches it
+warning: in the working copy of 'src/domains/fiscal/utils/danfe-styles.ts', LF will be replaced by CRLF the next time Git touches it
+warning: in the working copy of 'src/domains/fiscal/utils/danfe-template.ts', LF will be replaced by CRLF the next time Git touches it
+warning: in the working copy of 'src/domains/portal/services/portal-upload.service.ts', LF will be replaced by CRLF the next time Git touches it
+warning: in the working copy of 'src/shared/services/fiscal-audit.service.ts', LF will be replaced by CRLF the next time Git touches it
+warning: in the working copy of 'supabase/functions/fiscal-gerar-danfe/danfe-generator.ts', LF will be replaced by CRLF the next time Git touches it
+warning: in the working copy of 'supabase/functions/telegram-webhook/index.ts', LF will be replaced by CRLF the next time Git touches it
+warning: failed to remove .claude/step-stash-err.txt: Invalid argument
+warning: failed to remove .claude/step-stash-out.txt: Invalid argument
+warning: failed to remove docs/dados-historicos/01 - Tabela de Produtos/: Permission denied
+warning: failed to remove "docs/dados-historicos/02 - Lista de Descritivos T\303\251cnicos/": Permission denied
+warning: failed to remove "docs/dados-historicos/12 - Produ\303\247\303\243o/": Permission denied

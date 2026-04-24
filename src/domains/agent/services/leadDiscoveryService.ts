@@ -184,7 +184,7 @@ export async function importarLeadsDescobertos(
       segmento: inferSegmento(lead.tipos),
     };
 
-    const { error } = await supabase.from('leads').insert(payload);
+    const { data: _d, error } = await supabase.from('leads').insert(payload).select().single();
 
     if (error) {
       erros++;
@@ -267,14 +267,14 @@ export async function importarLeadsCSV(
       continue;
     }
 
-    const { error } = await supabase.from('leads').insert({
+    const { data: _d, error } = await supabase.from('leads').insert({
       empresa: csv.nome,
       contato_email: csv.email ?? null,
       contato_telefone: csv.telefone ?? null,
       status: 'novo' as const,
       temperatura: 'frio' as const,
       observacoes: 'Importado via lista CSV.',
-    });
+    }).select().single();
 
     if (error) {
       erros++;

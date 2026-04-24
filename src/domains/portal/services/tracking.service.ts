@@ -7,6 +7,7 @@ export async function registerView(params: {
   deviceType: string;
   browser: string;
   os: string;
+  ipAddress?: string;
   geoCity?: string;
   geoRegion?: string;
   geoCountry?: string;
@@ -17,6 +18,7 @@ export async function registerView(params: {
     p_device_type: params.deviceType,
     p_browser: params.browser,
     p_os: params.os,
+    p_ip_address: params.ipAddress || null,
     p_geo_city: params.geoCity || null,
     p_geo_region: params.geoRegion || null,
     p_geo_country: params.geoCountry || null,
@@ -44,7 +46,7 @@ export async function sendHeartbeat(params: {
   // Heartbeat failures are non-critical — don't throw
 }
 
-export async function resolveGeo(): Promise<{ city: string; region: string; country: string } | null> {
+export async function resolveGeo(): Promise<{ ip: string; city: string; region: string; country: string } | null> {
   try {
     const res = await fetch(`${import.meta.env.VITE_SUPABASE_URL}/functions/v1/resolve-geo`);
     if (!res.ok) return null;

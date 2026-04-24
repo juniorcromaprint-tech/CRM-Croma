@@ -14,6 +14,17 @@ MONITORAMENTO DE CONSUMIVEIS:
 - Dados de ConsumableConfigDyn.xml (nivel%, serial, estado, datas)
 - Historico de nivel para graficos de consumo
 
+LIMITACAO CONHECIDA (nao e bug do script):
+- Cartuchos com estado "refilledColor" NAO reportam
+  ConsumablePercentageLevelRemaining. O firmware da HP detecta que o cartucho
+  foi recarregado (mesmo com tinta original do bag 3L) e zera o sensor de
+  nivel. Por isso level_pct e gravado como NULL para esses cartuchos.
+- O nivel real e estimado via vw_nivel_cartuchos no Supabase, usando as
+  recargas registradas em impressora_recargas + consumo calculado pelo
+  modelo LM Ancora (ml_consumido = lm_ml_real x 21,5316).
+- O cartucho LM (CZ687A) e a unica excecao: nao e recarregado, reporta
+  level_pct confiavel e serve como ancora para o calculo dos outros.
+
 Uso:
     python croma_plotter_sync.py                    # coleta e salva localmente
     python croma_plotter_sync.py --supabase         # coleta e grava no Supabase
@@ -69,6 +80,17 @@ FATOR_TOTAL_SOBRE_LM = sum(PROPORCOES_RELATIVAS_AO_LM.values())  # 21.5316
 
 # ─── Fallback (quando LM indisponível) ───────────────────────
 CONSUMO_MEDIO_ML_M2 = 9.86  # ml/m² — média histórica da máquina
+
+# ─── Mapeamento Part Number → Cor (HP Latex 365) ──────────────
+PART_NUMBER_TO_COLOR = {
+    "CZ682A": "LC",   # Light Cyan
+    "CZ683A": "C",    # Cyan
+    "CZ684A": "M",    # Magenta
+    "CZ685A": "Y",    # Yellow
+    "CZ686A": "K",    # Black
+    "CZ687A": "LM",   # Light Magenta (CONFIRMADO: unico cartucho sem refilledColor)
+    "CZ706A": "OP",   # Optimizer
+}
 
 # ─── Custo de substrato por m² ───────────────────────────────
 SUBSTRATO_PADRAO_CUSTO_M2 = 11.64  # Vinil fosco SM790 — preço real catálogo Mubisys
@@ -411,6 +433,20 @@ def classify_consumable_type(tipo_enum: str) -> str:
     return "other"
 
 
+def get_color_from_part_number(product_number: str) -> str:
+    """Retorna cor baseada no part number do cartucho.
+    Exemplo: CZ687A -> LM (Light Magenta)
+    """
+    if not product_number:
+        return "?"
+    # Tenta match exato primeiro
+    color = PART_NUMBER_TO_COLOR.get(product_number.upper())
+    if color:
+        return color
+    # Se nao encontrar, tenta extrair da lista de conhecidos
+    return "?"
+
+
 def parse_date_safe(date_str: str):
     """Parse data ISO ou retorna None."""
     if not date_str or not date_str.strip():
@@ -487,10 +523,14 @@ def parse_consumables_xml(xml_text: str) -> list[dict]:
         # Expiracao
         exp_date = parse_date_safe(info.findtext("dd:ExpirationDate", "", ns) or "")
 
+        # Cor: use label se disponivel, senao derive do part number
+        color = label if label and label.strip() else get_color_from_part_number(product)
+
         consumables.append({
             "tipo": classify_consumable_type(tipo_enum),
             "tipo_raw": tipo_enum,
-            "label_code": label or "?",
+            "label_code": label or color or "?",
+            "color": color or "?",
             "station": station or "",
             "content_type": content or "",
             "product_number": product or "",
@@ -537,6 +577,7 @@ def send_consumables_to_supabase(consumables: list):
             "maquina_id": maquina_id,
             "tipo": c["tipo"],
             "label_code": c["label_code"],
+            "cor": c.get("color", "?"),
             "station": c["station"],
             "content_type": c["content_type"],
             "product_number": c["product_number"],
@@ -611,7 +652,8 @@ def print_consumables_summary(consumables: list):
         else:
             level_str = "N/A"
 
-        print(f"  [{icon}] {c['tipo']:12s} {c['label_code']:4s} | Nivel: {level_str:>6s} | Estado: {c['consumable_state']}")
+        color_display = c.get("color", c["label_code"])
+        print(f"  [{icon}] {c['tipo']:12s} {color_display:4s} | Nivel: {level_str:>6s} | Estado: {c['consumable_state']}")
         if c["serial_number"]:
             print(f"         Serial: {c['serial_number']} | Part: {c['product_number']}")
 
@@ -623,14 +665,45 @@ def print_consumables_summary(consumables: list):
     if low:
         print("\n  ALERTA - NIVEL BAIXO:")
         for c in low:
-            print(f"   {c['tipo']} {c['label_code']}: {c['level_pct']}% restante!")
+            color_display = c.get("color", c["label_code"])
+            print(f"   {c['tipo']} {color_display}: {c['level_pct']}% restante!")
 
     # Info sobre cartuchos sem medicao
     sem_nivel = [c for c in consumables if c["tipo"] == "ink" and c["measured_state"] == "unknown"]
     if sem_nivel:
-        cores = ", ".join(c["label_code"] for c in sem_nivel)
+        cores = ", ".join(c.get("color", c["label_code"]) for c in sem_nivel)
         print(f"\n  INFO: {len(sem_nivel)} cartuchos sem medicao de nivel ({cores})")
         print(f"         Nivel real estimado pelo modelo LM Ancora (ver abaixo)")
+
+    # Alertas de validade vencida / proxima (expiration_date)
+    hoje = datetime.now().date()
+    vencidos = []
+    proximos = []
+    for c in consumables:
+        exp = c.get("expiration_date")
+        if not exp:
+            continue
+        try:
+            exp_d = exp if isinstance(exp, datetime) else datetime.strptime(str(exp), "%Y-%m-%d").date()
+            if hasattr(exp_d, "date"):
+                exp_d = exp_d.date()
+        except (ValueError, TypeError):
+            continue
+        dias = (exp_d - hoje).days
+        color_display = c.get("color", c.get("label_code", ""))
+        if dias < 0:
+            vencidos.append((c["tipo"], color_display, exp_d, -dias))
+        elif dias <= 90:
+            proximos.append((c["tipo"], color_display, exp_d, dias))
+
+    if vencidos:
+        print("\n  ALERTA - VALIDADE VENCIDA:")
+        for tipo, cor, exp, dias_atras in vencidos:
+            print(f"   {tipo} {cor}: vencido em {exp} ({dias_atras} dias atras)")
+    if proximos:
+        print("\n  AVISO - VENCE EM 90 DIAS:")
+        for tipo, cor, exp, dias in proximos:
+            print(f"   {tipo} {cor}: vence em {exp} (em {dias} dias)")
     print()
 
 

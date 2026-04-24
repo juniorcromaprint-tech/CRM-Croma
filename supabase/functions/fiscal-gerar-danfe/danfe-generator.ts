@@ -1,10 +1,10 @@
 /**
- * DANFE Generator para Deno Edge Functions
- * Versao standalone do template DANFE profissional.
- * Gera HTML completo pronto para conversao em PDF.
+ * DANFE Generator para Deno Edge Functions — v2.0
+ * Versão standalone do template DANFE profissional.
+ * Espelha o template React em src/domains/fiscal/utils/danfe-template.ts
  *
- * NOTA: Este arquivo e uma versao self-contained para rodar em Deno (Edge Functions).
- * A versao React (frontend) esta em src/domains/fiscal/utils/danfe-template.ts
+ * NOTA: Self-contained para Deno (Edge Functions). Sem imports externos.
+ * Revisão completa 2026-04-09
  */
 
 // ============================================================
@@ -83,14 +83,19 @@ function fmtNumNFe(n: number | string | null | undefined): string {
   return String(n).padStart(9, '0');
 }
 
+function fmtSerie(s: number | string | null | undefined): string {
+  if (s == null) return '';
+  return String(s).padStart(3, '0');
+}
+
 function fretePorConta(mod: number | string | null | undefined): string {
   const m: Record<string, string> = {
     '0': '0-Contrat. por conta do Remetente',
-    '1': '1-Contrat. por conta do Destinat\u00e1rio',
+    '1': '1-Contrat. por conta do Destinatário',
     '2': '2-Contrat. por conta de Terceiros',
-    '3': '3-Transp. Pr\u00f3prio Remetente',
-    '4': '4-Transp. Pr\u00f3prio Destinat\u00e1rio',
-    '9': '9-Sem Ocorr\u00eancia de Transporte',
+    '3': '3-Transp. Próprio Remetente',
+    '4': '4-Transp. Próprio Destinatário',
+    '9': '9-Sem Ocorrência de Transporte',
   };
   return m[String(mod)] ?? `${mod}`;
 }
@@ -101,332 +106,564 @@ function esc(s: string | null | undefined): string {
 }
 
 // ============================================================
-// CSS
+// CSS — Profissional v2.0
 // ============================================================
 
 const CSS = `
 @page { size: A4 portrait; margin: 5mm; }
 * { margin:0; padding:0; box-sizing:border-box; }
-body,html { font-family:Arial,Helvetica,sans-serif; font-size:7pt; color:#000; background:#fff; line-height:1.2; -webkit-print-color-adjust:exact; print-color-adjust:exact; }
+body,html { font-family:'Times New Roman',Times,serif; font-size:7.5pt; color:#000; background:#fff; line-height:1.15; -webkit-print-color-adjust:exact; print-color-adjust:exact; }
 .pg { width:200mm; min-height:287mm; margin:0 auto; page-break-after:always; position:relative; }
 .pg:last-child { page-break-after:auto; }
 .tbl { width:100%; border-collapse:collapse; table-layout:fixed; }
-.tbl td,.tbl th { border:1px solid #000; padding:1px 3px; vertical-align:top; font-size:7pt; line-height:1.25; overflow:hidden; text-overflow:ellipsis; }
-.lbl { font-size:5.5pt; color:#000; text-transform:uppercase; font-weight:bold; display:block; line-height:1.1; margin-bottom:.5px; letter-spacing:.2px; }
-.v { font-size:7.5pt; display:block; line-height:1.3; min-height:9pt; word-break:break-all; }
+.tbl td,.tbl th { border:0.5pt solid #000; padding:0.8mm 1mm; vertical-align:top; font-size:7.5pt; line-height:1.15; overflow:hidden; text-overflow:ellipsis; }
+.lbl { font-size:5pt; color:#000; text-transform:uppercase; font-weight:normal; display:block; line-height:1; margin-bottom:0; letter-spacing:0.01em; font-family:Arial,Helvetica,sans-serif; }
+.v { font-size:8pt; display:block; line-height:1.2; min-height:3mm; word-break:break-word; }
 .vb { font-weight:bold; }
 .vm { font-family:'Courier New',monospace; }
 .vr { text-align:right; }
 .vc { text-align:center; }
-.cn td { border:1px solid #000; padding:2px 3px; font-size:6pt; }
-.cn-t { font-size:6pt; line-height:1.2; }
-.cn-nfe { font-weight:bold; text-align:center; font-size:8pt; }
-.cn-cut { border:0; border-top:1px dashed #000; margin:1px 0 3px; width:100%; }
-.hd td { border:1px solid #000; vertical-align:top; }
-.em-r { font-size:10pt; font-weight:bold; line-height:1.2; margin-bottom:2px; }
-.em-a { font-size:7pt; line-height:1.3; }
-.dt { text-align:center; padding:3px 4px; }
-.dt-t { font-size:12pt; font-weight:bold; letter-spacing:1px; }
-.dt-s { font-size:7pt; line-height:1.2; margin-top:1px; }
-.dt-chk { display:inline-block; width:10px; height:10px; border:1px solid #000; text-align:center; font-size:8pt; font-weight:bold; line-height:10px; vertical-align:middle; margin:0 2px; }
+.vlg { font-size:9pt; font-weight:bold; }
+.cc { padding-top:0.3mm !important; padding-bottom:0.3mm !important; }
+.cn { width:100%; border-collapse:collapse; margin-bottom:0; }
+.cn td { border:0.5pt solid #000; padding:0.5mm 1mm; font-size:6pt; vertical-align:middle; }
+.cn-r { font-size:6pt; line-height:1.2; }
+.cn-nfe { font-weight:bold; text-align:center; font-size:9pt; vertical-align:middle; }
+.cn-cut { border:0; border-top:1px dashed #999; margin:1mm 0 1.5mm; width:100%; }
+.hd { width:100%; border-collapse:collapse; }
+.hd td { border:0.5pt solid #000; vertical-align:top; }
+.em-b { padding:1.5mm 2mm; }
+.em-r { font-size:10pt; font-weight:bold; line-height:1.15; margin-bottom:0.5mm; }
+.em-f { font-size:7pt; font-style:italic; margin-bottom:0.5mm; display:block; }
+.em-a { font-size:6.5pt; line-height:1.25; }
+.dt { text-align:center; padding:1.5mm 1mm; }
+.dt-t { font-size:14pt; font-weight:bold; letter-spacing:2pt; line-height:1; }
+.dt-s { font-size:6pt; line-height:1.2; margin-top:0.3mm; font-family:Arial,Helvetica,sans-serif; }
+.dt-tb { margin:1.5mm 0 1mm; font-size:6pt; line-height:1.6; font-family:Arial,Helvetica,sans-serif; }
+.dt-chk { display:inline-block; width:2.5mm; height:2.5mm; border:0.5pt solid #000; text-align:center; font-size:6pt; font-weight:bold; line-height:2.5mm; vertical-align:middle; margin:0 0.5mm; }
 .dt-chk.on { background:#000; color:#fff; }
-.dt-n { font-size:9pt; font-weight:bold; margin-top:2px; }
-.ch-b { text-align:center; padding:4px 2px; }
-.ch-bc { font-family:'Libre Barcode 128','Courier New',monospace; font-size:28pt; line-height:1; }
-.ch-l { font-size:5.5pt; font-weight:bold; text-transform:uppercase; }
-.ch-v { font-family:'Courier New',monospace; font-size:7.5pt; font-weight:bold; letter-spacing:.5px; word-break:break-all; line-height:1.4; }
-.ch-c { font-size:6.5pt; text-align:center; line-height:1.3; margin-top:3px; }
-.bt { font-size:6pt; font-weight:bold; text-transform:uppercase; background:#e8e8e8; padding:1.5px 3px; border:1px solid #000; letter-spacing:.3px; }
-.pt { width:100%; border-collapse:collapse; table-layout:fixed; }
-.pt th { border:1px solid #000; padding:1.5px 2px; font-size:5.5pt; font-weight:bold; text-transform:uppercase; text-align:center; background:#f0f0f0; line-height:1.15; }
-.pt td { border:1px solid #000; border-top:none; padding:1px 2px; font-size:6.5pt; line-height:1.2; vertical-align:top; }
-.pt td.n { text-align:right; font-family:'Courier New',monospace; font-size:6.5pt; }
+.dt-nb { margin-top:1mm; border-top:0.5pt solid #000; padding-top:1mm; }
+.dt-n { font-size:10pt; font-weight:bold; }
+.dt-sr { font-size:9pt; font-weight:bold; }
+.dt-fl { font-size:8pt; font-weight:bold; }
+.ch-b { padding:1mm 1.5mm; }
+.ch-bc { text-align:center; padding:1mm 0; min-height:12mm; border-bottom:0.5pt solid #000; margin-bottom:0.5mm; }
+.ch-l { font-size:5pt; font-weight:normal; text-transform:uppercase; font-family:Arial,Helvetica,sans-serif; display:block; margin-top:0.5mm; }
+.ch-v { font-family:'Courier New',monospace; font-size:7pt; font-weight:bold; letter-spacing:0.3pt; word-spacing:2pt; line-height:1.3; text-align:center; margin-top:0.3mm; }
+.ch-c { font-size:5.5pt; text-align:center; line-height:1.2; margin-top:1mm; font-family:Arial,Helvetica,sans-serif; }
+.ch-p { border-top:0.5pt solid #000; padding-top:0.5mm; margin-top:1mm; }
+.ch-p .lbl { text-align:center; }
+.ch-p .v { text-align:center; font-family:'Courier New',monospace; font-size:7pt; font-weight:bold; }
+.bt { font-size:5.5pt; font-weight:bold; text-transform:uppercase; padding:0.3mm 1mm; border:0.5pt solid #000; border-bottom:none; letter-spacing:0.02em; font-family:Arial,Helvetica,sans-serif; background:none; }
+.pt { width:100%; border-collapse:collapse; table-layout:fixed; border:0.5pt solid #000; }
+.pt th { border:0.5pt solid #000; padding:0.5mm; font-size:5pt; font-weight:bold; text-transform:uppercase; text-align:center; background:#e8e8e8; line-height:1.15; font-family:Arial,Helvetica,sans-serif; vertical-align:middle; }
+.pt td { border-left:0.5pt solid #000; border-right:0.5pt solid #000; border-bottom:0.3pt solid #ccc; padding:0.3mm 0.7mm; font-size:6.5pt; line-height:1.15; vertical-align:top; }
+.pt tbody tr:last-child td { border-bottom:0.5pt solid #000; }
+.pt td.n { text-align:right; font-family:'Courier New',monospace; font-size:6.5pt; white-space:nowrap; }
 .pt td.c { text-align:center; }
-.pt td.d { word-break:break-word; overflow-wrap:break-word; }
-.da { font-size:6.5pt; line-height:1.3; white-space:pre-wrap; word-break:break-word; min-height:40px; }
-.rf { font-size:5.5pt; border-top:1px solid #000; padding:2px 3px; margin-top:1px; }
-.hb { text-align:center; font-size:8pt; font-weight:bold; background:#ffffcc; border:2px solid #000; padding:3px; margin-bottom:3px; text-transform:uppercase; letter-spacing:1px; }
+.pt td.d { word-break:break-word; overflow-wrap:break-word; font-size:6pt; }
+.pt tr.er td { border-bottom:none; height:3.2mm; }
+.pt tr.er:last-child td { border-bottom:0.5pt solid #000; }
+.da { font-size:6pt; line-height:1.25; white-space:pre-wrap; word-break:break-word; min-height:15mm; font-family:Arial,Helvetica,sans-serif; }
+.rf { font-size:5pt; color:#555; border-top:0.5pt solid #000; padding:0.5mm 1mm; margin-top:0.5mm; font-family:Arial,Helvetica,sans-serif; }
+.hb { text-align:center; font-size:7pt; font-weight:bold; color:#333; background:#fffde0; border:0.5pt solid #ccc; padding:1mm; margin-bottom:1mm; text-transform:uppercase; letter-spacing:1pt; font-family:Arial,Helvetica,sans-serif; }
+.bc-svg { width:100%; height:12mm; }
 @media print { body{margin:0;padding:0} .pg{margin:0;width:100%;min-height:auto} }
 `;
 
 // ============================================================
-// Tipos
+// Helpers
 // ============================================================
 
-interface Item { cod:string; desc:string; ncm:string; cst:string; cfop:string; un:string; qtd:number; vunit:number; vtot:number; bcicms:number; vicms:number; vipi:number; aicms:number; aipi:number; }
-interface Dup { num:string; venc:string; val:number; }
+function campo(label: string, valor: string, extra = ''): string {
+  return `<span class="lbl">${label}</span><span class="v ${extra}">${valor}</span>`;
+}
 
-interface DData {
-  num: number|string; serie: number|string; chave: string; prot?: string;
-  dtEmis: string; dtEntSai?: string; natOp: string; tpOp?: number|string; tpAmb?: number;
-  emit: { rs:string; cnpj:string; ie:string; ieSt?:string; end:string; bairro:string; mun:string; uf:string; cep:string; fone?:string; logo?:string; };
-  dest: { rs:string; doc:string; ie?:string; end:string; bairro:string; mun:string; uf:string; cep:string; fone?:string; compl?:string; };
-  imp: { bcIcms:number; vIcms:number; icmsDes?:number; bcSt:number; vSt:number; vImpImp?:number; vProd:number; vFrete:number; vSeg:number; vDesc:number; vOutras:number; vIpi:number; vPis:number; vCofins:number; vNota:number; };
-  transp?: { rs?:string; doc?:string; ie?:string; end?:string; mun?:string; uf?:string; modFr:number|string; antt?:string; placa?:string; placaUf?:string; };
-  vol?: { qtd?:number; esp?:string; marca?:string; numer?:string; pBruto?:number; pLiq?:number; };
-  fat?: { num:string; vOrig:number; vDesc:number; vLiq:number; };
-  dups?: Dup[];
-  itens: Item[];
-  infCompl?: string; resFisco?: string;
+function campoR(label: string, valor: string, extra = ''): string {
+  return campo(label, valor, `vr ${extra}`);
 }
 
 // ============================================================
-// Constantes de paginacao
-// ============================================================
-const IPG1 = 22;
-const IPGC = 42;
-
-// ============================================================
-// Render
+// Barcode SVG
 // ============================================================
 
-function rCanhoto(d: DData): string {
-  return `<table class="cn" cellspacing="0"><tr>
-<td style="width:60%" rowspan="3"><span class="cn-t"><b>RECEBEMOS DE</b> ${esc(d.emit.rs)}<br/>OS PRODUTOS CONSTANTES DA NOTA FISCAL INDICADA AO LADO</span></td>
-<td style="width:20%;text-align:center" class="cn-nfe">NF-e</td>
-<td style="width:20%" rowspan="3" class="vc"><span class="lbl">N&ordm;</span><span class="v vb" style="font-size:9pt">${fmtNumNFe(d.num)}</span><br/><span class="lbl">S&eacute;rie</span><span class="v vb">${d.serie}</span></td>
-</tr><tr><td><span class="lbl">VLR TOTAL NOTA</span><span class="v vb">${fmt(d.imp.vNota)}</span></td></tr>
-<tr><td><span class="lbl">DATA DA EMISS&Atilde;O</span><span class="v">${fmtDataBR(d.dtEmis)}</span></td></tr>
-<tr><td><span class="lbl">DATA DE RECEBIMENTO</span><span class="v">&nbsp;</span></td><td colspan="2"><span class="lbl">IDENTIFICA&Ccedil;&Atilde;O E ASSINATURA DO RECEBEDOR</span><span class="v">&nbsp;</span></td></tr>
-<tr><td colspan="3"><span class="lbl">DESTINAT&Aacute;RIO</span><span class="v">${esc(d.dest.rs)}</span></td></tr></table><hr class="cn-cut"/>`;
-}
-
-function rCab(d: DData, pg: number, tot: number): string {
-  const tp = d.tpOp != null ? Number(d.tpOp) : 1;
-  const logo = d.emit.logo ? `<img src="${esc(d.emit.logo)}" style="max-width:80px;max-height:50px;margin-bottom:3px;display:block"/>` : '';
-  return `<table class="hd" cellspacing="0"><tr>
-<td style="width:40%" class="p-3" rowspan="2"><span class="lbl">IDENTIFICA&Ccedil;&Atilde;O DO EMITENTE</span>${logo}<div class="em-r">${esc(d.emit.rs)}</div><div class="em-a">${esc(d.emit.end)}<br/>${esc(d.emit.bairro)}<br/>${esc(d.emit.mun)}-${esc(d.emit.uf)}<br/>CEP: ${formatCEP(d.emit.cep)}<br/>Fone: ${formatFone(d.emit.fone)}</div></td>
-<td style="width:24%" class="dt"><div class="dt-t">DANFE</div><div class="dt-s">Documento Auxiliar da<br/>Nota Fiscal Eletr&ocirc;nica</div>
-<div style="margin:4px 0"><span style="font-size:7pt;font-weight:bold">0 - ENTRADA</span> <span class="dt-chk ${tp===0?'on':''}">${tp===0?'1':''}</span><br/><span style="font-size:7pt;font-weight:bold">1 - SA&Iacute;DA</span> <span class="dt-chk ${tp===1?'on':''}">${tp===1?'1':''}</span></div>
-<div class="dt-n">N&ordm; ${fmtNumNFe(d.num)}</div><div class="dt-n">S&Eacute;RIE ${d.serie}</div><div class="dt-n">FL &nbsp;${pg} / ${tot}</div></td>
-<td style="width:36%" rowspan="2"><div class="ch-b"><div class="ch-bc" title="Barcode">${esc(d.chave?.replace(/\D/g,''))}</div></div><div class="ch-l" style="padding:0 4px">CHAVE DE ACESSO</div><div class="ch-v" style="padding:0 4px">${formatChaveAcesso(d.chave)}</div><div class="ch-c">Consulta de autenticidade no portal nacional da<br/>NF-e www.nfe.fazenda.gov.br/portal ou no site<br/>da Sefaz Autorizadora</div>
-${d.prot?`<div style="margin-top:3px;border-top:1px solid #000;padding:2px 4px"><span class="lbl">PROTOCOLO DE AUTORIZA&Ccedil;&Atilde;O DE USO</span><span class="v vm" style="font-size:7pt">${esc(d.prot)}</span></div>`:''}</td>
-</tr></table>`;
-}
-
-function rNatProt(d: DData): string {
-  return `<table class="tbl" cellspacing="0"><tr>
-<td style="width:50%"><span class="lbl">NATUREZA DA OPERA&Ccedil;&Atilde;O</span><span class="v">${esc(d.natOp)}</span></td>
-<td style="width:50%"><span class="lbl">PROTOCOLO DE AUTORIZA&Ccedil;&Atilde;O DE USO</span><span class="v vm">${esc(d.prot||'')}</span></td></tr>
-<tr><td style="width:33%"><span class="lbl">INSCRI&Ccedil;&Atilde;O ESTADUAL</span><span class="v">${esc(d.emit.ie)}</span></td>
-<td style="width:34%"><span class="lbl">INSC. ESTADUAL DO SUBST. TRIBUT&Aacute;RIO</span><span class="v">${esc(d.emit.ieSt||'')}</span></td>
-<td style="width:33%"><span class="lbl">CPF/CNPJ</span><span class="v">${formatCNPJ(d.emit.cnpj)}</span></td></tr></table>`;
-}
-
-function rDest(d: DData): string {
-  const t = d.dest;
-  return `<div class="bt">DESTINAT&Aacute;RIO / REMETENTE</div><table class="tbl" cellspacing="0">
-<tr><td style="width:50%"><span class="lbl">NOME / RAZ&Atilde;O SOCIAL</span><span class="v">${esc(t.rs)}</span></td>
-<td style="width:28%"><span class="lbl">CNPJ / CPF / IDestr.</span><span class="v">${formatCNPJouCPF(t.doc)}</span></td>
-<td style="width:22%"><span class="lbl">DATA DA EMISS&Atilde;O</span><span class="v">${fmtDataBR(d.dtEmis)}</span></td></tr>
-<tr><td style="width:50%"><span class="lbl">ENDERE&Ccedil;O</span><span class="v">${esc(t.end)}</span></td>
-<td style="width:28%"><span class="lbl">BAIRRO / DISTRITO</span><span class="v">${esc(t.bairro)}</span></td>
-<td style="width:22%"><span class="lbl">COMPLEMENTO</span><span class="v">${esc(t.compl||'')}</span></td></tr>
-<tr><td style="width:40%"><span class="lbl">MUNIC&Iacute;PIO</span><span class="v">${esc(t.mun)}</span></td>
-<td style="width:15%"><span class="lbl">FONE / FAX</span><span class="v">${formatFone(t.fone)}</span></td>
-<td style="width:6%"><span class="lbl">UF</span><span class="v">${esc(t.uf)}</span></td>
-<td style="width:17%"><span class="lbl">INSCRI&Ccedil;&Atilde;O ESTADUAL</span><span class="v">${esc(t.ie||'')}</span></td>
-<td style="width:10%"><span class="lbl">CEP</span><span class="v">${formatCEP(t.cep)}</span></td>
-<td style="width:22%"><span class="lbl">DATA/HORA ENTRADA/SA&Iacute;DA</span><span class="v">${d.dtEntSai?fmtDataHoraBR(d.dtEntSai):''}</span></td></tr></table>`;
-}
-
-function rFatDup(d: DData): string {
-  if (!d.fat && (!d.dups || d.dups.length === 0)) return '';
-  let h = '';
-  if (d.fat) {
-    h += `<div class="bt">FATURA</div><table class="tbl" cellspacing="0"><tr>
-<td style="width:25%"><span class="lbl">N&Uacute;MERO</span><span class="v">${esc(d.fat.num)}</span></td>
-<td style="width:25%"><span class="lbl">VALOR ORIGINAL</span><span class="v vr">${fmt(d.fat.vOrig)}</span></td>
-<td style="width:25%"><span class="lbl">VALOR DESCONTO</span><span class="v vr">${fmt(d.fat.vDesc)}</span></td>
-<td style="width:25%"><span class="lbl">VALOR L&Iacute;QUIDO</span><span class="v vr">${fmt(d.fat.vLiq)}</span></td></tr></table>`;
+function renderBarcodeSVG(digits: string): string {
+  if (!digits || digits.length < 10) {
+    return `<div style="height:12mm;display:flex;align-items:center;justify-content:center;font-size:6pt;color:#999;">C&Oacute;DIGO DE BARRAS</div>`;
   }
-  if (d.dups && d.dups.length > 0) {
-    h += `<div class="bt">DUPLICATAS</div><table class="tbl" cellspacing="0">`;
-    for (let i = 0; i < d.dups.length; i += 3) {
-      const ch = d.dups.slice(i, i + 3);
-      let cells = '';
-      for (const dp of ch) {
-        cells += `<td><span class="lbl">N&Uacute;MERO</span><span class="v">${esc(dp.num)}</span></td><td><span class="lbl">VENC.</span><span class="v">${fmtDataBR(dp.venc)}</span></td><td><span class="lbl">VALOR</span><span class="v vr">${fmt(dp.val)}</span></td>`;
-      }
-      for (let j = ch.length; j < 3; j++) cells += '<td></td><td></td><td></td>';
-      h += `<tr>${cells}</tr>`;
+  const bars: number[] = [];
+  bars.push(2, 1, 1, 2, 3, 2);
+  for (let i = 0; i < digits.length; i += 2) {
+    const pair = parseInt(digits.substring(i, i + 2), 10) || 0;
+    const b1 = ((pair >> 5) & 3) + 1;
+    const s1 = ((pair >> 3) & 3) + 1;
+    const b2 = ((pair >> 1) & 3) + 1;
+    const s2 = (pair & 1) + 1;
+    const b3 = 1;
+    const s3 = Math.max(1, 6 - b1 - s1 - b2 + 2);
+    bars.push(b1, s1, b2, s2, b3, s3);
+  }
+  bars.push(2, 3, 3, 1, 1, 1, 2);
+  const totalWidth = bars.reduce((a, b) => a + b, 0);
+  let svgBars = '';
+  let x = 0;
+  for (let i = 0; i < bars.length; i++) {
+    if (i % 2 === 0) {
+      svgBars += `<rect x="${(x / totalWidth) * 100}%" y="0" width="${(bars[i] / totalWidth) * 100}%" height="100%" fill="#000"/>`;
     }
-    h += '</table>';
+    x += bars[i];
   }
-  return h;
-}
-
-function rImp(d: DData): string {
-  const i = d.imp;
-  return `<div class="bt">C&Aacute;LCULO DO IMPOSTO</div><table class="tbl" cellspacing="0">
-<tr><td style="width:14%"><span class="lbl">BC ICMS</span><span class="v vr">${fmt(i.bcIcms)}</span></td>
-<td style="width:12%"><span class="lbl">VALOR ICMS</span><span class="v vr">${fmt(i.vIcms)}</span></td>
-<td style="width:14%"><span class="lbl">ICMS DESONERADO</span><span class="v vr">${fmt(i.icmsDes||0)}</span></td>
-<td style="width:14%"><span class="lbl">BC ICMS SUBSTITUI&Ccedil;&Atilde;O</span><span class="v vr">${fmt(i.bcSt)}</span></td>
-<td style="width:14%"><span class="lbl">VALOR ICMS SUBS</span><span class="v vr">${fmt(i.vSt)}</span></td>
-<td style="width:14%"><span class="lbl">VALOR IMP. IMPORTA&Ccedil;&Atilde;O</span><span class="v vr">${fmt(i.vImpImp||0)}</span></td>
-<td style="width:18%"><span class="lbl">VALOR TOTAL DOS PRODUTOS</span><span class="v vr vb">${fmt(i.vProd)}</span></td></tr>
-<tr><td><span class="lbl">VALOR FRETE</span><span class="v vr">${fmt(i.vFrete)}</span></td>
-<td><span class="lbl">VALOR SEGURO</span><span class="v vr">${fmt(i.vSeg)}</span></td>
-<td><span class="lbl">VALOR DESCONTO</span><span class="v vr">${fmt(i.vDesc)}</span></td>
-<td><span class="lbl">OUTRAS DESP. ACES.</span><span class="v vr">${fmt(i.vOutras)}</span></td>
-<td><span class="lbl">VALOR IPI</span><span class="v vr">${fmt(i.vIpi)}</span></td>
-<td><span class="lbl">VALOR DO PIS</span><span class="v vr">${fmt(i.vPis)}</span></td>
-<td><span class="lbl">VALOR DA COFINS</span><span class="v vr">${fmt(i.vCofins)}</span></td>
-<td><span class="lbl">VALOR TOTAL DA NOTA</span><span class="v vr vb">${fmt(i.vNota)}</span></td></tr></table>`;
-}
-
-function rTransp(d: DData): string {
-  const t = d.transp;
-  const v = d.vol;
-  return `<div class="bt">TRANSPORTADOR / VOLUMES TRANSPORTADOS</div><table class="tbl" cellspacing="0">
-<tr><td style="width:30%"><span class="lbl">RAZ&Atilde;O SOCIAL</span><span class="v">${esc(t?.rs||'')}</span></td>
-<td style="width:20%"><span class="lbl">FRETE POR CONTA</span><span class="v">${fretePorConta(t?.modFr)}</span></td>
-<td style="width:12%"><span class="lbl">C&Oacute;DIGO ANTT</span><span class="v">${esc(t?.antt||'')}</span></td>
-<td style="width:10%"><span class="lbl">PLACA</span><span class="v">${esc(t?.placa||'')}</span></td>
-<td style="width:5%"><span class="lbl">UF</span><span class="v">${esc(t?.placaUf||'')}</span></td>
-<td style="width:23%"><span class="lbl">CNPJ / CPF</span><span class="v">${formatCNPJouCPF(t?.doc)}</span></td></tr>
-<tr><td style="width:30%"><span class="lbl">ENDERE&Ccedil;O</span><span class="v">${esc(t?.end||'')}</span></td>
-<td style="width:25%" colspan="2"><span class="lbl">MUNIC&Iacute;PIO</span><span class="v">${esc(t?.mun||'')}</span></td>
-<td style="width:5%"><span class="lbl">UF</span><span class="v">${esc(t?.uf||'')}</span></td>
-<td style="width:20%" colspan="2"><span class="lbl">INSCRI&Ccedil;&Atilde;O ESTADUAL</span><span class="v">${esc(t?.ie||'')}</span></td></tr></table>
-<div class="bt">VOLUMES</div><table class="tbl" cellspacing="0"><tr>
-<td style="width:14%"><span class="lbl">QUANTIDADE</span><span class="v">${v?.qtd??''}</span></td>
-<td style="width:18%"><span class="lbl">ESP&Eacute;CIE</span><span class="v">${esc(v?.esp||'')}</span></td>
-<td style="width:18%"><span class="lbl">MARCA</span><span class="v">${esc(v?.marca||'')}</span></td>
-<td style="width:18%"><span class="lbl">NUMERA&Ccedil;&Atilde;O</span><span class="v">${esc(v?.numer||'')}</span></td>
-<td style="width:16%"><span class="lbl">PESO BRUTO</span><span class="v vr">${v?.pBruto!=null?fmt(v.pBruto):''}</span></td>
-<td style="width:16%"><span class="lbl">PESO L&Iacute;QUIDO</span><span class="v vr">${v?.pLiq!=null?fmt(v.pLiq):''}</span></td></tr></table>`;
-}
-
-function rProdH(): string {
-  return `<div class="bt">DADOS DO PRODUTO / SERVI&Ccedil;O</div><table class="pt" cellspacing="0"><thead><tr>
-<th style="width:9%">C&Oacute;D.<br/>PROD.</th><th style="width:23%">DESCRI&Ccedil;&Atilde;O DO PRODUTO / SERVI&Ccedil;O</th>
-<th style="width:7%">NCM/SH</th><th style="width:4%">CST</th><th style="width:4%">CFOP</th><th style="width:3%">UN</th>
-<th style="width:7%">QTD</th><th style="width:8%">V. UNIT&Aacute;RIO</th><th style="width:8%">V. TOTAL</th>
-<th style="width:7%">BC ICMS</th><th style="width:6%">V. ICMS</th><th style="width:5%">V. IPI</th>
-<th style="width:5%">AL&Iacute;Q.<br/>ICMS</th><th style="width:4%">AL&Iacute;Q.<br/>IPI</th></tr></thead>`;
-}
-
-function rProdRow(it: Item): string {
-  return `<tr><td class="c" style="font-size:6pt">${esc(it.cod)}</td><td class="d">${esc(it.desc)}</td>
-<td class="c">${esc(it.ncm)}</td><td class="c">${esc(it.cst)}</td><td class="c">${esc(it.cfop)}</td><td class="c">${esc(it.un)}</td>
-<td class="n">${fmtQtd(it.qtd)}</td><td class="n">${fmtUnit(it.vunit)}</td><td class="n">${fmt(it.vtot)}</td>
-<td class="n">${fmt(it.bcicms)}</td><td class="n">${fmt(it.vicms)}</td><td class="n">${fmt(it.vipi)}</td>
-<td class="n">${fmtAliq(it.aicms)}</td><td class="n">${fmtAliq(it.aipi)}</td></tr>`;
-}
-
-function rProdBlock(itens: Item[], vazias: number): string {
-  let h = rProdH() + '<tbody>';
-  for (const it of itens) h += rProdRow(it);
-  for (let i = 0; i < vazias; i++) h += '<tr><td>&nbsp;</td><td>&nbsp;</td><td>&nbsp;</td><td>&nbsp;</td><td>&nbsp;</td><td>&nbsp;</td><td>&nbsp;</td><td>&nbsp;</td><td>&nbsp;</td><td>&nbsp;</td><td>&nbsp;</td><td>&nbsp;</td><td>&nbsp;</td><td>&nbsp;</td></tr>';
-  h += '</tbody></table>';
-  return h;
-}
-
-function rDadosAd(d: DData, cont = false): string {
-  return `<div class="bt">DADOS ADICIONAIS${cont?' (COMPLEMENTO)':''}</div><table class="tbl" cellspacing="0"><tr>
-<td style="width:65%;vertical-align:top;min-height:50px"><span class="lbl">INFORMA&Ccedil;&Otilde;ES COMPLEMENTARES</span><div class="da">${esc(d.infCompl||'')}</div></td>
-<td style="width:35%;vertical-align:top;min-height:50px"><span class="lbl">RESERVADO AO FISCO</span><div class="da">${esc(d.resFisco||'')}</div></td></tr></table>`;
-}
-
-function rRodape(dt: string): string {
-  return `<div class="rf"><b>DATA E HORA DA IMPRESS&Atilde;O</b> ${esc(dt)}</div>`;
+  return `<svg class="bc-svg" viewBox="0 0 100 30" preserveAspectRatio="none" xmlns="http://www.w3.org/2000/svg">${svgBars}</svg>`;
 }
 
 // ============================================================
-// Gerador principal (Deno Edge Function)
+// Constantes de paginação
 // ============================================================
 
-export function gerarDanfeHTMLEdge(doc: any, empresa?: any): string {
-  // Converter dados do banco para formato interno
-  const itens: Item[] = (doc.fiscal_documentos_itens || []).map((it: any) => ({
-    cod: it.codigo_produto || '',
-    desc: it.descricao || '',
-    ncm: it.ncm || '',
-    cst: it.cst_ou_csosn || '',
-    cfop: it.cfop || '',
-    un: it.unidade || 'UN',
-    qtd: it.quantidade || 0,
-    vunit: it.valor_unitario || 0,
-    vtot: it.valor_total || 0,
-    bcicms: it.base_calculo_icms || 0,
-    vicms: it.valor_icms || 0,
-    vipi: 0,
-    aicms: it.aliquota_icms || 0,
-    aipi: 0,
+const ITENS_PG1 = 22;
+const ITENS_CONT = 45;
+
+// ============================================================
+// Blocos HTML
+// ============================================================
+
+// deno-lint-ignore no-explicit-any
+function renderCanhoto(d: any): string {
+  return `
+<table class="cn" cellspacing="0" cellpadding="0">
+  <tr>
+    <td style="width:75%;" class="cn-r">
+      RECEBEMOS DE <strong>${esc(d.emitente?.razao_social)}</strong>
+      OS PRODUTOS E/OU SERVI&Ccedil;OS CONSTANTES DA NOTA FISCAL ELETR&Ocirc;NICA INDICADA AO LADO.
+      VALOR TOTAL: R$ ${fmt(d.impostos?.valor_total_nota)}
+      &nbsp;&nbsp; DATA DE RECEBIMENTO: ____/____/______
+      &nbsp;&nbsp; IDENTIFICA&Ccedil;&Atilde;O E ASSINATURA DO RECEBEDOR: ________________________________
+    </td>
+    <td style="width:8%;" class="cn-nfe">NF-e</td>
+    <td style="width:17%; text-align:center; vertical-align:middle;">
+      <span class="lbl">N&ordm;</span>
+      <span style="font-size:10pt; font-weight:bold; display:block;">${fmtNumNFe(d.numero)}</span>
+      <span class="lbl">S&Eacute;RIE</span>
+      <span style="font-size:9pt; font-weight:bold;">${fmtSerie(d.serie)}</span>
+    </td>
+  </tr>
+</table>
+<hr class="cn-cut"/>`;
+}
+
+// deno-lint-ignore no-explicit-any
+function renderCabecalho(d: any, pgAtual: number, totalPgs: number): string {
+  const tipoOp = d.tipo_operacao != null ? Number(d.tipo_operacao) : 1;
+  const entChk = tipoOp === 0 ? 'on' : '';
+  const saiChk = tipoOp === 1 ? 'on' : '';
+
+  const logoHtml = d.emitente?.logo_url
+    ? `<img src="${esc(d.emitente.logo_url)}" style="max-width:90px;max-height:45px;margin-bottom:1mm;display:block;"/>`
+    : '';
+
+  const fantasiaHtml = d.emitente?.nome_fantasia
+    ? `<span class="em-f">${esc(d.emitente.nome_fantasia)}</span>`
+    : '';
+
+  const endParts = [
+    d.emitente?.endereco, d.emitente?.bairro,
+    `${d.emitente?.municipio || ''}-${d.emitente?.uf || ''}`,
+    d.emitente?.cep ? `CEP: ${formatCEP(d.emitente.cep)}` : '',
+    d.emitente?.fone ? `Fone: ${formatFone(d.emitente.fone)}` : '',
+  ].filter(Boolean);
+
+  return `
+<table class="hd" cellspacing="0" cellpadding="0">
+  <tr>
+    <td style="width:38%;" class="em-b" rowspan="2">
+      ${logoHtml}
+      <div class="em-r">${esc(d.emitente?.razao_social)}</div>
+      ${fantasiaHtml}
+      <div class="em-a">${endParts.map((p: string) => esc(p)).join('<br/>')}</div>
+    </td>
+    <td style="width:15%;" class="dt">
+      <div class="dt-t">DANFE</div>
+      <div class="dt-s">Documento Auxiliar da<br/>Nota Fiscal Eletr&ocirc;nica</div>
+      <div class="dt-tb">
+        <span class="dt-chk ${entChk}">${tipoOp === 0 ? 'X' : '&nbsp;'}</span> ENTRADA<br/>
+        <span class="dt-chk ${saiChk}">${tipoOp === 1 ? 'X' : '&nbsp;'}</span> SA&Iacute;DA
+      </div>
+      <div class="dt-nb">
+        <div class="dt-n">N&ordm; ${fmtNumNFe(d.numero)}</div>
+        <div class="dt-sr">S&Eacute;RIE ${fmtSerie(d.serie)}</div>
+        <div class="dt-fl">FOLHA ${pgAtual}/${totalPgs}</div>
+      </div>
+    </td>
+    <td style="width:47%;" class="ch-b" rowspan="2">
+      <div class="ch-bc">
+        ${renderBarcodeSVG(d.chave_acesso?.replace(/\D/g, '') || '')}
+      </div>
+      <span class="ch-l">CHAVE DE ACESSO</span>
+      <div class="ch-v">${formatChaveAcesso(d.chave_acesso)}</div>
+      <div class="ch-c">
+        Consulta de autenticidade no portal nacional da NF-e<br/>
+        www.nfe.fazenda.gov.br/portal ou no site da Sefaz Autorizadora
+      </div>
+      ${d.protocolo ? `
+      <div class="ch-p">
+        <span class="lbl">PROTOCOLO DE AUTORIZA&Ccedil;&Atilde;O DE USO</span>
+        <span class="v vm" style="font-size:7pt;text-align:center;">${esc(d.protocolo)}</span>
+      </div>` : ''}
+    </td>
+  </tr>
+</table>`;
+}
+
+// deno-lint-ignore no-explicit-any
+function renderNaturezaIE(d: any): string {
+  return `
+<table class="tbl" cellspacing="0" cellpadding="0">
+  <tr>
+    <td style="width:50%;" class="cc">${campo('NATUREZA DA OPERA&Ccedil;&Atilde;O', esc(d.natureza_operacao))}</td>
+    <td style="width:50%;" class="cc">${campo('PROTOCOLO DE AUTORIZA&Ccedil;&Atilde;O DE USO', esc(d.protocolo || ''), 'vm')}</td>
+  </tr>
+  <tr>
+    <td style="width:33%;" class="cc">${campo('INSCRI&Ccedil;&Atilde;O ESTADUAL', esc(d.emitente?.ie))}</td>
+    <td style="width:34%;" class="cc">${campo('INSC. ESTADUAL DO SUBST. TRIBUT&Aacute;RIO', esc(d.emitente?.ie_st || ''))}</td>
+    <td style="width:33%;" class="cc">${campo('CNPJ', formatCNPJ(d.emitente?.cnpj))}</td>
+  </tr>
+</table>`;
+}
+
+// deno-lint-ignore no-explicit-any
+function renderDest(d: any): string {
+  const ds = d.destinatario || {};
+  return `
+<div class="bt">DESTINAT&Aacute;RIO / REMETENTE</div>
+<table class="tbl" cellspacing="0" cellpadding="0">
+  <tr>
+    <td style="width:52%;" class="cc">${campo('NOME / RAZ&Atilde;O SOCIAL', esc(ds.razao_social))}</td>
+    <td style="width:26%;" class="cc">${campo('CNPJ / CPF', formatCNPJouCPF(ds.cnpj_cpf))}</td>
+    <td style="width:22%;" class="cc">${campo('DATA DA EMISS&Atilde;O', fmtDataBR(d.data_emissao))}</td>
+  </tr>
+  <tr>
+    <td style="width:52%;" class="cc">${campo('ENDERE&Ccedil;O', esc(ds.endereco))}</td>
+    <td style="width:26%;" class="cc">${campo('BAIRRO / DISTRITO', esc(ds.bairro))}</td>
+    <td style="width:22%;" class="cc">${campo('CEP', formatCEP(ds.cep))}</td>
+  </tr>
+  <tr>
+    <td style="width:35%;" class="cc">${campo('MUNIC&Iacute;PIO', esc(ds.municipio))}</td>
+    <td style="width:15%;" class="cc">${campo('FONE / FAX', formatFone(ds.fone))}</td>
+    <td style="width:5%;" class="cc">${campo('UF', esc(ds.uf))}</td>
+    <td style="width:18%;" class="cc">${campo('INSCRI&Ccedil;&Atilde;O ESTADUAL', esc(ds.ie || ''))}</td>
+    <td style="width:27%;" class="cc">${campo('DATA/HORA ENTRADA/SA&Iacute;DA', d.data_entrada_saida ? fmtDataHoraBR(d.data_entrada_saida) : '')}</td>
+  </tr>
+</table>`;
+}
+
+// deno-lint-ignore no-explicit-any
+function renderFatura(d: any): string {
+  const fat = d.fatura;
+  const dups = d.duplicatas || [];
+  if (!fat && dups.length === 0) return '';
+
+  let html = '';
+  if (fat) {
+    html += `
+<div class="bt">FATURA</div>
+<table class="tbl" cellspacing="0" cellpadding="0">
+  <tr>
+    <td style="width:25%;" class="cc">${campo('N&Uacute;MERO', esc(fat.numero))}</td>
+    <td style="width:25%;" class="cc">${campoR('VALOR ORIGINAL', fmt(fat.valor_original))}</td>
+    <td style="width:25%;" class="cc">${campoR('VALOR DESCONTO', fmt(fat.valor_desconto))}</td>
+    <td style="width:25%;" class="cc">${campoR('VALOR L&Iacute;QUIDO', fmt(fat.valor_liquido), 'vb')}</td>
+  </tr>
+</table>`;
+  }
+  if (dups.length > 0) {
+    let rows = '';
+    for (let i = 0; i < dups.length; i += 3) {
+      const chunk = dups.slice(i, i + 3);
+      let cells = '';
+      // deno-lint-ignore no-explicit-any
+      for (const dp of chunk) { cells += `<td class="cc">${campo('N&Uacute;MERO',esc(dp.numero))}</td><td class="cc">${campo('VENC.',fmtDataBR(dp.vencimento))}</td><td class="cc">${campoR('VALOR',fmt(dp.valor))}</td>`; }
+      for (let j = chunk.length; j < 3; j++) { cells += '<td class="cc"></td><td class="cc"></td><td class="cc"></td>'; }
+      rows += `<tr>${cells}</tr>`;
+    }
+    html += `<div class="bt">DUPLICATAS</div><table class="tbl" cellspacing="0" cellpadding="0">${rows}</table>`;
+  }
+  return html;
+}
+
+// deno-lint-ignore no-explicit-any
+function renderImpostos(d: any): string {
+  const i = d.impostos || {};
+  return `
+<div class="bt">C&Aacute;LCULO DO IMPOSTO</div>
+<table class="tbl" cellspacing="0" cellpadding="0">
+  <tr>
+    <td style="width:15%;" class="cc">${campoR('BASE DE C&Aacute;LCULO DO ICMS', fmt(i.bc_icms))}</td>
+    <td style="width:13%;" class="cc">${campoR('VALOR DO ICMS', fmt(i.valor_icms))}</td>
+    <td style="width:15%;" class="cc">${campoR('BASE DE C&Aacute;LC. ICMS SUBST.', fmt(i.bc_icms_st))}</td>
+    <td style="width:13%;" class="cc">${campoR('VALOR DO ICMS SUBST.', fmt(i.valor_icms_st))}</td>
+    <td style="width:13%;" class="cc">${campoR('VALOR IMP. IMPORTA&Ccedil;&Atilde;O', fmt(i.valor_imp_importacao || 0))}</td>
+    <td style="width:15%;" class="cc">${campoR('VALOR TOTAL DOS PRODUTOS', fmt(i.valor_total_produtos), 'vb')}</td>
+  </tr>
+  <tr>
+    <td class="cc">${campoR('VALOR DO FRETE', fmt(i.valor_frete))}</td>
+    <td class="cc">${campoR('VALOR DO SEGURO', fmt(i.valor_seguro))}</td>
+    <td class="cc">${campoR('DESCONTO', fmt(i.valor_desconto))}</td>
+    <td class="cc">${campoR('OUTRAS DESP. ACESS&Oacute;RIAS', fmt(i.outras_despesas))}</td>
+    <td class="cc">${campoR('VALOR DO IPI', fmt(i.valor_ipi))}</td>
+    <td class="cc">${campoR('VALOR TOTAL DA NOTA', fmt(i.valor_total_nota), 'vb vlg')}</td>
+  </tr>
+</table>`;
+}
+
+// deno-lint-ignore no-explicit-any
+function renderTransp(d: any): string {
+  const t = d.transportador || {};
+  const v = d.volumes || {};
+  return `
+<div class="bt">TRANSPORTADOR / VOLUMES TRANSPORTADOS</div>
+<table class="tbl" cellspacing="0" cellpadding="0">
+  <tr>
+    <td style="width:28%;" class="cc">${campo('RAZ&Atilde;O SOCIAL', esc(t.razao_social || ''))}</td>
+    <td style="width:18%;" class="cc">${campo('FRETE POR CONTA', fretePorConta(t.mod_frete))}</td>
+    <td style="width:12%;" class="cc">${campo('C&Oacute;DIGO ANTT', esc(t.codigo_antt || ''))}</td>
+    <td style="width:10%;" class="cc">${campo('PLACA DO VE&Iacute;CULO', esc(t.placa || ''))}</td>
+    <td style="width:5%;" class="cc">${campo('UF', esc(t.placa_uf || ''))}</td>
+    <td style="width:27%;" class="cc">${campo('CNPJ / CPF', formatCNPJouCPF(t.cnpj_cpf))}</td>
+  </tr>
+  <tr>
+    <td style="width:28%;" class="cc">${campo('ENDERE&Ccedil;O', esc(t.endereco || ''))}</td>
+    <td style="width:25%;" colspan="2" class="cc">${campo('MUNIC&Iacute;PIO', esc(t.municipio || ''))}</td>
+    <td style="width:5%;" class="cc">${campo('UF', esc(t.uf || ''))}</td>
+    <td style="width:22%;" colspan="2" class="cc">${campo('INSCRI&Ccedil;&Atilde;O ESTADUAL', esc(t.ie || ''))}</td>
+  </tr>
+</table>
+<table class="tbl" cellspacing="0" cellpadding="0" style="border-top:none;">
+  <tr>
+    <td style="width:14%;border-top:none;" class="cc">${campo('QUANTIDADE', v.quantidade != null ? String(v.quantidade) : '')}</td>
+    <td style="width:18%;border-top:none;" class="cc">${campo('ESP&Eacute;CIE', esc(v.especie || ''))}</td>
+    <td style="width:18%;border-top:none;" class="cc">${campo('MARCA', esc(v.marca || ''))}</td>
+    <td style="width:18%;border-top:none;" class="cc">${campo('NUMERA&Ccedil;&Atilde;O', esc(v.numeracao || ''))}</td>
+    <td style="width:16%;border-top:none;" class="cc">${campoR('PESO BRUTO', v.peso_bruto != null ? fmt(v.peso_bruto) : '')}</td>
+    <td style="width:16%;border-top:none;" class="cc">${campoR('PESO L&Iacute;QUIDO', v.peso_liquido != null ? fmt(v.peso_liquido) : '')}</td>
+  </tr>
+</table>`;
+}
+
+// deno-lint-ignore no-explicit-any
+function renderProdutos(itens: any[], linhasVazias = 0): string {
+  let html = `
+<div class="bt">DADOS DOS PRODUTOS / SERVI&Ccedil;OS</div>
+<table class="pt" cellspacing="0" cellpadding="0">
+  <thead><tr>
+    <th style="width:8%;">C&Oacute;DIGO<br/>PRODUTO</th>
+    <th style="width:24%;">DESCRI&Ccedil;&Atilde;O DO PRODUTO / SERVI&Ccedil;O</th>
+    <th style="width:7%;">NCM/SH</th>
+    <th style="width:3%;">O/CST</th>
+    <th style="width:4%;">CFOP</th>
+    <th style="width:3%;">UN</th>
+    <th style="width:7%;">QUANT.</th>
+    <th style="width:8%;">VALOR<br/>UNIT&Aacute;RIO</th>
+    <th style="width:8%;">VALOR<br/>TOTAL</th>
+    <th style="width:8%;">B.C&Aacute;LC.<br/>ICMS</th>
+    <th style="width:7%;">VALOR<br/>ICMS</th>
+    <th style="width:5%;">VALOR<br/>IPI</th>
+    <th style="width:4%;">AL&Iacute;Q.<br/>ICMS</th>
+    <th style="width:4%;">AL&Iacute;Q.<br/>IPI</th>
+  </tr></thead><tbody>`;
+
+  // deno-lint-ignore no-explicit-any
+  for (const it of itens) {
+    html += `<tr>
+      <td class="c">${esc(it.codigo)}</td>
+      <td class="d">${esc(it.descricao)}</td>
+      <td class="c">${esc(it.ncm)}</td>
+      <td class="c">${esc(it.cst)}</td>
+      <td class="c">${esc(it.cfop)}</td>
+      <td class="c">${esc(it.unidade)}</td>
+      <td class="n">${fmtQtd(it.quantidade)}</td>
+      <td class="n">${fmtUnit(it.valor_unitario)}</td>
+      <td class="n">${fmt(it.valor_total)}</td>
+      <td class="n">${fmt(it.bc_icms)}</td>
+      <td class="n">${fmt(it.valor_icms)}</td>
+      <td class="n">${fmt(it.valor_ipi)}</td>
+      <td class="n">${fmtAliq(it.aliq_icms)}</td>
+      <td class="n">${fmtAliq(it.aliq_ipi)}</td>
+    </tr>`;
+  }
+  for (let i = 0; i < linhasVazias; i++) {
+    html += `<tr class="er"><td>&nbsp;</td><td>&nbsp;</td><td>&nbsp;</td><td>&nbsp;</td><td>&nbsp;</td><td>&nbsp;</td><td>&nbsp;</td><td>&nbsp;</td><td>&nbsp;</td><td>&nbsp;</td><td>&nbsp;</td><td>&nbsp;</td><td>&nbsp;</td><td>&nbsp;</td></tr>`;
+  }
+  html += '</tbody></table>';
+  return html;
+}
+
+// deno-lint-ignore no-explicit-any
+function renderDadosAd(d: any): string {
+  return `
+<div class="bt">DADOS ADICIONAIS</div>
+<table class="tbl" cellspacing="0" cellpadding="0">
+  <tr>
+    <td style="width:65%;vertical-align:top;">
+      ${campo('INFORMA&Ccedil;&Otilde;ES COMPLEMENTARES', '')}
+      <div class="da">${esc(d.informacoes_complementares || '')}</div>
+    </td>
+    <td style="width:35%;vertical-align:top;">
+      ${campo('RESERVADO AO FISCO', '')}
+      <div class="da">${esc(d.reservado_fisco || '')}</div>
+    </td>
+  </tr>
+</table>`;
+}
+
+function renderRodape(dataImpressao: string): string {
+  return `<div class="rf">DATA E HORA DA IMPRESS&Atilde;O: ${esc(dataImpressao)} &mdash; DANFE gerado pelo sistema Croma Print</div>`;
+}
+
+// ============================================================
+// Gerador principal
+// ============================================================
+
+// deno-lint-ignore no-explicit-any
+export function gerarDanfeHTMLEdge(doc: any, empresa: any): string {
+  // Montar dados
+  const itens = (doc.fiscal_documentos_itens || []).map((item: any) => ({
+    codigo: item.codigo_produto || '',
+    descricao: item.descricao || '',
+    ncm: item.ncm || '',
+    cst: item.cst_ou_csosn || '',
+    cfop: item.cfop || '',
+    unidade: item.unidade || 'UN',
+    quantidade: item.quantidade || 0,
+    valor_unitario: item.valor_unitario || 0,
+    valor_total: item.valor_total || 0,
+    bc_icms: item.base_calculo_icms || 0,
+    valor_icms: item.valor_icms || 0,
+    valor_ipi: 0,
+    aliq_icms: item.aliquota_icms || 0,
+    aliq_ipi: 0,
   }));
 
   const emp = empresa || {};
   const cli = doc.clientes || {};
+  const tpAmb = doc.fiscal_ambientes?.tipo === 'producao' ? 1 : 2;
+  let protocolo = doc.protocolo || '';
+  if (doc.data_autorizacao && protocolo) protocolo = `${protocolo} ${fmtDataHoraBR(doc.data_autorizacao)}`;
 
-  // Extrair cobranca do payload
+  const d = {
+    numero: doc.numero || 0,
+    serie: doc.fiscal_series?.serie ?? 1,
+    chave_acesso: doc.chave_acesso || '',
+    protocolo,
+    data_emissao: doc.data_emissao || '',
+    data_entrada_saida: doc.data_emissao,
+    natureza_operacao: doc.natureza_operacao || 'VENDA DE MERCADORIA',
+    tipo_operacao: 1,
+    tp_amb: tpAmb,
+    emitente: {
+      razao_social: emp.razao_social || 'CROMA PRINT COMUNICAÇÃO VISUAL LTDA',
+      nome_fantasia: emp.nome_fantasia || '',
+      cnpj: emp.cnpj || '18923994000183',
+      ie: emp.ie || '',
+      ie_st: emp.ie_st || '',
+      endereco: emp.endereco || '',
+      bairro: emp.bairro || '',
+      municipio: emp.municipio || 'SAO PAULO',
+      uf: emp.uf || 'SP',
+      cep: emp.cep || '',
+      fone: emp.telefone || '',
+      logo_url: emp.logo_url,
+    },
+    destinatario: {
+      razao_social: cli.razao_social || '',
+      cnpj_cpf: cli.cnpj || cli.cpf || '',
+      ie: cli.ie || '',
+      endereco: cli.endereco || '',
+      bairro: cli.bairro || '',
+      municipio: cli.cidade || cli.municipio || '',
+      uf: cli.estado || cli.uf || '',
+      cep: cli.cep || '',
+      fone: cli.telefone || '',
+    },
+    impostos: {
+      bc_icms: doc.valor_total || 0,
+      valor_icms: doc.valor_icms || 0,
+      bc_icms_st: 0,
+      valor_icms_st: 0,
+      valor_total_produtos: doc.valor_produtos || doc.valor_total || 0,
+      valor_frete: doc.valor_frete || 0,
+      valor_seguro: 0,
+      valor_desconto: doc.valor_desconto || 0,
+      outras_despesas: 0,
+      valor_ipi: 0,
+      valor_pis: doc.valor_pis || 0,
+      valor_cofins: doc.valor_cofins || 0,
+      valor_total_nota: doc.valor_total || 0,
+    },
+    transportador: null as any,
+    volumes: null as any,
+    fatura: null as any,
+    duplicatas: [] as any[],
+    itens,
+    informacoes_complementares: doc.informacoes_contribuinte || doc.observacoes || '',
+    reservado_fisco: doc.informacoes_fisco || '',
+  };
+
+  // Extrair cobrança
   const cobr = doc.payload_json?.NFe?.infNFe?.cobr;
-  let fat: DData['fat'];
-  const dups: Dup[] = [];
-  if (cobr?.fat) fat = { num: cobr.fat.nFat||'', vOrig: parseFloat(cobr.fat.vOrig)||0, vDesc: parseFloat(cobr.fat.vDesc)||0, vLiq: parseFloat(cobr.fat.vLiq)||0 };
-  if (cobr?.dup) {
-    const arr = Array.isArray(cobr.dup) ? cobr.dup : [cobr.dup];
-    for (const dp of arr) dups.push({ num: dp.nDup||'', venc: dp.dVenc||'', val: parseFloat(dp.vDup)||0 });
+  if (cobr) {
+    if (cobr.fat) d.fatura = { numero: cobr.fat.nFat || '', valor_original: parseFloat(cobr.fat.vOrig)||0, valor_desconto: parseFloat(cobr.fat.vDesc)||0, valor_liquido: parseFloat(cobr.fat.vLiq)||0 };
+    const dps = cobr.dup;
+    if (Array.isArray(dps)) { for (const dp of dps) d.duplicatas.push({ numero: dp.nDup||'', vencimento: dp.dVenc||'', valor: parseFloat(dp.vDup)||0 }); }
+    else if (dps) d.duplicatas.push({ numero: dps.nDup||'', vencimento: dps.dVenc||'', valor: parseFloat(dps.vDup)||0 });
   }
 
   // Extrair transporte
   const tr = doc.payload_json?.NFe?.infNFe?.transp;
-  let transp: DData['transp'];
-  let vol: DData['vol'];
   if (tr) {
-    transp = { rs: tr.transporta?.xNome||'', doc: tr.transporta?.CNPJ||tr.transporta?.CPF||'', ie: tr.transporta?.IE||'', end: tr.transporta?.xEnder||'', mun: tr.transporta?.xMun||'', uf: tr.transporta?.UF||'', modFr: tr.modFrete??9, antt: tr.veicTransp?.RNTC||'', placa: tr.veicTransp?.placa||'', placaUf: tr.veicTransp?.UF||'' };
-    const v = Array.isArray(tr.vol) ? tr.vol[0] : tr.vol;
-    if (v) vol = { qtd: v.qVol?parseInt(v.qVol):undefined, esp: v.esp||'', marca: v.marca||'', numer: v.nVol||'', pBruto: v.pesoB?parseFloat(v.pesoB):undefined, pLiq: v.pesoL?parseFloat(v.pesoL):undefined };
+    d.transportador = { razao_social: tr.transporta?.xNome||'', cnpj_cpf: tr.transporta?.CNPJ||tr.transporta?.CPF||'', ie: tr.transporta?.IE||'', endereco: tr.transporta?.xEnder||'', municipio: tr.transporta?.xMun||'', uf: tr.transporta?.UF||'', mod_frete: tr.modFrete??9, codigo_antt: tr.veicTransp?.RNTC||'', placa: tr.veicTransp?.placa||'', placa_uf: tr.veicTransp?.UF||'' };
+    const vol = Array.isArray(tr.vol) ? tr.vol[0] : tr.vol;
+    if (vol) d.volumes = { quantidade: vol.qVol?parseInt(vol.qVol):undefined, especie: vol.esp||'', marca: vol.marca||'', numeracao: vol.nVol||'', peso_bruto: vol.pesoB?parseFloat(vol.pesoB):undefined, peso_liquido: vol.pesoL?parseFloat(vol.pesoL):undefined };
   }
 
-  const tpAmb = doc.fiscal_ambientes?.tipo === 'producao' ? 1 : 2;
-  let prot = doc.protocolo || '';
-  if (doc.data_autorizacao && prot) prot = `${prot} ${fmtDataHoraBR(doc.data_autorizacao)}`;
-
-  const d: DData = {
-    num: doc.numero || 0, serie: doc.fiscal_series?.serie ?? 1,
-    chave: doc.chave_acesso || '', prot: prot,
-    dtEmis: doc.data_emissao || '', dtEntSai: doc.data_emissao,
-    natOp: doc.natureza_operacao || 'VENDA DE MERCADORIA', tpOp: 1, tpAmb: tpAmb,
-    emit: { rs: emp.razao_social||'CROMA PRINT COMUNICAÇÃO VISUAL LTDA', cnpj: emp.cnpj||'18923994000183', ie: emp.ie||'', end: emp.endereco||'', bairro: emp.bairro||'', mun: emp.municipio||'SAO PAULO', uf: emp.uf||'SP', cep: emp.cep||'', fone: emp.telefone||'', logo: emp.logo_url },
-    dest: { rs: cli.razao_social||'', doc: cli.cnpj||cli.cpf||'', ie: cli.ie||'', end: cli.endereco||'', bairro: cli.bairro||'', mun: cli.cidade||cli.municipio||'', uf: cli.estado||cli.uf||'', cep: cli.cep||'', fone: cli.telefone||'', compl: cli.complemento||'' },
-    imp: { bcIcms: doc.valor_total||0, vIcms: doc.valor_icms||0, bcSt:0, vSt:0, vProd: doc.valor_produtos||doc.valor_total||0, vFrete: doc.valor_frete||0, vSeg:0, vDesc: doc.valor_desconto||0, vOutras:0, vIpi:0, vPis: doc.valor_pis||0, vCofins: doc.valor_cofins||0, vNota: doc.valor_total||0 },
-    transp, vol, fat, dups, itens,
-    infCompl: doc.informacoes_contribuinte || doc.observacoes || '',
-    resFisco: doc.informacoes_fisco || '',
-  };
-
-  // Gerar HTML multi-pagina
+  // Paginação
   const agora = new Date().toLocaleString('pt-BR', { timeZone: 'America/Sao_Paulo' });
-  const isHom = d.tpAmb === 2;
+  const isHom = d.tp_amb === 2;
+  const itensPg1 = itens.slice(0, ITENS_PG1);
+  const rest = itens.slice(ITENS_PG1);
+  const contPages: any[][] = [];
+  let r = rest;
+  while (r.length > 0) { contPages.push(r.slice(0, ITENS_CONT)); r = r.slice(ITENS_CONT); }
+  const totalPgs = 1 + contPages.length;
 
-  const pg1Itens = d.itens.slice(0, IPG1);
-  const restItens = d.itens.slice(IPG1);
-  const pgsCont: Item[][] = [];
-  let r = restItens;
-  while (r.length > 0) { pgsCont.push(r.slice(0, IPGC)); r = r.slice(IPGC); }
-  const totPg = 1 + pgsCont.length;
+  // Página 1
+  let pg1 = `<div class="pg">`;
+  if (isHom) pg1 += `<div class="hb">SEM VALOR FISCAL &mdash; AMBIENTE DE HOMOLOGA&Ccedil;&Atilde;O</div>`;
+  pg1 += renderCanhoto(d);
+  pg1 += renderCabecalho(d, 1, totalPgs);
+  pg1 += renderNaturezaIE(d);
+  pg1 += renderDest(d);
+  pg1 += renderFatura(d);
+  pg1 += renderImpostos(d);
+  pg1 += renderTransp(d);
+  pg1 += renderProdutos(itensPg1, Math.max(0, ITENS_PG1 - itensPg1.length));
+  if (contPages.length === 0) pg1 += renderDadosAd(d);
+  pg1 += renderRodape(agora);
+  pg1 += `</div>`;
 
-  // Pagina 1
-  let html = `<div class="pg">`;
-  if (isHom) html += `<div class="hb">SEM VALOR FISCAL - AMBIENTE DE HOMOLOGA&Ccedil;&Atilde;O</div>`;
-  html += rCanhoto(d) + rCab(d, 1, totPg) + rNatProt(d) + rDest(d) + rFatDup(d) + rImp(d) + rTransp(d);
-  html += rProdBlock(pg1Itens, Math.max(0, IPG1 - pg1Itens.length));
-  if (pgsCont.length === 0) html += rDadosAd(d);
-  html += rRodape(agora) + `</div>`;
-
-  // Paginas continuacao
-  for (let i = 0; i < pgsCont.length; i++) {
-    const pgI = pgsCont[i];
-    const isLast = i === pgsCont.length - 1;
-    html += `<div class="pg">`;
-    if (isHom) html += `<div class="hb">SEM VALOR FISCAL - AMBIENTE DE HOMOLOGA&Ccedil;&Atilde;O</div>`;
-    html += rCab(d, i + 2, totPg) + rNatProt(d);
-    html += rProdBlock(pgI, Math.max(0, IPGC - pgI.length));
-    if (isLast) html += rDadosAd(d, true);
-    html += rRodape(agora) + `</div>`;
+  // Páginas de continuação
+  let cont = '';
+  for (let i = 0; i < contPages.length; i++) {
+    const pgItens = contPages[i];
+    const isLast = i === contPages.length - 1;
+    cont += `<div class="pg">`;
+    if (isHom) cont += `<div class="hb">SEM VALOR FISCAL &mdash; AMBIENTE DE HOMOLOGA&Ccedil;&Atilde;O</div>`;
+    cont += renderCabecalho(d, i + 2, totalPgs);
+    cont += renderNaturezaIE(d);
+    cont += renderProdutos(pgItens, Math.max(0, ITENS_CONT - pgItens.length));
+    if (isLast) cont += renderDadosAd(d);
+    cont += renderRodape(agora);
+    cont += `</div>`;
   }
 
-  return `<!DOCTYPE html><html lang="pt-BR"><head><meta charset="utf-8"/><title>DANFE - NF-e ${fmtNumNFe(d.num)}</title><style>${CSS}</style></head><body>${html}</body></html>`;
+  return `<!DOCTYPE html><html lang="pt-BR"><head><meta charset="utf-8"/><title>DANFE - NF-e ${fmtNumNFe(d.numero)}</title><style>${CSS}</style></head><body>${pg1}${cont}</body></html>`;
 }

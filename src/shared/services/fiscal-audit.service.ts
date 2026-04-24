@@ -42,7 +42,6 @@ export class FiscalAuditService {
       });
     } catch {
       // Auditoria nunca deve quebrar o fluxo principal
-      console.error('[FiscalAudit] Falha ao registrar auditoria', params);
     }
   }
 

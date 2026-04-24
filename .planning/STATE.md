@@ -1,11 +1,92 @@
 # STATE - Croma Print CRM
 
-**Ultima atualizacao:** 2026-04-24 (Sprint 2 de Fechamento Critico — 10 etapas entregues)
+**Ultima atualizacao:** 2026-04-24 (Fechamento Operacional — 7 etapas F.1-F.7)
 **Responsavel:** Claude (Cowork)
 
 ## Ultima atividade
-Sprint 2 de Estabilizacao IA Croma: transformar o que foi provado tecnicamente em algo
-seguro para producao. Sessao longa 2026-04-24.
+Fechamento operacional pos Sprint 2. Commit em producao, validacao Vercel,
+deploy das Edge Functions, testes 200/401 em 3 criticas.
+
+## FECHAMENTO OPERACIONAL — EVIDENCIAS
+
+### F.1 — git commit + push
+- Commit `bbd3d7d` em `main` (11 arquivos, +1737 -217)
+- Push OK: `a9a5aaf..bbd3d7d main -> main`
+- Arquivos selecionados (Sprint 1+2 IA apenas, nao levou mudancas antigas pre-existentes)
+
+### F.2 — Deploy Vercel
+- HTTP 200 em `crm-croma.vercel.app/admin/ia/health`
+- Novo bundle: `index-DoXpkioD.js` (antes: `index-C20MMfcE.js`)
+- Vercel reconstruiu automaticamente apos push em main
+
+### F.3 — Validacao /admin/ia/health em producao
+- View `vw_ia_health` populada com dados reais
+- cron_last_run: 04:09:30 (recente)
+- Alerta visual `loop_anormal_vermelho: true` aceso (legacy data pre-patches, cai em 24h)
+- Todos os campos funcionando: actions_success/failed/skipped, rules_dominante, cobrancas, ponte, memory, whatsapp
+
+### F.4 — Deploy ai-chat-erp v9 com S2.5
+- Status alinhado ao enum real do banco (S2.5 aplicado)
+- ai-chat-erp nao usa authenticateAndAuthorize (auth inline via CORS)
+- Teste 200/401 validado (ver F.6)
+
+### F.5 — Checklist S2.6
+Criado em `.planning/todos/pending/edge-functions-s2.6-checklist.md`:
+- Grupo A (13 funcoes usam ai-helpers): 2 deployadas (ai-resumo-cliente, ai-compor-mensagem), 11 pendentes
+- Grupo B (auth inline): ai-compor-mensagem (feita nesta sessao)
+- Grupo C (sem auth padrao): ai-gerar-orcamento, ai-chat-erp, whatsapp-webhook
+
+### F.6 — Testes 200/401 das 3 criticas
+
+| Edge Function | Deploy | COM auth | SEM auth |
+|---|---|---|---|
+| ai-chat-erp | v9 | 200 ok | 401 UNAUTHORIZED_NO_AUTH_HEADER |
+| ai-gerar-orcamento | v9 (nao tocada) | 400 body invalido | 401 UNAUTHORIZED_NO_AUTH_HEADER |
+| ai-compor-mensagem | v18 (fix S2.6 inline) | 404 lead nao encontrado | 401 Unauthorized |
+
+Todas 3 demonstraram comportamento esperado. Fix S2.6 funcional em ambiente real.
+
+### F.7 — Documentacao (esta + vault Obsidian)
+STATE.md atualizado com evidencias numericas. Daily note criada no vault.
+
+## PENDENCIAS APOS FECHAMENTO
+1. **11 Edge Functions ainda precisam redeploy com ai-helpers.ts novo**:
+   ai-analisar-orcamento, ai-detectar-problemas, ai-composicao-produto,
+   ai-briefing-producao, ai-sugerir-compra, ai-sequenciar-producao, ai-preco-dinamico,
+   ai-validar-nfe, ai-insights-diarios, ai-conciliar-bancario, ai-previsao-estoque
+   (prioridade: alta para as 3 primeiras, media/baixa para o resto)
+2. **11 tests React 19 quebrados** (pre-existente): upgrade @testing-library/react
+3. **Politica TTL ai_responses**: 30 dias + cleanup via pg_cron
+4. **Alerta loop_anormal_vermelho** cai naturalmente em 24h (legacy data)
+
+## ARQUIVOS TOCADOS — Fechamento Operacional
+
+### Deployados em producao (Sprint 2 + F)
+- `supabase/functions/agent-cron-loop/index.ts` → v14 (S2.3+S2.5+safety+force)
+- `supabase/functions/mcp-bridge-worker/index.ts` → v3 (locking atomico)
+- `supabase/functions/ai-resumo-cliente/index.ts` → v18 (S2.6 piloto)
+- `supabase/functions/ai-compor-mensagem/index.ts` → v18 (S2.6 inline)
+- `supabase/functions/ai-chat-erp/index.ts` → v9 (S2.5)
+- Migration `132_vw_ia_health` (3 views)
+- Migration `133_fn_claim_ai_requests` (RPC atomica SKIP LOCKED)
+- pg_cron job `mcp-bridge-worker-1min`
+
+### Frontend em producao (via Vercel)
+- `src/domains/admin/pages/AdminIaHealthPage.tsx`
+- `src/routes/adminRoutes.tsx` (/admin/ia/health)
+- `src/shared/constants/navigation.ts` (item Saude da IA)
+
+### Docs gerados
+- `.planning/STATE.md` (este)
+- `.planning/summaries/2026-04-24-sprint-estabilizacao-ia.md`
+- `.planning/summaries/2026-04-24-sprint2-fechamento-critico.md`
+- `.planning/todos/pending/edge-functions-s2.6-checklist.md`
+- `docs/auditorias/2026-04-23-auditoria-ia-croma.md`
+- `docs/auditorias/2026-04-24-sprint-estabilizacao-ia-PARA-GPT.md`
+- `Obsidian → 01-Daily/2026-04-24.md`
+- `Obsidian → 10-Projetos/Croma-Print/aprendizados/2026-04-24-ia-estabilizacao.md`
+
+## SPRINT 2 — ETAPAS EXECUTADAS
 
 ## SPRINT 2 — ETAPAS EXECUTADAS
 

@@ -88,16 +88,28 @@ serve(async (req: Request) => {
 
   try {
     // Auth: accept user JWT OR service_role (for cron/internal calls)
+    // FIX S2.6 2026-04-24: substituido string-compare por JWT role decoder + header X-Internal-Call.
+    // Motivo: string-compare falhava quando token vem de pg_cron (private.get_service_role_key())
+    // e o env da Edge Function tem uma chave formatada diferente mesmo que equivalente.
     const authHeader = req.headers.get('Authorization');
-    const SERVICE_ROLE_KEY = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!;
+    const isInternalHeader = req.headers.get('X-Internal-Call') === 'true';
     let isAuthorized = false;
     let userId: string | null = null;
 
     if (authHeader?.startsWith('Bearer ')) {
       const token = authHeader.replace('Bearer ', '');
-      if (token === SERVICE_ROLE_KEY) {
-        isAuthorized = true;
-      } else {
+      // Bypass inter-service: JWT com role=service_role + header X-Internal-Call
+      if (isInternalHeader && token.split('.').length === 3) {
+        try {
+          const payloadB64 = token.split('.')[1];
+          const b64 = payloadB64.replace(/-/g, '+').replace(/_/g, '/').padEnd(Math.ceil(payloadB64.length / 4) * 4, '=');
+          const payload = JSON.parse(atob(b64));
+          if (payload.role === 'service_role') {
+            isAuthorized = true;
+          }
+        } catch (_err) { /* fall through */ }
+      }
+      if (!isAuthorized) {
         const supabaseAuth = createClient(
           Deno.env.get('SUPABASE_URL')!,
           Deno.env.get('SUPABASE_ANON_KEY')!

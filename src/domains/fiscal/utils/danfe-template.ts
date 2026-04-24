@@ -1,10 +1,12 @@
 /**
- * DANFE — Template HTML profissional
- * Gera HTML completo do DANFE no padrao classico brasileiro.
- * Suporta multiplas paginas com continuacao de produtos e dados adicionais.
+ * DANFE — Template HTML profissional v2.0
+ * Gera HTML completo do DANFE no padrão clássico brasileiro.
+ * Suporta múltiplas páginas com continuação de produtos e dados adicionais.
  *
- * Referencia: MOC (Manual de Orientacao do Contribuinte) SEFAZ
- * Layout baseado no modelo VinilSul/classico SP.
+ * Referências: MOC (Manual de Orientação do Contribuinte) SEFAZ,
+ * brasil-js/danfe (tipografia + grid), SrPattif.Danfe (blocos + organização).
+ *
+ * Revisão completa 2026-04-09 — refatoração profissional
  */
 
 import { DANFE_CSS } from './danfe-styles';
@@ -118,7 +120,6 @@ export interface DanfeImpostos {
 }
 
 export interface DanfeData {
-  // Identificacao
   numero: number | string;
   serie: number | string;
   chave_acesso: string;
@@ -127,40 +128,41 @@ export interface DanfeData {
   data_entrada_saida?: string;
   hora_entrada_saida?: string;
   natureza_operacao: string;
-  tipo_operacao?: number | string; // 0=entrada, 1=saida
+  tipo_operacao?: number | string;
   finalidade?: string;
-  tp_amb?: number; // 1=producao, 2=homologacao
-
-  // Entidades
+  tp_amb?: number;
   emitente: DanfeEmitente;
   destinatario: DanfeDestinatario;
-
-  // Impostos
   impostos: DanfeImpostos;
-
-  // Transporte
   transportador?: DanfeTransportador;
   volumes?: DanfeVolumes;
-
-  // Fatura/duplicatas
   fatura?: DanfeFatura;
   duplicatas?: DanfeDuplicata[];
-
-  // Itens
   itens: DanfeItem[];
-
-  // Observacoes
   informacoes_complementares?: string;
   reservado_fisco?: string;
 }
 
 // ============================================================
-// Constantes de paginacao
+// Constantes de paginação
 // ============================================================
 
-/** Itens por pagina: ~25 na primeira (com canhoto+cabecalhos), ~45 nas continuacoes */
 const ITENS_PAGINA_1 = 22;
-const ITENS_PAGINA_CONT = 42;
+const ITENS_PAGINA_CONT = 45;
+
+// ============================================================
+// Helpers
+// ============================================================
+
+/** Gera um campo fiscal (label + valor) padronizado */
+function campo(label: string, valor: string, extra = ''): string {
+  return `<span class="lbl">${label}</span><span class="val ${extra}">${valor}</span>`;
+}
+
+/** Gera um campo com valor alinhado à direita */
+function campoR(label: string, valor: string, extra = ''): string {
+  return campo(label, valor, `val-right ${extra}`);
+}
 
 // ============================================================
 // Geradores de blocos HTML
@@ -170,43 +172,21 @@ function renderCanhoto(d: DanfeData): string {
   return `
 <table class="canhoto" cellspacing="0" cellpadding="0">
   <tr>
-    <td style="width:60%;" rowspan="3">
-      <span class="canhoto-titulo">
-        <strong>RECEBEMOS DE</strong> ${escapeHtml(d.emitente.razao_social)}<br/>
-        OS PRODUTOS CONSTANTES DA NOTA FISCAL INDICADA AO LADO
-      </span>
+    <td style="width:75%;" class="canhoto-recebemos">
+      RECEBEMOS DE <strong>${escapeHtml(d.emitente.razao_social)}</strong>
+      OS PRODUTOS E/OU SERVI&Ccedil;OS CONSTANTES DA NOTA FISCAL ELETR&Ocirc;NICA INDICADA AO LADO.
+      VALOR TOTAL: R$ ${formatMoeda(d.impostos.valor_total_nota)}
+      &nbsp;&nbsp; DATA DE RECEBIMENTO: ____/____/______
+      &nbsp;&nbsp; IDENTIFICA&Ccedil;&Atilde;O E ASSINATURA DO RECEBEDOR: ________________________________
     </td>
-    <td style="width:20%; text-align:center;" class="canhoto-nfe">NF-e</td>
-    <td style="width:20%;" rowspan="3" class="text-center">
+    <td style="width:8%;" class="canhoto-nfe">
+      NF-e
+    </td>
+    <td style="width:17%; text-align:center; vertical-align:middle;">
       <span class="lbl">N&ordm;</span>
-      <span class="val val-bold" style="font-size:9pt;">${formatNumeroNFe(d.numero)}</span><br/>
-      <span class="lbl">S&eacute;rie</span>
-      <span class="val val-bold">${d.serie}</span>
-    </td>
-  </tr>
-  <tr>
-    <td>
-      <span class="lbl">VLR TOTAL NOTA</span>
-      <span class="val val-bold">${formatMoeda(d.impostos.valor_total_nota)}</span>
-    </td>
-  </tr>
-  <tr>
-    <td><span class="lbl">DATA DA EMISS&Atilde;O</span><span class="val">${formatDataBR(d.data_emissao)}</span></td>
-  </tr>
-  <tr>
-    <td>
-      <span class="lbl">DATA DE RECEBIMENTO</span>
-      <span class="val">&nbsp;</span>
-    </td>
-    <td colspan="2">
-      <span class="lbl">IDENTIFICA&Ccedil;&Atilde;O E ASSINATURA DO RECEBEDOR</span>
-      <span class="val">&nbsp;</span>
-    </td>
-  </tr>
-  <tr>
-    <td colspan="3">
-      <span class="lbl">DESTINAT&Aacute;RIO</span>
-      <span class="val">${escapeHtml(d.destinatario.razao_social)}</span>
+      <span style="font-size:10pt; font-weight:bold; display:block;">${formatNumeroNFe(d.numero)}</span>
+      <span class="lbl">S&Eacute;RIE</span>
+      <span style="font-size:9pt; font-weight:bold;">${formatSerie(d.serie)}</span>
     </td>
   </tr>
 </table>
@@ -219,87 +199,131 @@ function renderCabecalhoPrincipal(d: DanfeData, paginaAtual: number, totalPagina
   const saidaCheck = tipoOp === 1 ? 'active' : '';
 
   const logoHtml = d.emitente.logo_url
-    ? `<img src="${escapeHtml(d.emitente.logo_url)}" style="max-width:80px; max-height:50px; margin-bottom:3px; display:block;"/>`
+    ? `<img src="${escapeHtml(d.emitente.logo_url)}" style="max-width:90px; max-height:45px; margin-bottom:1mm; display:block;"/>`
     : '';
+
+  const fantasiaHtml = d.emitente.nome_fantasia
+    ? `<span class="emitente-fantasia">${escapeHtml(d.emitente.nome_fantasia)}</span>`
+    : '';
+
+  const endParts = [
+    d.emitente.endereco,
+    d.emitente.bairro,
+    `${d.emitente.municipio}-${d.emitente.uf}`,
+    d.emitente.cep ? `CEP: ${formatCEP(d.emitente.cep)}` : '',
+    d.emitente.fone ? `Fone: ${formatFone(d.emitente.fone)}` : '',
+  ].filter(Boolean);
 
   return `
 <table class="header-block" cellspacing="0" cellpadding="0">
   <tr>
-    <!-- EMITENTE -->
-    <td style="width:40%;" class="emitente-box" rowspan="2">
-      <span class="lbl">IDENTIFICA&Ccedil;&Atilde;O DO EMITENTE</span>
+    <!-- EMITENTE (38%) -->
+    <td style="width:38%;" class="emitente-box" rowspan="2">
       ${logoHtml}
       <div class="emitente-razao">${escapeHtml(d.emitente.razao_social)}</div>
-      <div class="emitente-endereco">
-        ${escapeHtml(d.emitente.endereco)}<br/>
-        ${escapeHtml(d.emitente.bairro)}<br/>
-        ${escapeHtml(d.emitente.municipio)}-${escapeHtml(d.emitente.uf)}<br/>
-        CEP: ${formatCEP(d.emitente.cep)}<br/>
-        Fone: ${formatFone(d.emitente.fone) || ''}
-      </div>
+      ${fantasiaHtml}
+      <div class="emitente-endereco">${endParts.map(p => escapeHtml(p)).join('<br/>')}</div>
     </td>
-    <!-- DANFE TITULO + TIPO + NUMERO -->
-    <td style="width:24%;" class="danfe-titulo-box">
+    <!-- DANFE TÍTULO + TIPO + NÚMERO (15%) -->
+    <td style="width:15%;" class="danfe-titulo-box">
       <div class="danfe-titulo">DANFE</div>
       <div class="danfe-subtitulo">Documento Auxiliar da<br/>Nota Fiscal Eletr&ocirc;nica</div>
       <div class="danfe-tipo-box">
-        <span class="danfe-tipo-label">0 - ENTRADA</span>
-        <span class="danfe-tipo-check ${entradaCheck}">${tipoOp === 0 ? '1' : ''}</span>
-        <br/>
-        <span class="danfe-tipo-label">1 - SA&Iacute;DA</span>
-        <span class="danfe-tipo-check ${saidaCheck}">${tipoOp === 1 ? '1' : ''}</span>
+        <span class="danfe-tipo-check ${entradaCheck}">${tipoOp === 0 ? 'X' : '&nbsp;'}</span> ENTRADA<br/>
+        <span class="danfe-tipo-check ${saidaCheck}">${tipoOp === 1 ? 'X' : '&nbsp;'}</span> SA&Iacute;DA
       </div>
-      <div class="danfe-numero">N&ordm; ${formatNumeroNFe(d.numero)}</div>
-      <div class="danfe-serie">S&Eacute;RIE ${d.serie}</div>
-      <div class="danfe-folha">FL &nbsp; ${paginaAtual} &nbsp;/&nbsp; ${totalPaginas}</div>
+      <div class="danfe-numero-box">
+        <div class="danfe-numero">N&ordm; ${formatNumeroNFe(d.numero)}</div>
+        <div class="danfe-serie">S&Eacute;RIE ${formatSerie(d.serie)}</div>
+        <div class="danfe-folha">FOLHA ${paginaAtual}/${totalPaginas}</div>
+      </div>
     </td>
-    <!-- BARCODE + CHAVE -->
-    <td style="width:36%;" class="chave-box" rowspan="2">
+    <!-- BARCODE + CHAVE (47%) -->
+    <td style="width:47%;" class="chave-box" rowspan="2">
       <div class="barcode-box">
-        <div class="barcode-placeholder" title="Codigo de barras">${escapeHtml(d.chave_acesso?.replace(/\D/g, ''))}</div>
+        ${renderBarcodeSVG(d.chave_acesso?.replace(/\D/g, '') || '')}
       </div>
-      <div class="chave-label">CHAVE DE ACESSO</div>
+      <span class="chave-label">CHAVE DE ACESSO</span>
       <div class="chave-valor">${formatChaveAcesso(d.chave_acesso)}</div>
       <div class="chave-consulta">
-        Consulta de autenticidade no portal nacional da<br/>
-        NF-e www.nfe.fazenda.gov.br/portal ou no site<br/>
-        da Sefaz Autorizadora
+        Consulta de autenticidade no portal nacional da NF-e<br/>
+        www.nfe.fazenda.gov.br/portal ou no site da Sefaz Autorizadora
       </div>
       ${d.protocolo ? `
-      <div style="margin-top:3px; border-top:1px solid #000; padding-top:2px;">
+      <div class="protocolo-box">
         <span class="lbl">PROTOCOLO DE AUTORIZA&Ccedil;&Atilde;O DE USO</span>
-        <span class="val val-mono" style="font-size:7pt;">${escapeHtml(d.protocolo)}</span>
+        <span class="val val-mono" style="font-size:7pt; text-align:center;">${escapeHtml(d.protocolo)}</span>
       </div>` : ''}
     </td>
   </tr>
 </table>`;
 }
 
-function renderNaturezaProtocolo(d: DanfeData): string {
+/**
+ * Gera SVG inline de Code 128B para a chave de acesso.
+ * Implementação simplificada — gera barras visuais representativas.
+ * Para produção real, a chave de acesso usa Code 128C (numérico).
+ */
+function renderBarcodeSVG(digits: string): string {
+  if (!digits || digits.length < 10) {
+    return `<div style="height:12mm; display:flex; align-items:center; justify-content:center; font-size:6pt; color:#999;">C&Oacute;DIGO DE BARRAS</div>`;
+  }
+
+  // Gera barras pseudo-Code128 baseado nos dígitos
+  // Cada par de dígitos gera um padrão de barras
+  const bars: number[] = [];
+  // Start code C
+  bars.push(2, 1, 1, 2, 3, 2);
+
+  for (let i = 0; i < digits.length; i += 2) {
+    const pair = parseInt(digits.substring(i, i + 2), 10) || 0;
+    // Simplified encoding — creates visual barcode pattern
+    const b1 = ((pair >> 5) & 3) + 1;
+    const s1 = ((pair >> 3) & 3) + 1;
+    const b2 = ((pair >> 1) & 3) + 1;
+    const s2 = (pair & 1) + 1;
+    const b3 = 1;
+    const s3 = Math.max(1, 6 - b1 - s1 - b2 + 2);
+    bars.push(b1, s1, b2, s2, b3, s3);
+  }
+
+  // Stop pattern
+  bars.push(2, 3, 3, 1, 1, 1, 2);
+
+  const totalWidth = bars.reduce((a, b) => a + b, 0);
+  let svgBars = '';
+  let x = 0;
+  for (let i = 0; i < bars.length; i++) {
+    if (i % 2 === 0) {
+      // Bar (black)
+      svgBars += `<rect x="${(x / totalWidth) * 100}%" y="0" width="${(bars[i] / totalWidth) * 100}%" height="100%" fill="#000"/>`;
+    }
+    x += bars[i];
+  }
+
+  return `<svg class="barcode-svg" viewBox="0 0 100 30" preserveAspectRatio="none" xmlns="http://www.w3.org/2000/svg">${svgBars}</svg>`;
+}
+
+function renderNaturezaIE(d: DanfeData): string {
   return `
 <table class="danfe-table" cellspacing="0" cellpadding="0">
   <tr>
-    <td style="width:50%;">
-      <span class="lbl">NATUREZA DA OPERA&Ccedil;&Atilde;O</span>
-      <span class="val">${escapeHtml(d.natureza_operacao)}</span>
+    <td style="width:50%;" class="cell-compact">
+      ${campo('NATUREZA DA OPERA&Ccedil;&Atilde;O', escapeHtml(d.natureza_operacao))}
     </td>
-    <td style="width:50%;">
-      <span class="lbl">PROTOCOLO DE AUTORIZA&Ccedil;&Atilde;O DE USO</span>
-      <span class="val val-mono">${escapeHtml(d.protocolo || '')}</span>
+    <td style="width:50%;" class="cell-compact">
+      ${campo('PROTOCOLO DE AUTORIZA&Ccedil;&Atilde;O DE USO', escapeHtml(d.protocolo || ''), 'val-mono')}
     </td>
   </tr>
   <tr>
-    <td style="width:33%;">
-      <span class="lbl">INSCRI&Ccedil;&Atilde;O ESTADUAL</span>
-      <span class="val">${escapeHtml(d.emitente.ie)}</span>
+    <td style="width:33%;" class="cell-compact">
+      ${campo('INSCRI&Ccedil;&Atilde;O ESTADUAL', escapeHtml(d.emitente.ie))}
     </td>
-    <td style="width:34%;">
-      <span class="lbl">INSC. ESTADUAL DO SUBST. TRIBUT&Aacute;RIO</span>
-      <span class="val">${escapeHtml(d.emitente.ie_st || '')}</span>
+    <td style="width:34%;" class="cell-compact">
+      ${campo('INSC. ESTADUAL DO SUBST. TRIBUT&Aacute;RIO', escapeHtml(d.emitente.ie_st || ''))}
     </td>
-    <td style="width:33%;">
-      <span class="lbl">CPF/CNPJ</span>
-      <span class="val">${formatCNPJ(d.emitente.cnpj)}</span>
+    <td style="width:33%;" class="cell-compact">
+      ${campo('CNPJ', formatCNPJ(d.emitente.cnpj))}
     </td>
   </tr>
 </table>`;
@@ -311,57 +335,42 @@ function renderDestinatario(d: DanfeData): string {
 <div class="bloco-titulo">DESTINAT&Aacute;RIO / REMETENTE</div>
 <table class="danfe-table" cellspacing="0" cellpadding="0">
   <tr>
-    <td style="width:50%;">
-      <span class="lbl">NOME / RAZ&Atilde;O SOCIAL</span>
-      <span class="val">${escapeHtml(dest.razao_social)}</span>
+    <td style="width:52%;" class="cell-compact">
+      ${campo('NOME / RAZ&Atilde;O SOCIAL', escapeHtml(dest.razao_social))}
     </td>
-    <td style="width:28%;">
-      <span class="lbl">CNPJ / CPF / IDestr.</span>
-      <span class="val">${formatCNPJouCPF(dest.cnpj_cpf)}</span>
+    <td style="width:26%;" class="cell-compact">
+      ${campo('CNPJ / CPF', formatCNPJouCPF(dest.cnpj_cpf))}
     </td>
-    <td style="width:22%;">
-      <span class="lbl">DATA DA EMISS&Atilde;O</span>
-      <span class="val">${formatDataBR(d.data_emissao)}</span>
+    <td style="width:22%;" class="cell-compact">
+      ${campo('DATA DA EMISS&Atilde;O', formatDataBR(d.data_emissao))}
     </td>
   </tr>
   <tr>
-    <td style="width:50%;">
-      <span class="lbl">ENDERE&Ccedil;O</span>
-      <span class="val">${escapeHtml(dest.endereco)}</span>
+    <td style="width:52%;" class="cell-compact">
+      ${campo('ENDERE&Ccedil;O', escapeHtml(dest.endereco))}
     </td>
-    <td style="width:28%;">
-      <span class="lbl">BAIRRO / DISTRITO</span>
-      <span class="val">${escapeHtml(dest.bairro)}</span>
+    <td style="width:26%;" class="cell-compact">
+      ${campo('BAIRRO / DISTRITO', escapeHtml(dest.bairro))}
     </td>
-    <td style="width:22%;">
-      <span class="lbl">COMPLEMENTO</span>
-      <span class="val">${escapeHtml(dest.complemento || '')}</span>
+    <td style="width:22%;" class="cell-compact">
+      ${campo('CEP', formatCEP(dest.cep))}
     </td>
   </tr>
   <tr>
-    <td style="width:40%;">
-      <span class="lbl">MUNIC&Iacute;PIO</span>
-      <span class="val">${escapeHtml(dest.municipio)}</span>
+    <td style="width:35%;" class="cell-compact">
+      ${campo('MUNIC&Iacute;PIO', escapeHtml(dest.municipio))}
     </td>
-    <td style="width:15%;">
-      <span class="lbl">FONE / FAX</span>
-      <span class="val">${formatFone(dest.fone)}</span>
+    <td style="width:15%;" class="cell-compact">
+      ${campo('FONE / FAX', formatFone(dest.fone))}
     </td>
-    <td style="width:6%;">
-      <span class="lbl">UF</span>
-      <span class="val">${escapeHtml(dest.uf)}</span>
+    <td style="width:5%;" class="cell-compact">
+      ${campo('UF', escapeHtml(dest.uf))}
     </td>
-    <td style="width:17%;">
-      <span class="lbl">INSCRI&Ccedil;&Atilde;O ESTADUAL</span>
-      <span class="val">${escapeHtml(dest.ie || '')}</span>
+    <td style="width:18%;" class="cell-compact">
+      ${campo('INSCRI&Ccedil;&Atilde;O ESTADUAL', escapeHtml(dest.ie || ''))}
     </td>
-    <td style="width:10%;">
-      <span class="lbl">CEP</span>
-      <span class="val">${formatCEP(dest.cep)}</span>
-    </td>
-    <td style="width:22%;">
-      <span class="lbl">DATA/HORA ENTRADA/SA&Iacute;DA</span>
-      <span class="val">${d.data_entrada_saida ? formatDataHoraBR(d.data_entrada_saida) : ''}</span>
+    <td style="width:27%;" class="cell-compact">
+      ${campo('DATA/HORA ENTRADA/SA&Iacute;DA', d.data_entrada_saida ? formatDataHoraBR(d.data_entrada_saida) : '')}
     </td>
   </tr>
 </table>`;
@@ -379,21 +388,17 @@ function renderFaturaDuplicatas(d: DanfeData): string {
 <div class="bloco-titulo">FATURA</div>
 <table class="danfe-table" cellspacing="0" cellpadding="0">
   <tr>
-    <td style="width:25%;">
-      <span class="lbl">N&Uacute;MERO</span>
-      <span class="val">${escapeHtml(fat.numero)}</span>
+    <td style="width:25%;" class="cell-compact">
+      ${campo('N&Uacute;MERO', escapeHtml(fat.numero))}
     </td>
-    <td style="width:25%;">
-      <span class="lbl">VALOR ORIGINAL</span>
-      <span class="val val-right">${formatMoeda(fat.valor_original)}</span>
+    <td style="width:25%;" class="cell-compact">
+      ${campoR('VALOR ORIGINAL', formatMoeda(fat.valor_original))}
     </td>
-    <td style="width:25%;">
-      <span class="lbl">VALOR DESCONTO</span>
-      <span class="val val-right">${formatMoeda(fat.valor_desconto)}</span>
+    <td style="width:25%;" class="cell-compact">
+      ${campoR('VALOR DESCONTO', formatMoeda(fat.valor_desconto))}
     </td>
-    <td style="width:25%;">
-      <span class="lbl">VALOR L&Iacute;QUIDO</span>
-      <span class="val val-right">${formatMoeda(fat.valor_liquido)}</span>
+    <td style="width:25%;" class="cell-compact">
+      ${campoR('VALOR L&Iacute;QUIDO', formatMoeda(fat.valor_liquido), 'val-bold')}
     </td>
   </tr>
 </table>`;
@@ -401,7 +406,6 @@ function renderFaturaDuplicatas(d: DanfeData): string {
 
   let dupsHtml = '';
   if (dups.length > 0) {
-    // Até 6 duplicatas por linha (3 grupos de numero+venc+valor)
     const dupsPerRow = 3;
     let dupsRows = '';
     for (let i = 0; i < dups.length; i += dupsPerRow) {
@@ -409,13 +413,12 @@ function renderFaturaDuplicatas(d: DanfeData): string {
       let cells = '';
       for (const dup of chunk) {
         cells += `
-      <td><span class="lbl">N&Uacute;MERO</span><span class="val">${escapeHtml(dup.numero)}</span></td>
-      <td><span class="lbl">VENC.</span><span class="val">${formatDataBR(dup.vencimento)}</span></td>
-      <td><span class="lbl">VALOR</span><span class="val val-right">${formatMoeda(dup.valor)}</span></td>`;
+      <td class="cell-compact">${campo('N&Uacute;MERO', escapeHtml(dup.numero))}</td>
+      <td class="cell-compact">${campo('VENCIMENTO', formatDataBR(dup.vencimento))}</td>
+      <td class="cell-compact">${campoR('VALOR', formatMoeda(dup.valor))}</td>`;
       }
-      // Preencher celulas vazias
       for (let j = chunk.length; j < dupsPerRow; j++) {
-        cells += '<td></td><td></td><td></td>';
+        cells += '<td class="cell-compact"></td><td class="cell-compact"></td><td class="cell-compact"></td>';
       }
       dupsRows += `<tr>${cells}</tr>`;
     }
@@ -435,67 +438,43 @@ function renderImpostos(d: DanfeData): string {
 <div class="bloco-titulo">C&Aacute;LCULO DO IMPOSTO</div>
 <table class="danfe-table" cellspacing="0" cellpadding="0">
   <tr>
-    <td style="width:14%;">
-      <span class="lbl">BC ICMS</span>
-      <span class="val val-right">${formatMoeda(imp.bc_icms)}</span>
+    <td style="width:15%;" class="cell-compact">
+      ${campoR('BASE DE C&Aacute;LCULO DO ICMS', formatMoeda(imp.bc_icms))}
     </td>
-    <td style="width:12%;">
-      <span class="lbl">VALOR ICMS</span>
-      <span class="val val-right">${formatMoeda(imp.valor_icms)}</span>
+    <td style="width:13%;" class="cell-compact">
+      ${campoR('VALOR DO ICMS', formatMoeda(imp.valor_icms))}
     </td>
-    <td style="width:14%;">
-      <span class="lbl">ICMS DESONERADO</span>
-      <span class="val val-right">${formatMoeda(imp.icms_desonerado || 0)}</span>
+    <td style="width:15%;" class="cell-compact">
+      ${campoR('BASE DE C&Aacute;LC. ICMS SUBST.', formatMoeda(imp.bc_icms_st))}
     </td>
-    <td style="width:14%;">
-      <span class="lbl">BC ICMS SUBSTITUI&Ccedil;&Atilde;O</span>
-      <span class="val val-right">${formatMoeda(imp.bc_icms_st)}</span>
+    <td style="width:13%;" class="cell-compact">
+      ${campoR('VALOR DO ICMS SUBST.', formatMoeda(imp.valor_icms_st))}
     </td>
-    <td style="width:14%;">
-      <span class="lbl">VALOR ICMS SUBS</span>
-      <span class="val val-right">${formatMoeda(imp.valor_icms_st)}</span>
+    <td style="width:13%;" class="cell-compact">
+      ${campoR('VALOR IMP. IMPORTA&Ccedil;&Atilde;O', formatMoeda(imp.valor_imp_importacao || 0))}
     </td>
-    <td style="width:14%;">
-      <span class="lbl">VALOR IMP. IMPORTA&Ccedil;&Atilde;O</span>
-      <span class="val val-right">${formatMoeda(imp.valor_imp_importacao || 0)}</span>
-    </td>
-    <td style="width:18%;">
-      <span class="lbl">VALOR TOTAL DOS PRODUTOS</span>
-      <span class="val val-right val-bold">${formatMoeda(imp.valor_total_produtos)}</span>
+    <td style="width:15%;" class="cell-compact">
+      ${campoR('VALOR TOTAL DOS PRODUTOS', formatMoeda(imp.valor_total_produtos), 'val-bold')}
     </td>
   </tr>
   <tr>
-    <td>
-      <span class="lbl">VALOR FRETE</span>
-      <span class="val val-right">${formatMoeda(imp.valor_frete)}</span>
+    <td class="cell-compact">
+      ${campoR('VALOR DO FRETE', formatMoeda(imp.valor_frete))}
     </td>
-    <td>
-      <span class="lbl">VALOR SEGURO</span>
-      <span class="val val-right">${formatMoeda(imp.valor_seguro)}</span>
+    <td class="cell-compact">
+      ${campoR('VALOR DO SEGURO', formatMoeda(imp.valor_seguro))}
     </td>
-    <td>
-      <span class="lbl">VALOR DESCONTO</span>
-      <span class="val val-right">${formatMoeda(imp.valor_desconto)}</span>
+    <td class="cell-compact">
+      ${campoR('DESCONTO', formatMoeda(imp.valor_desconto))}
     </td>
-    <td>
-      <span class="lbl">OUTRAS DESP. ACES.</span>
-      <span class="val val-right">${formatMoeda(imp.outras_despesas)}</span>
+    <td class="cell-compact">
+      ${campoR('OUTRAS DESP. ACESS&Oacute;RIAS', formatMoeda(imp.outras_despesas))}
     </td>
-    <td>
-      <span class="lbl">VALOR IPI</span>
-      <span class="val val-right">${formatMoeda(imp.valor_ipi)}</span>
+    <td class="cell-compact">
+      ${campoR('VALOR DO IPI', formatMoeda(imp.valor_ipi))}
     </td>
-    <td>
-      <span class="lbl">VALOR DO PIS</span>
-      <span class="val val-right">${formatMoeda(imp.valor_pis)}</span>
-    </td>
-    <td>
-      <span class="lbl">VALOR DA COFINS</span>
-      <span class="val val-right">${formatMoeda(imp.valor_cofins)}</span>
-    </td>
-    <td>
-      <span class="lbl">VALOR TOTAL DA NOTA</span>
-      <span class="val val-right val-bold">${formatMoeda(imp.valor_total_nota)}</span>
+    <td class="cell-compact">
+      ${campoR('VALOR TOTAL DA NOTA', formatMoeda(imp.valor_total_nota), 'val-bold val-lg')}
     </td>
   </tr>
 </table>`;
@@ -508,76 +487,59 @@ function renderTransportador(d: DanfeData): string {
 <div class="bloco-titulo">TRANSPORTADOR / VOLUMES TRANSPORTADOS</div>
 <table class="danfe-table" cellspacing="0" cellpadding="0">
   <tr>
-    <td style="width:30%;">
-      <span class="lbl">RAZ&Atilde;O SOCIAL</span>
-      <span class="val">${escapeHtml(t?.razao_social || '')}</span>
+    <td style="width:28%;" class="cell-compact">
+      ${campo('RAZ&Atilde;O SOCIAL', escapeHtml(t?.razao_social || ''))}
     </td>
-    <td style="width:20%;">
-      <span class="lbl">FRETE POR CONTA</span>
-      <span class="val">${fretePorConta(t?.mod_frete)}</span>
+    <td style="width:18%;" class="cell-compact">
+      ${campo('FRETE POR CONTA', fretePorConta(t?.mod_frete))}
     </td>
-    <td style="width:12%;">
-      <span class="lbl">C&Oacute;DIGO ANTT</span>
-      <span class="val">${escapeHtml(t?.codigo_antt || '')}</span>
+    <td style="width:12%;" class="cell-compact">
+      ${campo('C&Oacute;DIGO ANTT', escapeHtml(t?.codigo_antt || ''))}
     </td>
-    <td style="width:10%;">
-      <span class="lbl">PLACA</span>
-      <span class="val">${escapeHtml(t?.placa || '')}</span>
+    <td style="width:10%;" class="cell-compact">
+      ${campo('PLACA DO VE&Iacute;CULO', escapeHtml(t?.placa || ''))}
     </td>
-    <td style="width:5%;">
-      <span class="lbl">UF</span>
-      <span class="val">${escapeHtml(t?.placa_uf || '')}</span>
+    <td style="width:5%;" class="cell-compact">
+      ${campo('UF', escapeHtml(t?.placa_uf || ''))}
     </td>
-    <td style="width:23%;">
-      <span class="lbl">CNPJ / CPF</span>
-      <span class="val">${formatCNPJouCPF(t?.cnpj_cpf)}</span>
+    <td style="width:27%;" class="cell-compact">
+      ${campo('CNPJ / CPF', formatCNPJouCPF(t?.cnpj_cpf))}
     </td>
   </tr>
   <tr>
-    <td style="width:30%;">
-      <span class="lbl">ENDERE&Ccedil;O</span>
-      <span class="val">${escapeHtml(t?.endereco || '')}</span>
+    <td style="width:28%;" class="cell-compact">
+      ${campo('ENDERE&Ccedil;O', escapeHtml(t?.endereco || ''))}
     </td>
-    <td style="width:25%" colspan="2">
-      <span class="lbl">MUNIC&Iacute;PIO</span>
-      <span class="val">${escapeHtml(t?.municipio || '')}</span>
+    <td style="width:25%;" colspan="2" class="cell-compact">
+      ${campo('MUNIC&Iacute;PIO', escapeHtml(t?.municipio || ''))}
     </td>
-    <td style="width:5%;">
-      <span class="lbl">UF</span>
-      <span class="val">${escapeHtml(t?.uf || '')}</span>
+    <td style="width:5%;" class="cell-compact">
+      ${campo('UF', escapeHtml(t?.uf || ''))}
     </td>
-    <td style="width:20%" colspan="2">
-      <span class="lbl">INSCRI&Ccedil;&Atilde;O ESTADUAL</span>
-      <span class="val">${escapeHtml(t?.ie || '')}</span>
+    <td style="width:22%;" colspan="2" class="cell-compact">
+      ${campo('INSCRI&Ccedil;&Atilde;O ESTADUAL', escapeHtml(t?.ie || ''))}
     </td>
   </tr>
 </table>
-<div class="bloco-titulo">VOLUMES</div>
-<table class="danfe-table" cellspacing="0" cellpadding="0">
+<table class="danfe-table" cellspacing="0" cellpadding="0" style="border-top:none;">
   <tr>
-    <td style="width:14%;">
-      <span class="lbl">QUANTIDADE</span>
-      <span class="val">${v?.quantidade ?? ''}</span>
+    <td style="width:14%; border-top:none;" class="cell-compact">
+      ${campo('QUANTIDADE', v?.quantidade != null ? String(v.quantidade) : '')}
     </td>
-    <td style="width:18%;">
-      <span class="lbl">ESP&Eacute;CIE</span>
-      <span class="val">${escapeHtml(v?.especie || '')}</span>
+    <td style="width:18%; border-top:none;" class="cell-compact">
+      ${campo('ESP&Eacute;CIE', escapeHtml(v?.especie || ''))}
     </td>
-    <td style="width:18%;">
-      <span class="lbl">MARCA</span>
-      <span class="val">${escapeHtml(v?.marca || '')}</span>
+    <td style="width:18%; border-top:none;" class="cell-compact">
+      ${campo('MARCA', escapeHtml(v?.marca || ''))}
     </td>
-    <td style="width:18%;">
-      <span class="lbl">NUMERA&Ccedil;&Atilde;O</span>
-      <span class="val">${escapeHtml(v?.numeracao || '')}</span>
+    <td style="width:18%; border-top:none;" class="cell-compact">
+      ${campo('NUMERA&Ccedil;&Atilde;O', escapeHtml(v?.numeracao || ''))}
     </td>
-    <td style="width:16%;">
-      <span class="lbl">PESO BRUTO</span>
-      <span class="val val-right">${v?.peso_bruto != null ? formatMoeda(v.peso_bruto) : ''}</span>
+    <td style="width:16%; border-top:none;" class="cell-compact">
+      ${campoR('PESO BRUTO', v?.peso_bruto != null ? formatMoeda(v.peso_bruto) : '')}
     </td>
-    <td style="width:16%;">
-      <span class="lbl">PESO L&Iacute;QUIDO</span>
-      <span class="val val-right">${v?.peso_liquido != null ? formatMoeda(v.peso_liquido) : ''}</span>
+    <td style="width:16%; border-top:none;" class="cell-compact">
+      ${campoR('PESO L&Iacute;QUIDO', v?.peso_liquido != null ? formatMoeda(v.peso_liquido) : '')}
     </td>
   </tr>
 </table>`;
@@ -585,23 +547,23 @@ function renderTransportador(d: DanfeData): string {
 
 function renderProdutosHeader(): string {
   return `
-<div class="bloco-titulo">DADOS DO PRODUTO / SERVI&Ccedil;O</div>
+<div class="bloco-titulo">DADOS DOS PRODUTOS / SERVI&Ccedil;OS</div>
 <table class="produtos-table" cellspacing="0" cellpadding="0">
   <thead>
     <tr>
-      <th style="width:9%;">C&Oacute;D.<br/>PROD.</th>
-      <th style="width:23%;">DESCRI&Ccedil;&Atilde;O DO PRODUTO / SERVI&Ccedil;O</th>
+      <th style="width:8%;">C&Oacute;DIGO<br/>PRODUTO</th>
+      <th style="width:24%;">DESCRI&Ccedil;&Atilde;O DO PRODUTO / SERVI&Ccedil;O</th>
       <th style="width:7%;">NCM/SH</th>
-      <th style="width:4%;">CST</th>
+      <th style="width:3%;">O/CST</th>
       <th style="width:4%;">CFOP</th>
       <th style="width:3%;">UN</th>
-      <th style="width:7%;">QTD</th>
-      <th style="width:8%;">V. UNIT&Aacute;RIO</th>
-      <th style="width:8%;">V. TOTAL</th>
-      <th style="width:7%;">BC ICMS</th>
-      <th style="width:6%;">V. ICMS</th>
-      <th style="width:5%;">V. IPI</th>
-      <th style="width:5%;">AL&Iacute;Q.<br/>ICMS</th>
+      <th style="width:7%;">QUANT.</th>
+      <th style="width:8%;">VALOR<br/>UNIT&Aacute;RIO</th>
+      <th style="width:8%;">VALOR<br/>TOTAL</th>
+      <th style="width:8%;">B.C&Aacute;LC.<br/>ICMS</th>
+      <th style="width:7%;">VALOR<br/>ICMS</th>
+      <th style="width:5%;">VALOR<br/>IPI</th>
+      <th style="width:4%;">AL&Iacute;Q.<br/>ICMS</th>
       <th style="width:4%;">AL&Iacute;Q.<br/>IPI</th>
     </tr>
   </thead>`;
@@ -610,7 +572,7 @@ function renderProdutosHeader(): string {
 function renderProdutoRow(item: DanfeItem): string {
   return `
     <tr>
-      <td class="center" style="font-size:6pt;">${escapeHtml(item.codigo)}</td>
+      <td class="center">${escapeHtml(item.codigo)}</td>
       <td class="desc">${escapeHtml(item.descricao)}</td>
       <td class="center">${escapeHtml(item.ncm)}</td>
       <td class="center">${escapeHtml(item.cst)}</td>
@@ -633,9 +595,8 @@ function renderProdutosBlock(itens: DanfeItem[], linhasVazias = 0): string {
   for (const item of itens) {
     html += renderProdutoRow(item);
   }
-  // Linhas vazias para preencher espaco
   for (let i = 0; i < linhasVazias; i++) {
-    html += `<tr>
+    html += `<tr class="empty-row">
       <td>&nbsp;</td><td>&nbsp;</td><td>&nbsp;</td><td>&nbsp;</td><td>&nbsp;</td>
       <td>&nbsp;</td><td>&nbsp;</td><td>&nbsp;</td><td>&nbsp;</td><td>&nbsp;</td>
       <td>&nbsp;</td><td>&nbsp;</td><td>&nbsp;</td><td>&nbsp;</td>
@@ -647,15 +608,15 @@ function renderProdutosBlock(itens: DanfeItem[], linhasVazias = 0): string {
 
 function renderDadosAdicionais(d: DanfeData, isContinuacao = false): string {
   return `
-<div class="bloco-titulo">DADOS ADICIONAIS${isContinuacao ? ' (COMPLEMENTO)' : ''}</div>
+<div class="bloco-titulo">DADOS ADICIONAIS</div>
 <table class="danfe-table" cellspacing="0" cellpadding="0">
   <tr>
-    <td style="width:65%; vertical-align:top; min-height:50px;">
-      <span class="lbl">INFORMA&Ccedil;&Otilde;ES COMPLEMENTARES</span>
+    <td style="width:65%; vertical-align:top;">
+      ${campo('INFORMA&Ccedil;&Otilde;ES COMPLEMENTARES', '')}
       <div class="dados-adicionais">${escapeHtml(d.informacoes_complementares || '')}</div>
     </td>
-    <td style="width:35%; vertical-align:top; min-height:50px;">
-      <span class="lbl">RESERVADO AO FISCO</span>
+    <td style="width:35%; vertical-align:top;">
+      ${campo('RESERVADO AO FISCO', '')}
       <div class="dados-adicionais">${escapeHtml(d.reservado_fisco || '')}</div>
     </td>
   </tr>
@@ -664,13 +625,13 @@ function renderDadosAdicionais(d: DanfeData, isContinuacao = false): string {
 
 function renderRodape(dataImpressao: string): string {
   return `<div class="danfe-rodape">
-  <strong>DATA E HORA DA IMPRESS&Atilde;O</strong> ${escapeHtml(dataImpressao)}
+  DATA E HORA DA IMPRESS&Atilde;O: ${escapeHtml(dataImpressao)} &mdash; DANFE gerado pelo sistema Croma Print
 </div>`;
 }
 
 function renderHomologacaoBanner(): string {
   return `<div class="homologacao-banner">
-  SEM VALOR FISCAL - AMBIENTE DE HOMOLOGA&Ccedil;&Atilde;O
+  SEM VALOR FISCAL &mdash; AMBIENTE DE HOMOLOGA&Ccedil;&Atilde;O
 </div>`;
 }
 
@@ -679,14 +640,14 @@ function renderHomologacaoBanner(): string {
 // ============================================================
 
 /**
- * Gera HTML completo do DANFE profissional, multi-pagina.
+ * Gera HTML completo do DANFE profissional, multi-página.
  */
 export function gerarDanfeHTML(data: DanfeData): string {
   const agora = new Date().toLocaleString('pt-BR', { timeZone: 'America/Sao_Paulo' });
   const isHomologacao = data.tp_amb === 2;
   const itens = data.itens || [];
 
-  // Calcular paginacao
+  // Calcular paginação
   const itensPg1 = itens.slice(0, ITENS_PAGINA_1);
   const itensRestantes = itens.slice(ITENS_PAGINA_1);
   const paginasContinuacao: DanfeItem[][] = [];
@@ -697,27 +658,25 @@ export function gerarDanfeHTML(data: DanfeData): string {
   }
   const totalPaginas = 1 + paginasContinuacao.length;
 
-  // --- PAGINA 1 ---
+  // --- PÁGINA 1 ---
   const linhasVaziasPg1 = Math.max(0, ITENS_PAGINA_1 - itensPg1.length);
   let pagina1 = `<div class="danfe-page">`;
   if (isHomologacao) pagina1 += renderHomologacaoBanner();
   pagina1 += renderCanhoto(data);
   pagina1 += renderCabecalhoPrincipal(data, 1, totalPaginas);
-  pagina1 += renderNaturezaProtocolo(data);
+  pagina1 += renderNaturezaIE(data);
   pagina1 += renderDestinatario(data);
   pagina1 += renderFaturaDuplicatas(data);
   pagina1 += renderImpostos(data);
   pagina1 += renderTransportador(data);
   pagina1 += renderProdutosBlock(itensPg1, linhasVaziasPg1);
-  // Dados adicionais so na primeira pagina se nao ha continuacao,
-  // senao na ultima pagina
   if (paginasContinuacao.length === 0) {
     pagina1 += renderDadosAdicionais(data);
   }
   pagina1 += renderRodape(agora);
   pagina1 += `</div>`;
 
-  // --- PAGINAS DE CONTINUACAO ---
+  // --- PÁGINAS DE CONTINUAÇÃO ---
   let paginasCont = '';
   for (let i = 0; i < paginasContinuacao.length; i++) {
     const pgNum = i + 2;
@@ -727,20 +686,16 @@ export function gerarDanfeHTML(data: DanfeData): string {
 
     paginasCont += `<div class="danfe-page">`;
     if (isHomologacao) paginasCont += renderHomologacaoBanner();
-    // Cabecalho reduzido nas continuacoes
     paginasCont += renderCabecalhoPrincipal(data, pgNum, totalPaginas);
-    paginasCont += renderNaturezaProtocolo(data);
-    // Continuacao dos produtos
+    paginasCont += renderNaturezaIE(data);
     paginasCont += renderProdutosBlock(itensPg, linhasVazias);
-    // Dados adicionais na ultima pagina
     if (isUltima) {
-      paginasCont += renderDadosAdicionais(data, paginasContinuacao.length > 0);
+      paginasCont += renderDadosAdicionais(data, true);
     }
     paginasCont += renderRodape(agora);
     paginasCont += `</div>`;
   }
 
-  // --- HTML COMPLETO ---
   return `<!DOCTYPE html>
 <html lang="pt-BR">
 <head>
@@ -758,7 +713,6 @@ ${paginasCont}
 
 /**
  * Converte dados de um FiscalDocumento (do banco Supabase) para DanfeData.
- * Isso permite usar os dados reais do sistema para gerar o DANFE.
  */
 export function fiscalDocumentoToDanfeData(doc: any, empresa?: any): DanfeData {
   const itens: DanfeItem[] = (doc.fiscal_documentos_itens || []).map((item: any) => ({
@@ -778,10 +732,10 @@ export function fiscalDocumentoToDanfeData(doc: any, empresa?: any): DanfeData {
     aliq_ipi: 0,
   }));
 
-  // Extrair dados do emitente (empresa ou defaults)
   const emp = empresa || {};
   const emitente: DanfeEmitente = {
     razao_social: emp.razao_social || 'CROMA PRINT COMUNICAÇÃO VISUAL LTDA',
+    nome_fantasia: emp.nome_fantasia || '',
     cnpj: emp.cnpj || '18923994000183',
     ie: emp.ie || '',
     endereco: emp.endereco || '',
@@ -793,7 +747,6 @@ export function fiscalDocumentoToDanfeData(doc: any, empresa?: any): DanfeData {
     logo_url: emp.logo_url,
   };
 
-  // Extrair dados do destinatario (cliente)
   const cli = doc.clientes || {};
   const destinatario: DanfeDestinatario = {
     razao_social: cli.razao_social || '',
@@ -808,7 +761,6 @@ export function fiscalDocumentoToDanfeData(doc: any, empresa?: any): DanfeData {
     complemento: cli.complemento || '',
   };
 
-  // Extrair duplicatas do payload se disponivel
   const payloadCobranca = doc.payload_json?.NFe?.infNFe?.cobr;
   const duplicatas: DanfeDuplicata[] = [];
   let fatura: DanfeFatura | undefined;
@@ -840,7 +792,6 @@ export function fiscalDocumentoToDanfeData(doc: any, empresa?: any): DanfeData {
     }
   }
 
-  // Extrair transporte do payload
   const payloadTransp = doc.payload_json?.NFe?.infNFe?.transp;
   let transportador: DanfeTransportador | undefined;
   let volumes: DanfeVolumes | undefined;
@@ -872,10 +823,8 @@ export function fiscalDocumentoToDanfeData(doc: any, empresa?: any): DanfeData {
     }
   }
 
-  // Detectar ambiente
   const tpAmb = doc.fiscal_ambientes?.tipo === 'producao' ? 1 : 2;
 
-  // Protocolo formatado
   let protocolo = doc.protocolo || '';
   if (doc.data_autorizacao && protocolo) {
     protocolo = `${protocolo} ${formatDataHoraBR(doc.data_autorizacao)}`;

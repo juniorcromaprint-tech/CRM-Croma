@@ -28,6 +28,7 @@ serve(async (req) => {
     const data = await res.json();
 
     return new Response(JSON.stringify({
+      ip: clientIp,
       city: data.city || '',
       region: data.region || '',
       country: data.country || '',
@@ -35,7 +36,7 @@ serve(async (req) => {
       headers: { ...corsHeaders, 'Content-Type': 'application/json' },
     });
   } catch (_err) {
-    return new Response(JSON.stringify({ city: '', region: '', country: '' }), {
+    return new Response(JSON.stringify({ ip: '', city: '', region: '', country: '' }), {
       status: 200,
       headers: { ...corsHeaders, 'Content-Type': 'application/json' },
     });

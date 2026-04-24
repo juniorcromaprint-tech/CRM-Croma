@@ -1,0 +1,3 @@
+dbc2e7f ﻿feat(pdf): refaz 3 modos de PDF da proposta (cliente/producao/tecnico) no estilo Mubisys+
+7ce4884 fix(campo): delete-job robustez auth + Bearer token explicito no invoke
+daa825b Merge pull request #11 from juniorcromaprint-tech/fix/date-parse-timezone

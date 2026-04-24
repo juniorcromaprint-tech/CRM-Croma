@@ -1,13 +1,13 @@
 /**
- * Utilitários de formatação para respostas do MCP
- * Formata valores monetários, datas e status em português
+ * Utilitários de formatacao para respostas do MCP
+ * Formata valores monetários, datas e status em portugues
  */
 
 /**
  * Formata valor monetário em BRL
  */
 export function formatBRL(value: number | null | undefined): string {
-  if (value == null) return "—";
+  if (value == null) return "-";
   return new Intl.NumberFormat("pt-BR", {
     style: "currency",
     currency: "BRL",
@@ -18,14 +18,13 @@ export function formatBRL(value: number | null | undefined): string {
  * Formata data ISO para formato brasileiro
  */
 export function formatDate(dateStr: string | null | undefined): string {
-  if (!dateStr) return "—";
+  if (!dateStr) return "-";
   try {
+    // Evita problema de timezone: datas ISO sem hora sao UTC 00:00 e ficam um dia atras no fuso -3h
+    const match = dateStr.match(/^(\d{4})-(\d{2})-(\d{2})/);
+    if (match) return match[3] + "/" + match[2] + "/" + match[1];
     const date = new Date(dateStr);
-    return date.toLocaleDateString("pt-BR", {
-      day: "2-digit",
-      month: "2-digit",
-      year: "numeric",
-    });
+    return date.toLocaleDateString("pt-BR", { timeZone: "UTC", day: "2-digit", month: "2-digit", year: "numeric" });
   } catch {
     return dateStr;
   }
@@ -35,7 +34,7 @@ export function formatDate(dateStr: string | null | undefined): string {
  * Formata data e hora
  */
 export function formatDateTime(dateStr: string | null | undefined): string {
-  if (!dateStr) return "—";
+  if (!dateStr) return "-";
   try {
     const date = new Date(dateStr);
     return date.toLocaleString("pt-BR", {
@@ -51,7 +50,7 @@ export function formatDateTime(dateStr: string | null | undefined): string {
 }
 
 /**
- * Mapa de status para labels em português
+ * Mapa de status para labels em portugues
  */
 const STATUS_LABELS: Record<string, string> = {
   // Leads
@@ -64,25 +63,25 @@ const STATUS_LABELS: Record<string, string> = {
   // Propostas
   rascunho: "Rascunho",
   enviada: "Enviada",
-  em_revisao: "Em Revisão",
+  em_revisao: "Em Revisao",
   aprovada: "Aprovada",
   recusada: "Recusada",
   expirada: "Expirada",
 
   // Pedidos
-  aguardando_aprovacao: "Aguardando Aprovação",
+  aguardando_aprovacao: "Aguardando Aprovacao",
   aprovado: "Aprovado",
-  em_producao: "Em Produção",
-  producao_concluida: "Produção Concluída",
-  em_instalacao: "Em Instalação",
+  em_producao: "Em Producao",
+  producao_concluida: "Producao Concluida",
+  em_instalacao: "Em Instalacao",
   entregue: "Entregue",
   faturado: "Faturado",
   cancelado: "Cancelado",
 
-  // Produção
+  // Producao
   pendente: "Pendente",
   em_andamento: "Em Andamento",
-  concluido: "Concluído",
+  concluido: "Concluido",
   pausado: "Pausado",
   retrabalho: "Retrabalho",
 
@@ -94,15 +93,15 @@ const STATUS_LABELS: Record<string, string> = {
   renegociado: "Renegociado",
   baixado: "Baixado",
 
-  // Instalação
+  // Instalacao
   agendada: "Agendada",
-  em_execucao: "Em Execução",
-  concluida: "Concluída",
+  em_execucao: "Em Execucao",
+  concluida: "Concluida",
   reagendada: "Reagendada",
 };
 
 export function formatStatus(status: string | null | undefined): string {
-  if (!status) return "—";
+  if (!status) return "-";
   return STATUS_LABELS[status] ?? status;
 }
 
@@ -110,7 +109,7 @@ export function formatStatus(status: string | null | undefined): string {
  * Formata CNPJ: 00.000.000/0001-00
  */
 export function formatCNPJ(cnpj: string | null | undefined): string {
-  if (!cnpj) return "—";
+  if (!cnpj) return "-";
   const digits = cnpj.replace(/\D/g, "");
   if (digits.length !== 14) return cnpj;
   return digits.replace(/(\d{2})(\d{3})(\d{3})(\d{4})(\d{2})/, "$1.$2.$3/$4-$5");
@@ -120,7 +119,7 @@ export function formatCNPJ(cnpj: string | null | undefined): string {
  * Formata telefone: (00) 00000-0000
  */
 export function formatPhone(phone: string | null | undefined): string {
-  if (!phone) return "—";
+  if (!phone) return "-";
   const digits = phone.replace(/\D/g, "");
   if (digits.length === 11) {
     return digits.replace(/(\d{2})(\d{5})(\d{4})/, "($1) $2-$3");
