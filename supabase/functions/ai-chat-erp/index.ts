@@ -33,8 +33,8 @@ const QUERY_TEMPLATES: Record<string, Record<string, string>> = {
       COUNT(*) as count, 
       COALESCE(SUM(saldo), 0) as valor 
       FROM contas_receber 
-      WHERE status IN ('aberto','vencido') 
-      AND data_vencimento < CURRENT_DATE 
+      WHERE status IN ('vencido','parcial','faturado','a_vencer')
+      AND data_vencimento < CURRENT_DATE
       AND data_pagamento IS NULL 
       AND excluido_em IS NULL`,
     a_receber: `SELECT 

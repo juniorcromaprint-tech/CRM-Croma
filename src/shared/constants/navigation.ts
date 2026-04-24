@@ -133,6 +133,7 @@ export const NAV_GROUPS: NavGroup[] = [
       { name: 'Gestão de Dados', path: '/admin/dados', icon: 'Database', module: 'admin' },
       { name: 'Quadro de Avisos', path: '/admin/avisos', icon: 'Megaphone', module: 'admin' },
       { name: 'Automação', path: '/admin/automacao', icon: 'Zap', module: 'admin' },
+      { name: 'Saúde da IA', path: '/admin/ia/health', icon: 'Activity', module: 'admin' },
       { name: 'Relatórios', path: '/relatorios', icon: 'BarChart3', module: 'admin' },
     ],
   },

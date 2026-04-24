@@ -53,6 +53,29 @@ export async function authenticateAndAuthorize(
     };
   }
 
+  // ── FIX S2.6 2026-04-24: chamadas inter-service via JWT role=service_role ──
+  // Segurança: decodifica o JWT e exige role=service_role NO CLAIM + header X-Internal-Call.
+  // JWT service_role só pode ser gerado com o JWT_SECRET do Supabase (env de admin).
+  // Usuário comum tem JWT com role=authenticated → não passa na checagem.
+  const token = authHeader.substring(7);
+  const isInternalHeader = req.headers.get('X-Internal-Call') === 'true';
+  if (isInternalHeader && token.split('.').length === 3) {
+    try {
+      const payloadB64 = token.split('.')[1];
+      // Base64url-decode
+      const b64 = payloadB64.replace(/-/g, '+').replace(/_/g, '/').padEnd(Math.ceil(payloadB64.length / 4) * 4, '=');
+      const payload = JSON.parse(atob(b64));
+      if (payload.role === 'service_role') {
+        return {
+          auth: { userId: '00000000-0000-0000-0000-000000000000', userRole: 'service' },
+          error: null,
+        };
+      }
+    } catch (_err) {
+      // Decoding falhou → fallback pra lógica padrão abaixo (não é um JWT válido)
+    }
+  }
+
   const supabaseAuth = createClient(
     Deno.env.get('SUPABASE_URL')!,
     Deno.env.get('SUPABASE_ANON_KEY')!,

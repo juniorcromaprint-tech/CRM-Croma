@@ -23,6 +23,7 @@ const CatalogoProdutosPage = lazy(() => import("@/domains/admin/pages/CatalogoPr
 const WebhooksPage = lazy(() => import("@/domains/admin/pages/WebhooksPage"));
 const AdminAvisosPage = lazy(() => import("@/domains/admin/pages/AdminAvisosPage"));
 const AutomacaoPage = lazy(() => import("@/domains/admin/pages/AutomacaoPage"));
+const AdminIaHealthPage = lazy(() => import("@/domains/admin/pages/AdminIaHealthPage"));
 const CockpitExecutivoPage = lazy(() => import("@/domains/admin/pages/CockpitExecutivoPage"));
 const DashboardExecutivoPage = lazy(() => import("@/domains/comercial/pages/DashboardExecutivoPage"));
 
@@ -116,6 +117,11 @@ export const adminRoutes = (
     <Route path="admin/automacao" element={
       <PermissionGuard module="admin" action="ver">
         <LazyPage><AutomacaoPage /></LazyPage>
+      </PermissionGuard>
+    } />
+    <Route path="admin/ia/health" element={
+      <PermissionGuard module="admin" action="ver">
+        <LazyPage><AdminIaHealthPage /></LazyPage>
       </PermissionGuard>
     } />
     <Route path="admin/cockpit" element={

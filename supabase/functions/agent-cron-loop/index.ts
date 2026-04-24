@@ -56,12 +56,13 @@ const PIX_CNPJ = '18.923.994/0001-83';
 const EMAIL_COMERCIAL = 'junior@cromaprint.com.br';
 
 // ── Cobrança message templates ───────────────────────────────────────
+// FIX S2.3 2026-04-24: removido "R$ " do template porque formatBRL() já prefixa → evita "R$ R$ 1.500,00"
 const COBRANCA_TEMPLATES: Record<number, (d: Record<string, string>) => string> = {
-  1: (d) => `Oi ${d.cliente}! Tudo bem? Percebemos que o pagamento ref. ao pedido ${d.pedido} venceu ontem (${d.vencimento}). O valor é R$ ${d.valor}. Se já pagou, pode desconsiderar! PIX: CNPJ ${PIX_CNPJ}. Qualquer dúvida é só chamar. - Croma Print`,
+  1: (d) => `Oi ${d.cliente}! Tudo bem? Percebemos que o pagamento ref. ao pedido ${d.pedido} venceu ontem (${d.vencimento}). O valor é ${d.valor}. Se já pagou, pode desconsiderar! PIX: CNPJ ${PIX_CNPJ}. Qualquer dúvida é só chamar. - Croma Print`,
 
-  2: (d) => `Olá ${d.cliente}, passando para lembrar do pagamento no valor de R$ ${d.valor} (vencido em ${d.vencimento}). Se precisar de segunda via ou combinar outra data, estamos à disposição. PIX: CNPJ ${PIX_CNPJ} - Croma Print`,
+  2: (d) => `Olá ${d.cliente}, passando para lembrar do pagamento no valor de ${d.valor} (vencido em ${d.vencimento}). Se precisar de segunda via ou combinar outra data, estamos à disposição. PIX: CNPJ ${PIX_CNPJ} - Croma Print`,
 
-  3: (d) => `Prezado(a) ${d.cliente},\n\nInformamos que identificamos um título em aberto no valor de R$ ${d.valor}, com vencimento em ${d.vencimento}, referente ao pedido ${d.pedido}.\n\nSolicitamos a gentileza de regularizar o pagamento.\n\nDados para pagamento:\nPIX CNPJ: ${PIX_CNPJ}\nEmail: ${EMAIL_COMERCIAL}\n\nAtenciosamente,\nCroma Print Comunicação Visual`,
+  3: (d) => `Prezado(a) ${d.cliente},\n\nInformamos que identificamos um título em aberto no valor de ${d.valor}, com vencimento em ${d.vencimento}, referente ao pedido ${d.pedido}.\n\nSolicitamos a gentileza de regularizar o pagamento.\n\nDados para pagamento:\nPIX CNPJ: ${PIX_CNPJ}\nEmail: ${EMAIL_COMERCIAL}\n\nAtenciosamente,\nCroma Print Comunicação Visual`,
 };
 
 // ── Main Handler ─────────────────────────────────────────────────────
@@ -107,7 +108,11 @@ Deno.serve(async (req) => {
     const startHour = parseInt(config.horario_inicio?.split(':')[0] ?? '8', 10);
     const endHour = parseInt(config.horario_fim?.split(':')[0] ?? '23', 10);
 
-    if (brtHour < startHour || brtHour >= endHour) {
+    // Force-run override: ?force=1 permite testes manuais fora do horário
+    const url = new URL(req.url);
+    const force = url.searchParams.get('force') === '1';
+
+    if (!force && (brtHour < startHour || brtHour >= endHour)) {
       return jsonOk({ status: 'skipped', motivo: `Fora do horário (${brtHour}h BRT)` });
     }
 
@@ -138,19 +143,28 @@ Deno.serve(async (req) => {
     }).catch(() => {});
 
     // Register system_event for monitoring
-    await supabase.from('system_events').insert({
+    // NOTE: entity_id é NOT NULL — usar UUID sentinel '000...000' para eventos de sistema
+    const rulesSkipped = ruleResults.reduce((s, r) => s + r.skipped, 0);
+    const rulesErrors = ruleResults.reduce((s, r) => s + r.errors.length, 0);
+    const sysInsert = await supabase.from('system_events').insert({
       event_type: 'cron_loop_executed',
       entity_type: 'system',
+      entity_id: '00000000-0000-0000-0000-000000000000',
       payload: {
         duration_ms: duration,
         rules_processed: ruleResults.length,
         rules_total_matches: ruleResults.reduce((s, r) => s + r.matches, 0),
-        rules_total_executed: ruleResults.reduce((s, r) => s + r.executed, 0),
+        actions_success: ruleResults.reduce((s, r) => s + r.executed, 0),
+        actions_failed: rulesErrors,
+        rules_skipped: rulesSkipped,
         followups: followUpResults,
         nightly: nightlyResults,
         brt_hour: brtHour,
       },
-    }).catch(() => {});
+    });
+    if (sysInsert.error) {
+      console.error('cron_loop_executed insert failed:', sysInsert.error.message);
+    }
 
     return jsonOk({
       status: 'ok',
@@ -259,7 +273,7 @@ async function evaluateRule(supabase: SupabaseClient, rule: AgentRule): Promise<
         cr.cliente_id, c.nome_fantasia as cliente_nome, c.telefone, c.email,
         (CURRENT_DATE - cr.data_vencimento) as dias_atraso, p.numero as pedido_numero
         FROM contas_receber cr JOIN clientes c ON c.id = cr.cliente_id LEFT JOIN pedidos p ON p.id = cr.pedido_id
-        WHERE cr.status IN ('aberto','vencido','pendente') AND (CURRENT_DATE - cr.data_vencimento) BETWEEN 1 AND 2
+        WHERE cr.status IN ('vencido','parcial','faturado','a_vencer') AND (CURRENT_DATE - cr.data_vencimento) BETWEEN 1 AND 2
         AND cr.data_pagamento IS NULL AND cr.saldo > 0 AND cr.excluido_em IS NULL`;
       break;
 
@@ -268,7 +282,7 @@ async function evaluateRule(supabase: SupabaseClient, rule: AgentRule): Promise<
         cr.cliente_id, c.nome_fantasia as cliente_nome, c.telefone, c.email,
         (CURRENT_DATE - cr.data_vencimento) as dias_atraso, p.numero as pedido_numero
         FROM contas_receber cr JOIN clientes c ON c.id = cr.cliente_id LEFT JOIN pedidos p ON p.id = cr.pedido_id
-        WHERE cr.status IN ('aberto','vencido','pendente') AND (CURRENT_DATE - cr.data_vencimento) BETWEEN 3 AND 6
+        WHERE cr.status IN ('vencido','parcial','faturado','a_vencer') AND (CURRENT_DATE - cr.data_vencimento) BETWEEN 3 AND 6
         AND cr.data_pagamento IS NULL AND cr.saldo > 0 AND cr.excluido_em IS NULL`;
       break;
 
@@ -277,7 +291,7 @@ async function evaluateRule(supabase: SupabaseClient, rule: AgentRule): Promise<
         cr.cliente_id, c.nome_fantasia as cliente_nome, c.telefone, c.email,
         (CURRENT_DATE - cr.data_vencimento) as dias_atraso, p.numero as pedido_numero
         FROM contas_receber cr JOIN clientes c ON c.id = cr.cliente_id LEFT JOIN pedidos p ON p.id = cr.pedido_id
-        WHERE cr.status IN ('aberto','vencido','pendente') AND (CURRENT_DATE - cr.data_vencimento) BETWEEN 7 AND 14
+        WHERE cr.status IN ('vencido','parcial','faturado','a_vencer') AND (CURRENT_DATE - cr.data_vencimento) BETWEEN 7 AND 14
         AND cr.data_pagamento IS NULL AND cr.saldo > 0 AND cr.excluido_em IS NULL`;
       break;
 
@@ -286,7 +300,7 @@ async function evaluateRule(supabase: SupabaseClient, rule: AgentRule): Promise<
         cr.cliente_id, c.nome_fantasia as cliente_nome, c.telefone, c.email,
         (CURRENT_DATE - cr.data_vencimento) as dias_atraso, p.numero as pedido_numero
         FROM contas_receber cr JOIN clientes c ON c.id = cr.cliente_id LEFT JOIN pedidos p ON p.id = cr.pedido_id
-        WHERE cr.status IN ('aberto','vencido','pendente') AND (CURRENT_DATE - cr.data_vencimento) BETWEEN 15 AND 29
+        WHERE cr.status IN ('vencido','parcial','faturado','a_vencer') AND (CURRENT_DATE - cr.data_vencimento) BETWEEN 15 AND 29
         AND cr.data_pagamento IS NULL AND cr.saldo > 0 AND cr.excluido_em IS NULL`;
       break;
 
@@ -295,7 +309,7 @@ async function evaluateRule(supabase: SupabaseClient, rule: AgentRule): Promise<
         cr.cliente_id, c.nome_fantasia as cliente_nome, c.telefone, c.email,
         (CURRENT_DATE - cr.data_vencimento) as dias_atraso, p.numero as pedido_numero
         FROM contas_receber cr JOIN clientes c ON c.id = cr.cliente_id LEFT JOIN pedidos p ON p.id = cr.pedido_id
-        WHERE cr.status IN ('aberto','vencido','pendente') AND (CURRENT_DATE - cr.data_vencimento) >= 30
+        WHERE cr.status IN ('vencido','parcial','faturado','a_vencer') AND (CURRENT_DATE - cr.data_vencimento) >= 30
         AND cr.data_pagamento IS NULL AND cr.saldo > 0 AND cr.excluido_em IS NULL`;
       break;
 
@@ -347,11 +361,26 @@ async function evaluateRule(supabase: SupabaseClient, rule: AgentRule): Promise<
       break;
 
     case 'follow_up_lead_24h':
+      // FIX 2026-04-24: filtrar leads COM contato válido + excluir já processados nas últimas 24h
+      // + LIMIT 20 para evitar floods quando há bulk import de 400+ leads
       query = `SELECT l.id, l.contato_nome, l.empresa, l.email, l.telefone, l.score,
         l.status, l.updated_at
         FROM leads l
         WHERE l.updated_at < now() - interval '24 hours'
-        AND l.status NOT IN ('convertido','perdido','descartado')`;
+        AND l.status NOT IN ('convertido','perdido','descartado')
+        AND (
+          (l.telefone IS NOT NULL AND l.telefone <> '')
+          OR (l.email IS NOT NULL AND l.email <> '')
+        )
+        AND NOT EXISTS (
+          SELECT 1 FROM system_events se
+          WHERE se.entity_id = l.id
+          AND se.event_type = 'rule_executed'
+          AND se.payload->>'rule_name' = 'follow_up_lead_24h'
+          AND se.created_at > now() - interval '24 hours'
+        )
+        ORDER BY l.score DESC NULLS LAST, l.updated_at ASC
+        LIMIT 20`;
       break;
 
     case 'follow_up_proposta_48h':
@@ -424,18 +453,20 @@ async function wasRecentlyProcessed(supabase: SupabaseClient, rule: AgentRule, m
     return (data?.length ?? 0) > 0;
   }
 
-  // Para outras regras: verificar em system_events
+  // Para outras regras: verificar em system_events FILTRADO POR rule_name
+  // FIX 2026-04-24: antes o dedup pegava qualquer rule_executed no entity_id → falso-positivo
+  // entre rules diferentes (lead_quente + follow_up apagavam um ao outro).
+  // Agora filtra por payload->>'rule_name' usando JSON operator.
   const { data } = await supabase
     .from('system_events')
     .select('id')
     .eq('event_type', 'rule_executed')
     .eq('entity_id', match.id)
+    .filter('payload->>rule_name', 'eq', rule.nome)
     .gte('created_at', new Date(Date.now() - 24 * 60 * 60 * 1000).toISOString())
     .limit(1);
 
-  // Filtrar por rule_id no payload (system_events não tem campo rule_id)
-  if (data && data.length > 0) return true;
-  return false;
+  return (data?.length ?? 0) > 0;
 }
 
 // ── Execute action for matched record ──
@@ -456,7 +487,9 @@ async function executeRuleAction(supabase: SupabaseClient, rule: AgentRule, matc
       break;
 
     case 'enviar_mensagem':
-      // Follow-up leads/propostas — registrar alerta (envio real via ai-decidir-acao)
+      // FIX 2026-04-24: criar/atualizar agent_conversation para que processLeadFollowUps
+      // pegue o lead na próxima rodada. Antes só criava alert — envio real nunca saía.
+      await ensureConversationScheduled(supabase, rule, match);
       await createSystemAlert(supabase, rule, match);
       break;
 
@@ -553,8 +586,8 @@ async function executeCobranca(supabase: SupabaseClient, rule: AgentRule, match:
   // D+15 e D+30: sempre alerta Telegram
   if (nivel >= 4 || rule.nome.includes('d15') || rule.nome.includes('d30')) {
     const telegramMsg = nivel >= 5 || rule.nome.includes('d30')
-      ? `🚨 INADIMPLÊNCIA D+${diasAtraso}: ${match.cliente_nome} — R$ ${formatBRL(match.saldo ?? match.valor_original)} vencido há ${diasAtraso} dias. RECOMENDAÇÃO: suspender novos pedidos até regularização.`
-      : `⚠️ COBRANÇA D+${diasAtraso}: ${match.cliente_nome} com R$ ${formatBRL(match.saldo ?? match.valor_original)} vencido há ${diasAtraso} dias (pedido ${match.pedido_numero ?? '-'}). Ação sugerida: ligar pessoalmente.`;
+      ? `🚨 INADIMPLÊNCIA D+${diasAtraso}: ${match.cliente_nome} — ${formatBRL(match.saldo ?? match.valor_original)} vencido há ${diasAtraso} dias. RECOMENDAÇÃO: suspender novos pedidos até regularização.`
+      : `⚠️ COBRANÇA D+${diasAtraso}: ${match.cliente_nome} com ${formatBRL(match.saldo ?? match.valor_original)} vencido há ${diasAtraso} dias (pedido ${match.pedido_numero ?? '-'}). Ação sugerida: ligar pessoalmente.`;
 
     await sendTelegram(telegramMsg);
   }
@@ -701,6 +734,57 @@ async function createSystemAlert(supabase: SupabaseClient, rule: AgentRule, matc
         estoque_minimo: String(match.estoque_minimo ?? ''),
       }),
     },
+  });
+}
+
+// ── Garante agent_conversation agendada (fix follow_up_lead_24h) ──
+// FIX 2026-04-24: antes o case 'enviar_mensagem' só gerava alert e nada saía.
+// Agora conecta o lead ao fluxo real de follow-up via agent_conversations.
+async function ensureConversationScheduled(
+  supabase: SupabaseClient,
+  rule: AgentRule,
+  match: any,
+): Promise<void> {
+  if (!match.id) return;
+  // Só aplica a leads — outras rules (propostas, etc) têm fluxo próprio
+  if (rule.modulo !== 'comercial' || !rule.nome.startsWith('follow_up_lead')) return;
+
+  // Escolher canal: whatsapp se telefone, senão email
+  const hasPhone = !!(match.telefone && String(match.telefone).trim());
+  const hasEmail = !!(match.email && String(match.email).trim());
+  if (!hasPhone && !hasEmail) return; // Safety — já filtrado na query mas protege
+  const canal = hasPhone ? 'whatsapp' : 'email';
+
+  // Verificar se já existe conversa ativa
+  const { data: existing } = await supabase
+    .from('agent_conversations')
+    .select('id, proximo_followup')
+    .eq('lead_id', match.id)
+    .in('status', ['ativa'])
+    .limit(1);
+
+  if (existing && existing.length > 0) {
+    // Já existe — apenas garantir proximo_followup <= now para ser pego na próxima rodada
+    await supabase
+      .from('agent_conversations')
+      .update({ proximo_followup: new Date().toISOString() })
+      .eq('id', existing[0].id);
+    return;
+  }
+
+  // Criar nova conversa ativa com follow-up imediato
+  await supabase.from('agent_conversations').insert({
+    lead_id: match.id,
+    canal,
+    status: 'ativa',
+    etapa: 'abertura',
+    mensagens_recebidas: 0,
+    mensagens_enviadas: 0,
+    score_engajamento: 0,
+    proximo_followup: new Date().toISOString(),
+    tentativas: 0,
+    max_tentativas: 3, // Conservador — 3 tentativas e encerra
+    auto_aprovacao: false, // Requer aprovação manual do Junior
   });
 }
 
