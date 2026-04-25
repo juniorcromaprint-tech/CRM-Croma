@@ -17,9 +17,14 @@ import {
   Layers,
   Table2,
 } from 'lucide-react';
-import type { TerceirizacaoItem } from '@/hooks/useTerceirizacaoCatalogo';
+import type {
+  TerceirizacaoItem,
+  TerceirizacaoVariacao,
+  TerceirizacaoVariacaoTipo,
+} from '@/hooks/useTerceirizacaoCatalogo';
 import {
   useTerceirizacaoFaixas,
+  useTerceirizacaoVariacoes,
 } from '@/hooks/useTerceirizacaoCatalogo';
 
 interface TerceirizacaoDetailDrawerProps {
@@ -38,8 +43,7 @@ function InfoRow({ label, value }: { label: string; value: string | null | undef
   );
 }
 
-// ─── Tabela de faixas ────────────────────────────────────────────────────────
-
+// Tabela de faixas (Fase 2)
 function FaixasTable({
   catalogoId,
   markupAplicado,
@@ -108,7 +112,90 @@ function FaixasTable({
   );
 }
 
-// ─── Drawer principal ────────────────────────────────────────────────────────
+// Variacoes (Fase 3)
+const TIPO_LABEL: Record<TerceirizacaoVariacaoTipo, string> = {
+  cor: 'Cores',
+  revestimento: 'Revestimentos',
+  opcao: 'Opções',
+  outro: 'Outras variações',
+};
+
+const TIPO_ORDEM: TerceirizacaoVariacaoTipo[] = ['cor', 'revestimento', 'opcao', 'outro'];
+
+const TIPO_CHIP_STYLE: Record<TerceirizacaoVariacaoTipo, string> = {
+  cor: 'border-rose-200 bg-rose-50 text-rose-700',
+  revestimento: 'border-indigo-200 bg-indigo-50 text-indigo-700',
+  opcao: 'border-sky-200 bg-sky-50 text-sky-700',
+  outro: 'border-slate-200 bg-slate-50 text-slate-600',
+};
+
+function agruparVariacoes(variacoes: TerceirizacaoVariacao[]) {
+  const grupos = new Map<TerceirizacaoVariacaoTipo, TerceirizacaoVariacao[]>();
+  for (const v of variacoes) {
+    const tipo = (v.tipo ?? 'outro') as TerceirizacaoVariacaoTipo;
+    const lista = grupos.get(tipo) ?? [];
+    lista.push(v);
+    grupos.set(tipo, lista);
+  }
+  return TIPO_ORDEM
+    .filter((t) => grupos.has(t))
+    .map((t) => ({ tipo: t, itens: grupos.get(t)! }));
+}
+
+function VariacoesChips({ catalogoId }: { catalogoId: string }) {
+  const { data: variacoes = [], isLoading } = useTerceirizacaoVariacoes(catalogoId);
+
+  if (isLoading) {
+    return (
+      <div className="animate-pulse mt-2 space-y-3">
+        {[1, 2].map((i) => (
+          <div key={i}>
+            <div className="h-3 bg-slate-100 rounded w-24 mb-2" />
+            <div className="flex gap-1.5">
+              {[1, 2, 3].map((j) => (
+                <div key={j} className="h-6 w-16 bg-slate-100 rounded-full" />
+              ))}
+            </div>
+          </div>
+        ))}
+      </div>
+    );
+  }
+
+  if (variacoes.length === 0) {
+    return (
+      <p className="text-xs text-slate-400 italic mt-2">
+        Nenhuma variação capturada para este produto.
+      </p>
+    );
+  }
+
+  const grupos = agruparVariacoes(variacoes);
+
+  return (
+    <div className="mt-2 space-y-4">
+      {grupos.map(({ tipo, itens }) => (
+        <div key={tipo}>
+          <p className="text-xs font-medium text-slate-500 mb-1.5">
+            {TIPO_LABEL[tipo]}
+            <span className="text-slate-400 font-normal ml-1">({itens.length})</span>
+          </p>
+          <div className="flex flex-wrap gap-1.5">
+            {itens.map((v) => (
+              <span
+                key={v.id}
+                className={`inline-flex items-center rounded-full border px-2.5 py-1 text-xs font-medium ${TIPO_CHIP_STYLE[tipo]}`}
+                title={v.valor_id}
+              >
+                {v.rotulo}
+              </span>
+            ))}
+          </div>
+        </div>
+      ))}
+    </div>
+  );
+}
 
 export default function TerceirizacaoDetailDrawer({
   item,
@@ -122,8 +209,6 @@ export default function TerceirizacaoDetailDrawer({
   const temVenda = item.preco_venda != null && item.preco_venda > 0;
   const diferenca =
     temPreco && temVenda ? item.preco_venda! - item.preco_valor! : null;
-
-  // Faixas só existem em produtos "cada"
   const temFaixas = item.preco_unidade === 'cada';
 
   return (
@@ -139,12 +224,10 @@ export default function TerceirizacaoDetailDrawer({
           </p>
         </SheetHeader>
 
-        {/* Badge categoria */}
         <Badge variant="outline" className="mb-6 text-xs">
           {item.categoria}
         </Badge>
 
-        {/* Bloco de preços */}
         {(temPreco || temVenda || item.preco_texto) && (
           <div className="bg-slate-50 rounded-2xl p-4 mb-6 space-y-3">
             <h4 className="text-xs font-semibold text-slate-500 uppercase tracking-wide">
@@ -200,7 +283,6 @@ export default function TerceirizacaoDetailDrawer({
           </div>
         )}
 
-        {/* Faixas de quantidade (Fase 2) */}
         {temFaixas && (
           <div className="bg-white rounded-2xl border border-slate-100 p-4 mb-6">
             <h4 className="text-xs font-semibold text-slate-500 uppercase tracking-wide mb-1 flex items-center gap-1.5">
@@ -214,7 +296,6 @@ export default function TerceirizacaoDetailDrawer({
           </div>
         )}
 
-        {/* Especificações técnicas */}
         <div className="bg-white rounded-2xl border border-slate-100 p-4 mb-6">
           <h4 className="text-xs font-semibold text-slate-500 uppercase tracking-wide mb-4 flex items-center gap-1.5">
             <Package size={13} />
@@ -236,17 +317,14 @@ export default function TerceirizacaoDetailDrawer({
           )}
         </div>
 
-        {/* Variações — Fase 3 */}
-        <div className="bg-amber-50 rounded-2xl border border-amber-100 p-4 mb-6">
-          <div className="flex items-center gap-2 text-amber-700">
-            <Layers size={14} />
-            <span className="text-xs font-medium">
-              Variações (cores, revestimentos, opções) disponíveis em breve (Fase 3)
-            </span>
-          </div>
+        <div className="bg-white rounded-2xl border border-slate-100 p-4 mb-6">
+          <h4 className="text-xs font-semibold text-slate-500 uppercase tracking-wide mb-1 flex items-center gap-1.5">
+            <Layers size={13} />
+            Variações Disponíveis
+          </h4>
+          <VariacoesChips catalogoId={item.id} />
         </div>
 
-        {/* Rodapé — link externo + captura */}
         <div className="flex items-center justify-between text-xs text-slate-400">
           {item.capturado_em && (
             <span>Capturado em {formatDate(item.capturado_em)}</span>

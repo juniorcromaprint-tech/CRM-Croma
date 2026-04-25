@@ -3,8 +3,6 @@
 import { useQuery } from '@tanstack/react-query';
 import { supabase } from '@/integrations/supabase/client';
 
-// ─── Tipos ───────────────────────────────────────────────────────────────────
-
 export interface TerceirizacaoFornecedor {
   id: string;
   razao_social: string;
@@ -38,8 +36,6 @@ export interface UseTerceirizacaoCatalogoFilters {
   search?: string;
 }
 
-// ─── Hook ────────────────────────────────────────────────────────────────────
-
 export function useTerceirizacaoCatalogo(filters: UseTerceirizacaoCatalogoFilters = {}) {
   return useQuery({
     queryKey: ['terceirizacao_catalogo', filters],
@@ -72,12 +68,11 @@ export function useTerceirizacaoCatalogo(filters: UseTerceirizacaoCatalogoFilter
       if (error) throw error;
       return (data ?? []) as unknown as TerceirizacaoItem[];
     },
-    staleTime: 1000 * 60 * 5, // 5 min
+    staleTime: 1000 * 60 * 5,
   });
 }
 
-// ─── Tipos faixas ────────────────────────────────────────────────────────────
-
+// Tipos faixas
 export interface TerceirizacaoFaixa {
   id: string;
   catalogo_id: string;
@@ -85,8 +80,6 @@ export interface TerceirizacaoFaixa {
   preco_unitario: number;
   capturado_em: string;
 }
-
-// ─── Hook faixas ─────────────────────────────────────────────────────────────
 
 export function useTerceirizacaoFaixas(catalogoId: string | null | undefined) {
   return useQuery({
@@ -106,7 +99,39 @@ export function useTerceirizacaoFaixas(catalogoId: string | null | undefined) {
   });
 }
 
-// ─── Hook categorias ─────────────────────────────────────────────────────────
+// Tipos variacoes (Fase 3)
+export type TerceirizacaoVariacaoTipo = 'cor' | 'revestimento' | 'opcao' | 'outro';
+
+export interface TerceirizacaoVariacao {
+  id: string;
+  catalogo_id: string;
+  tipo: TerceirizacaoVariacaoTipo;
+  valor_id: string;
+  rotulo: string;
+  modificador_preco: number | null;
+  ordem: number;
+  capturado_em: string;
+}
+
+export function useTerceirizacaoVariacoes(catalogoId: string | null | undefined) {
+  return useQuery({
+    queryKey: ['terceirizacao_variacoes', catalogoId],
+    enabled: !!catalogoId,
+    queryFn: async () => {
+      const { data, error } = await supabase
+        .from('terceirizacao_catalogo_variacoes')
+        .select('id, catalogo_id, tipo, valor_id, rotulo, modificador_preco, ordem, capturado_em')
+        .eq('catalogo_id', catalogoId!)
+        .order('tipo', { ascending: true })
+        .order('ordem', { ascending: true })
+        .order('rotulo', { ascending: true });
+
+      if (error) throw error;
+      return (data ?? []) as TerceirizacaoVariacao[];
+    },
+    staleTime: 1000 * 60 * 10,
+  });
+}
 
 export function useTerceirizacaoCategorias() {
   return useQuery({
