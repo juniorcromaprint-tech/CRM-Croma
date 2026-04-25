@@ -1,8 +1,7 @@
 // supabase/functions/ai-compor-mensagem/index.ts
 
 import { serve } from 'https://deno.land/std@0.168.0/http/server.ts';
-import { handleCorsOptions, getCorsHeaders, jsonResponse, getServiceClient } from '../ai-shared/ai-helpers.ts';
-import { createClient } from 'https://esm.sh/@supabase/supabase-js@2';
+import { handleCorsOptions, getCorsHeaders, jsonResponse, getServiceClient, authenticateAndAuthorize } from '../ai-shared/ai-helpers.ts';
 import { callOpenRouter } from '../ai-shared/openrouter-provider.ts';
 import { logAICall } from '../ai-shared/ai-logger.ts';
 
@@ -87,51 +86,10 @@ serve(async (req: Request) => {
   const corsHeaders = getCorsHeaders(req);
 
   try {
-    // Auth: accept user JWT OR service_role (for cron/internal calls)
-    // FIX S2.6 2026-04-24: substituido string-compare por JWT role decoder + header X-Internal-Call.
-    // Motivo: string-compare falhava quando token vem de pg_cron (private.get_service_role_key())
-    // e o env da Edge Function tem uma chave formatada diferente mesmo que equivalente.
-    const authHeader = req.headers.get('Authorization');
-    const isInternalHeader = req.headers.get('X-Internal-Call') === 'true';
-    let isAuthorized = false;
-    let userId: string | null = null;
-
-    if (authHeader?.startsWith('Bearer ')) {
-      const token = authHeader.replace('Bearer ', '');
-      // Bypass inter-service: JWT com role=service_role + header X-Internal-Call
-      if (isInternalHeader && token.split('.').length === 3) {
-        try {
-          const payloadB64 = token.split('.')[1];
-          const b64 = payloadB64.replace(/-/g, '+').replace(/_/g, '/').padEnd(Math.ceil(payloadB64.length / 4) * 4, '=');
-          const payload = JSON.parse(atob(b64));
-          if (payload.role === 'service_role') {
-            isAuthorized = true;
-          }
-        } catch (_err) { /* fall through */ }
-      }
-      if (!isAuthorized) {
-        const supabaseAuth = createClient(
-          Deno.env.get('SUPABASE_URL')!,
-          Deno.env.get('SUPABASE_ANON_KEY')!
-        );
-        const { data: { user } } = await supabaseAuth.auth.getUser(token);
-        if (user) {
-          const supabaseService = getServiceClient();
-          const { data: profile } = await supabaseService.from('profiles').select('role').eq('id', user.id).single();
-          const allowedRoles = ['comercial', 'gerente', 'admin'];
-          if (profile && allowedRoles.includes(profile.role)) {
-            isAuthorized = true;
-            userId = user.id;
-          }
-        }
-      }
-    }
-
-    if (!isAuthorized) {
-      return new Response(JSON.stringify({ error: 'Unauthorized' }), {
-        status: 401, headers: { ...corsHeaders, 'Content-Type': 'application/json' }
-      });
-    }
+    // Auth centralizada v2 — HMAC JWT verification + role-based access
+    const { auth, error: authError } = await authenticateAndAuthorize(req, 'compor-mensagem');
+    if (authError) return authError;
+    const userId = auth!.userId === '00000000-0000-0000-0000-000000000000' ? null : auth!.userId;
 
     const body = await req.json();
     const { lead_id, canal, etapa, contexto_extra } = body as {

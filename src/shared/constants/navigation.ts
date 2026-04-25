@@ -71,6 +71,7 @@ export const NAV_GROUPS: NavGroup[] = [
       { name: 'Movimentações', path: '/estoque/movimentacoes', icon: 'ArrowLeftRight', module: 'estoque' },
       { name: 'Inventário', path: '/estoque/inventario', icon: 'ClipboardList', module: 'estoque' },
       { name: 'Produtos', path: '/produtos', icon: 'Package', module: 'producao' },
+      { name: 'Terceirização', path: '/terceirizacao', icon: 'Network', module: 'compras' },
       { name: 'Matéria Prima', path: '/admin/materiais', icon: 'Package', module: 'admin' },
     ],
   },

@@ -91,6 +91,39 @@ Deno.serve(async (req) => {
   }
 
   try {
+    // ── 0. Circuit breaker: skip if too many consecutive errors ──
+    const { count: recentErrors } = await supabase
+      .from('ai_logs')
+      .select('*', { count: 'exact', head: true })
+      .eq('function_name', 'agent-cron-loop')
+      .eq('status', 'error')
+      .gte('created_at', new Date(Date.now() - 3 * 3600_000).toISOString()); // last 3h
+
+    const CB_THRESHOLD = 5; // 5 errors in 3h → open circuit
+    if ((recentErrors ?? 0) >= CB_THRESHOLD) {
+      // Check if we already sent circuit-breaker alert recently (avoid spam)
+      const { count: cbAlerts } = await supabase
+        .from('system_events')
+        .select('*', { count: 'exact', head: true })
+        .eq('event_type', 'circuit_breaker_open')
+        .gte('created_at', new Date(Date.now() - 3 * 3600_000).toISOString());
+
+      if ((cbAlerts ?? 0) === 0) {
+        await sendTelegram(
+          `🔴 CIRCUIT BREAKER: agent-cron-loop pausado — ${recentErrors} erros nas últimas 3h. ` +
+          `Verifique os logs. O cron será retomado automaticamente quando os erros pararem.`
+        );
+        await supabase.from('system_events').insert({
+          event_type: 'circuit_breaker_open',
+          entity_type: 'system',
+          entity_id: '00000000-0000-0000-0000-000000000000',
+          payload: { errors_count: recentErrors, threshold: CB_THRESHOLD, window_hours: 3 },
+        });
+      }
+
+      return jsonOk({ status: 'circuit_breaker_open', errors_last_3h: recentErrors, threshold: CB_THRESHOLD });
+    }
+
     // ── 1. Check business hours (BRT = UTC-3) ──
     const now = new Date();
     const brtHour = (now.getUTCHours() - 3 + 24) % 24;

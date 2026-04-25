@@ -1,11 +1,45 @@
 # STATE - Croma Print CRM
 
-**Ultima atualizacao:** 2026-04-24 (Fechamento Operacional — 7 etapas F.1-F.7)
+**Ultima atualizacao:** 2026-04-25 (Fase 1 Terceirizacao entregue)
 **Responsavel:** Claude (Cowork)
 
-## Ultima atividade
-Fechamento operacional pos Sprint 2. Commit em producao, validacao Vercel,
-deploy das Edge Functions, testes 200/401 em 3 criticas.
+## Proxima sessao - PRIORIDADE
+Continuar `.planning/FEATURE-terceirizacao.md` a partir da **Fase 2**.
+
+- Fase 2: migration `terceirizacao_catalogo_faixas` + script scraping faixas + drawer
+- Fase 3: migration `terceirizacao_catalogo_variacoes` + script + drawer
+- Fase 4: coluna `descricao` + script + drawer
+- Fases 5-10: integracao Mubisys, automacao, multi-fornecedor, fiscal, BI, docs
+
+## Ultima atividade - FASE 1 TERCEIRIZACAO (2026-04-25)
+Pagina /terceirizacao implementada e build passou sem erros (vite 29.28s, 4654 modulos).
+
+### Arquivos criados/alterados
+- `src/hooks/useTerceirizacaoCatalogo.ts` -- hook React Query com filtros
+- `src/domains/terceirizacao/components/TerceirizacaoFilters.tsx`
+- `src/domains/terceirizacao/components/TerceirizacaoProductCard.tsx`
+- `src/domains/terceirizacao/components/TerceirizacaoDetailDrawer.tsx`
+- `src/domains/terceirizacao/components/TerceirizacaoEmptyState.tsx`
+- `src/domains/terceirizacao/pages/TerceirizacaoPage.tsx`
+- `src/routes/terceirizacaoRoutes.tsx`
+- `src/App.tsx` -- import terceirizacaoRoutes
+- `src/shared/constants/navigation.ts` -- item Terceirizacao em SUPRIMENTOS
+
+### Criterios de aceite Fase 1
+- [x] Rota /terceirizacao registrada com PermissionGuard (modulo compras)
+- [x] Hook com filtros: categoria, busca debounced 300ms, fornecedor
+- [x] Grid 4 colunas com skeletons de loading
+- [x] Card: preco Scan vs preco venda Croma, badge markup %, prazo, link externo
+- [x] Drawer lateral (Sheet): precificacao completa, specs, margem bruta, link Scan
+- [x] Paginacao load-more (48/pagina)
+- [x] Item Terceirizacao no menu SUPRIMENTOS (icone Network)
+- [x] Build vite: zero erros, TerceirizacaoPage 14.27kB gzip 4.01kB
+- [ ] Deploy Vercel (pendente: Junior faz git push para main)
+
+## Sprint anterior — HARDENING FINAL (mantido pra historico)
+
+Sprint HARDENING FINAL: eliminar ghost code, blindar auth JWT com HMAC-SHA256,
+redeploy Edge Functions criticas, circuit breaker + TTL cleanup. Zero features novas.
 
 ## FECHAMENTO OPERACIONAL — EVIDENCIAS
 
@@ -49,15 +83,33 @@ Todas 3 demonstraram comportamento esperado. Fix S2.6 funcional em ambiente real
 ### F.7 — Documentacao (esta + vault Obsidian)
 STATE.md atualizado com evidencias numericas. Daily note criada no vault.
 
-## PENDENCIAS APOS FECHAMENTO
-1. **11 Edge Functions ainda precisam redeploy com ai-helpers.ts novo**:
-   ai-analisar-orcamento, ai-detectar-problemas, ai-composicao-produto,
+## HARDENING FINAL — Concluido 2026-04-24
+
+### E1 — Ghost code eliminado
+- Migration 135: fn_cobranca_escalonada + fn_faturar_contratos_vencidos versionados
+
+### E2 — Auth JWT blindada
+- ai-helpers.ts v2: HMAC-SHA256 via Web Crypto (zero deps) + defense-in-depth
+- AI_ROLE_ACCESS: 14 funcoes com role 'service'
+- Migration 136: 5 pg_cron jobs HTTP com X-Internal-Call
+
+### E3 — Deploys criticos
+- ai-detectar-problemas v17, ai-compor-mensagem v19, agent-cron-loop v15, mcp-bridge-worker v3
+
+### E4 — Estabilidade
+- Migration 137: fn_ttl_cleanup (system_events 60d, ai_logs 90d, ai_responses 30d) + cron diario 03:00 UTC
+- Circuit breaker: 5 erros/3h → pausa + alerta Telegram, auto-recupera
+
+### Relatorio completo
+`docs/qa-reports/2026-04-24-HARDENING-FINAL-REPORT.md`
+
+## PENDENCIAS REMANESCENTES
+1. **11 tests React 19 quebrados** (pre-existente): upgrade @testing-library/react
+2. **Job 11 vs Job 18**: redundancia de cleanup system_events (90d semanal vs 60d diario) — considerar remover job 11
+3. **Edge Functions IA restantes sem redeploy**: ai-analisar-orcamento, ai-composicao-produto,
    ai-briefing-producao, ai-sugerir-compra, ai-sequenciar-producao, ai-preco-dinamico,
    ai-validar-nfe, ai-insights-diarios, ai-conciliar-bancario, ai-previsao-estoque
-   (prioridade: alta para as 3 primeiras, media/baixa para o resto)
-2. **11 tests React 19 quebrados** (pre-existente): upgrade @testing-library/react
-3. **Politica TTL ai_responses**: 30 dias + cleanup via pg_cron
-4. **Alerta loop_anormal_vermelho** cai naturalmente em 24h (legacy data)
+   (ja funcionam via gateway Supabase, mas nao tem HMAC layer 2 ate redeploy)
 
 ## ARQUIVOS TOCADOS — Fechamento Operacional
 
@@ -195,6 +247,7 @@ STATE.md atualizado com evidencias numericas. Daily note criada no vault.
 5. **Retenção dos ai_responses**: sem politica de expiracao. Considerar TTL de 30 dias + cleanup via pg_cron.
 
 ## Sessoes anteriores (historico resumido)
+- 2026-04-24 noite: HARDENING FINAL (4 etapas — ghost code, JWT HMAC, deploys, circuit breaker + TTL)
 - 2026-04-24 madrugada: Sprint 1 Estabilizacao IA (4 etapas + 2 relatorios + AdminIaHealthPage)
 - 2026-04-23 noite: PDF proposta v2 — 12 fixes P0+P1+P2 (commit a9a5aaf)
 - 2026-04-23 tarde: Artifact "Minha atencao hoje" no Cowork

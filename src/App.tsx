@@ -25,6 +25,7 @@ import { fiscalRoutes } from "./routes/fiscalRoutes";
 import { contabilidadeRoutes } from "./routes/contabilidadeRoutes";
 import { adminRoutes } from "./routes/adminRoutes";
 import { agentRoutes } from "./routes/agentRoutes";
+import { terceirizacaoRoutes } from "./routes/terceirizacaoRoutes";
 
 const queryClient = new QueryClient({
   defaultOptions: {
@@ -111,6 +112,7 @@ const App = () => (
               {contabilidadeRoutes}
               {adminRoutes}
               {agentRoutes}
+              {terceirizacaoRoutes}
             </Route>
 
             <Route path="*" element={<Navigate to="/" replace />} />
