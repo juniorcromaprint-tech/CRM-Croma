@@ -3,30 +3,33 @@
 > Atualizado: 2026-04-25
 
 ## Status Atual
-**Fase**: Terceirização — Fase 3 CONCLUÍDA | Fase 4 pendente
+**Fase**: Terceirização — Fase 4 CONCLUÍDA | Fase 5 pendente
 
 ## Último trabalho
 - Fase 1 (✅ commit 6573cfb): página, hook, components, rota, menu
-- Fase 2 (✅ commit 4f613d5): migration faixas, hook useTerceirizacaoFaixas, FaixasTable no drawer, scraping 27/75 produtos, 27 faixas inseridas no Supabase
-- Fase 3 (✅ 2026-04-25): migration `terceirizacao_catalogo_variacoes`, hook `useTerceirizacaoVariacoes`, script `scrape_variacoes.py`, 380 variações em 87 produtos (59.6% cobertura), componente `VariacoesChips` no drawer
+- Fase 2 (✅ commit 4f613d5): migration faixas, hook useTerceirizacaoFaixas, FaixasTable no drawer, 27 faixas inseridas
+- Fase 3 (✅ commit d038ec1): migration variacoes, hook useTerceirizacaoVariacoes, 380 variações em 87 produtos (59.6%)
+- Fase 4 (✅ 2026-04-25): coluna `descricao` em terceirizacao_catalogo, script `scrape_descricoes.py`, 144 descrições (98.6%), bloco "Sobre o produto" no drawer
 
 ## Próxima tarefa
-**Fase 4**: Descrições técnicas resumidas
-- Migration: `ALTER TABLE terceirizacao_catalogo ADD COLUMN descricao text`
-- Script: extrair seção técnica de cada URL e resumir em 3–5 frases
-- Drawer: renderizar descrição no topo das especificações
-- Cookie Scan: PHPSESSID=3c2d65fc27deb7348025186fb63ac0f1 (válido, testado 2026-04-24)
+**Fase 5**: Integração com orçamento Mubisys
+- Função SQL `sugerir_terceirizacao(produto_croma_id, medidas, qtd)`
+- View `vw_terceirizacao_alternativas`
+- Card "Alternativa de fornecimento" no orçamento
+- Snapshot em `proposta_itens` (fornecedor_id, terceirizado, preco_terceirizacao_snapshot)
+- Pedido de compra automático quando proposta vira pedido
 
-## Resultados da Fase 3
-- Total variações: **380**
-- Por tipo: opcao=261, revestimento=66, outro=39, cor=14
-- Produtos com variações: 87 de 146 (59.6%)
+## Resultados da Fase 4
+- Descrições: **144/146 (98.6%)**
+- Tamanho médio: 211 chars (min 41, max 395)
+- Fonte: blocos `produto-pagina-info` + `produto-pagina-descricao-html` das páginas Scan
+- Filtro: remoção de marketing ("garanta", "perfeito", "ideal", "alta visibilidade", etc.)
 
-## Fases pendentes (4-10)
-Ver: C:\Users\Caldera\Claude\CRM-Croma\.planning\FEATURE-terceirizacao.md
+## Fases pendentes (5-10)
+Ver: `.planning/FEATURE-terceirizacao.md`
 
 ## Blockers
 - Nenhum no momento
 
 ## Branch
-main — aguardando commit da Fase 3
+main — aguardando commit da Fase 4

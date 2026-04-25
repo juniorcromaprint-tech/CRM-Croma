@@ -25,6 +25,7 @@ export interface TerceirizacaoItem {
   preco_unidade: string | null;
   markup_aplicado: number | null;
   preco_venda: number | null;
+  descricao: string | null;
   url: string | null;
   capturado_em: string | null;
   fornecedores: TerceirizacaoFornecedor;
@@ -45,7 +46,7 @@ export function useTerceirizacaoCatalogo(filters: UseTerceirizacaoCatalogoFilter
         .select(`
           id, categoria, nome, cores, material, revestimento, acabamento, extras,
           prazo, preco_info, preco_texto, preco_valor, preco_unidade,
-          markup_aplicado, preco_venda, url, capturado_em,
+          markup_aplicado, preco_venda, descricao, url, capturado_em,
           fornecedores!inner(id, razao_social, nome_fantasia)
         `)
         .eq('ativo', true)

@@ -16,6 +16,7 @@ import {
   Package,
   Layers,
   Table2,
+  FileText,
 } from 'lucide-react';
 import type {
   TerceirizacaoItem,
@@ -210,6 +211,7 @@ export default function TerceirizacaoDetailDrawer({
   const diferenca =
     temPreco && temVenda ? item.preco_venda! - item.preco_valor! : null;
   const temFaixas = item.preco_unidade === 'cada';
+  const temDescricao = !!item.descricao && item.descricao.trim().length >= 20;
 
   return (
     <Sheet open={open} onOpenChange={(v) => { if (!v) onClose(); }}>
@@ -227,6 +229,19 @@ export default function TerceirizacaoDetailDrawer({
         <Badge variant="outline" className="mb-6 text-xs">
           {item.categoria}
         </Badge>
+
+        {/* Descricao (Fase 4) */}
+        {temDescricao && (
+          <div className="bg-blue-50/50 rounded-2xl border border-blue-100 p-4 mb-6">
+            <h4 className="text-xs font-semibold text-slate-500 uppercase tracking-wide mb-2 flex items-center gap-1.5">
+              <FileText size={13} />
+              Sobre o produto
+            </h4>
+            <p className="text-sm text-slate-700 leading-relaxed">
+              {item.descricao}
+            </p>
+          </div>
+        )}
 
         {(temPreco || temVenda || item.preco_texto) && (
           <div className="bg-slate-50 rounded-2xl p-4 mb-6 space-y-3">
