@@ -76,6 +76,36 @@ export function useTerceirizacaoCatalogo(filters: UseTerceirizacaoCatalogoFilter
   });
 }
 
+// ─── Tipos faixas ────────────────────────────────────────────────────────────
+
+export interface TerceirizacaoFaixa {
+  id: string;
+  catalogo_id: string;
+  qtd_min: number;
+  preco_unitario: number;
+  capturado_em: string;
+}
+
+// ─── Hook faixas ─────────────────────────────────────────────────────────────
+
+export function useTerceirizacaoFaixas(catalogoId: string | null | undefined) {
+  return useQuery({
+    queryKey: ['terceirizacao_faixas', catalogoId],
+    enabled: !!catalogoId,
+    queryFn: async () => {
+      const { data, error } = await supabase
+        .from('terceirizacao_catalogo_faixas')
+        .select('id, catalogo_id, qtd_min, preco_unitario, capturado_em')
+        .eq('catalogo_id', catalogoId!)
+        .order('qtd_min', { ascending: true });
+
+      if (error) throw error;
+      return (data ?? []) as TerceirizacaoFaixa[];
+    },
+    staleTime: 1000 * 60 * 10,
+  });
+}
+
 // ─── Hook categorias ─────────────────────────────────────────────────────────
 
 export function useTerceirizacaoCategorias() {
