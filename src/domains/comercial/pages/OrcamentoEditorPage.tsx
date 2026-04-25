@@ -1,7 +1,8 @@
 // ============================================================================
-// ORÇAMENTO EDITOR PAGE — v3.0
+// ORÇAMENTO EDITOR PAGE — v3.1
 // Editor completo com seleção de produto → modelo → materiais → acabamentos
 // Layout 2 colunas: wizard 3 etapas (esquerda) + pricing em tempo real (direita)
+// + Card de alternativa de terceirização (Fase 5)
 // ============================================================================
 
 import React, { useState, useEffect, useMemo } from "react";
@@ -9,7 +10,7 @@ import { useNavigate, useParams, Link } from "react-router-dom";
 import {
   ArrowLeft, Plus, Trash2, Save, Loader2, FileText,
   ChevronDown, ChevronUp, AlertTriangle, Package, Layers, CheckCircle,
-  Pencil,
+  Pencil, Truck,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -62,6 +63,8 @@ import type { AIResponse } from '@/domains/ai/types/ai.types';
 
 import type { ItemEditorState } from "../hooks/useItemEditor";
 import { PropostaAttachmentsSection } from "../components/PropostaAttachmentsSection";
+import { useTerceirizacaoSugestao, type TerceirizacaoSugestao } from "../hooks/useTerceirizacaoSugestao";
+import TerceirizacaoCard from "../components/TerceirizacaoCard";
 
 // ─── Step definitions ────────────────────────────────────────────────────────
 
@@ -191,6 +194,26 @@ export default function OrcamentoEditorPage() {
   // ─── Item form visibility ───────────────────────────────────────────────
   const [showItemForm, setShowItemForm] = useState(false);
   const [itemFormExpanded, setItemFormExpanded] = useState(true);
+
+  // ─── Terceirização (Fase 5) ─────────────────────────────────────────────
+  const [terceirizacaoSelecionada, setTerceirizacaoSelecionada] = useState<TerceirizacaoSugestao | null>(null);
+
+  const { data: sugestoesTerceirizacao = [], isLoading: loadingTerceirizacao } =
+    useTerceirizacaoSugestao({
+      produto_id: editor.newItem.produto_id,
+      categoria: editor.newItem.categoria,
+      largura_cm: editor.newItem.largura_cm,
+      altura_cm: editor.newItem.altura_cm,
+      quantidade: editor.newItem.quantidade,
+    });
+
+  const handleSelecionarTerceirizacao = (sugestao: TerceirizacaoSugestao) => {
+    if (terceirizacaoSelecionada?.catalogo_id === sugestao.catalogo_id) {
+      setTerceirizacaoSelecionada(null); // deselect
+    } else {
+      setTerceirizacaoSelecionada(sugestao);
+    }
+  };
 
   // ─── Serviços state ─────────────────────────────────────────────────────
   const [servicos, setServicos] = useState<OrcamentoServicoItem[]>([]);
@@ -511,6 +534,36 @@ export default function OrcamentoEditorPage() {
 
       // NOTE: recalcularTotais + cache invalidation already handled by
       // useAdicionarItemDetalhado / useAtualizarItemDetalhado hooks
+
+      // ─── Fase 5: se terceirização foi selecionada, gravar snapshot ───
+      if (terceirizacaoSelecionada) {
+        // Para edit mode, atualiza o item existente; para add mode, busca o último inserido
+        const itemIdParaAtualizar = editor.editingItemId
+          || (await (async () => {
+            const { data: ultimoItem } = await supabase
+              .from("proposta_itens")
+              .select("id")
+              .eq("proposta_id", id)
+              .order("created_at", { ascending: false })
+              .limit(1)
+              .single();
+            return ultimoItem?.id;
+          })());
+
+        if (itemIdParaAtualizar) {
+          await supabase
+            .from("proposta_itens")
+            .update({
+              terceirizado: true,
+              fornecedor_id: terceirizacaoSelecionada.fornecedor_id,
+              terceirizacao_catalogo_id: terceirizacaoSelecionada.catalogo_id,
+              preco_terceirizacao_snapshot: terceirizacaoSelecionada.preco_unitario_scan,
+            })
+            .eq("id", itemIdParaAtualizar);
+        }
+        setTerceirizacaoSelecionada(null);
+      }
+
       editor.reset();
       setShowItemForm(false);
       showSuccess(isEditing ? "Item atualizado!" : "Item adicionado com sucesso!");
@@ -922,6 +975,14 @@ export default function OrcamentoEditorPage() {
                               </Badge>
                             </div>
                           )}
+                          {/* Badge terceirizado */}
+                          {(item as any).terceirizado && (
+                            <div className="flex items-center gap-1 mt-1">
+                              <Badge className="text-[10px] h-5 bg-emerald-100 text-emerald-700 border-emerald-300">
+                                <Truck size={10} className="mr-1" /> Terceirizado
+                              </Badge>
+                            </div>
+                          )}
                           {/* Material/acabamento badges */}
                           {(item.materiais?.length || item.acabamentos?.length) ? (
                             <div className="flex flex-wrap gap-1 mt-1">
@@ -1229,6 +1290,17 @@ export default function OrcamentoEditorPage() {
                       <div className="lg:col-span-2">
                         <div className="sticky top-4 space-y-4">
                           <PricingCalculator resultado={pricingResult} quantidade={newItem.quantidade} />
+
+                          {/* Card de alternativa terceirizada (Fase 5) */}
+                          {(sugestoesTerceirizacao.length > 0 || loadingTerceirizacao) && (
+                            <TerceirizacaoCard
+                              sugestoes={sugestoesTerceirizacao}
+                              precoInternoTotal={pricingResult?.precoTotal ?? null}
+                              isLoading={loadingTerceirizacao}
+                              onSelecionar={handleSelecionarTerceirizacao}
+                              selecionado={terceirizacaoSelecionada?.catalogo_id ?? null}
+                            />
+                          )}
 
                           {/* Escala de preços por volume */}
                           {pricingResult && pricingResult.precoUnitario > 0 && (
