@@ -5,6 +5,7 @@ import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/contexts/AuthContext";
 import { Button } from "@/components/ui/button";
 import { toast } from "sonner";
+import PropostaAttachmentsHerdados from "@/shared/components/PropostaAttachmentsHerdados";
 
 interface JobAttachment {
   id: string;
@@ -32,6 +33,22 @@ export function OSAnexosReferencia({ pedidoId, jobId, ordemInstalacaoId }: OSAne
   const [isUploading, setIsUploading] = useState(false);
   const fileRef = useRef<HTMLInputElement>(null);
   const isAdmin = profile?.role === "admin";
+
+  // Buscar proposta_id do pedido para herdar anexos da proposta
+  const { data: pedidoInfo } = useQuery({
+    queryKey: ["pedido-proposta-id", pedidoId],
+    queryFn: async () => {
+      const { data, error } = await supabase
+        .from("pedidos")
+        .select("proposta_id")
+        .eq("id", pedidoId)
+        .maybeSingle();
+      if (error) throw error;
+      return data as { proposta_id: string | null } | null;
+    },
+    enabled: !!pedidoId,
+    staleTime: 5 * 60 * 1000,
+  });
 
   // Buscar todos os attachments do pedido/job
   const { data: attachments, isLoading } = useQuery({
@@ -174,6 +191,16 @@ export function OSAnexosReferencia({ pedidoId, jobId, ordemInstalacaoId }: OSAne
 
   return (
     <div className="space-y-4">
+      {/* ===== Arte herdada da proposta (OneDrive) ===== */}
+      {pedidoInfo?.proposta_id && (
+        <div className="rounded-2xl border border-blue-200 bg-blue-50 overflow-hidden shadow-sm p-4">
+          <PropostaAttachmentsHerdados
+            propostaId={pedidoInfo.proposta_id}
+            titulo="Arte do Cliente (da Proposta)"
+          />
+        </div>
+      )}
+
       {/* ===== Secao A: Referencias (read-only para producao) ===== */}
       {referencias.length > 0 && (
         <div className="rounded-2xl border border-slate-200 bg-slate-50 overflow-hidden shadow-sm">

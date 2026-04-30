@@ -1,6 +1,7 @@
 import React, { useState } from 'react'
 import PedidoAnexos from '../components/PedidoAnexos'
 import { PedidoItensArtes } from '../components/PedidoItensArtes'
+import PropostaAttachmentsHerdados from '@/shared/components/PropostaAttachmentsHerdados'
 import { useParams, useNavigate } from 'react-router-dom'
 import {
   ArrowLeft, FolderOpen, ExternalLink, Loader2,
@@ -400,38 +401,47 @@ export default function PedidoDetailPage() {
           <PedidoItensArtes pedidoId={pedido.id} />
         </TabsContent>
 
-        <TabsContent value="arquivos" className="mt-4">
+        <TabsContent value="arquivos" className="mt-4 space-y-4">
+          {/* Seção A: Arte herdada da proposta */}
+          {(pedido as Record<string, unknown>).proposta_id && (
+            <div className="bg-white rounded-2xl border border-slate-200 p-6 shadow-sm">
+              <PropostaAttachmentsHerdados
+                propostaId={String((pedido as Record<string, unknown>).proposta_id)}
+                titulo="Arte do Cliente (da Proposta)"
+              />
+            </div>
+          )}
+
+          {/* Seção B: Pasta OneDrive do pedido (arquivos extras de produção) */}
           <div className="bg-white rounded-2xl border border-slate-200 p-6 shadow-sm">
+            <div className="flex items-center gap-2 mb-4">
+              <FolderOpen size={16} className="text-slate-500" />
+              <h4 className="font-semibold text-slate-700 text-sm">Pasta OneDrive do Pedido</h4>
+            </div>
             {(pedido as Record<string, unknown>).onedrive_folder_url ? (
-              <div className="space-y-4">
-                <div className="flex items-center gap-3 p-4 bg-blue-50 rounded-xl border border-blue-100">
-                  <FolderOpen size={24} className="text-blue-600 shrink-0" />
-                  <div className="flex-1 min-w-0">
-                    <p className="font-medium text-slate-800">Pasta OneDrive vinculada</p>
-                    <p className="text-xs text-slate-500 truncate">
-                      {String((pedido as Record<string, unknown>).onedrive_folder_url)}
-                    </p>
-                  </div>
-                  <a
-                    href={String((pedido as Record<string, unknown>).onedrive_folder_url)}
-                    target="_blank"
-                    rel="noopener noreferrer"
-                  >
-                    <Button variant="outline" className="rounded-xl gap-2 shrink-0">
-                      <ExternalLink size={15} /> Abrir no OneDrive
-                    </Button>
-                  </a>
-                </div>
-              </div>
-            ) : (
-              <div className="flex flex-col items-center gap-4 py-12">
-                <FolderOpen size={48} className="text-slate-200" />
-                <div className="text-center">
-                  <p className="font-semibold text-slate-700">Pasta OneDrive não criada</p>
-                  <p className="text-sm text-slate-400 mt-1">
-                    Crie uma pasta no OneDrive para armazenar os arquivos deste pedido
+              <div className="flex items-center gap-3 p-4 bg-blue-50 rounded-xl border border-blue-100">
+                <FolderOpen size={24} className="text-blue-600 shrink-0" />
+                <div className="flex-1 min-w-0">
+                  <p className="font-medium text-slate-800">Pasta vinculada</p>
+                  <p className="text-xs text-slate-500 truncate">
+                    {String((pedido as Record<string, unknown>).onedrive_folder_url)}
                   </p>
                 </div>
+                <a
+                  href={String((pedido as Record<string, unknown>).onedrive_folder_url)}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                >
+                  <Button variant="outline" className="rounded-xl gap-2 shrink-0">
+                    <ExternalLink size={15} /> Abrir no OneDrive
+                  </Button>
+                </a>
+              </div>
+            ) : (
+              <div className="flex flex-col items-center gap-3 py-6">
+                <p className="text-sm text-slate-400">
+                  Pasta para arquivos extras (produção, referências)
+                </p>
                 <Button
                   onClick={() => criarPasta.mutate(pedido.id)}
                   disabled={criarPasta.isPending}

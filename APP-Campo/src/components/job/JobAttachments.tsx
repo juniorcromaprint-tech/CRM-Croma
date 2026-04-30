@@ -16,8 +16,20 @@ interface JobAttachment {
   created_at: string;
 }
 
+interface PropostaAttachment {
+  id: string;
+  nome_arquivo: string;
+  tipo_mime: string;
+  tamanho_bytes: number | null;
+  onedrive_file_url: string | null;
+  preview_url: string | null;
+  uploaded_by_type: string | null;
+  uploaded_by_name: string | null;
+}
+
 interface JobAttachmentsProps {
   jobId: string;
+  pedidoId?: string | null;
 }
 
 const TIPO_CONFIG = {
@@ -57,7 +69,7 @@ function isPdf(attachment: JobAttachment) {
   );
 }
 
-export default function JobAttachments({ jobId }: JobAttachmentsProps) {
+export default function JobAttachments({ jobId, pedidoId }: JobAttachmentsProps) {
   const [modalUrl, setModalUrl] = useState("");
   const [isModalOpen, setIsModalOpen] = useState(false);
 
@@ -77,6 +89,32 @@ export default function JobAttachments({ jobId }: JobAttachmentsProps) {
     enabled: !!jobId,
   });
 
+  // Buscar proposta_id via pedido e carregar anexos da proposta (OneDrive)
+  const { data: propostaAttachments } = useQuery({
+    queryKey: ["campo-proposta-attachments", pedidoId],
+    queryFn: async () => {
+      if (!pedidoId) return [];
+      // Buscar proposta_id do pedido
+      const { data: pedido } = await supabase
+        .from("pedidos")
+        .select("proposta_id")
+        .eq("id", pedidoId)
+        .maybeSingle();
+      if (!pedido?.proposta_id) return [];
+      // Buscar anexos da proposta
+      const { data, error } = await supabase
+        .from("proposta_attachments")
+        .select("id, nome_arquivo, tipo_mime, tamanho_bytes, onedrive_file_url, preview_url, uploaded_by_type, uploaded_by_name")
+        .eq("proposta_id", pedido.proposta_id)
+        .is("deleted_at", null)
+        .order("created_at", { ascending: false });
+      if (error) throw error;
+      return (data ?? []) as PropostaAttachment[];
+    },
+    enabled: !!pedidoId,
+    staleTime: 5 * 60 * 1000,
+  });
+
   if (isLoading) {
     return (
       <div className="flex justify-center py-4">
@@ -85,10 +123,13 @@ export default function JobAttachments({ jobId }: JobAttachmentsProps) {
     );
   }
 
-  if (!attachments || attachments.length === 0) return null;
+  const hasJobAttachments = attachments && attachments.length > 0;
+  const hasPropostaAttachments = propostaAttachments && propostaAttachments.length > 0;
+
+  if (!hasJobAttachments && !hasPropostaAttachments) return null;
 
   // Agrupar por tipo
-  const grouped = attachments.reduce<Record<string, JobAttachment[]>>((acc, att) => {
+  const grouped = (attachments ?? []).reduce<Record<string, JobAttachment[]>>((acc, att) => {
     if (!acc[att.tipo]) acc[att.tipo] = [];
     acc[att.tipo].push(att);
     return acc;
@@ -101,12 +142,83 @@ export default function JobAttachments({ jobId }: JobAttachmentsProps) {
   return (
     <>
       <div className="mb-4 space-y-3">
-        <div className="flex items-center gap-2 px-1">
-          <span className="text-sm font-semibold text-gray-700">Referencias</span>
-          <span className="text-xs bg-gray-100 text-gray-500 px-2 py-0.5 rounded-full">
-            {attachments.length}
-          </span>
-        </div>
+        {/* ===== Arte da proposta (OneDrive) ===== */}
+        {hasPropostaAttachments && (
+          <div className="rounded-xl border border-indigo-200 bg-indigo-50 overflow-hidden">
+            <div className="flex items-center gap-2 px-3 py-2">
+              <FileText size={14} className="text-indigo-600" />
+              <span className="text-xs font-semibold text-indigo-600">
+                📋 Arte do Cliente (Proposta)
+              </span>
+              <span className="ml-auto text-xs px-1.5 py-0.5 rounded-full font-medium bg-indigo-100 text-indigo-700">
+                {propostaAttachments!.length}
+              </span>
+            </div>
+            <div className="px-3 pb-3 grid grid-cols-3 gap-2">
+              {propostaAttachments!.map((att) => {
+                const attIsPdf = att.tipo_mime?.includes("pdf") || att.nome_arquivo?.toLowerCase().endsWith(".pdf");
+                return (
+                  <div key={att.id} className="flex flex-col gap-1">
+                    {attIsPdf ? (
+                      <a
+                        href={att.onedrive_file_url || "#"}
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        className="w-full aspect-square bg-white rounded-lg border border-gray-200 flex flex-col items-center justify-center gap-1 shadow-sm active:opacity-70"
+                      >
+                        <FileText size={28} className="text-red-400" />
+                        <ExternalLink size={10} className="text-gray-400" />
+                      </a>
+                    ) : att.preview_url ? (
+                      <button
+                        onClick={() => {
+                          setModalUrl(att.preview_url!);
+                          setIsModalOpen(true);
+                        }}
+                        className="w-full aspect-square rounded-lg overflow-hidden border border-gray-200 shadow-sm active:opacity-70"
+                      >
+                        <img
+                          src={att.preview_url}
+                          alt={att.nome_arquivo}
+                          className="w-full h-full object-contain bg-white"
+                          loading="lazy"
+                        />
+                      </button>
+                    ) : (
+                      <a
+                        href={att.onedrive_file_url || "#"}
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        className="w-full aspect-square bg-white rounded-lg border border-gray-200 flex flex-col items-center justify-center gap-1 shadow-sm active:opacity-70"
+                      >
+                        <FileText size={28} className="text-indigo-400" />
+                        <ExternalLink size={10} className="text-gray-400" />
+                      </a>
+                    )}
+                    <p className="text-[10px] text-gray-500 truncate leading-tight">
+                      {att.nome_arquivo}
+                    </p>
+                    {att.uploaded_by_type === "cliente" && (
+                      <span className="text-[9px] bg-green-50 text-green-600 px-1 py-0.5 rounded-full w-fit">
+                        Cliente
+                      </span>
+                    )}
+                  </div>
+                );
+              })}
+            </div>
+          </div>
+        )}
+
+        {/* ===== Anexos do job (Supabase Storage) ===== */}
+        {hasJobAttachments && (
+          <div className="flex items-center gap-2 px-1">
+            <span className="text-sm font-semibold text-gray-700">Referencias</span>
+            <span className="text-xs bg-gray-100 text-gray-500 px-2 py-0.5 rounded-full">
+              {attachments!.length}
+            </span>
+          </div>
+        )}
 
         {tiposPresentes.map((tipo) => {
           const config = TIPO_CONFIG[tipo];

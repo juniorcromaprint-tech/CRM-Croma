@@ -653,7 +653,7 @@ export default function JobDetail() {
               <JobArtesReferencia pedidoId={(job as { pedido_id?: string | null }).pedido_id ?? null} />
             </Suspense>
             <Suspense fallback={<TabFallback />}>
-              <JobAttachments jobId={id!} />
+              <JobAttachments jobId={id!} pedidoId={(job as { pedido_id?: string | null }).pedido_id ?? null} />
             </Suspense>
 
             <Tabs defaultValue="photos" className="w-full">

@@ -148,7 +148,7 @@ serve(async (req) => {
 
     const { data: proposta, error: propostaError } = await supabase
       .from('propostas')
-      .select('id, numero, cliente:clientes(nome_fantasia)')
+      .select('id, numero, cliente:clientes(id, nome_fantasia, razao_social)')
       .eq('share_token', token)
       .eq('share_token_active', true)
       .or('share_token_expires_at.is.null,share_token_expires_at.gt.now()')
@@ -161,11 +161,14 @@ serve(async (req) => {
       );
     }
 
-    const nomeCliente = (proposta.cliente as any)?.nome_fantasia || 'cliente';
+    const clienteObj = proposta.cliente as any;
+    const nomeCliente = clienteObj?.nome_fantasia || clienteObj?.razao_social || 'sem-nome';
+    const clienteId = clienteObj?.id as string | undefined;
+    const clienteIdCurto = clienteId ? clienteId.slice(0, 8) : 'sem-id';
     const uploadedByName = clientNameOverride || nomeCliente;
     const safeCliente = sanitizeName(nomeCliente);
     const safeFileName = sanitizeName(file.name);
-    const targetPath = `Croma/Clientes/${safeCliente}/${proposta.numero}_${safeFileName}`;
+    const targetPath = `Croma/Clientes/${clienteIdCurto}_${safeCliente}/${proposta.numero}/${Date.now()}_${safeFileName}`;
     const displayFileName = `${proposta.numero}_${file.name}`;
 
     console.log(`[upload v13] ${displayFileName} -> OneDrive:/${targetPath} (${file.size} bytes) preview=${previewUrl ? 'yes' : 'no'}`);

@@ -208,8 +208,8 @@ serve(async (req) => {
     // Buscar entity + checar escopo de permissao (scope=proposta precisa checar vendedor_id)
     const tabela = scope === 'pedido' ? 'pedidos' : 'propostas';
     const selectQuery = scope === 'proposta'
-      ? 'id, numero, vendedor_id, cliente:clientes(id, nome_fantasia)'
-      : 'id, numero, cliente:clientes(nome_fantasia)';
+      ? 'id, numero, vendedor_id, cliente:clientes(id, nome_fantasia, razao_social)'
+      : 'id, numero, cliente:clientes(id, nome_fantasia, razao_social)';
 
     const { data: entity, error: entityError } = await supabase
       .from(tabela)
@@ -276,20 +276,15 @@ serve(async (req) => {
       }
     }
 
-    // Montar path OneDrive
-    const nomeCliente = (entity.cliente as any)?.nome_fantasia || 'cliente';
+    // Montar path OneDrive — formato padrao: Croma/Clientes/{id8}_{nome}/{numero}/{ts}_{file}
+    const clienteObj = entity.cliente as any;
+    const nomeCliente = clienteObj?.nome_fantasia || clienteObj?.razao_social || 'sem-nome';
+    const clienteId = clienteObj?.id as string | undefined;
+    const clienteIdCurto = clienteId ? clienteId.slice(0, 8) : 'sem-id';
     const safeCliente = sanitizeName(nomeCliente);
     const safeFileName = sanitizeName(file.name);
     const numeroEntity = (entity as any).numero ?? entityId;
-    let targetPath: string;
-
-    if (scope === 'proposta') {
-      const clienteId = (entity.cliente as any)?.id as string | undefined;
-      const clienteIdCurto = clienteId ? clienteId.slice(0, 8) : 'sem-id';
-      targetPath = `Croma/Clientes/${clienteIdCurto}_${safeCliente}/${numeroEntity}/${Date.now()}_${safeFileName}`;
-    } else {
-      targetPath = `Croma/Clientes/${safeCliente}/${numeroEntity}_${safeFileName}`;
-    }
+    const targetPath = `Croma/Clientes/${clienteIdCurto}_${safeCliente}/${numeroEntity}/${Date.now()}_${safeFileName}`;
 
     console.log(`[onedrive-upload-interno v2] ${file.name} -> ${targetPath} (${file.size} bytes) by ${uploadedByName} scope=${scope}`);
 
