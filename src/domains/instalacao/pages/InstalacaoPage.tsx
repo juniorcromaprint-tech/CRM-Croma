@@ -62,6 +62,7 @@ import {
   instalacaoService,
   type CampoInstalacao,
   type CampoFoto,
+  type PedidoItemResumo,
 } from "../services/instalacao.service";
 import { useCampoRealtimeGlobal } from "../hooks/useCampoRealtime";
 import ChecklistSheet from "../components/ChecklistSheet";
@@ -383,7 +384,7 @@ function FotosSheet({
   const fotosAntes = fotos.filter((f) => f.photo_type === "before");
   const fotosDepois = fotos.filter((f) => f.photo_type === "after");
   const fotosOutras = fotos.filter(
-    (f) => f.photo_type !== "before" && f.photo_type !== "after"
+    (f) => f.photo_type !== "before" && f.photo_type !== "after" && f.photo_type !== "layout"
   );
 
   return (
@@ -496,6 +497,20 @@ function DetalhesSheet({
   open: boolean;
   onClose: () => void;
 }) {
+  // Query: itens do pedido (arte a instalar)
+  const { data: itensPedido = [] } = useQuery<PedidoItemResumo[]>({
+    queryKey: ['campo-itens-pedido', job?.pedido_id],
+    enabled: open && !!job?.pedido_id,
+    queryFn: () => instalacaoService.buscarItensPedido(job!.pedido_id!),
+  });
+
+  // Query: fotos de layout/referência
+  const { data: fotosLayout = [] } = useQuery<CampoFoto[]>({
+    queryKey: ['campo-fotos-layout', job?.job_id],
+    enabled: open && !!job?.job_id,
+    queryFn: () => instalacaoService.buscarFotosLayout(job!.job_id),
+  });
+
   if (!job) return null;
 
   const cfg = getStatusConfig(job.status_campo);
@@ -525,6 +540,69 @@ function DetalhesSheet({
         </SheetHeader>
 
         <div className="space-y-5">
+          {/* Arte a instalar — destaque para o instalador */}
+          {itensPedido.length > 0 && (
+            <div className="bg-gradient-to-br from-blue-50 to-indigo-50 rounded-2xl p-4 space-y-3 border border-blue-200">
+              <h4 className="text-xs font-bold text-blue-700 uppercase tracking-wide flex items-center gap-2">
+                <Image size={14} className="text-blue-600" />
+                Arte a instalar
+                <span className="ml-auto text-blue-500 font-normal">
+                  {itensPedido.reduce((s, i) => s + i.quantidade, 0)} {itensPedido.length === 1 ? 'peça' : 'peças'}
+                </span>
+              </h4>
+
+              {itensPedido.map((item) => (
+                <div key={item.id} className="bg-white rounded-xl p-3 space-y-2 border border-blue-100">
+                  <p className="text-sm font-semibold text-slate-800">{item.descricao}</p>
+                  {(item.largura_cm || item.altura_cm) && (
+                    <p className="text-xs font-medium text-blue-700">
+                      Qtd: {item.quantidade} &middot;{' '}
+                      {item.largura_cm ? (item.largura_cm >= 100 ? `${(item.largura_cm / 100).toFixed(2)}m` : `${item.largura_cm}cm`) : '?'} × {item.altura_cm ? (item.altura_cm >= 100 ? `${(item.altura_cm / 100).toFixed(2)}m` : `${item.altura_cm}cm`) : '?'}
+                      {item.area_m2 != null && ` (${item.area_m2.toFixed(2)} m²)`}
+                    </p>
+                  )}
+                  {item.especificacao && (
+                    <p className="text-xs text-slate-600 bg-slate-50 rounded-lg p-2 leading-relaxed">{item.especificacao}</p>
+                  )}
+                  {item.instrucoes && (
+                    <div className="bg-amber-50 rounded-lg p-2 border border-amber-100">
+                      <p className="text-xs font-semibold text-amber-700 mb-0.5">Instruções:</p>
+                      <p className="text-xs text-amber-800 leading-relaxed whitespace-pre-wrap">{item.instrucoes}</p>
+                    </div>
+                  )}
+                </div>
+              ))}
+
+              {/* Fotos de layout */}
+              {fotosLayout.length > 0 && (
+                <div className="space-y-2">
+                  <p className="text-xs font-bold text-blue-600 uppercase tracking-wide">Referências visuais</p>
+                  <div className="grid grid-cols-2 gap-2">
+                    {fotosLayout.map((foto) => (
+                      <a
+                        key={foto.id}
+                        href={foto.photo_url}
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        className="rounded-xl overflow-hidden border border-blue-100 hover:border-blue-300 transition-colors bg-white"
+                      >
+                        <img
+                          src={foto.photo_url}
+                          alt={foto.description ?? 'Referência'}
+                          className="w-full h-auto max-h-36 object-contain"
+                          loading="lazy"
+                        />
+                        {foto.description && (
+                          <p className="text-xs text-slate-500 px-2 py-1 truncate border-t border-blue-50">{foto.description}</p>
+                        )}
+                      </a>
+                    ))}
+                  </div>
+                </div>
+              )}
+            </div>
+          )}
+
           {/* Cliente / Loja */}
           <div className="bg-slate-50 rounded-2xl p-4 space-y-3">
             <h4 className="text-xs font-bold text-slate-500 uppercase tracking-wide">

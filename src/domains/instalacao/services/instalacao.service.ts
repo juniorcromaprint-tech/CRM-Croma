@@ -53,6 +53,19 @@ export type CampoFoto = {
   loja_marca: string | null;
 };
 
+export type PedidoItemResumo = {
+  id: string;
+  descricao: string | null;
+  especificacao: string | null;
+  instrucoes: string | null;
+  largura_cm: number | null;
+  altura_cm: number | null;
+  area_m2: number | null;
+  quantidade: number;
+  valor_unitario: number | null;
+  valor_total: number | null;
+};
+
 export type FiltrosCampo = {
   status?: string;
   dataInicio?: string;
@@ -133,6 +146,42 @@ export const instalacaoService = {
     const { data, error } = await query;
     if (error) throw error;
     return (data || []) as unknown as CampoInstalacao[];
+  },
+
+  /**
+   * Busca os itens do pedido vinculado a um job (para seção "Arte a instalar").
+   */
+  async buscarItensPedido(pedidoId: string): Promise<PedidoItemResumo[]> {
+    const { data, error } = await supabase
+      .from('pedido_itens')
+      .select('id, descricao, especificacao, instrucoes, largura_cm, altura_cm, area_m2, quantidade, valor_unitario, valor_total')
+      .eq('pedido_id', pedidoId)
+      .order('created_at', { ascending: true });
+
+    if (error) throw error;
+    return (data || []) as PedidoItemResumo[];
+  },
+
+  /**
+   * Busca fotos de layout/referência de um job (photo_type = 'layout').
+   */
+  async buscarFotosLayout(jobId: string): Promise<CampoFoto[]> {
+    const { data, error } = await supabase
+      .from('job_photos')
+      .select('id, job_id, photo_type, photo_url, description, note, created_at')
+      .eq('job_id', jobId)
+      .eq('photo_type', 'layout')
+      .order('created_at', { ascending: true });
+
+    if (error) throw error;
+    return (data || []).map((f: any) => ({
+      ...f,
+      os_number: null,
+      ordem_instalacao_id: null,
+      pedido_id: null,
+      loja_nome: null,
+      loja_marca: null,
+    })) as CampoFoto[];
   },
 
   /**

@@ -21,7 +21,7 @@ import {
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { supabase } from '@/integrations/supabase/client';
-import { instalacaoService, type CampoInstalacao, type CampoFoto } from '../services/instalacao.service';
+import { instalacaoService, type CampoInstalacao, type CampoFoto, type PedidoItemResumo } from '../services/instalacao.service';
 
 // ─── Status config ────────────────────────────────────────────────────────────
 
@@ -83,9 +83,23 @@ export default function InstalacaoDetailPage() {
     queryFn: () => instalacaoService.buscarFotosPorJob(jobId!),
   });
 
+  // Query: itens do pedido (arte a instalar)
+  const { data: itensPedido = [] } = useQuery<PedidoItemResumo[]>({
+    queryKey: ['campo-itens-pedido', job?.pedido_id],
+    enabled: !!job?.pedido_id,
+    queryFn: () => instalacaoService.buscarItensPedido(job!.pedido_id!),
+  });
+
+  // Query: fotos de layout/referência
+  const { data: fotosLayout = [] } = useQuery<CampoFoto[]>({
+    queryKey: ['campo-fotos-layout', jobId],
+    enabled: !!jobId,
+    queryFn: () => instalacaoService.buscarFotosLayout(jobId!),
+  });
+
   const fotosAntes = fotos.filter((f) => f.photo_type === 'before');
   const fotosDepois = fotos.filter((f) => f.photo_type === 'after');
-  const fotosOutras = fotos.filter((f) => f.photo_type !== 'before' && f.photo_type !== 'after');
+  const fotosOutras = fotos.filter((f) => f.photo_type !== 'before' && f.photo_type !== 'after' && f.photo_type !== 'layout');
 
   if (loadingJob) {
     return (
@@ -161,6 +175,86 @@ export default function InstalacaoDetailPage() {
           </div>
         </div>
       </div>
+
+      {/* Arte a instalar — aparece ANTES de tudo para o instalador saber o que vai fazer */}
+      {itensPedido.length > 0 && (
+        <div className="bg-gradient-to-br from-blue-50 to-indigo-50 rounded-2xl border border-blue-200 p-5 space-y-4">
+          <div className="flex items-center gap-2">
+            <div className="w-8 h-8 rounded-lg bg-blue-100 flex items-center justify-center">
+              <Image size={16} className="text-blue-600" />
+            </div>
+            <h3 className="font-bold text-blue-800 text-sm">Arte a instalar</h3>
+            <Badge variant="outline" className="text-xs border-blue-200 text-blue-600">
+              {itensPedido.length} {itensPedido.length === 1 ? 'peça' : 'peças'}
+            </Badge>
+          </div>
+
+          {itensPedido.map((item, idx) => (
+            <div key={item.id} className="bg-white rounded-xl border border-blue-100 p-4 space-y-3">
+              {/* Descrição principal */}
+              <p className="text-sm font-semibold text-slate-800">{item.descricao}</p>
+
+              {/* Dimensões */}
+              {(item.largura_cm || item.altura_cm) && (
+                <div className="flex items-center gap-3 flex-wrap">
+                  <span className="text-xs font-medium text-slate-500">Qtd: {item.quantidade} pc</span>
+                  <span className="text-xs font-bold text-blue-700 bg-blue-50 px-2 py-0.5 rounded-md">
+                    {item.largura_cm ? (item.largura_cm >= 100 ? `${(item.largura_cm / 100).toFixed(2)}m` : `${item.largura_cm}cm`) : '?'} × {item.altura_cm ? (item.altura_cm >= 100 ? `${(item.altura_cm / 100).toFixed(2)}m` : `${item.altura_cm}cm`) : '?'}
+                  </span>
+                  {item.area_m2 != null && (
+                    <span className="text-xs text-slate-500">({item.area_m2.toFixed(2)} m²)</span>
+                  )}
+                </div>
+              )}
+
+              {/* Especificação (materiais) */}
+              {item.especificacao && (
+                <div className="bg-slate-50 rounded-lg p-3">
+                  <p className="text-xs text-slate-600 leading-relaxed">{item.especificacao}</p>
+                </div>
+              )}
+
+              {/* Instruções */}
+              {item.instrucoes && (
+                <div className="bg-amber-50 rounded-lg p-3 border border-amber-100">
+                  <p className="text-xs font-semibold text-amber-700 mb-1">Instruções:</p>
+                  <p className="text-xs text-amber-800 leading-relaxed whitespace-pre-wrap">{item.instrucoes}</p>
+                </div>
+              )}
+            </div>
+          ))}
+
+          {/* Fotos de layout/referência */}
+          {fotosLayout.length > 0 && (
+            <div className="space-y-2">
+              <p className="text-xs font-bold text-blue-700 uppercase tracking-wide">Referências visuais</p>
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                {fotosLayout.map((foto) => (
+                  <a
+                    key={foto.id}
+                    href={foto.photo_url}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="group relative rounded-xl overflow-hidden border border-blue-100 hover:border-blue-300 transition-colors bg-white"
+                  >
+                    <img
+                      src={foto.photo_url}
+                      alt={foto.description ?? 'Referência visual'}
+                      className="w-full h-auto max-h-48 object-contain group-hover:scale-[1.02] transition-transform duration-200"
+                      loading="lazy"
+                    />
+                    {foto.description && (
+                      <div className="px-3 py-2 bg-slate-50 border-t border-blue-50">
+                        <p className="text-xs text-slate-600 truncate">{foto.description}</p>
+                      </div>
+                    )}
+                  </a>
+                ))}
+              </div>
+            </div>
+          )}
+        </div>
+      )}
 
       {/* 2-column layout */}
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-5">
