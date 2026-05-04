@@ -5,7 +5,7 @@
 
 import { useState, useRef, useEffect } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
-import { useQuery } from '@tanstack/react-query';
+import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import {
   ArrowLeft,
   Loader2,
@@ -22,10 +22,21 @@ import {
   CornerDownRight,
   Bot,
   Trash2,
+  Pencil,
+  X,
+  Save,
+  User,
+  Building2,
+  Phone,
+  MapPin,
+  Briefcase,
+  ChevronDown,
+  ChevronUp,
 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { Textarea } from '@/components/ui/textarea';
+import { Input } from '@/components/ui/input';
 import {
   AlertDialog,
   AlertDialogAction,
@@ -39,6 +50,7 @@ import {
 } from '@/components/ui/alert-dialog';
 import { supabase } from '@/integrations/supabase/client';
 import { formatDate } from '@/shared/utils/format';
+import { showSuccess, showError } from '@/utils/toast';
 import { useAgentMessages, useEscalateConversation, useResumeConversation, useSendManualWhatsApp, useDeleteConversation, useDeleteMessage } from '../hooks/useAgentMessages';
 import type { AgentConversation, AgentCanal, AgentMessageStatus } from '../types/agent.types';
 
@@ -48,7 +60,7 @@ const CONVERSATION_SELECT = `
   id, lead_id, canal, status, etapa, mensagens_enviadas, mensagens_recebidas,
   ultima_mensagem_em, proximo_followup, tentativas, max_tentativas,
   score_engajamento, metadata, created_at, updated_at,
-  leads(empresa, contato_nome, contato_email, segmento, temperatura, score)
+  leads(id, empresa, contato_nome, contato_email, email, telefone, contato_telefone, whatsapp, cargo, segmento, temperatura, score, cidade, uf, endereco, bairro, cep, cnpj, razao_social, observacoes, status, valor_estimado)
 `.trim();
 
 function useConversationById(id: string | undefined) {
@@ -68,6 +80,224 @@ function useConversationById(id: string | undefined) {
       return data as AgentConversation;
     },
   });
+}
+
+// ─── Lead Info Panel ─────────────────────────────────────────────────────────
+
+interface LeadData {
+  id: string;
+  empresa: string;
+  contato_nome: string | null;
+  contato_email: string | null;
+  email: string | null;
+  telefone: string | null;
+  contato_telefone: string | null;
+  whatsapp: string | null;
+  cargo: string | null;
+  segmento: string | null;
+  temperatura: string;
+  score: number | null;
+  cidade: string | null;
+  uf: string | null;
+  endereco: string | null;
+  bairro: string | null;
+  cep: string | null;
+  cnpj: string | null;
+  razao_social: string | null;
+  observacoes: string | null;
+  status: string | null;
+  valor_estimado: number | null;
+}
+
+function LeadInfoPanel({ lead, conversationId }: { lead: LeadData; conversationId: string }) {
+  const [expanded, setExpanded] = useState(false);
+  const [editing, setEditing] = useState(false);
+  const [form, setForm] = useState<Partial<LeadData>>({});
+  const queryClient = useQueryClient();
+
+  const updateLead = useMutation({
+    mutationFn: async (updates: Partial<LeadData>) => {
+      const { data, error } = await supabase
+        .from('leads')
+        .update(updates)
+        .eq('id', lead.id)
+        .select()
+        .single();
+      if (error) throw error;
+      return data;
+    },
+    onSuccess: () => {
+      showSuccess('Lead atualizado com sucesso');
+      setEditing(false);
+      queryClient.invalidateQueries({ queryKey: ['agent', 'conversations', 'detail', conversationId] });
+    },
+    onError: (err: Error) => {
+      showError(`Erro ao salvar: ${err.message}`);
+    },
+  });
+
+  const startEditing = () => {
+    setForm({
+      empresa: lead.empresa,
+      contato_nome: lead.contato_nome,
+      contato_email: lead.contato_email,
+      email: lead.email,
+      telefone: lead.telefone,
+      contato_telefone: lead.contato_telefone,
+      whatsapp: lead.whatsapp,
+      cargo: lead.cargo,
+      cidade: lead.cidade,
+      uf: lead.uf,
+      endereco: lead.endereco,
+      bairro: lead.bairro,
+      cep: lead.cep,
+      cnpj: lead.cnpj,
+      razao_social: lead.razao_social,
+      observacoes: lead.observacoes,
+    });
+    setEditing(true);
+    setExpanded(true);
+  };
+
+  const cancelEditing = () => {
+    setEditing(false);
+    setForm({});
+  };
+
+  const saveChanges = () => {
+    const updates: Record<string, unknown> = {};
+    const editableKeys = ['empresa', 'contato_nome', 'contato_email', 'email', 'telefone', 'contato_telefone', 'whatsapp', 'cargo', 'cidade', 'uf', 'endereco', 'bairro', 'cep', 'cnpj', 'razao_social', 'observacoes'] as const;
+    for (const key of editableKeys) {
+      if (form[key] !== undefined && form[key] !== lead[key]) {
+        updates[key] = form[key] || null;
+      }
+    }
+    if (Object.keys(updates).length === 0) {
+      setEditing(false);
+      return;
+    }
+    updateLead.mutate(updates as Partial<LeadData>);
+  };
+
+  const Field = ({ label, value, field, icon: Icon }: { label: string; value: string | null; field?: keyof LeadData; icon?: typeof User }) => (
+    <div className="space-y-1">
+      <label className="text-xs font-medium text-slate-400 flex items-center gap-1.5">
+        {Icon && <Icon size={11} />}
+        {label}
+      </label>
+      {editing && field ? (
+        <Input
+          value={form[field] as string ?? ''}
+          onChange={(e) => setForm((prev) => ({ ...prev, [field]: e.target.value }))}
+          className="h-8 text-sm rounded-lg"
+          placeholder={label}
+        />
+      ) : (
+        <p className="text-sm text-slate-700">{value || <span className="text-slate-300 italic">—</span>}</p>
+      )}
+    </div>
+  );
+
+  const mainPhone = lead.whatsapp || lead.telefone || lead.contato_telefone;
+  const mainEmail = lead.contato_email || lead.email;
+
+  return (
+    <div className="bg-white rounded-2xl border border-slate-200 overflow-hidden">
+      {/* Compact row — always visible */}
+      <div className="px-6 py-3 flex items-center justify-between">
+        <button
+          onClick={() => setExpanded(!expanded)}
+          className="flex items-center gap-3 text-left flex-1 min-w-0"
+        >
+          <div className="w-8 h-8 rounded-full bg-slate-100 flex items-center justify-center shrink-0">
+            <User size={14} className="text-slate-500" />
+          </div>
+          <div className="min-w-0 flex-1">
+            <p className="text-sm font-medium text-slate-700 truncate">{lead.contato_nome || lead.empresa}</p>
+            <div className="flex items-center gap-3 text-xs text-slate-400">
+              {mainPhone && <span className="flex items-center gap-1"><Phone size={10} />{mainPhone}</span>}
+              {mainEmail && <span className="truncate">{mainEmail}</span>}
+            </div>
+          </div>
+          {expanded ? <ChevronUp size={16} className="text-slate-400" /> : <ChevronDown size={16} className="text-slate-400" />}
+        </button>
+
+        {!editing ? (
+          <Button variant="ghost" size="sm" onClick={startEditing} className="text-slate-400 hover:text-blue-600 gap-1.5 ml-2">
+            <Pencil size={13} />
+            Editar
+          </Button>
+        ) : (
+          <div className="flex items-center gap-1 ml-2">
+            <Button variant="ghost" size="sm" onClick={cancelEditing} className="text-slate-400 hover:text-red-500 gap-1">
+              <X size={13} />
+            </Button>
+            <Button
+              size="sm"
+              onClick={saveChanges}
+              disabled={updateLead.isPending}
+              className="bg-blue-600 hover:bg-blue-700 gap-1.5 text-xs"
+            >
+              {updateLead.isPending ? <Loader2 size={12} className="animate-spin" /> : <Save size={12} />}
+              Salvar
+            </Button>
+          </div>
+        )}
+      </div>
+
+      {/* Expanded panel */}
+      {expanded && (
+        <div className="px-6 pb-5 pt-2 border-t border-slate-100">
+          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
+            <Field label="Empresa" value={lead.empresa} field="empresa" icon={Building2} />
+            <Field label="Razao Social" value={lead.razao_social} field="razao_social" icon={Building2} />
+            <Field label="CNPJ" value={lead.cnpj} field="cnpj" icon={Building2} />
+            <Field label="Contato" value={lead.contato_nome} field="contato_nome" icon={User} />
+            <Field label="Cargo" value={lead.cargo} field="cargo" icon={Briefcase} />
+            <Field label="Telefone" value={lead.telefone} field="telefone" icon={Phone} />
+            <Field label="WhatsApp" value={lead.whatsapp} field="whatsapp" icon={Smartphone} />
+            <Field label="Tel. Contato" value={lead.contato_telefone} field="contato_telefone" icon={Phone} />
+            <Field label="Email" value={lead.email} field="email" icon={Mail} />
+            <Field label="Email Contato" value={lead.contato_email} field="contato_email" icon={Mail} />
+            <Field label="Endereco" value={lead.endereco} field="endereco" icon={MapPin} />
+            <Field label="Bairro" value={lead.bairro} field="bairro" icon={MapPin} />
+            <Field label="Cidade" value={lead.cidade} field="cidade" icon={MapPin} />
+            <Field label="UF" value={lead.uf} field="uf" icon={MapPin} />
+            <Field label="CEP" value={lead.cep} field="cep" icon={MapPin} />
+          </div>
+
+          {/* Badges row */}
+          <div className="flex items-center gap-2 mt-4 flex-wrap">
+            {lead.segmento && <Badge variant="secondary" className="text-xs">{lead.segmento}</Badge>}
+            {lead.temperatura && (
+              <Badge variant="secondary" className={`text-xs ${
+                lead.temperatura === 'quente' ? 'bg-red-100 text-red-700' :
+                lead.temperatura === 'morno' ? 'bg-amber-100 text-amber-700' :
+                'bg-sky-100 text-sky-700'
+              }`}>{lead.temperatura}</Badge>
+            )}
+            {lead.score != null && <Badge variant="secondary" className="text-xs">Score: {lead.score}</Badge>}
+            {lead.status && <Badge variant="outline" className="text-xs">{lead.status}</Badge>}
+          </div>
+
+          {/* Observacoes */}
+          <div className="mt-4">
+            <label className="text-xs font-medium text-slate-400">Observacoes</label>
+            {editing ? (
+              <Textarea
+                value={form.observacoes ?? ''}
+                onChange={(e) => setForm((prev) => ({ ...prev, observacoes: e.target.value }))}
+                className="mt-1 text-sm rounded-xl min-h-[60px] resize-y"
+                placeholder="Notas sobre o lead..."
+              />
+            ) : (
+              <p className="text-sm text-slate-600 mt-1">{lead.observacoes || <span className="text-slate-300 italic">Sem observacoes</span>}</p>
+            )}
+          </div>
+        </div>
+      )}
+    </div>
+  );
 }
 
 // ─── Badge helpers ───────────────────────────────────────────────────────────
@@ -298,6 +528,11 @@ export default function AgentConversationPage() {
           <span>Score: {conversation.score_engajamento}/100</span>
         </div>
       </div>
+
+      {/* Lead info panel */}
+      {lead && (
+        <LeadInfoPanel lead={lead as unknown as LeadData} conversationId={conversation.id} />
+      )}
 
       {/* Messages timeline */}
       <div className="bg-white rounded-2xl border border-slate-200 p-6">

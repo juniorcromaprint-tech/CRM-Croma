@@ -524,9 +524,10 @@ async function executeRuleAction(supabase: SupabaseClient, rule: AgentRule, matc
       break;
 
     case 'enviar_mensagem':
-      // FIX 2026-04-24: criar/atualizar agent_conversation para que processLeadFollowUps
-      // pegue o lead na próxima rodada. Antes só criava alert — envio real nunca saía.
-      await ensureConversationScheduled(supabase, rule, match);
+      // FIX 2026-05-04: NÃO criar conversas automaticamente via cron.
+      // Conversas só devem existir quando Junior dispara manualmente ou lead responde.
+      // A criação automática gerava dezenas de "fantasmas" sem mensagem real.
+      // Mantém apenas o alerta para visibilidade.
       await createSystemAlert(supabase, rule, match);
       break;
 
@@ -1080,4 +1081,3 @@ async function sendWhatsAppTemplate(
   }
   return true;
 }
-                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                  
