@@ -122,7 +122,8 @@ export function useLeads(filters?: LeadFilters) {
       let query = supabase
         .from('leads')
         .select('id, empresa, contato_nome, contato_email, contato_telefone, segmento, origem_id, vendedor_id, status, temperatura, valor_estimado, proximo_contato, observacoes, cargo, score, motivo_descarte, telefone, email, created_at, updated_at')
-        .order('created_at', { ascending: false });
+        .order('created_at', { ascending: false })
+        .limit(5000);
 
       // Filtro por status
       if (filters?.status) {
@@ -286,7 +287,8 @@ export function useLeadStats() {
     queryFn: async (): Promise<LeadStats> => {
       const { data, error } = await supabase
         .from('leads')
-        .select('status, temperatura, valor_estimado');
+        .select('status, temperatura, valor_estimado')
+        .limit(10000);
 
       if (error) {
         throw new Error(`Erro ao buscar estatísticas de leads: ${error.message}`);
