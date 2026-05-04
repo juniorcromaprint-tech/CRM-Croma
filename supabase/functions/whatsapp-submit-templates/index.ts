@@ -4,6 +4,7 @@
 // Ref: https://developers.facebook.com/docs/whatsapp/business-management-api/message-templates
 
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
+import { getWhatsAppCredentials } from "../ai-shared/whatsapp-credentials.ts";
 
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
@@ -115,26 +116,17 @@ Deno.serve(async (req: Request) => {
       Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!
     );
 
-    // Buscar credenciais WhatsApp do admin_config
-    const { data: configs } = await supabase
-      .from("admin_config")
-      .select("chave, valor")
-      .in("chave", ["WHATSAPP_ACCESS_TOKEN", "WHATSAPP_WABA_ID"]);
-
-    const configMap: Record<string, string> = {};
-    configs?.forEach((c: { chave: string; valor: string }) => {
-      configMap[c.chave] = c.valor;
-    });
-
-    const accessToken = configMap.WHATSAPP_ACCESS_TOKEN;
-    const wabaId = configMap.WHATSAPP_WABA_ID || "1262844242060742";
-
-    if (!accessToken) {
+    // Carrega credenciais canonicas (única fonte da verdade: admin_config)
+    const credsResult = await getWhatsAppCredentials(supabase);
+    if (!credsResult.ok) {
       return new Response(
-        JSON.stringify({ error: "WHATSAPP_ACCESS_TOKEN não configurado no admin_config" }),
+        JSON.stringify({ error: credsResult.message, missing: credsResult.missing }),
         { status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" } }
       );
     }
+    const accessToken = credsResult.accessToken;
+    const wabaId = credsResult.wabaId;
+    const apiVersion = credsResult.apiVersion;
 
     // Verificar se quer submeter template específico ou todos
     let body: { template_name?: string } = {};
@@ -159,9 +151,9 @@ Deno.serve(async (req: Request) => {
 
     for (const template of templatesToSubmit) {
       try {
-        // Submeter à Meta API v22.0
+        // Submeter à Meta API (versao via admin_config)
         const response = await fetch(
-          `https://graph.facebook.com/v22.0/${wabaId}/message_templates`,
+          `https://graph.facebook.com/${apiVersion}/${wabaId}/message_templates`,
           {
             method: "POST",
             headers: {

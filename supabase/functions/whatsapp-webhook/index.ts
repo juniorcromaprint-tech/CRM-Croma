@@ -13,6 +13,10 @@
 import { serve } from 'https://deno.land/std@0.168.0/http/server.ts';
 import { getServiceClient } from '../ai-shared/ai-helpers.ts';
 import { callOpenRouter, setFallbackModel } from '../ai-shared/openrouter-provider.ts';
+import {
+  getWhatsAppCredentials,
+  postToMetaCloud,
+} from '../ai-shared/whatsapp-credentials.ts';
 
 // ─────────────────────────────────────────────────────────────
 // Constants
@@ -111,6 +115,7 @@ async function notifyTelegram(supabase: ReturnType<typeof getServiceClient>, tex
 
 // ─────────────────────────────────────────────────────────────
 // Send WhatsApp message via Meta Cloud API
+// Uses the shared credential helper — single source of truth.
 // ─────────────────────────────────────────────────────────────
 async function sendWhatsApp(
   supabase: ReturnType<typeof getServiceClient>,
@@ -118,45 +123,21 @@ async function sendWhatsApp(
   message: string,
 ): Promise<boolean> {
   try {
-    // Load credentials from admin_config
-    const keys = ['WHATSAPP_ACCESS_TOKEN', 'WHATSAPP_PHONE_NUMBER_ID', 'WHATSAPP_API_VERSION'];
-    const { data: configs } = await supabase
-      .from('admin_config')
-      .select('chave, valor')
-      .in('chave', keys);
-
-    const cfg: Record<string, string> = {};
-    for (const c of configs ?? []) cfg[c.chave] = c.valor;
-
-    const token = cfg['WHATSAPP_ACCESS_TOKEN'];
-    const phoneId = cfg['WHATSAPP_PHONE_NUMBER_ID'];
-    const apiVersion = cfg['WHATSAPP_API_VERSION'] || 'v22.0';
-
-    if (!token || !phoneId) {
-      console.error('whatsapp-webhook: Missing WhatsApp credentials');
+    const credsResult = await getWhatsAppCredentials(supabase);
+    if (!credsResult.ok) {
+      console.error('whatsapp-webhook: Missing WhatsApp credentials —', credsResult.message);
       return false;
     }
 
-    const resp = await fetch(
-      `https://graph.facebook.com/${apiVersion}/${phoneId}/messages`,
-      {
-        method: 'POST',
-        headers: {
-          'Authorization': `Bearer ${token}`,
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify({
-          messaging_product: 'whatsapp',
-          to: toPhone,
-          type: 'text',
-          text: { body: message },
-        }),
-      }
-    );
+    const result = await postToMetaCloud(credsResult, {
+      messaging_product: 'whatsapp',
+      to: toPhone,
+      type: 'text',
+      text: { body: message },
+    });
 
-    if (!resp.ok) {
-      const errBody = await resp.text();
-      console.error('whatsapp-webhook: WhatsApp send failed:', resp.status, errBody);
+    if (!result.ok) {
+      console.error('whatsapp-webhook: WhatsApp send failed:', result.status, result.body);
       return false;
     }
 
@@ -712,14 +693,43 @@ serve(async (req: Request) => {
     const message = messages[0];
     const contact = contacts?.[0];
 
-    if (message.type !== 'text') {
-      console.log('whatsapp-webhook: ignoring non-text message type', message.type);
+    // Extract textBody based on message type
+    //  - text:        { type: 'text',        text: { body } }
+    //  - button:      { type: 'button',      button: { text, payload } }                  ← Quick Reply de TEMPLATE
+    //  - interactive: { type: 'interactive', interactive: { type: 'button_reply'|'list_reply', button_reply: { id, title } } }
+    let textBody = '';
+    let messageOrigin: 'text' | 'button' | 'interactive' | 'other' = 'other';
+
+    if (message.type === 'text') {
+      textBody = (message.text as Record<string, string>)?.body ?? '';
+      messageOrigin = 'text';
+    } else if (message.type === 'button') {
+      const btn = message.button as Record<string, string> | undefined;
+      textBody = btn?.text ?? btn?.payload ?? '';
+      messageOrigin = 'button';
+    } else if (message.type === 'interactive') {
+      const inter = message.interactive as Record<string, unknown> | undefined;
+      const interType = inter?.type as string | undefined;
+      if (interType === 'button_reply') {
+        const br = inter?.button_reply as Record<string, string> | undefined;
+        textBody = br?.title ?? br?.id ?? '';
+      } else if (interType === 'list_reply') {
+        const lr = inter?.list_reply as Record<string, string> | undefined;
+        textBody = lr?.title ?? lr?.id ?? '';
+      }
+      messageOrigin = 'interactive';
+    } else {
+      console.log('whatsapp-webhook: ignoring unsupported message type', message.type);
+      return new Response('OK', { status: 200 });
+    }
+
+    if (!textBody) {
+      console.log('whatsapp-webhook: empty textBody for type', message.type);
       return new Response('OK', { status: 200 });
     }
 
     const fromPhone = message.from as string;
     const messageId = message.id as string;
-    const textBody = (message.text as Record<string, string>)?.body ?? '';
     const contactName = (contact?.profile as Record<string, string>)?.name ?? '';
     const normalizedPhone = normalizePhone(fromPhone);
 
@@ -821,6 +831,8 @@ serve(async (req: Request) => {
         whatsapp_message_id: messageId,
         from_phone: fromPhone,
         contact_name: contactName,
+        message_origin: messageOrigin,
+        message_type: message.type,
       },
     });
 
@@ -989,3 +1001,4 @@ serve(async (req: Request) => {
     return new Response('OK', { status: 200 });
   }
 });
+                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                      

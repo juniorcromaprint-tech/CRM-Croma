@@ -1,6 +1,14 @@
 // supabase/functions/whatsapp-enviar/index.ts
 // Sends a WhatsApp message via Meta Cloud API for an approved agent_message.
 // POST { message_id } → sends the message and updates DB
+//
+// CREDENTIALS POLICY (2026-05-04 hardening):
+// All Edge Functions that talk to Meta Graph API now load credentials
+// EXCLUSIVELY from `admin_config` via getWhatsAppCredentials(). Reading
+// Deno.env.get('WHATSAPP_*') is forbidden — env vars can drift from the
+// canonical DB values and silently send to a stale test phone, producing
+// "(#131030) Recipient phone number not in allowed list" errors even
+// though the WABA is fully verified and in production.
 
 import { serve } from 'https://deno.land/std@0.168.0/http/server.ts';
 import {
@@ -9,8 +17,10 @@ import {
   jsonResponse,
   getServiceClient,
 } from '../ai-shared/ai-helpers.ts';
-
-const META_API_VERSION = 'v22.0';
+import {
+  getWhatsAppCredentials,
+  postToMetaCloud,
+} from '../ai-shared/whatsapp-credentials.ts';
 
 // ─────────────────────────────────────────────────────────────
 // Phone normalization
@@ -199,123 +209,68 @@ serve(async (req: Request) => {
     }
 
     const toPhone = normalizePhone(lead.contato_telefone);
-
-    // ── 3. Credentials: env vars → fallback admin_config ──────
-    let PHONE_NUMBER_ID = Deno.env.get('WHATSAPP_PHONE_NUMBER_ID');
-    let ACCESS_TOKEN = Deno.env.get('WHATSAPP_ACCESS_TOKEN');
     const now = new Date().toISOString();
 
-    // Fallback: read from admin_config table if env vars not set
-    if (!PHONE_NUMBER_ID || !ACCESS_TOKEN) {
-      const { data: configs } = await supabase
-        .from('admin_config')
-        .select('chave, valor')
-        .in('chave', ['WHATSAPP_PHONE_NUMBER_ID', 'WHATSAPP_ACCESS_TOKEN']);
-      for (const cfg of configs ?? []) {
-        if (cfg.chave === 'WHATSAPP_PHONE_NUMBER_ID' && !PHONE_NUMBER_ID) PHONE_NUMBER_ID = cfg.valor;
-        if (cfg.chave === 'WHATSAPP_ACCESS_TOKEN' && !ACCESS_TOKEN) ACCESS_TOKEN = cfg.valor;
-      }
-    }
+    // ── 3. Load canonical credentials from admin_config ───────
+    // Single source of truth — NEVER read Deno.env for WHATSAPP_*.
+    const credsResult = await getWhatsAppCredentials(supabase);
 
-    // ── 4. Demo mode if ACCESS_TOKEN not set ──────────────────
-    if (!ACCESS_TOKEN) {
+    if (!credsResult.ok) {
+      // Production must always have credentials. If they are missing,
+      // this is an operational failure — surface it clearly instead of
+      // silently dropping the message into a "demo" mode.
+      console.error('whatsapp-enviar: credenciais ausentes:', credsResult.message);
       await supabase
         .from('agent_messages')
-        .update({
-          status: 'enviada',
-          enviado_em: now,
-          metadata: { ...(msg.metadata || {}), demo: true },
-        })
+        .update({ status: 'erro', erro_mensagem: credsResult.message })
         .eq('id', message_id);
 
-      await supabase
-        .from('agent_conversations')
-        .update({
-          mensagens_enviadas: (conversa.mensagens_enviadas ?? 0) + 1,
-          ultima_mensagem_em: now,
-        })
-        .eq('id', msg.conversation_id);
-
-      await supabase.from('atividades_comerciais').insert({
-        entidade_tipo: 'lead',
-        entidade_id: lead.id,
-        tipo: 'whatsapp',
-        descricao: `[Agente] WhatsApp enviado (demo): ${(msg.conteudo ?? '').substring(0, 80)}`,
-        resultado: 'enviado',
-        data_atividade: now,
-      });
-
-      if (lead.status === 'novo') {
-        await supabase
-          .from('leads')
-          .update({ status: 'contatado' })
-          .eq('id', lead.id)
-          .eq('status', 'novo');
-      }
-
       return jsonResponse(
-        { success: true, demo: true, message_id, to: toPhone },
-        200,
-        corsHeaders
-      );
-    }
-
-    if (!PHONE_NUMBER_ID) {
-      return jsonResponse(
-        { error: 'WHATSAPP_PHONE_NUMBER_ID nao configurado' },
+        { error: credsResult.message, missing: credsResult.missing },
         500,
         corsHeaders
       );
     }
 
-    // ── 5. Decide payload: template vs free-form text ─────────
-    // First message (mensagens_enviadas === 0) → must use approved template
-    // Subsequent messages (lead replied = mensagens_recebidas > 0) → free-form text
+    const creds = credsResult;
+
+    // ── 4. Decide payload: template vs free-form text ─────────
+    // First message (mensagens_enviadas === 0) AND lead never replied → must use approved template
+    // Subsequent messages OR lead has replied (24h window open) → free-form text
     const isFirstMessage = (conversa.mensagens_enviadas ?? 0) === 0;
     const hasReceivedReply = (conversa.mensagens_recebidas ?? 0) > 0;
 
     let waPayload: Record<string, unknown>;
 
     if (isFirstMessage && !hasReceivedReply) {
-      // Initiating conversation: use template
       waPayload = buildTemplatePayload(toPhone, lead.contato_nome ?? lead.empresa ?? '');
     } else {
-      // Inside 24h window: free-form text
       waPayload = buildTextPayload(toPhone, msg.conteudo ?? '');
     }
 
-    // ── 6. Call Meta Cloud API ────────────────────────────────
-    const apiUrl = `https://graph.facebook.com/${META_API_VERSION}/${PHONE_NUMBER_ID}/messages`;
+    // ── 5. Call Meta Cloud API via shared helper ──────────────
+    const metaResult = await postToMetaCloud(creds, waPayload);
 
-    const metaRes = await fetch(apiUrl, {
-      method: 'POST',
-      headers: {
-        Authorization: `Bearer ${ACCESS_TOKEN}`,
-        'Content-Type': 'application/json',
-      },
-      body: JSON.stringify(waPayload),
-    });
-
-    if (!metaRes.ok) {
-      const errText = await metaRes.text();
-      const errMsg = errText.substring(0, 500);
-
+    if (!metaResult.ok) {
+      console.error(
+        `whatsapp-enviar: Meta API falhou (${metaResult.status}) para ${toPhone}:`,
+        metaResult.body,
+      );
       await supabase
         .from('agent_messages')
-        .update({ status: 'erro', erro_mensagem: errMsg })
+        .update({ status: 'erro', erro_mensagem: metaResult.body })
         .eq('id', message_id);
 
       return jsonResponse(
-        { error: 'Falha ao enviar via Meta Cloud API', detail: errMsg },
+        { error: 'Falha ao enviar via Meta Cloud API', status: metaResult.status, detail: metaResult.body },
         502,
         corsHeaders
       );
     }
 
-    const metaData = await metaRes.json();
-    const waMessageId = metaData?.messages?.[0]?.id as string | undefined;
+    const waMessageId = (metaResult.metaData as any)?.messages?.[0]?.id as string | undefined;
 
-    // ── 7. Mark message as sent ───────────────────────────────
+    // ── 6. Mark message as sent ───────────────────────────────
     await supabase
       .from('agent_messages')
       .update({
@@ -329,7 +284,7 @@ serve(async (req: Request) => {
       })
       .eq('id', message_id);
 
-    // ── 8. Update conversation ────────────────────────────────
+    // ── 7. Update conversation ────────────────────────────────
     await supabase
       .from('agent_conversations')
       .update({
@@ -338,7 +293,7 @@ serve(async (req: Request) => {
       })
       .eq('id', msg.conversation_id);
 
-    // ── 9. Log atividade comercial ────────────────────────────
+    // ── 8. Log atividade comercial ────────────────────────────
     await supabase.from('atividades_comerciais').insert({
       entidade_tipo: 'lead',
       entidade_id: lead.id,
@@ -348,7 +303,7 @@ serve(async (req: Request) => {
       data_atividade: now,
     });
 
-    // ── 10. Update lead status novo → contatado ───────────────
+    // ── 9. Update lead status novo → contatado ────────────────
     if (lead.status === 'novo') {
       await supabase
         .from('leads')
@@ -377,3 +332,4 @@ serve(async (req: Request) => {
     );
   }
 });
+                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                 

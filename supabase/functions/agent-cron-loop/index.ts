@@ -8,6 +8,10 @@
 // Uses service role (no user auth — this is a cron job)
 
 import { createClient, SupabaseClient } from 'https://esm.sh/@supabase/supabase-js@2';
+import {
+  getWhatsAppCredentials,
+  postToMetaCloud,
+} from '../ai-shared/whatsapp-credentials.ts';
 
 const SUPABASE_URL = Deno.env.get('SUPABASE_URL')!;
 const SERVICE_ROLE_KEY = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!;
@@ -1051,43 +1055,29 @@ async function sendWhatsAppTemplate(
   templateName: string,
   params: Record<string, string>
 ): Promise<boolean> {
-  const keys = ['WHATSAPP_ACCESS_TOKEN', 'WHATSAPP_PHONE_NUMBER_ID', 'WHATSAPP_API_VERSION'];
-  const { data: configs } = await supabase
-    .from('admin_config')
-    .select('chave, valor')
-    .in('chave', keys);
-
-  const cfg: Record<string, string> = {};
-  for (const c of configs ?? []) cfg[c.chave] = c.valor;
-
-  const token = cfg['WHATSAPP_ACCESS_TOKEN'];
-  const phoneId = cfg['WHATSAPP_PHONE_NUMBER_ID'];
-  const apiVersion = cfg['WHATSAPP_API_VERSION'] || 'v22.0';
-  if (!token || !phoneId) return false;
+  const credsResult = await getWhatsAppCredentials(supabase);
+  if (!credsResult.ok) {
+    console.error(`sendWhatsAppTemplate: ${credsResult.message}`);
+    return false;
+  }
 
   const bodyParameters = Object.values(params).map((value) => ({ type: 'text', text: value }));
 
-  const resp = await fetch(
-    `https://graph.facebook.com/${apiVersion}/${phoneId}/messages`,
-    {
-      method: 'POST',
-      headers: { 'Authorization': `Bearer ${token}`, 'Content-Type': 'application/json' },
-      body: JSON.stringify({
-        messaging_product: 'whatsapp',
-        to: toPhone,
-        type: 'template',
-        template: {
-          name: templateName,
-          language: { code: 'pt_BR' },
-          components: [{ type: 'body', parameters: bodyParameters }],
-        },
-      }),
-    }
-  );
+  const result = await postToMetaCloud(credsResult, {
+    messaging_product: 'whatsapp',
+    to: toPhone,
+    type: 'template',
+    template: {
+      name: templateName,
+      language: { code: 'pt_BR' },
+      components: [{ type: 'body', parameters: bodyParameters }],
+    },
+  });
 
-  if (!resp.ok) {
-    const err = await resp.text();
-    console.error(`sendWhatsAppTemplate: ${resp.status} — ${err.substring(0, 200)}`);
+  if (!result.ok) {
+    console.error(`sendWhatsAppTemplate: ${result.status} — ${result.body.substring(0, 200)}`);
+    return false;
   }
-  return resp.ok;
+  return true;
 }
+                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                  
