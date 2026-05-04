@@ -119,50 +119,67 @@ export function useLeads(filters?: LeadFilters) {
     queryKey: leadsQueryKey(filters),
     staleTime: 2 * 60 * 1000,
     queryFn: async (): Promise<Lead[]> => {
-      let query = supabase
-        .from('leads')
-        .select('id, empresa, contato_nome, contato_email, contato_telefone, segmento, origem_id, vendedor_id, status, temperatura, valor_estimado, proximo_contato, observacoes, cargo, score, motivo_descarte, telefone, email, created_at, updated_at')
-        .order('created_at', { ascending: false })
-        .limit(5000);
+      const PAGE_SIZE = 1000;
+      const allRows: Lead[] = [];
+      let page = 0;
+      let hasMore = true;
 
-      // Filtro por status
-      if (filters?.status) {
-        if (Array.isArray(filters.status)) {
-          query = query.in('status', filters.status);
-        } else {
-          query = query.eq('status', filters.status);
+      while (hasMore) {
+        let query = supabase
+          .from('leads')
+          .select('id, empresa, contato_nome, contato_email, contato_telefone, segmento, origem_id, vendedor_id, status, temperatura, valor_estimado, proximo_contato, observacoes, cargo, score, motivo_descarte, telefone, email, created_at, updated_at')
+          .order('created_at', { ascending: false })
+          .range(page * PAGE_SIZE, (page + 1) * PAGE_SIZE - 1);
+
+        // Filtro por status
+        if (filters?.status) {
+          if (Array.isArray(filters.status)) {
+            query = query.in('status', filters.status);
+          } else {
+            query = query.eq('status', filters.status);
+          }
         }
-      }
 
-      // Filtro por temperatura
-      if (filters?.temperatura) {
-        if (Array.isArray(filters.temperatura)) {
-          query = query.in('temperatura', filters.temperatura);
-        } else {
-          query = query.eq('temperatura', filters.temperatura);
+        // Filtro por temperatura
+        if (filters?.temperatura) {
+          if (Array.isArray(filters.temperatura)) {
+            query = query.in('temperatura', filters.temperatura);
+          } else {
+            query = query.eq('temperatura', filters.temperatura);
+          }
         }
+
+        // Filtro por vendedor
+        if (filters?.vendedor_id) {
+          query = query.eq('vendedor_id', filters.vendedor_id);
+        }
+
+        // Busca textual (empresa, contato_nome, contato_email)
+        if (filters?.search && filters.search.trim().length > 0) {
+          const term = ilikeTerm(filters.search);
+          query = query.or(
+            `empresa.ilike.${term},contato_nome.ilike.${term},contato_email.ilike.${term}`
+          );
+        }
+
+        const { data, error } = await query;
+
+        if (error) {
+          throw new Error(`Erro ao buscar leads: ${error.message}`);
+        }
+
+        const rows = (data ?? []) as Lead[];
+        allRows.push(...rows);
+
+        // Se retornou menos que PAGE_SIZE, não tem mais páginas
+        hasMore = rows.length === PAGE_SIZE;
+        page++;
+
+        // Safety: max 10 páginas (10.000 leads)
+        if (page >= 10) break;
       }
 
-      // Filtro por vendedor
-      if (filters?.vendedor_id) {
-        query = query.eq('vendedor_id', filters.vendedor_id);
-      }
-
-      // Busca textual (empresa, contato_nome, contato_email)
-      if (filters?.search && filters.search.trim().length > 0) {
-        const term = ilikeTerm(filters.search);
-        query = query.or(
-          `empresa.ilike.${term},contato_nome.ilike.${term},contato_email.ilike.${term}`
-        );
-      }
-
-      const { data, error } = await query;
-
-      if (error) {
-        throw new Error(`Erro ao buscar leads: ${error.message}`);
-      }
-
-      return (data ?? []) as Lead[];
+      return allRows;
     },
   });
 }
@@ -285,16 +302,30 @@ export function useLeadStats() {
     queryKey: LEADS_STATS_KEY,
     staleTime: 60 * 1000,
     queryFn: async (): Promise<LeadStats> => {
-      const { data, error } = await supabase
-        .from('leads')
-        .select('status, temperatura, valor_estimado')
-        .limit(10000);
+      // Paginate to bypass Supabase max_rows=1000 server limit
+      const PAGE_SIZE = 1000;
+      const allRows: Pick<Lead, 'status' | 'temperatura' | 'valor_estimado'>[] = [];
+      let page = 0;
+      let hasMore = true;
 
-      if (error) {
-        throw new Error(`Erro ao buscar estatísticas de leads: ${error.message}`);
+      while (hasMore) {
+        const { data, error } = await supabase
+          .from('leads')
+          .select('status, temperatura, valor_estimado')
+          .range(page * PAGE_SIZE, (page + 1) * PAGE_SIZE - 1);
+
+        if (error) {
+          throw new Error(`Erro ao buscar estatísticas de leads: ${error.message}`);
+        }
+
+        const rows = (data ?? []) as Pick<Lead, 'status' | 'temperatura' | 'valor_estimado'>[];
+        allRows.push(...rows);
+        hasMore = rows.length === PAGE_SIZE;
+        page++;
+        if (page >= 10) break;
       }
 
-      const leads = (data ?? []) as Pick<Lead, 'status' | 'temperatura' | 'valor_estimado'>[];
+      const leads = allRows;
 
       // Agregar por status
       const statusMap = new Map<LeadStatus, { count: number; valor_total: number }>();
