@@ -67,3 +67,18 @@ _secure/
 _archive/
 _logs/
 _temp/
+.tmp/
+__pycache__/
+
+# MCP server dist (build local, nao versionar)
+mcp-server/dist/
+
+# Temp data files
+jobs_plotter.json
+mcp-server/temp_*.json
+
+# Leads SQL batches (ja importados no banco)
+leads-base/
+
+# Supabase CLI local state
+supabase/.temp/
