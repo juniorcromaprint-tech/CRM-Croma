@@ -85,7 +85,7 @@ export function DispararAberturaModal({ open, onClose, leads, onSuccess }: Props
     return sorted[0][1] / leads.length > 0.7 ? sorted[0][0] : undefined;
   }, [leads]);
 
-  const { data: templates = [], isLoading: loadingTemplates } = useTemplatesAbertura(segmentoPred);
+  const { data: templates = [], isLoading: loadingTemplates } = useTemplatesAbertura();
 
   const elegiveis  = leads.filter(l => !l.bloqueado_disparo && l.tem_telefone_valido && !l.em_conversa_ativa);
   const semTel     = leads.filter(l => !l.bloqueado_disparo && !l.tem_telefone_valido);
@@ -184,14 +184,23 @@ export function DispararAberturaModal({ open, onClose, leads, onSuccess }: Props
               </div>
             ) : (
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-                {templates.map((t: any) => (
-                  <TemplateCard
-                    key={t.id}
-                    template={t}
-                    selected={t.id === templateId}
-                    onClick={() => setTemplateId(t.id)}
-                  />
-                ))}
+                {templates
+                  .slice()
+                  .sort((a: any, b: any) => {
+                    // Recomendado primeiro (segmento bate), depois geral, depois resto
+                    const aRec = a.segmento === segmentoPred ? 0 : a.segmento === null ? 1 : 2;
+                    const bRec = b.segmento === segmentoPred ? 0 : b.segmento === null ? 1 : 2;
+                    return aRec - bRec;
+                  })
+                  .map((t: any) => (
+                    <TemplateCard
+                      key={t.id}
+                      template={t}
+                      selected={t.id === templateId}
+                      recomendado={!!segmentoPred && t.segmento === segmentoPred}
+                      onClick={() => setTemplateId(t.id)}
+                    />
+                  ))}
               </div>
             )}
 
@@ -320,10 +329,11 @@ export function DispararAberturaModal({ open, onClose, leads, onSuccess }: Props
 interface TemplateCardProps {
   template: any;
   selected: boolean;
+  recomendado?: boolean;
   onClick: () => void;
 }
 
-function TemplateCard({ template, selected, onClick }: TemplateCardProps) {
+function TemplateCard({ template, selected, recomendado, onClick }: TemplateCardProps) {
   const previewLen = 140;
   const preview = (template.conteudo ?? '').replace(/\s+/g, ' ').trim();
   const previewTrunc = preview.length > previewLen ? preview.slice(0, previewLen) + '...' : preview;
@@ -334,19 +344,28 @@ function TemplateCard({ template, selected, onClick }: TemplateCardProps) {
       type="button"
       onClick={onClick}
       className={[
-        'text-left bg-white border rounded-xl p-3 flex flex-col gap-2 transition-all',
+        'text-left bg-white border rounded-xl p-3 flex flex-col gap-2 transition-all relative',
         selected
           ? 'border-blue-500 border-2 ring-2 ring-blue-100'
-          : 'border-slate-200 hover:border-slate-300 hover:bg-slate-50',
+          : recomendado
+            ? 'border-amber-300 hover:border-amber-400 hover:bg-amber-50/30'
+            : 'border-slate-200 hover:border-slate-300 hover:bg-slate-50',
       ].join(' ')}
     >
       <div className="flex items-start justify-between gap-2">
         <span className="text-sm font-semibold text-slate-800 leading-snug">{template.nome}</span>
-        {selected && (
-          <Badge className="bg-blue-600 text-white text-[10px] px-1.5 py-0 shrink-0">
-            <CheckCircle2 size={10} className="mr-0.5" /> Selecionado
-          </Badge>
-        )}
+        <div className="flex flex-col items-end gap-1 shrink-0">
+          {selected && (
+            <Badge className="bg-blue-600 text-white text-[10px] px-1.5 py-0">
+              <CheckCircle2 size={10} className="mr-0.5" /> Selecionado
+            </Badge>
+          )}
+          {!selected && recomendado && (
+            <Badge className="bg-amber-100 text-amber-700 border-amber-200 text-[10px] px-1.5 py-0 hover:bg-amber-200">
+              ★ Recomendado
+            </Badge>
+          )}
+        </div>
       </div>
 
       <div className="text-xs text-slate-600 leading-relaxed border-l-2 border-slate-100 pl-2">

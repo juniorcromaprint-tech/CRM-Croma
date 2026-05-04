@@ -1,6 +1,5 @@
 // src/domains/comercial/hooks/useDispararAbertura.ts
 // Mutation que chama RPC fn_disparar_abertura_em_massa.
-// Fonte: PLANO-DISPAROS-PROSPECCAO.md secao 6.8
 
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { supabase } from '@/integrations/supabase/client';
@@ -61,21 +60,21 @@ export function useDispararAbertura() {
   });
 }
 
-// Templates disponiveis para disparo (canal=whatsapp, etapa=abertura, ativo=true)
-export function useTemplatesAbertura(segmento?: string) {
+// Templates de abertura ativos.
+// IMPORTANTE: traz TODOS (independente do segmento). O modal marca como
+// "recomendado" o que casa com o segmento dos leads selecionados.
+export function useTemplatesAbertura() {
   return useQuery({
-    queryKey: ['templates-abertura', segmento],
+    queryKey: ['templates-abertura-todos'],
     queryFn: async () => {
-      let q = supabase
+      const { data, error } = await supabase
         .from('agent_templates')
         .select('id, nome, etapa, segmento, sub_segmento, meta_template_name, conteudo, variaveis, vezes_usado, taxa_resposta, template_language')
         .eq('canal', 'whatsapp')
         .eq('etapa', 'abertura')
-        .eq('ativo', true);
-
-      if (segmento) q = q.eq('segmento', segmento);
-
-      const { data, error } = await q.order('nome');
+        .eq('ativo', true)
+        .order('segmento', { nullsFirst: false })
+        .order('nome');
       if (error) throw error;
       return data ?? [];
     },

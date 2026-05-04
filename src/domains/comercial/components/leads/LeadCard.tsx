@@ -1,7 +1,5 @@
 // src/domains/comercial/components/leads/LeadCard.tsx
 // Card visual de um lead — substitui linha da tabela densa.
-// Avatar com inicial + cor por sub-segmento, badges de telefone/conversa, status.
-// Fonte: redesign UX 2026-05-04L.
 
 import { Phone, MessageCircle, Ban, ChevronRight } from 'lucide-react';
 import { Checkbox } from '@/components/ui/checkbox';
@@ -10,7 +8,6 @@ import {
 } from '@/components/ui/tooltip';
 import type { LeadDisparo } from '../../hooks/useLeadsDisparo';
 
-// Cores de avatar por sub-segmento (alinha com SegmentoPills)
 const SUB_SEGMENTO_AVATAR: Record<string, { bg: string; fg: string; label: string }> = {
   vigilancia_patrimonial: { bg: 'bg-purple-50', fg: 'text-purple-700', label: 'Vigilância' },
   seguranca_eletronica:   { bg: 'bg-orange-50', fg: 'text-orange-700', label: 'Eletrônica' },
@@ -55,42 +52,42 @@ export function LeadCard({ lead, selected, onToggle, onOpen }: Props) {
   const avatarBg = tone?.bg ?? 'bg-slate-100';
   const avatarFg = tone?.fg ?? 'text-slate-600';
 
+  // Click no card inteiro = toggle do checkbox.
+  // Botao "abrir detalhe" eh separado (botao interno menor).
+  const handleCardClick = () => {
+    if (!isBlocked) onToggle();
+  };
+
   const baseClasses = [
     'group relative flex items-center gap-3 px-3 py-2.5 rounded-xl border transition-colors',
     isBlocked
       ? 'bg-slate-50 border-slate-200 opacity-50 cursor-default'
       : selected
-        ? 'bg-blue-50/70 border-blue-300'
-        : 'bg-white border-slate-200 hover:bg-slate-50/70',
+        ? 'bg-blue-50/70 border-blue-300 cursor-pointer'
+        : 'bg-white border-slate-200 hover:bg-slate-50/70 cursor-pointer',
   ].join(' ');
 
   return (
     <TooltipProvider delayDuration={400}>
       <Tooltip>
         <TooltipTrigger asChild>
-          <div className={baseClasses}>
-            {/* Checkbox */}
-            <div onClick={e => { e.stopPropagation(); if (!isBlocked) onToggle(); }}>
-              <Checkbox
-                checked={selected}
-                disabled={isBlocked}
-                onCheckedChange={() => { if (!isBlocked) onToggle(); }}
-                aria-label={`Selecionar ${lead.empresa ?? 'lead'}`}
-              />
-            </div>
+          <div className={baseClasses} onClick={handleCardClick}>
+            {/* Checkbox — controlado pelo card; nao tem onCheckedChange propio */}
+            <Checkbox
+              checked={selected}
+              disabled={isBlocked}
+              tabIndex={-1}
+              aria-label={`Selecionar ${lead.empresa ?? 'lead'}`}
+              className="pointer-events-none"
+            />
 
             {/* Avatar */}
             <div className={`w-9 h-9 rounded-lg flex items-center justify-center text-xs font-semibold shrink-0 ${avatarBg} ${avatarFg}`}>
               {isBlocked ? <Ban size={14} /> : inicial}
             </div>
 
-            {/* Conteúdo principal — clicável pra abrir detalhe */}
-            <button
-              type="button"
-              onClick={onOpen}
-              disabled={isBlocked}
-              className="flex-1 min-w-0 text-left"
-            >
+            {/* Conteúdo principal */}
+            <div className="flex-1 min-w-0">
               <div className="flex items-center gap-2 mb-0.5">
                 <span className="text-sm font-medium text-slate-800 truncate">
                   {lead.empresa ?? lead.contato_nome ?? '—'}
@@ -118,7 +115,7 @@ export function LeadCard({ lead, selected, onToggle, onOpen }: Props) {
                   </>
                 )}
               </div>
-            </button>
+            </div>
 
             {/* Badges direita */}
             <div className="flex items-center gap-1.5 shrink-0">
@@ -141,11 +138,16 @@ export function LeadCard({ lead, selected, onToggle, onOpen }: Props) {
                   sem tel
                 </span>
               )}
+              {/* Botao para abrir detalhe — separado do toggle do card */}
               {!isBlocked && (
-                <ChevronRight
-                  size={14}
-                  className="text-slate-300 group-hover:text-blue-500 transition-colors"
-                />
+                <button
+                  type="button"
+                  onClick={(e) => { e.stopPropagation(); onOpen(); }}
+                  className="p-1 rounded-md text-slate-300 hover:text-blue-500 hover:bg-blue-50 transition-colors"
+                  aria-label="Abrir detalhe"
+                >
+                  <ChevronRight size={14} />
+                </button>
               )}
             </div>
           </div>
