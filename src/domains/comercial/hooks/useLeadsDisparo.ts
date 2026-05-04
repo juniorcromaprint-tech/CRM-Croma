@@ -1,12 +1,9 @@
 // src/domains/comercial/hooks/useLeadsDisparo.ts
 // Hooks de query para vw_leads_disparo: lista paginada, counts por sub-segmento
 // e status da campanha em andamento.
-// Fonte: PLANO-DISPAROS-PROSPECCAO.md seções 6.2 e redesign UX 2026-05-04L
 
 import { useQuery } from '@tanstack/react-query';
 import { supabase } from '@/integrations/supabase/client';
-
-// ─── Types ───────────────────────────────────────────────────────────────────
 
 export interface LeadsFilterState {
   segmentos?: string[];
@@ -17,15 +14,15 @@ export interface LeadsFilterState {
   estados?: string[];
   regioes?: string[];
   cidades?: string[];
-  temTelefone?: boolean | null;       // true | false | null (qualquer)
+  temTelefone?: boolean | null;
   temEmail?: boolean | null;
   emConversaAtiva?: boolean | null;
   scoreMin?: number;
   scoreMax?: number;
   vendedorId?: string | null;
-  cadastroDe?: string;                // ISO date string
+  cadastroDe?: string;
   cadastroAte?: string;
-  excluirBloqueados?: boolean;        // default true
+  excluirBloqueados?: boolean;
   busca?: string;
 }
 
@@ -67,13 +64,7 @@ export interface LeadsDisparoPage {
   pageSize: number;
 }
 
-// ─── Helper: aplica todos os filtros menos os listados em `excluir` ──────────
-
-function applyFilters(
-  q: ReturnType<typeof supabase['from']> extends (...a: any) => infer R ? R : never,
-  filters: LeadsFilterState,
-  excluir: Array<keyof LeadsFilterState> = [],
-) {
+function applyFilters(q: any, filters: LeadsFilterState, excluir: Array<keyof LeadsFilterState> = []) {
   const skip = new Set(excluir);
 
   if (!skip.has('segmentos')    && filters.segmentos?.length)    q = q.in('segmento',     filters.segmentos);
@@ -109,15 +100,194 @@ function applyFilters(
   }
 
   if (!skip.has('busca') && filters.busca) {
-    const b = filters.busca.trim().replace(/[%_]/g, ''); // sanitização leve
+    const b = filters.busca.trim().replace(/[%_]/g, '');
     if (b) {
-      q = q.or(
-        `empresa.ilike.%${b}%,contato_nome.ilike.%${b}%,contato_telefone.ilike.%${b}%`
-      );
+      q = q.or(`empresa.ilike.%${b}%,contato_nome.ilike.%${b}%,contato_telefone.ilike.%${b}%`);
     }
   }
 
   return q;
 }
 
-// ─── Hook principal: lista paginada ────────────────────────────────────────�
+export interface UseLeadsDisparoOptions {
+  page?: number;
+  pageSize?: number;
+  enabled?: boolean;
+}
+
+export function useLeadsDisparo(filters: LeadsFilterState, options: UseLeadsDisparoOptions = {}) {
+  const page     = options.page     ?? 1;
+  const pageSize = options.pageSize ?? 50;
+  const from = (page - 1) * pageSize;
+  const to   = from + pageSize - 1;
+
+  return useQuery({
+    queryKey: ['leads-disparo', filters, page, pageSize],
+    queryFn: async (): Promise<LeadsDisparoPage> => {
+      let q: any = supabase.from('vw_leads_disparo').select('*', { count: 'exact' });
+      q = applyFilters(q, filters);
+      q = q.order('created_at', { ascending: false }).range(from, to);
+
+      const { data, error, count } = await q;
+      if (error) throw error;
+      return {
+        data: (data ?? []) as LeadDisparo[],
+        totalCount: count ?? 0,
+        page,
+        pageSize,
+      };
+    },
+    staleTime: 30_000,
+    enabled: options.enabled ?? true,
+  });
+}
+
+export function useLeadsDisparoCountsBySub(filters: LeadsFilterState) {
+  return useQuery({
+    queryKey: ['leads-disparo-counts-by-sub', { ...filters, subSegmentos: undefined }],
+    queryFn: async () => {
+      let q: any = supabase.from('vw_leads_disparo').select('sub_segmento');
+      q = applyFilters(q, filters, ['subSegmentos']);
+
+      const { data, error } = await q;
+      if (error) throw error;
+
+      const counts: Record<string, number> = {};
+      let semSub = 0;
+      let total = 0;
+      for (const row of (data ?? []) as { sub_segmento: string | null }[]) {
+        total++;
+        if (row.sub_segmento) {
+          counts[row.sub_segmento] = (counts[row.sub_segmento] ?? 0) + 1;
+        } else {
+          semSub++;
+        }
+      }
+      return { counts, semSub, total };
+    },
+    staleTime: 60_000,
+  });
+}
+
+export function useLeadsDisparoCountsBySegmento(filters: LeadsFilterState) {
+  return useQuery({
+    queryKey: ['leads-disparo-counts-by-segmento', { ...filters, segmentos: undefined, subSegmentos: undefined }],
+    queryFn: async () => {
+      let q: any = supabase.from('vw_leads_disparo').select('segmento');
+      q = applyFilters(q, filters, ['segmentos', 'subSegmentos']);
+
+      const { data, error } = await q;
+      if (error) throw error;
+
+      const counts: Record<string, number> = {};
+      let total = 0;
+      for (const row of (data ?? []) as { segmento: string | null }[]) {
+        total++;
+        if (row.segmento) {
+          counts[row.segmento] = (counts[row.segmento] ?? 0) + 1;
+        }
+      }
+      return { counts, total };
+    },
+    staleTime: 60_000,
+  });
+}
+
+export interface CampanhaStatus {
+  totalLeads: number;
+  totalDisparados: number;
+  enviadasHoje: number;
+  diaDaRampa: number | null;
+  limiteDiarioAtual: number;
+  totalEnfileiradas: number;
+}
+
+export function useCampanhaStatus(segmento = 'seguranca') {
+  return useQuery<CampanhaStatus>({
+    queryKey: ['campanha-status', segmento],
+    queryFn: async () => {
+      const { count: totalLeads } = await supabase
+        .from('vw_leads_disparo')
+        .select('id', { count: 'exact', head: true })
+        .eq('segmento', segmento)
+        .eq('bloqueado_disparo', false);
+
+      const { count: totalDisparados } = await supabase
+        .from('vw_leads_disparo')
+        .select('id', { count: 'exact', head: true })
+        .eq('segmento', segmento)
+        .or('em_conversa_ativa.eq.true,ultima_conversa_em.not.is.null');
+
+      const inicioHoje = new Date();
+      inicioHoje.setHours(0, 0, 0, 0);
+
+      const { count: enviadasHoje } = await supabase
+        .from('agent_messages')
+        .select('id', { count: 'exact', head: true })
+        .eq('canal', 'whatsapp')
+        .eq('status', 'enviada')
+        .gte('enviado_em', inicioHoje.toISOString());
+
+      const { count: totalEnfileiradas } = await supabase
+        .from('agent_messages')
+        .select('id', { count: 'exact', head: true })
+        .eq('canal', 'whatsapp')
+        .eq('status', 'aprovada');
+
+      const { data: primeiraMsg } = await supabase
+        .from('agent_messages')
+        .select('enviado_em')
+        .eq('canal', 'whatsapp')
+        .eq('status', 'enviada')
+        .order('enviado_em', { ascending: true })
+        .limit(1)
+        .maybeSingle();
+
+      let diaDaRampa: number | null = null;
+      if (primeiraMsg?.enviado_em) {
+        const inicio = new Date(primeiraMsg.enviado_em);
+        inicio.setHours(0, 0, 0, 0);
+        const diff = Math.floor((inicioHoje.getTime() - inicio.getTime()) / 86_400_000);
+        diaDaRampa = diff + 1;
+      }
+
+      const limiteDiarioAtual = diaDaRampa == null || diaDaRampa <= 2 ? 15 : 30;
+
+      return {
+        totalLeads:          totalLeads          ?? 0,
+        totalDisparados:     totalDisparados     ?? 0,
+        enviadasHoje:        enviadasHoje        ?? 0,
+        totalEnfileiradas:   totalEnfileiradas   ?? 0,
+        diaDaRampa,
+        limiteDiarioAtual,
+      };
+    },
+    staleTime: 60_000,
+  });
+}
+
+export function useLeadsDisparoMeta() {
+  return useQuery({
+    queryKey: ['leads-disparo-meta'],
+    queryFn: async () => {
+      const { data, error } = await supabase
+        .from('vw_leads_disparo')
+        .select('segmento, sub_segmento, origem_nome, status, temperatura, estado, regiao, cidade');
+      if (error) throw error;
+      const rows = data ?? [];
+      const uniq = <T,>(arr: (T | null)[]): T[] =>
+        [...new Set(arr.filter((x): x is T => x !== null && (x as any) !== ''))] as T[];
+      return {
+        segmentos:    uniq(rows.map((r: any) => r.segmento)),
+        subSegmentos: uniq(rows.map((r: any) => r.sub_segmento)),
+        origens:      uniq(rows.map((r: any) => r.origem_nome)),
+        status:       uniq(rows.map((r: any) => r.status)),
+        temperaturas: uniq(rows.map((r: any) => r.temperatura)),
+        estados:      uniq(rows.map((r: any) => r.estado)),
+        regioes:      uniq(rows.map((r: any) => r.regiao)),
+        cidades:      uniq(rows.map((r: any) => r.cidade)),
+      };
+    },
+    staleTime: 5 * 60_000,
+  });
+}
