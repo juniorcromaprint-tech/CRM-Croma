@@ -1,6 +1,6 @@
 // src/domains/comercial/hooks/useDispararAbertura.ts
 // Mutation que chama RPC fn_disparar_abertura_em_massa.
-// Fonte: PLANO-DISPAROS-PROSPECCAO.md seção 6.8
+// Fonte: PLANO-DISPAROS-PROSPECCAO.md secao 6.8
 
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { supabase } from '@/integrations/supabase/client';
@@ -50,7 +50,7 @@ export function useDispararAbertura() {
         `${criados} disparo${criados !== 1 ? 's' : ''} enfileirado${criados !== 1 ? 's' : ''}.`,
         bloqueados ? `${bloqueados} bloqueado${bloqueados !== 1 ? 's' : ''}.` : '',
         pulados    ? `${pulados} sem telefone.` : '',
-        dups       ? `${dups} já em conversa.` : '',
+        dups       ? `${dups} ja em conversa.` : '',
       ].filter(Boolean).join(' ');
 
       showSuccess(msg);
@@ -61,7 +61,7 @@ export function useDispararAbertura() {
   });
 }
 
-// Templates disponíveis para disparo (canal=whatsapp, etapa=abertura, ativo=true)
+// Templates disponiveis para disparo (canal=whatsapp, etapa=abertura, ativo=true)
 export function useTemplatesAbertura(segmento?: string) {
   return useQuery({
     queryKey: ['templates-abertura', segmento],
@@ -77,4 +77,8 @@ export function useTemplatesAbertura(segmento?: string) {
 
       const { data, error } = await q.order('nome');
       if (error) throw error;
-      ret
+      return data ?? [];
+    },
+    staleTime: 2 * 60_000,
+  });
+}
