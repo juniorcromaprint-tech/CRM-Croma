@@ -1,18 +1,15 @@
 // src/domains/comercial/pages/LeadsPage.tsx
-// Página de leads com disparo em massa — usa vw_leads_disparo.
-// Fonte: PLANO-DISPAROS-PROSPECCAO.md seção 6.1
+// Página de leads com disparo em massa.
+// v2 (2026-05-04L): redesign UX — banner de campanha, pills de segmento,
+// cards de lead, cesta lateral sticky, paginação 50/pg, modal galeria.
 
-import { useState, useCallback, useEffect } from 'react';
+import { useState, useCallback, useEffect, useMemo } from 'react';
 import { useNavigate, useSearchParams } from 'react-router-dom';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { supabase } from '@/integrations/supabase/client';
 import { showSuccess, showError } from '@/utils/toast';
-import { brl as formatBRL } from '@/shared/utils/format';
 import { ilikeTerm } from '@/shared/utils/searchUtils';
-import {
-  UserPlus, Plus, Loader2, Trash2, AlertTriangle,
-  Phone, Mail, Building2, Thermometer,
-} from 'lucide-react';
+import { Plus, Loader2, AlertTriangle } from 'lucide-react';
 import { useAuth } from '@/contexts/AuthContext';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
@@ -29,16 +26,15 @@ import {
 } from '@/components/ui/select';
 import { Label } from '@/components/ui/label';
 import { Textarea } from '@/components/ui/textarea';
-import { Tabs, TabsList, TabsTrigger } from '@/components/ui/tabs';
-import { TEMPERATURA_CONFIG } from '../constants/temperatura';
 import { LEAD_STATUS_CONFIG, getStatusConfig } from '@/shared/constants/status';
 import QueryErrorState from '@/shared/components/QueryErrorState';
-import { useLeadsDisparo } from '../hooks/useLeadsDisparo';
-import type { LeadsFilterState } from '../hooks/useLeadsDisparo';
+import { useLeadsDisparo, type LeadsFilterState } from '../hooks/useLeadsDisparo';
 import { useLeadsSelection } from '../hooks/useLeadsSelection';
+import { CampanhaBanner } from '../components/leads/CampanhaBanner';
+import { SegmentoPills } from '../components/leads/SegmentoPills';
 import { LeadsFilters } from '../components/leads/LeadsFilters';
-import { LeadsTable } from '../components/leads/LeadsTable';
-import { LeadsBulkActionBar } from '../components/leads/LeadsBulkActionBar';
+import { LeadsCardList } from '../components/leads/LeadsCardList';
+import { LeadsCesta } from '../components/leads/LeadsCesta';
 import { DispararAberturaModal } from '../components/leads/DispararAberturaModal';
 
 // ─── Types ───────────────────────────────────────────────────────────────────
@@ -47,13 +43,10 @@ interface LeadDuplicado {
   id: string; empresa: string | null; contato_nome: string | null; status: string;
 }
 
-// ─── Default filter state ─────────────────────────────────────────────────────
+const PAGE_SIZE = 50;
+const DEFAULT_FILTERS: LeadsFilterState = { excluirBloqueados: true };
 
-const DEFAULT_FILTERS: LeadsFilterState = {
-  excluirBloqueados: true,
-};
-
-// ─── Helpers ─────────────────────────────────────────────────────────────────
+// ─── URL <-> Filtros ─────────────────────────────────────────────────────────
 
 function filtersFromParams(sp: URLSearchParams): LeadsFilterState {
   const get = (k: string) => sp.get(k) ?? undefined;
@@ -66,12 +59,17 @@ function filtersFromParams(sp: URLSearchParams): LeadsFilterState {
     regioes:          getArr('reg'),
     busca:            get('q'),
     temTelefone:      sp.get('tel') === '1' ? true : sp.get('tel') === '0' ? false : null,
+    temEmail:         sp.get('email') === '1' ? true : sp.get('email') === '0' ? false : null,
     emConversaAtiva:  sp.get('conv') === '1' ? true : null,
     excluirBloqueados: sp.get('bloq') !== '0',
+    scoreMin:         sp.get('smin') ? Number(sp.get('smin')) : undefined,
+    scoreMax:         sp.get('smax') ? Number(sp.get('smax')) : undefined,
+    cadastroDe:       get('dde'),
+    cadastroAte:      get('date'),
   };
 }
 
-function filtersToParams(f: LeadsFilterState): URLSearchParams {
+function filtersToParams(f: LeadsFilterState, page: number): URLSearchParams {
   const sp = new URLSearchParams();
   f.segmentos?.forEach(v => sp.append('seg', v));
   f.subSegmentos?.forEach(v => sp.append('sub', v));
@@ -81,34 +79,45 @@ function filtersToParams(f: LeadsFilterState): URLSearchParams {
   if (f.busca) sp.set('q', f.busca);
   if (f.temTelefone === true)  sp.set('tel', '1');
   if (f.temTelefone === false) sp.set('tel', '0');
+  if (f.temEmail === true)     sp.set('email', '1');
+  if (f.temEmail === false)    sp.set('email', '0');
   if (f.emConversaAtiva === true) sp.set('conv', '1');
   if (f.excluirBloqueados === false) sp.set('bloq', '0');
+  if (f.scoreMin != null)  sp.set('smin', String(f.scoreMin));
+  if (f.scoreMax != null)  sp.set('smax', String(f.scoreMax));
+  if (f.cadastroDe)        sp.set('dde', f.cadastroDe);
+  if (f.cadastroAte)       sp.set('date', f.cadastroAte);
+  if (page > 1) sp.set('page', String(page));
   return sp;
 }
 
 // ─── Component ───────────────────────────────────────────────────────────────
 
 export default function LeadsPage() {
-  const navigate      = useNavigate();
-  const queryClient   = useQueryClient();
-  const { profile }   = useAuth();
+  const queryClient = useQueryClient();
+  const { profile } = useAuth();
   const [searchParams, setSearchParams] = useSearchParams();
 
-  const canDelete = profile?.role === 'admin' || profile?.role === 'diretor';
-
-  // ── View mode ────────────────────────────────────────────────────────────
-  const [viewMode, setViewMode] = useState<'disparo' | 'classico'>('disparo');
-
-  // ── Filters (URL-persisted) ───────────────────────────────────────────────
+  // Filtros (URL-persisted)
   const [filters, setFiltersState] = useState<LeadsFilterState>(() =>
     filtersFromParams(searchParams)
   );
+  const [page, setPageState] = useState<number>(() => {
+    const p = Number(searchParams.get('page') ?? 1);
+    return Number.isFinite(p) && p > 0 ? p : 1;
+  });
+
+  // Seleção
+  const selection = useLeadsSelection();
 
   const setFilters = useCallback((next: LeadsFilterState) => {
     setFiltersState(next);
-    setSearchParams(filtersToParams(next), { replace: true });
+    setPageState(1);
+    setSearchParams(filtersToParams(next, 1), { replace: true });
     selection.clear();
-  }, []); // eslint-disable-line
+    // selection.clear é estável (useCallback com [] no useLeadsSelection)
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
 
   const patchFilters = useCallback((patch: Partial<LeadsFilterState>) => {
     setFilters({ ...filters, ...patch });
@@ -118,45 +127,50 @@ export default function LeadsPage() {
     setFilters(DEFAULT_FILTERS);
   }, [setFilters]);
 
-  // ── Selection ─────────────────────────────────────────────────────────────
-  const selection = useLeadsSelection();
+  const setPage = useCallback((next: number) => {
+    setPageState(next);
+    setSearchParams(filtersToParams(filters, next), { replace: true });
+    // Scroll suave pro topo da lista
+    window.scrollTo({ top: 0, behavior: 'smooth' });
+  }, [filters, setSearchParams]);
 
-  // ── Disparo modal ─────────────────────────────────────────────────────────
+  // Disparo modal
   const [showDisparar, setShowDisparar] = useState(false);
 
-  // ── Data — vw_leads_disparo ───────────────────────────────────────────────
-  const { data: leads = [], isLoading, isError, refetch } = useLeadsDisparo(filters);
+  // Data — paginada
+  const { data: pageData, isLoading, isError, refetch } = useLeadsDisparo(
+    filters,
+    { page, pageSize: PAGE_SIZE }
+  );
+  const leads = pageData?.data ?? [];
+  const totalCount = pageData?.totalCount ?? 0;
+
+  // Cesta — busca dados completos dos selecionados (podem estar em outras páginas)
+  const { data: cestaLeads = [] } = useQuery({
+    queryKey: ['leads-cesta', Array.from(selection.ids).sort()],
+    enabled: selection.count > 0,
+    queryFn: async () => {
+      const ids = Array.from(selection.ids);
+      if (ids.length === 0) return [];
+      const { data, error } = await supabase
+        .from('vw_leads_disparo')
+        .select('*')
+        .in('id', ids);
+      if (error) throw error;
+      return data ?? [];
+    },
+    staleTime: 30_000,
+  });
 
   // ── New lead dialog ───────────────────────────────────────────────────────
-  const [showNewLead, setShowNewLead]             = useState(false);
-  const [showConfirmDup, setShowConfirmDup]       = useState(false);
-  const [leadsDuplicados, setLeadsDuplicados]     = useState<LeadDuplicado[]>([]);
-  const [confirmDeleteLeadId, setConfirmDeleteLeadId] = useState<string | null>(null);
+  const [showNewLead, setShowNewLead]               = useState(false);
+  const [showConfirmDup, setShowConfirmDup]         = useState(false);
+  const [leadsDuplicados, setLeadsDuplicados]       = useState<LeadDuplicado[]>([]);
   const [form, setForm] = useState({
     empresa: '', contato_nome: '', contato_email: '', contato_telefone: '',
     segmento: '', status: 'novo', temperatura: 'frio', valor_estimado: '',
     proximo_contato: '', observacoes: '',
   });
-
-  // ── Stats (classic view) ──────────────────────────────────────────────────
-  const { data: stats } = useQuery({
-    queryKey: ['leads', 'stats'],
-    staleTime: 60_000,
-    queryFn: async () => {
-      const { data } = await supabase.from('leads').select('status, temperatura, valor_estimado');
-      const byStatus: Record<string, number> = {};
-      const byTemp:   Record<string, number> = {};
-      let totalValor = 0;
-      data?.forEach(l => {
-        byStatus[l.status] = (byStatus[l.status] || 0) + 1;
-        byTemp[l.temperatura]   = (byTemp[l.temperatura] || 0) + 1;
-        totalValor += Number(l.valor_estimado) || 0;
-      });
-      return { byStatus, byTemp, total: data?.length || 0, totalValor };
-    },
-  });
-
-  // ── Mutations ─────────────────────────────────────────────────────────────
 
   const verificarDuplicata = useCallback(async (termo: string) => {
     if (!termo || termo.trim().length < 3) return;
@@ -181,7 +195,9 @@ export default function LeadsPage() {
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['leads'] });
       queryClient.invalidateQueries({ queryKey: ['leads-disparo'] });
-      queryClient.invalidateQueries({ queryKey: ['dashboard'] });
+      queryClient.invalidateQueries({ queryKey: ['leads-disparo-counts-by-segmento'] });
+      queryClient.invalidateQueries({ queryKey: ['leads-disparo-counts-by-sub'] });
+      queryClient.invalidateQueries({ queryKey: ['campanha-status'] });
       showSuccess('Lead criado com sucesso!');
       setShowNewLead(false);
       setLeadsDuplicados([]);
@@ -189,24 +205,6 @@ export default function LeadsPage() {
         segmento: '', status: 'novo', temperatura: 'frio', valor_estimado: '', proximo_contato: '', observacoes: '' });
     },
     onError: (err: any) => showError(err.message || 'Erro ao criar lead'),
-  });
-
-  const deleteLead = useMutation({
-    mutationFn: async (leadId: string) => {
-      const { data, error } = await supabase.from('leads').update({
-        excluido_em: new Date().toISOString(), excluido_por: profile?.id ?? null,
-      }).eq('id', leadId).select('id').single();
-      if (error) throw error;
-      if (!data) throw new Error('Falha ao excluir lead — verifique suas permissões.');
-    },
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['leads'] });
-      queryClient.invalidateQueries({ queryKey: ['leads-disparo'] });
-      queryClient.invalidateQueries({ queryKey: ['dashboard'] });
-      showSuccess('Lead excluído com sucesso');
-      setConfirmDeleteLeadId(null);
-    },
-    onError: (err: any) => showError(err.message || 'Erro ao excluir lead'),
   });
 
   const handleSalvar = () =>
@@ -218,153 +216,70 @@ export default function LeadsPage() {
       segmento: '', status: 'novo', temperatura: 'frio', valor_estimado: '', proximo_contato: '', observacoes: '' });
   };
 
-  // ── Leads selected for disparo (non-blocked) ──────────────────────────────
-  const leadsParaDisparar = leads.filter(l => selection.has(l.id));
+  // Cesta — derivar segmento principal pra mostrar banner contextual
+  const segmentoBanner = useMemo<string>(() => {
+    return filters.segmentos?.[0] ?? 'seguranca';
+  }, [filters.segmentos]);
 
   if (isError) return <QueryErrorState onRetry={refetch} />;
 
   return (
-    <div className="space-y-5 pb-24">
-      {/* Header */}
-      <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
+    <div className="space-y-4 pb-24 lg:pb-6">
+      {/* Header compacto */}
+      <div className="flex items-center justify-between gap-4 flex-wrap">
         <div>
           <h1 className="text-2xl font-bold text-slate-800">Leads</h1>
-          <p className="text-slate-500 mt-1">
-            {stats?.total ?? 0} leads · {formatBRL(stats?.totalValor ?? 0)} em pipeline
+          <p className="text-sm text-slate-500">
+            {totalCount.toLocaleString('pt-BR')} {totalCount === 1 ? 'lead' : 'leads'} no filtro atual
           </p>
         </div>
-        <div className="flex items-center gap-2">
-          <Tabs value={viewMode} onValueChange={v => { setViewMode(v as typeof viewMode); selection.clear(); }}>
-            <TabsList className="h-8">
-              <TabsTrigger value="disparo" className="text-xs px-3">Disparos</TabsTrigger>
-              <TabsTrigger value="classico" className="text-xs px-3">Clássico</TabsTrigger>
-            </TabsList>
-          </Tabs>
-          <Button onClick={() => setShowNewLead(true)} className="bg-blue-600 hover:bg-blue-700" size="sm">
-            <Plus size={15} className="mr-1.5" /> Novo Lead
-          </Button>
-        </div>
+        <Button onClick={() => setShowNewLead(true)} className="bg-blue-600 hover:bg-blue-700" size="sm">
+          <Plus size={15} className="mr-1.5" /> Novo lead
+        </Button>
       </div>
 
-      {/* ── MODO DISPARO ──────────────────────────────────────────────────── */}
-      {viewMode === 'disparo' && (
-        <div className="grid grid-cols-1 lg:grid-cols-[280px_1fr] gap-5">
-          {/* Filtros laterais */}
-          <LeadsFilters
-            filters={filters}
-            onChange={patchFilters}
-            onReset={resetFilters}
-            totalVisible={leads.length}
-          />
+      {/* Banner da campanha em andamento */}
+      <CampanhaBanner segmento={segmentoBanner} />
 
-          {/* Tabela */}
-          <div>
-            <LeadsTable
-              leads={leads}
-              isLoading={isLoading}
-              selection={selection}
-            />
-          </div>
-        </div>
-      )}
+      {/* Pills de segmento + sub-segmento */}
+      <SegmentoPills filters={filters} onChange={patchFilters} />
 
-      {/* ── MODO CLÁSSICO ─────────────────────────────────────────────────── */}
-      {viewMode === 'classico' && (
-        <>
-          {/* Stats Pills */}
-          <div className="flex flex-wrap gap-2">
-            {Object.entries(stats?.byTemp ?? {}).map(([temp, count]) => (
-              <span key={temp} className={`inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-medium ${TEMPERATURA_CONFIG[temp as keyof typeof TEMPERATURA_CONFIG]?.badgeColor || 'bg-slate-100 text-slate-600'}`}>
-                <Thermometer size={12} />
-                {TEMPERATURA_CONFIG[temp as keyof typeof TEMPERATURA_CONFIG]?.label || temp}: {count}
-              </span>
-            ))}
-          </div>
+      {/* Busca + filtros avançados */}
+      <LeadsFilters filters={filters} onChange={patchFilters} onReset={resetFilters} />
 
-          <div className="space-y-3">
-            {isLoading ? (
-              <div className="space-y-3">
-                {[1,2,3].map(i => (
-                  <div key={i} className="bg-white rounded-2xl border border-slate-200 p-5 animate-pulse">
-                    <div className="h-5 bg-slate-100 rounded w-1/3 mb-3" />
-                    <div className="h-4 bg-slate-100 rounded w-1/2" />
-                  </div>
-                ))}
-              </div>
-            ) : leads.length > 0 ? (
-              leads.slice(0, 100).map(lead => (
-                <div
-                  key={lead.id}
-                  className="bg-white rounded-2xl border border-slate-200 p-5 hover:shadow-md transition-shadow group cursor-pointer"
-                  onClick={() => navigate(`/leads/${lead.id}`)}
-                >
-                  <div className="flex items-start justify-between">
-                    <div className="flex-1 min-w-0">
-                      <div className="flex items-center gap-2 mb-1 flex-wrap">
-                        <h3 className="font-semibold text-slate-800 truncate">{lead.empresa}</h3>
-                        {lead.status && (
-                          <span className={`px-2 py-0.5 rounded-full text-xs font-medium ${getStatusConfig(LEAD_STATUS_CONFIG, lead.status as any).color}`}>
-                            {getStatusConfig(LEAD_STATUS_CONFIG, lead.status as any).label}
-                          </span>
-                        )}
-                        {lead.temperatura && (
-                          <span className={`px-2 py-0.5 rounded-full text-xs font-medium ${TEMPERATURA_CONFIG[lead.temperatura as keyof typeof TEMPERATURA_CONFIG]?.badgeColor || 'bg-slate-100'}`}>
-                            {TEMPERATURA_CONFIG[lead.temperatura as keyof typeof TEMPERATURA_CONFIG]?.label || lead.temperatura}
-                          </span>
-                        )}
-                      </div>
-                      <div className="flex flex-wrap items-center gap-x-4 gap-y-1 text-sm text-slate-500">
-                        {lead.contato_nome && <span className="flex items-center gap-1"><Building2 size={13} /> {lead.contato_nome}</span>}
-                        {lead.contato_telefone && <span className="flex items-center gap-1"><Phone size={13} /> {lead.contato_telefone}</span>}
-                        {lead.contato_email && <span className="flex items-center gap-1"><Mail size={13} /> {lead.contato_email}</span>}
-                        {lead.valor_estimado && <span className="font-medium text-emerald-600">{formatBRL(Number(lead.valor_estimado))}</span>}
-                      </div>
-                    </div>
-                    <div className="flex items-center gap-1">
-                      {canDelete && (
-                        <button
-                          onClick={e => { e.stopPropagation(); setConfirmDeleteLeadId(lead.id); }}
-                          className="p-1.5 rounded-lg text-slate-300 hover:text-red-500 hover:bg-red-50 transition-colors opacity-0 group-hover:opacity-100"
-                          title="Excluir lead"
-                        >
-                          <Trash2 size={14} />
-                        </button>
-                      )}
-                    </div>
-                  </div>
-                </div>
-              ))
-            ) : (
-              <div className="bg-white rounded-2xl border border-slate-200 p-12 text-center">
-                <UserPlus size={40} className="mx-auto text-slate-300 mb-3" />
-                <h3 className="font-semibold text-slate-600">Nenhum lead encontrado</h3>
-                <p className="text-sm text-slate-400 mt-1">Clique em "Novo Lead" para começar a prospectar</p>
-              </div>
-            )}
-          </div>
-        </>
-      )}
+      {/* Layout principal: lista + cesta */}
+      <div className="grid grid-cols-1 lg:grid-cols-[minmax(0,1fr)_280px] gap-4 items-start">
+        <LeadsCardList
+          leads={leads}
+          totalCount={totalCount}
+          page={page}
+          pageSize={PAGE_SIZE}
+          onPageChange={setPage}
+          isLoading={isLoading}
+          selection={selection}
+        />
 
-      {/* ── Bulk action bar ───────────────────────────────────────────────── */}
-      <LeadsBulkActionBar
-        count={selection.count}
-        onDisparar={() => setShowDisparar(true)}
-        onClear={selection.clear}
-        isDisparando={false}
-      />
+        <LeadsCesta
+          leads={cestaLeads}
+          onRemove={(id) => selection.toggle(id)}
+          onClear={selection.clear}
+          onDisparar={() => setShowDisparar(true)}
+          isDisparando={false}
+        />
+      </div>
 
-      {/* ── Disparo modal ─────────────────────────────────────────────────── */}
+      {/* Modal de disparo */}
       <DispararAberturaModal
         open={showDisparar}
         onClose={() => setShowDisparar(false)}
-        leads={leadsParaDisparar}
+        leads={cestaLeads as any}
         onSuccess={() => { selection.clear(); setShowDisparar(false); }}
       />
 
-      {/* ── New Lead Dialog ───────────────────────────────────────────────── */}
+      {/* New Lead Dialog */}
       <Dialog open={showNewLead} onOpenChange={open => { if (!open) handleFecharDialog(); }}>
         <DialogContent className="sm:max-w-lg">
-          <DialogHeader><DialogTitle>Novo Lead</DialogTitle></DialogHeader>
+          <DialogHeader><DialogTitle>Novo lead</DialogTitle></DialogHeader>
           <div className="grid gap-4 py-4">
             <div>
               <Label htmlFor="empresa">Empresa *</Label>
@@ -391,7 +306,7 @@ export default function LeadsPage() {
             {leadsDuplicados.length > 0 && (
               <div className="p-3 bg-yellow-50 border border-yellow-200 rounded-xl">
                 <div className="flex items-center gap-2 text-yellow-700 text-sm font-medium mb-2">
-                  <AlertTriangle size={14} /> Possíveis duplicatas encontradas
+                  <AlertTriangle size={14} /> Possíveis duplicatas
                 </div>
                 {leadsDuplicados.map(lead => (
                   <div key={lead.id} className="flex items-center justify-between text-xs text-yellow-600 py-1 border-b border-yellow-100 last:border-0">
@@ -423,7 +338,7 @@ export default function LeadsPage() {
                 </Select>
               </div>
               <div>
-                <Label htmlFor="valor_estimado">Valor Estimado</Label>
+                <Label htmlFor="valor_estimado">Valor estimado</Label>
                 <Input id="valor_estimado" type="number" min={0} value={form.valor_estimado}
                   onChange={e => setForm({ ...form, valor_estimado: e.target.value })} placeholder="50000" />
               </div>
@@ -458,19 +373,21 @@ export default function LeadsPage() {
               className="bg-blue-600 hover:bg-blue-700">
               {createLead.isPending
                 ? <><Loader2 size={16} className="animate-spin mr-2" />Salvando...</>
-                : 'Criar Lead'}
+                : 'Criar lead'}
             </Button>
           </DialogFooter>
         </DialogContent>
       </Dialog>
 
-      {/* ── Confirmação duplicata ────────────────────────────────────────── */}
+      {/* AlertDialog confirmação duplicata
+          Regra do projeto: AlertDialogAction com mutation async DEVE usar
+          e.preventDefault() e fechar manualmente após settle. */}
       <AlertDialog open={showConfirmDup} onOpenChange={setShowConfirmDup}>
         <AlertDialogContent>
           <AlertDialogHeader>
             <AlertDialogTitle className="flex items-center gap-2">
               <AlertTriangle size={18} className="text-yellow-500" />
-              Possíveis duplicatas encontradas
+              Possíveis duplicatas
             </AlertDialogTitle>
             <AlertDialogDescription asChild>
               <div className="space-y-3">
@@ -494,32 +411,18 @@ export default function LeadsPage() {
           </AlertDialogHeader>
           <AlertDialogFooter>
             <AlertDialogCancel>Voltar e revisar</AlertDialogCancel>
-            <AlertDialogAction onClick={() => { setShowConfirmDup(false); createLead.mutate(form); }}
-              className="bg-blue-600 hover:bg-blue-700">
-              Criar mesmo assim
-            </AlertDialogAction>
-          </AlertDialogFooter>
-        </AlertDialogContent>
-      </AlertDialog>
-
-      {/* ── Confirmação exclusão ─────────────────────────────────────────── */}
-      <AlertDialog open={!!confirmDeleteLeadId} onOpenChange={open => { if (!open) setConfirmDeleteLeadId(null); }}>
-        <AlertDialogContent>
-          <AlertDialogHeader>
-            <AlertDialogTitle>Excluir lead permanentemente?</AlertDialogTitle>
-            <AlertDialogDescription>
-              Esta ação não pode ser desfeita. O lead será removido permanentemente do sistema.
-            </AlertDialogDescription>
-          </AlertDialogHeader>
-          <AlertDialogFooter>
-            <AlertDialogCancel>Cancelar</AlertDialogCancel>
             <AlertDialogAction
-              onClick={() => confirmDeleteLeadId && deleteLead.mutate(confirmDeleteLeadId)}
-              className="bg-red-600 hover:bg-red-700">
-              {deleteLead.isPending
-                ? <Loader2 size={14} className="animate-spin mr-1" />
-                : <Trash2 size={14} className="mr-1" />}
-              Excluir
+              onClick={async (e) => {
+                e.preventDefault(); // impede o close automático do Radix
+                try {
+                  await createLead.mutateAsync(form);
+                } finally {
+                  setShowConfirmDup(false);
+                }
+              }}
+              className="bg-blue-600 hover:bg-blue-700"
+            >
+              Criar mesmo assim
             </AlertDialogAction>
           </AlertDialogFooter>
         </AlertDialogContent>
