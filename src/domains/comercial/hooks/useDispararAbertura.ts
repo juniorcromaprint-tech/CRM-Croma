@@ -68,7 +68,7 @@ export function useTemplatesAbertura(segmento?: string) {
     queryFn: async () => {
       let q = supabase
         .from('agent_templates')
-        .select('id, nome, etapa, segmento, sub_segmento, meta_template_name, conteudo')
+        .select('id, nome, etapa, segmento, sub_segmento, meta_template_name, conteudo, variaveis, vezes_usado, taxa_resposta, template_language')
         .eq('canal', 'whatsapp')
         .eq('etapa', 'abertura')
         .eq('ativo', true);
@@ -77,8 +77,4 @@ export function useTemplatesAbertura(segmento?: string) {
 
       const { data, error } = await q.order('nome');
       if (error) throw error;
-      return data ?? [];
-    },
-    staleTime: 2 * 60_000,
-  });
-}
+      ret
