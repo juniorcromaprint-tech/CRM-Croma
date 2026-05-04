@@ -9,7 +9,7 @@ import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { supabase } from '@/integrations/supabase/client';
 import { showSuccess, showError } from '@/utils/toast';
 import { ilikeTerm } from '@/shared/utils/searchUtils';
-import { Plus, Loader2, AlertTriangle } from 'lucide-react';
+import { Plus, Loader2, AlertTriangle, Upload, Download } from 'lucide-react';
 import { useAuth } from '@/contexts/AuthContext';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
@@ -36,6 +36,8 @@ import { LeadsFilters } from '../components/leads/LeadsFilters';
 import { LeadsCardList } from '../components/leads/LeadsCardList';
 import { LeadsCesta } from '../components/leads/LeadsCesta';
 import { DispararAberturaModal } from '../components/leads/DispararAberturaModal';
+import { ImportWizard } from '@/domains/dados/components/ImportWizard';
+import { ExportDialog } from '@/domains/dados/components/ExportDialog';
 
 // ─── Types ───────────────────────────────────────────────────────────────────
 
@@ -137,6 +139,9 @@ export default function LeadsPage() {
   // Disparo modal
   const [showDisparar, setShowDisparar] = useState(false);
 
+  // Import modal
+  const [showImport, setShowImport] = useState(false);
+
   // Data — paginada
   const { data: pageData, isLoading, isError, refetch } = useLeadsDisparo(
     filters,
@@ -233,9 +238,22 @@ export default function LeadsPage() {
             {totalCount.toLocaleString('pt-BR')} {totalCount === 1 ? 'lead' : 'leads'} no filtro atual
           </p>
         </div>
-        <Button onClick={() => setShowNewLead(true)} className="bg-blue-600 hover:bg-blue-700" size="sm">
-          <Plus size={15} className="mr-1.5" /> Novo lead
-        </Button>
+        <div className="flex items-center gap-2">
+          <ExportDialog
+            entityKey="leads"
+            trigger={
+              <Button variant="outline" size="sm">
+                <Download size={14} className="mr-1.5" /> Exportar
+              </Button>
+            }
+          />
+          <Button variant="outline" size="sm" onClick={() => setShowImport(true)}>
+            <Upload size={14} className="mr-1.5" /> Importar
+          </Button>
+          <Button onClick={() => setShowNewLead(true)} className="bg-blue-600 hover:bg-blue-700" size="sm">
+            <Plus size={15} className="mr-1.5" /> Novo lead
+          </Button>
+        </div>
       </div>
 
       {/* Banner da campanha em andamento */}
@@ -376,6 +394,23 @@ export default function LeadsPage() {
                 : 'Criar lead'}
             </Button>
           </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {/* Import Wizard Dialog */}
+      <Dialog open={showImport} onOpenChange={open => { if (!open) setShowImport(false); }}>
+        <DialogContent className="sm:max-w-2xl max-h-[85vh] overflow-y-auto">
+          <DialogHeader><DialogTitle>Importar leads</DialogTitle></DialogHeader>
+          <ImportWizard
+            entityKey="leads"
+            onClose={() => {
+              setShowImport(false);
+              queryClient.invalidateQueries({ queryKey: ['leads'] });
+              queryClient.invalidateQueries({ queryKey: ['leads-disparo'] });
+              queryClient.invalidateQueries({ queryKey: ['leads-disparo-counts-by-segmento'] });
+              queryClient.invalidateQueries({ queryKey: ['leads-disparo-counts-by-sub'] });
+            }}
+          />
         </DialogContent>
       </Dialog>
 

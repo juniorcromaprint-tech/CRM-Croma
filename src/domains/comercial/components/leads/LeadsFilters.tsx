@@ -1,7 +1,8 @@
 // src/domains/comercial/components/leads/LeadsFilters.tsx
 // Barra leve de filtros + drawer "Mais filtros".
 // Filtros principais (segmento/sub-seg) ficam fora daqui no SegmentoPills.
-// Aqui ficam: busca livre (debounced) + status + temperatura + regiao + toggles + score + datas.
+// Aqui ficam: busca livre (debounced) + status + temperatura + região + toggles + score + datas.
+// Fonte: redesign UX 2026-05-04L.
 
 import { useEffect, useState } from 'react';
 import { Search, SlidersHorizontal, X } from 'lucide-react';
@@ -21,7 +22,7 @@ import type { LeadsFilterState } from '../../hooks/useLeadsDisparo';
 
 const STATUS_LABELS: Record<string, string> = {
   novo: 'Novo', contatado: 'Contatado', qualificado: 'Qualificado',
-  proposta: 'Proposta', negociacao: 'Negociacao', fechado: 'Fechado', perdido: 'Perdido',
+  proposta: 'Proposta', negociacao: 'Negociação', fechado: 'Fechado', perdido: 'Perdido',
 };
 
 const TEMPERATURA_LABELS: Record<string, string> = {
@@ -41,6 +42,8 @@ interface Props {
   onReset: () => void;
 }
 
+// ─── Conta filtros avançados ativos (para badge no botão) ────────────────────
+
 function countAvancados(f: LeadsFilterState) {
   return [
     (f.status?.length ?? 0) > 0,
@@ -53,15 +56,18 @@ function countAvancados(f: LeadsFilterState) {
     f.scoreMin != null || f.scoreMax != null,
     Boolean(f.cadastroDe || f.cadastroAte),
     Boolean(f.vendedorId),
-    f.excluirBloqueados === false,
+    f.excluirBloqueados === false, // toggle off é considerado "ajustado"
   ].filter(Boolean).length;
 }
+
+// ─── Componente principal ────────────────────────────────────────────────────
 
 export function LeadsFilters({ filters, onChange, onReset }: Props) {
   const [openSheet, setOpenSheet] = useState(false);
   const [buscaLocal, setBuscaLocal] = useState(filters.busca ?? '');
   const buscaDebounced = useDebouncedValue(buscaLocal, 300);
 
+  // Sincroniza debounce → onChange (evitando loop com filters.busca remoto)
   useEffect(() => {
     if (buscaDebounced !== (filters.busca ?? '')) {
       onChange({ busca: buscaDebounced || undefined });
@@ -69,6 +75,7 @@ export function LeadsFilters({ filters, onChange, onReset }: Props) {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [buscaDebounced]);
 
+  // Sincroniza filtro externo (ex: clicar "Limpar todos") → estado local
   useEffect(() => {
     if ((filters.busca ?? '') !== buscaLocal) {
       setBuscaLocal(filters.busca ?? '');
@@ -80,6 +87,7 @@ export function LeadsFilters({ filters, onChange, onReset }: Props) {
 
   return (
     <div className="flex items-center gap-2 flex-wrap">
+      {/* Busca livre */}
       <div className="relative flex-1 min-w-[220px]">
         <Search size={14} className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" />
         <Input
@@ -99,6 +107,7 @@ export function LeadsFilters({ filters, onChange, onReset }: Props) {
         )}
       </div>
 
+      {/* Botão "Mais filtros" */}
       <Sheet open={openSheet} onOpenChange={setOpenSheet}>
         <SheetTrigger asChild>
           <Button variant="outline" size="sm" className="h-9 gap-1.5 shrink-0">
@@ -114,10 +123,11 @@ export function LeadsFilters({ filters, onChange, onReset }: Props) {
 
         <SheetContent className="overflow-y-auto">
           <SheetHeader>
-            <SheetTitle>Filtros avancados</SheetTitle>
+            <SheetTitle>Filtros avançados</SheetTitle>
           </SheetHeader>
 
           <div className="space-y-4 mt-4">
+            {/* Status */}
             <div>
               <Label className="text-xs text-slate-500 mb-1 block">Status</Label>
               <Select
@@ -136,6 +146,7 @@ export function LeadsFilters({ filters, onChange, onReset }: Props) {
               </Select>
             </div>
 
+            {/* Temperatura */}
             <div>
               <Label className="text-xs text-slate-500 mb-1 block">Temperatura</Label>
               <Select
@@ -154,14 +165,15 @@ export function LeadsFilters({ filters, onChange, onReset }: Props) {
               </Select>
             </div>
 
+            {/* Região */}
             <div>
-              <Label className="text-xs text-slate-500 mb-1 block">Regiao</Label>
+              <Label className="text-xs text-slate-500 mb-1 block">Região</Label>
               <Select
                 value={filters.regioes?.[0] ?? 'all'}
                 onValueChange={v => onChange({ regioes: v !== 'all' ? [v] : undefined })}
               >
                 <SelectTrigger className="h-8 text-xs">
-                  <SelectValue placeholder="Todas as regioes" />
+                  <SelectValue placeholder="Todas as regiões" />
                 </SelectTrigger>
                 <SelectContent>
                   <SelectItem value="all">Todas</SelectItem>
@@ -172,18 +184,19 @@ export function LeadsFilters({ filters, onChange, onReset }: Props) {
               </Select>
             </div>
 
+            {/* Score range */}
             <div>
               <Label className="text-xs text-slate-500 mb-1 block">Score</Label>
               <div className="flex items-center gap-2">
                 <Input
-                  type="number" min={0} max={100} placeholder="Min"
+                  type="number" min={0} max={100} placeholder="Mín"
                   value={filters.scoreMin ?? ''}
                   onChange={e => onChange({ scoreMin: e.target.value ? Number(e.target.value) : undefined })}
                   className="h-8 text-xs"
                 />
-                <span className="text-slate-400 text-xs">ate</span>
+                <span className="text-slate-400 text-xs">até</span>
                 <Input
-                  type="number" min={0} max={100} placeholder="Max"
+                  type="number" min={0} max={100} placeholder="Máx"
                   value={filters.scoreMax ?? ''}
                   onChange={e => onChange({ scoreMax: e.target.value ? Number(e.target.value) : undefined })}
                   className="h-8 text-xs"
@@ -191,6 +204,7 @@ export function LeadsFilters({ filters, onChange, onReset }: Props) {
               </div>
             </div>
 
+            {/* Data de cadastro */}
             <div>
               <Label className="text-xs text-slate-500 mb-1 block">Cadastrado entre</Label>
               <div className="flex items-center gap-2">
@@ -210,14 +224,15 @@ export function LeadsFilters({ filters, onChange, onReset }: Props) {
               </div>
             </div>
 
+            {/* Toggles */}
             <div className="space-y-2 pt-2 border-t border-slate-100">
               <ToggleRow
-                label="Tem telefone valido"
+                label="Tem telefone válido"
                 checked={filters.temTelefone === true}
                 onChange={v => onChange({ temTelefone: v ? true : null })}
               />
               <ToggleRow
-                label="Tem email valido"
+                label="Tem email válido"
                 checked={filters.temEmail === true}
                 onChange={v => onChange({ temEmail: v ? true : null })}
               />

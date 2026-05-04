@@ -1,4 +1,4 @@
-# MCP Server Croma — 93 Ferramentas
+# MCP Server Croma — 100 Ferramentas
 
 > Arquivo de referência — carregado sob demanda quando precisar saber que ferramenta usar
 
@@ -16,7 +16,7 @@
 
 | Módulo | Ferramentas |
 |---|---|
-| **CRM** | `croma_listar_clientes`, `croma_detalhe_cliente`, `croma_cadastrar_cliente`, `croma_atualizar_cliente`, `croma_listar_leads`, `croma_cadastrar_lead`, `croma_atualizar_status_lead`, `croma_listar_atividades_comerciais`, `croma_registrar_atividade_comercial`, `croma_listar_comissoes`, `croma_registrar_comissao`, `croma_listar_contratos`, `croma_criar_contrato`, `croma_listar_campanhas`, `croma_listar_nps` |
+| **CRM** | `croma_listar_clientes`, `croma_detalhe_cliente`, `croma_cadastrar_cliente`, `croma_atualizar_cliente`, `croma_listar_leads`, `croma_cadastrar_lead`, `croma_importar_leads_massa`, `croma_atualizar_status_lead`, `croma_listar_atividades_comerciais`, `croma_registrar_atividade_comercial`, `croma_listar_comissoes`, `croma_registrar_comissao`, `croma_listar_contratos`, `croma_criar_contrato`, `croma_listar_campanhas`, `croma_listar_nps` |
 | **Orçamentos** | `croma_listar_propostas`, `croma_detalhe_proposta`, `croma_criar_proposta`, `croma_atualizar_status_proposta`, `croma_enviar_proposta` |
 | **Pedidos** | `croma_listar_pedidos`, `croma_detalhe_pedido`, `croma_atualizar_status_pedido`, `croma_listar_ordens_producao`, `croma_atualizar_status_producao`, `croma_criar_ordem_producao`, `croma_registrar_apontamento_producao`, `croma_listar_apontamentos_producao` || **Campo** | `croma_listar_instalacoes`, `croma_agendar_instalacao`, `croma_listar_jobs_campo`, `croma_detalhe_job_campo`, `croma_listar_fotos_job`, `croma_criar_job_campo`, `croma_atualizar_job_campo`, `croma_listar_equipes` |
 | **Financeiro** | `croma_listar_contas_receber`, `croma_listar_contas_pagar`, `croma_criar_conta_receber`, `croma_registrar_pagamento`, `croma_criar_conta_pagar`, `croma_registrar_pagamento_cp`, `croma_registrar_lancamento_caixa`, `croma_listar_lancamentos_caixa`, `croma_listar_contas_bancarias`, `croma_gerar_boleto`, `croma_consultar_das` |
@@ -29,3 +29,5 @@
 | **Compras** | `croma_listar_compras`, `croma_detalhe_compra`, `croma_criar_compra`, `croma_atualizar_status_compra`, `croma_registrar_recebimento` |
 | **BI** | `croma_dashboard_executivo`, `croma_alertas_ativos`, `croma_pipeline_comercial` |
 | **Sistema** | `croma_executar_sql` (SELECT only), `croma_health_check` |
+| **Stores** | `croma_listar_stores`, `croma_criar_store`, `croma_atualizar_store` |
+| **Espelhamento** | `croma_espelhar_os_mubisys` — importa OS Mubisys completa (cliente→store→pedido→itens→OI→job). Suporta dry_run=true |

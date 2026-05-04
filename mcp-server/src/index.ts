@@ -34,6 +34,8 @@ import { registerImpressoraTools } from "./tools/impressora.js";
 import { registerFornecedoresTools } from "./tools/fornecedores.js";
 import { registerComprasTools } from "./tools/compras.js";
 import { registerPropostasAnexosTools } from "./tools/propostas-anexos.js";
+import { registerStoresTools } from "./tools/stores.js";
+import { registerEspelhamentoTools } from "./tools/espelhamento.js";
 
 // ─── Inicialização do servidor ──────────────────────────────────────────────
 
@@ -44,7 +46,7 @@ const server = new McpServer({
 
 // ─── Registra todas as ferramentas ──────────────────────────────────────────
 
-registerCrmTools(server);         // 7+8 ferramentas: clientes, leads, atividades, comissoes, contratos, campanhas, nps
+registerCrmTools(server);         // 7+9 ferramentas: clientes, leads, atividades, comissoes, contratos, campanhas, nps, importar_leads_massa
 registerPropostasTools(server);   // 5 ferramentas: propostas/orçamentos (+ enviar email)
 registerPedidosTools(server);     // 6+2 ferramentas: pedidos, produção, apontamentos
 registerCampoTools(server);       // 7+1 ferramentas: instalações, jobs campo, equipes
@@ -59,8 +61,10 @@ registerImpressoraTools(server);  // 8 ferramentas: HP Latex 365 — jobs, resum
 registerFornecedoresTools(server); // 5 ferramentas: listar, detalhe, cadastrar, atualizar, historico_compras
 registerComprasTools(server);      // 5 ferramentas: listar, detalhe, criar, atualizar_status, registrar_recebimento
 registerPropostasAnexosTools(server); // 3 ferramentas: listar_anexos, anexar_arquivo_url, remover_anexo (Claudete via MCP)
+registerStoresTools(server);          // 3 ferramentas: listar_stores, criar_store, atualizar_store (lojas/pontos de instalação)
+registerEspelhamentoTools(server);    // 1 ferramenta: croma_espelhar_os_mubisys (migração Mubisys → CRM)
 
-// Total: 96 ferramentas
+// Total: 100 ferramentas
 
 // ─── Validação de credenciais ───────────────────────────────────────────────
 
@@ -99,7 +103,7 @@ async function main(): Promise<void> {
   const transport = new StdioServerTransport();
   await server.connect(transport);
 
-  process.stderr.write(`[croma-mcp] 🚀 Servidor Croma MCP iniciado (96 ferramentas)\n`);
+  process.stderr.write(`[croma-mcp] 🚀 Servidor Croma MCP iniciado (100 ferramentas)\n`);
 }
 
 main().catch((err) => {

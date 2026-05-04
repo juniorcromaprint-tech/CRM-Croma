@@ -1425,4 +1425,206 @@ Args:
       }
     }
   );
+
+  // ─── croma_importar_leads_massa ──────────────────────────────────────────────────
+
+  server.registerTool(
+    "croma_importar_leads_massa",
+    {
+      title: "Importar Leads em Massa",
+      description: `Importa múltiplos leads de uma vez no CRM da Croma Print.
+
+ATENÇÃO: Ação que modifica dados em lote. Confirme com o usuário antes.
+
+Recebe um array de leads (máximo 200 por chamada). Cada lead precisa ao menos do campo "empresa".
+Campos duplicados (mesmo email ou mesmo empresa+telefone) são detectados e reportados.
+
+Ideal para:
+- Importar lista de leads de eventos, feiras, campanhas
+- Carga inicial de prospects de planilha
+- Claudete receber lista e cadastrar direto
+
+Args:
+  - leads (array, obrigatório): Array de objetos lead. Cada um com:
+    - empresa (string, obrigatório): Nome da empresa
+    - contato_nome, cargo, email, email2, telefone, telefone2, whatsapp (opcionais)
+    - razao_social, nome_fantasia, cnpj, site (opcionais)
+    - endereco, bairro, cidade, uf, cep (opcionais)
+    - segmento, classificacao (A/B/C), status, temperatura (frio/morno/quente) (opcionais)
+    - score (number 0-100), valor_estimado (number), observacoes (opcionais)
+  - skip_duplicates (boolean, opcional): Se true, pula leads duplicados em vez de reportar erro (padrão: true)
+  - default_status (string, opcional): Status padrão para leads sem status (padrão: "novo")
+
+Retorna resumo: total recebidos, inseridos, duplicados pulados, erros.`,
+      inputSchema: z.object({
+        leads: z.array(z.object({
+          empresa: z.string().min(1).max(200),
+          razao_social: z.string().max(200).optional(),
+          nome_fantasia: z.string().max(200).optional(),
+          cnpj: z.string().max(20).optional(),
+          contato_nome: z.string().max(100).optional(),
+          cargo: z.string().max(100).optional(),
+          email: z.string().max(200).optional(),
+          email2: z.string().max(200).optional(),
+          telefone: z.string().max(30).optional(),
+          telefone2: z.string().max(30).optional(),
+          whatsapp: z.string().max(30).optional(),
+          site: z.string().max(300).optional(),
+          endereco: z.string().max(300).optional(),
+          bairro: z.string().max(100).optional(),
+          cidade: z.string().max(100).optional(),
+          uf: z.string().max(2).optional(),
+          cep: z.string().max(10).optional(),
+          segmento: z.string().max(100).optional(),
+          classificacao: z.enum(["A", "B", "C"]).optional(),
+          status: z.string().max(30).optional(),
+          temperatura: z.enum(["frio", "morno", "quente"]).optional(),
+          score: z.coerce.number().int().min(0).max(100).optional(),
+          valor_estimado: z.coerce.number().min(0).optional(),
+          observacoes: z.string().max(2000).optional(),
+        })).min(1).max(200).describe("Array de leads (máx 200 por chamada)"),
+        skip_duplicates: z.boolean().default(true).describe("Pular duplicados em vez de dar erro"),
+        default_status: z.string().default("novo").describe("Status padrão"),
+      }).strict(),
+      annotations: {
+        readOnlyHint: false,
+        destructiveHint: false,
+        idempotentHint: false,
+        openWorldHint: false,
+      },
+    },
+    async (params) => {
+      try {
+        const sb = getUserClient();
+        const { leads, skip_duplicates, default_status } = params;
+
+        // 1) Buscar emails existentes para detectar duplicatas
+        const emails = leads
+          .map(l => l.email?.toLowerCase().trim())
+          .filter((e): e is string => !!e);
+
+        let existingEmails = new Set<string>();
+        if (emails.length > 0) {
+          const { data: emailRows } = await sb
+            .from("leads")
+            .select("email")
+            .in("email", emails);
+          existingEmails = new Set(
+            (emailRows ?? []).map(r => (r.email as string).toLowerCase())
+          );
+        }
+
+        // 2) Preparar lotes e rastrear resultados
+        const inserted: Array<{ empresa: string; id: string }> = [];
+        const skipped: Array<{ empresa: string; motivo: string }> = [];
+        const errors: Array<{ empresa: string; erro: string }> = [];
+
+        const BATCH_SIZE = 50;
+        const toInsert: Array<Record<string, unknown>> = [];
+
+        for (const lead of leads) {
+          const emailNorm = lead.email?.toLowerCase().trim();
+          if (emailNorm && existingEmails.has(emailNorm)) {
+            if (skip_duplicates) {
+              skipped.push({ empresa: lead.empresa, motivo: `email duplicado: ${emailNorm}` });
+              continue;
+            }
+          }
+
+          const row: Record<string, unknown> = {
+            empresa: lead.empresa.trim(),
+            status: lead.status || default_status,
+          };
+
+          const optionalFields = [
+            "razao_social", "nome_fantasia", "cnpj", "contato_nome", "cargo",
+            "email", "email2", "telefone", "telefone2", "whatsapp", "site",
+            "endereco", "bairro", "cidade", "uf", "cep", "segmento",
+            "classificacao", "temperatura", "score", "valor_estimado", "observacoes",
+          ] as const;
+
+          for (const field of optionalFields) {
+            if (lead[field] !== undefined && lead[field] !== null && lead[field] !== "") {
+              row[field] = typeof lead[field] === "string"
+                ? (lead[field] as string).trim()
+                : lead[field];
+            }
+          }
+
+          toInsert.push(row);
+          if (emailNorm) existingEmails.add(emailNorm);
+        }
+
+        // Inserir em lotes de 50
+        for (let i = 0; i < toInsert.length; i += BATCH_SIZE) {
+          const batch = toInsert.slice(i, i + BATCH_SIZE);
+          const { data, error } = await sb
+            .from("leads")
+            .insert(batch)
+            .select("id, empresa");
+
+          if (error) {
+            for (const row of batch) {
+              errors.push({ empresa: row.empresa as string, erro: error.message });
+            }
+          } else if (data) {
+            for (const d of data) {
+              inserted.push({ empresa: d.empresa, id: d.id });
+            }
+          }
+        }
+
+        // 3) Montar resposta
+        const lines = [
+          `## Importação em Massa — Resultado`,
+          "",
+          `| Métrica | Qtd |`,
+          `|---------|-----|`,
+          `| Recebidos | ${leads.length} |`,
+          `| ✅ Inseridos | ${inserted.length} |`,
+          `| ⏭️ Duplicados pulados | ${skipped.length} |`,
+          `| ❌ Erros | ${errors.length} |`,
+          "",
+        ];
+
+        if (skipped.length > 0 && skipped.length <= 20) {
+          lines.push("### Duplicados pulados:");
+          for (const s of skipped) {
+            lines.push(`- ${s.empresa} — ${s.motivo}`);
+          }
+          lines.push("");
+        } else if (skipped.length > 20) {
+          lines.push(`### Duplicados pulados: ${skipped.length} (mostrando primeiros 10)`);
+          for (const s of skipped.slice(0, 10)) {
+            lines.push(`- ${s.empresa} — ${s.motivo}`);
+          }
+          lines.push("");
+        }
+
+        if (errors.length > 0) {
+          lines.push("### Erros:");
+          for (const e of errors.slice(0, 10)) {
+            lines.push(`- ${e.empresa} — ${e.erro}`);
+          }
+          if (errors.length > 10) lines.push(`... e mais ${errors.length - 10} erros`);
+          lines.push("");
+        }
+
+        return {
+          content: [{ type: "text" as const, text: lines.join("\n") }],
+          structuredContent: {
+            total_recebidos: leads.length,
+            total_inseridos: inserted.length,
+            total_duplicados: skipped.length,
+            total_erros: errors.length,
+            inseridos: inserted.slice(0, 50),
+            duplicados: skipped.slice(0, 50),
+            erros: errors.slice(0, 50),
+          },
+        };
+      } catch (error) {
+        return errorResult(error);
+      }
+    }
+  );
 }

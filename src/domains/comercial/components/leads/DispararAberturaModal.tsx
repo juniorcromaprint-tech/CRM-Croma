@@ -18,6 +18,8 @@ import { useTemplatesAbertura, useDispararAbertura } from '../../hooks/useDispar
 import type { DisparoResultRow } from '../../hooks/useDispararAbertura';
 import type { LeadDisparo } from '../../hooks/useLeadsDisparo';
 
+// ─── Types ───────────────────────────────────────────────────────────────────
+
 interface Props {
   open: boolean;
   onClose: () => void;
@@ -27,10 +29,12 @@ interface Props {
 
 type Step = 'confirmacao' | 'template' | 'cadencia' | 'resultado';
 
+// ─── Step indicator ──────────────────────────────────────────────────────────
+
 const STEPS: { id: Step; label: string }[] = [
   { id: 'confirmacao', label: 'Cesta'    },
   { id: 'template',    label: 'Abertura' },
-  { id: 'cadencia',    label: 'Cadencia' },
+  { id: 'cadencia',    label: 'Cadência' },
   { id: 'resultado',   label: 'Resultado' },
 ];
 
@@ -57,14 +61,18 @@ function StepDots({ current }: { current: Step }) {
   );
 }
 
+// ─── Substitui placeholders {{contato_nome}}, {{empresa}}, {{cidade}} ────────
+
 function renderPreview(conteudo: string | null, lead?: LeadDisparo): string {
   if (!conteudo) return '';
   if (!lead) return conteudo;
   return conteudo
     .replace(/\{\{contato_nome\}\}/g, lead.contato_nome ?? lead.empresa ?? 'Cliente')
     .replace(/\{\{empresa\}\}/g, lead.empresa ?? 'sua empresa')
-    .replace(/\{\{cidade\}\}/g, lead.cidade ?? 'sua regiao');
+    .replace(/\{\{cidade\}\}/g, lead.cidade ?? 'sua região');
 }
+
+// ─── Main component ─────────────────────────────────────────────────────────
 
 export function DispararAberturaModal({ open, onClose, leads, onSuccess }: Props) {
   const [step, setStep] = useState<Step>('confirmacao');
@@ -74,6 +82,7 @@ export function DispararAberturaModal({ open, onClose, leads, onSuccess }: Props
 
   const dispararMutation = useDispararAbertura();
 
+  // Segmento predominante (filtra templates relevantes; se misto, mostra todos)
   const segmentoPred = useMemo(() => {
     const counts: Record<string, number> = {};
     for (const l of leads) {
@@ -85,14 +94,15 @@ export function DispararAberturaModal({ open, onClose, leads, onSuccess }: Props
     return sorted[0][1] / leads.length > 0.7 ? sorted[0][0] : undefined;
   }, [leads]);
 
-  const { data: templates = [], isLoading: loadingTemplates } = useTemplatesAbertura();
+  const { data: templates = [], isLoading: loadingTemplates } = useTemplatesAbertura(segmentoPred);
 
+  // Stats da cesta
   const elegiveis  = leads.filter(l => !l.bloqueado_disparo && l.tem_telefone_valido && !l.em_conversa_ativa);
   const semTel     = leads.filter(l => !l.bloqueado_disparo && !l.tem_telefone_valido);
   const bloqueados = leads.filter(l => l.bloqueado_disparo);
   const emConv     = leads.filter(l => l.em_conversa_ativa);
 
-  const templateSelecionado = templates.find((t: any) => t.id === templateId);
+  const templateSelecionado = templates.find(t => t.id === templateId);
   const leadAmostra = elegiveis[0] ?? leads[0];
 
   const handleDisparar = async () => {
@@ -129,6 +139,7 @@ export function DispararAberturaModal({ open, onClose, leads, onSuccess }: Props
 
         <StepDots current={step} />
 
+        {/* ── Passo 1: Confirmação ────────────────────────────────────────── */}
         {step === 'confirmacao' && (
           <div className="space-y-4">
             <p className="text-sm text-slate-600">
@@ -137,40 +148,61 @@ export function DispararAberturaModal({ open, onClose, leads, onSuccess }: Props
             </p>
 
             <div className="grid grid-cols-2 gap-3">
-              <StatCard label="Receberao a mensagem" value={elegiveis.length} tone="emerald" />
-              <StatCard label="Pulados" value={semTel.length + bloqueados.length + emConv.length} tone="amber" />
+              <StatCard
+                label="Receberão a mensagem"
+                value={elegiveis.length}
+                tone="emerald"
+              />
+              <StatCard
+                label="Pulados"
+                value={semTel.length + bloqueados.length + emConv.length}
+                tone="amber"
+              />
             </div>
 
             {(semTel.length + bloqueados.length + emConv.length) > 0 && (
               <div className="bg-slate-50 rounded-xl p-3 space-y-1.5 text-xs">
-                {semTel.length > 0 && <Row label="Sem telefone valido" value={semTel.length} tone="text-amber-600" />}
-                {bloqueados.length > 0 && <Row label="Bloqueados (NAO INCLUIR)" value={bloqueados.length} tone="text-red-500" />}
-                {emConv.length > 0 && <Row label="Ja em conversa ativa" value={emConv.length} tone="text-blue-500" />}
+                {semTel.length > 0 && (
+                  <Row label="Sem telefone válido" value={semTel.length} tone="text-amber-600" />
+                )}
+                {bloqueados.length > 0 && (
+                  <Row label="Bloqueados (NAO INCLUIR)" value={bloqueados.length} tone="text-red-500" />
+                )}
+                {emConv.length > 0 && (
+                  <Row label="Já em conversa ativa" value={emConv.length} tone="text-blue-500" />
+                )}
               </div>
             )}
 
             {elegiveis.length === 0 && (
               <div className="flex items-center gap-2 text-amber-700 bg-amber-50 rounded-xl p-3 text-sm">
                 <AlertTriangle size={15} />
-                Nenhum lead elegivel. Ajuste a cesta antes de continuar.
+                Nenhum lead elegível. Ajuste a cesta antes de continuar.
               </div>
             )}
 
             <div className="flex justify-end gap-2 pt-2">
               <Button variant="outline" onClick={handleClose}>Cancelar</Button>
-              <Button onClick={() => setStep('template')} disabled={elegiveis.length === 0} className="bg-blue-600 hover:bg-blue-700">
-                Proximo <ChevronRight size={14} className="ml-1" />
+              <Button
+                onClick={() => setStep('template')}
+                disabled={elegiveis.length === 0}
+                className="bg-blue-600 hover:bg-blue-700"
+              >
+                Próximo <ChevronRight size={14} className="ml-1" />
               </Button>
             </div>
           </div>
         )}
 
+        {/* ── Passo 2: Galeria de Templates ───────────────────────────────── */}
         {step === 'template' && (
           <div className="space-y-4">
             <div className="flex items-center justify-between flex-wrap gap-2">
-              <p className="text-sm text-slate-600">Escolha a abertura — clique no card para selecionar.</p>
+              <p className="text-sm text-slate-600">
+                Escolha a abertura — clique no card para selecionar.
+              </p>
               <span className="text-xs text-slate-400">
-                {templates.length} {templates.length === 1 ? 'opcao' : 'opcoes'}
+                {templates.length} {templates.length === 1 ? 'opção' : 'opções'}
               </span>
             </div>
 
@@ -180,30 +212,22 @@ export function DispararAberturaModal({ open, onClose, leads, onSuccess }: Props
               </div>
             ) : templates.length === 0 ? (
               <div className="bg-amber-50 rounded-xl p-4 text-sm text-amber-700">
-                Nenhum template de abertura ativo para esse segmento. Cadastre um na pagina de templates.
+                Nenhum template de abertura ativo para esse segmento. Cadastre um na página de templates.
               </div>
             ) : (
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-                {templates
-                  .slice()
-                  .sort((a: any, b: any) => {
-                    // Recomendado primeiro (segmento bate), depois geral, depois resto
-                    const aRec = a.segmento === segmentoPred ? 0 : a.segmento === null ? 1 : 2;
-                    const bRec = b.segmento === segmentoPred ? 0 : b.segmento === null ? 1 : 2;
-                    return aRec - bRec;
-                  })
-                  .map((t: any) => (
-                    <TemplateCard
-                      key={t.id}
-                      template={t}
-                      selected={t.id === templateId}
-                      recomendado={!!segmentoPred && t.segmento === segmentoPred}
-                      onClick={() => setTemplateId(t.id)}
-                    />
-                  ))}
+                {templates.map(t => (
+                  <TemplateCard
+                    key={t.id}
+                    template={t}
+                    selected={t.id === templateId}
+                    onClick={() => setTemplateId(t.id)}
+                  />
+                ))}
               </div>
             )}
 
+            {/* Preview ao vivo */}
             {templateSelecionado && (
               <div className="bg-emerald-50 border border-emerald-100 rounded-xl p-3 space-y-2">
                 <div className="flex items-center justify-between gap-2">
@@ -224,40 +248,41 @@ export function DispararAberturaModal({ open, onClose, leads, onSuccess }: Props
               <Button variant="outline" onClick={() => setStep('confirmacao')}>
                 <ChevronLeft size={14} className="mr-1" /> Voltar
               </Button>
-              <Button onClick={() => setStep('cadencia')} disabled={!templateId} className="bg-blue-600 hover:bg-blue-700">
-                Proximo <ChevronRight size={14} className="ml-1" />
+              <Button
+                onClick={() => setStep('cadencia')}
+                disabled={!templateId}
+                className="bg-blue-600 hover:bg-blue-700"
+              >
+                Próximo <ChevronRight size={14} className="ml-1" />
               </Button>
             </div>
           </div>
         )}
 
+        {/* ── Passo 3: Cadência ───────────────────────────────────────────── */}
         {step === 'cadencia' && (
           <div className="space-y-4">
             <p className="text-sm text-slate-600">Como enviar?</p>
 
             <RadioGroup value={modo} onValueChange={(v) => setModo(v as typeof modo)}>
-              <div
-                className={`flex items-start gap-3 p-3 rounded-xl border cursor-pointer transition-colors ${modo === 'agendado' ? 'border-blue-400 bg-blue-50' : 'border-slate-200 hover:bg-slate-50'}`}
-                onClick={() => setModo('agendado')}
-              >
+              <div className={`flex items-start gap-3 p-3 rounded-xl border cursor-pointer transition-colors ${modo === 'agendado' ? 'border-blue-400 bg-blue-50' : 'border-slate-200 hover:bg-slate-50'}`}
+                onClick={() => setModo('agendado')}>
                 <RadioGroupItem value="agendado" id="agendado" className="mt-0.5" />
                 <Label htmlFor="agendado" className="cursor-pointer flex-1">
                   <div className="font-medium text-slate-800 text-sm">Cron com rampa de aquecimento (recomendado)</div>
                   <div className="text-xs text-slate-500 mt-0.5">
-                    Cron processa respeitando 15/dia nos primeiros 2 dias e 30/dia depois. Janelas 10-12h e 14-17h BRT.
+                    Cron processa respeitando 15/dia nos primeiros 2 dias e 30/dia depois. Janelas 10–12h e 14–17h BRT.
                   </div>
                 </Label>
               </div>
 
-              <div
-                className={`flex items-start gap-3 p-3 rounded-xl border cursor-pointer transition-colors ${modo === 'imediato' ? 'border-blue-400 bg-blue-50' : 'border-slate-200 hover:bg-slate-50'}`}
-                onClick={() => setModo('imediato')}
-              >
+              <div className={`flex items-start gap-3 p-3 rounded-xl border cursor-pointer transition-colors ${modo === 'imediato' ? 'border-blue-400 bg-blue-50' : 'border-slate-200 hover:bg-slate-50'}`}
+                onClick={() => setModo('imediato')}>
                 <RadioGroupItem value="imediato" id="imediato" className="mt-0.5" />
                 <Label htmlFor="imediato" className="cursor-pointer flex-1">
                   <div className="font-medium text-slate-800 text-sm">Imediato</div>
                   <div className="text-xs text-slate-500 mt-0.5">
-                    Mensagens entram na fila agora e sao enviadas dentro da proxima janela. Respeita o limite diario.
+                    Mensagens entram na fila agora e são enviadas dentro da próxima janela. Respeita o limite diário.
                   </div>
                 </Label>
               </div>
@@ -268,15 +293,21 @@ export function DispararAberturaModal({ open, onClose, leads, onSuccess }: Props
                 <BarChart3 size={12} /> Resumo do disparo
               </div>
               <div>Template: <strong>{templateSelecionado?.nome}</strong></div>
-              <div>Vao receber: <strong>{elegiveis.length}</strong> {elegiveis.length === 1 ? 'lead' : 'leads'}</div>
-              <div className="text-slate-400">Janelas: 10-12h e 14-17h BRT · limite atual 15/dia</div>
+              <div>Vão receber: <strong>{elegiveis.length}</strong> {elegiveis.length === 1 ? 'lead' : 'leads'}</div>
+              <div className="text-slate-400">
+                Janelas: 10–12h e 14–17h BRT · limite atual 15/dia
+              </div>
             </div>
 
             <div className="flex justify-between pt-1">
               <Button variant="outline" onClick={() => setStep('template')}>
                 <ChevronLeft size={14} className="mr-1" /> Voltar
               </Button>
-              <Button onClick={handleDisparar} disabled={dispararMutation.isPending} className="bg-blue-600 hover:bg-blue-700 gap-2">
+              <Button
+                onClick={handleDisparar}
+                disabled={dispararMutation.isPending}
+                className="bg-blue-600 hover:bg-blue-700 gap-2"
+              >
                 {dispararMutation.isPending ? (
                   <><Loader2 size={14} className="animate-spin" /> Disparando...</>
                 ) : (
@@ -294,30 +325,41 @@ export function DispararAberturaModal({ open, onClose, leads, onSuccess }: Props
           </div>
         )}
 
+        {/* ── Passo 4: Resultado ─────────────────────────────────────────── */}
         {step === 'resultado' && resultado && (
           <div className="space-y-4">
             <div className="flex items-center gap-2 text-emerald-600">
               <CheckCircle2 size={20} />
-              <span className="font-semibold">Disparo concluido!</span>
+              <span className="font-semibold">Disparo concluído!</span>
             </div>
 
             <div className="grid grid-cols-2 gap-3">
-              <StatCard label="Enfileirados" value={resultado.filter(r => r.status === 'criado').length} tone="emerald" />
-              <StatCard label="Nao enviados" value={resultado.filter(r => r.status !== 'criado').length} tone="amber" />
+              <StatCard
+                label="Enfileirados"
+                value={resultado.filter(r => r.status === 'criado').length}
+                tone="emerald"
+              />
+              <StatCard
+                label="Não enviados"
+                value={resultado.filter(r => r.status !== 'criado').length}
+                tone="amber"
+              />
             </div>
 
             <div className="bg-slate-50 rounded-xl p-3 space-y-1.5 text-xs">
               <Row label="Bloqueados" value={resultado.filter(r => r.status === 'bloqueado').length} tone="text-red-500" />
               <Row label="Sem telefone" value={resultado.filter(r => r.status === 'pulado').length} tone="text-amber-600" />
-              <Row label="Ja em conversa" value={resultado.filter(r => r.status === 'duplicado').length} tone="text-blue-500" />
+              <Row label="Já em conversa" value={resultado.filter(r => r.status === 'duplicado').length} tone="text-blue-500" />
             </div>
 
             <p className="text-xs text-slate-500">
-              As mensagens serao enviadas dentro das janelas de horario configuradas.
+              As mensagens serão enviadas dentro das janelas de horário configuradas.
             </p>
 
             <div className="flex justify-end pt-1">
-              <Button onClick={handleClose} className="bg-blue-600 hover:bg-blue-700">Fechar</Button>
+              <Button onClick={handleClose} className="bg-blue-600 hover:bg-blue-700">
+                Fechar
+              </Button>
             </div>
           </div>
         )}
@@ -326,17 +368,29 @@ export function DispararAberturaModal({ open, onClose, leads, onSuccess }: Props
   );
 }
 
+// ─── Card de template ────────────────────────────────────────────────────────
+
 interface TemplateCardProps {
-  template: any;
+  template: {
+    id: string;
+    nome: string;
+    etapa: string;
+    segmento: string | null;
+    sub_segmento: string | null;
+    meta_template_name: string | null;
+    conteudo: string | null;
+    variaveis: string[] | null;
+    vezes_usado: number | null;
+    taxa_resposta: number | null;
+  };
   selected: boolean;
-  recomendado?: boolean;
   onClick: () => void;
 }
 
-function TemplateCard({ template, selected, recomendado, onClick }: TemplateCardProps) {
+function TemplateCard({ template, selected, onClick }: TemplateCardProps) {
   const previewLen = 140;
   const preview = (template.conteudo ?? '').replace(/\s+/g, ' ').trim();
-  const previewTrunc = preview.length > previewLen ? preview.slice(0, previewLen) + '...' : preview;
+  const previewTrunc = preview.length > previewLen ? preview.slice(0, previewLen) + '…' : preview;
   const numVars = template.variaveis?.length ?? 0;
 
   return (
@@ -344,37 +398,32 @@ function TemplateCard({ template, selected, recomendado, onClick }: TemplateCard
       type="button"
       onClick={onClick}
       className={[
-        'text-left bg-white border rounded-xl p-3 flex flex-col gap-2 transition-all relative',
+        'text-left bg-white border rounded-xl p-3 flex flex-col gap-2 transition-all',
         selected
           ? 'border-blue-500 border-2 ring-2 ring-blue-100'
-          : recomendado
-            ? 'border-amber-300 hover:border-amber-400 hover:bg-amber-50/30'
-            : 'border-slate-200 hover:border-slate-300 hover:bg-slate-50',
+          : 'border-slate-200 hover:border-slate-300 hover:bg-slate-50',
       ].join(' ')}
     >
       <div className="flex items-start justify-between gap-2">
-        <span className="text-sm font-semibold text-slate-800 leading-snug">{template.nome}</span>
-        <div className="flex flex-col items-end gap-1 shrink-0">
-          {selected && (
-            <Badge className="bg-blue-600 text-white text-[10px] px-1.5 py-0">
-              <CheckCircle2 size={10} className="mr-0.5" /> Selecionado
-            </Badge>
-          )}
-          {!selected && recomendado && (
-            <Badge className="bg-amber-100 text-amber-700 border-amber-200 text-[10px] px-1.5 py-0 hover:bg-amber-200">
-              ★ Recomendado
-            </Badge>
-          )}
-        </div>
+        <span className="text-sm font-semibold text-slate-800 leading-snug">
+          {template.nome}
+        </span>
+        {selected && (
+          <Badge className="bg-blue-600 text-white text-[10px] px-1.5 py-0 shrink-0">
+            <CheckCircle2 size={10} className="mr-0.5" /> Selecionado
+          </Badge>
+        )}
       </div>
 
       <div className="text-xs text-slate-600 leading-relaxed border-l-2 border-slate-100 pl-2">
-        {previewTrunc || <span className="text-slate-400 italic">sem conteudo</span>}
+        {previewTrunc || <span className="text-slate-400 italic">sem conteúdo</span>}
       </div>
 
       <div className="flex items-center gap-1 flex-wrap">
         {template.segmento && (
-          <Badge variant="outline" className="text-[10px] capitalize">{template.segmento}</Badge>
+          <Badge variant="outline" className="text-[10px] capitalize">
+            {template.segmento}
+          </Badge>
         )}
         {template.sub_segmento && (
           <Badge variant="outline" className="text-[10px] bg-indigo-50 text-indigo-600 border-indigo-200">
@@ -382,7 +431,7 @@ function TemplateCard({ template, selected, recomendado, onClick }: TemplateCard
           </Badge>
         )}
         <Badge variant="outline" className="text-[10px] text-slate-500">
-          {numVars === 0 ? 'Sem variaveis' : `${numVars} ${numVars === 1 ? 'variavel' : 'variaveis'}`}
+          {numVars === 0 ? 'Sem variáveis' : `${numVars} ${numVars === 1 ? 'variável' : 'variáveis'}`}
         </Badge>
       </div>
 
@@ -398,6 +447,8 @@ function TemplateCard({ template, selected, recomendado, onClick }: TemplateCard
     </button>
   );
 }
+
+// ─── Helpers ─────────────────────────────────────────────────────────────────
 
 function StatCard({
   label, value, tone,

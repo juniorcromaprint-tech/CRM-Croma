@@ -15,8 +15,16 @@
 | **Custo operacional** | R$ 36.800/mês |
 | **Equipe de produção** | 6 funcionários |
 
-## Produtos Fabricados
-Fachadas ACM, banners/impressão grande formato, material PDV, envelopamento veicular, letreiros/sinalização, placas/totens.
+## Produtos Fabricados (foco principal — produção própria)
+Banners e lonas, adesivos (jateado, recorte, blackout, perfurado, refletivo), placas (PVC, acrílico, MDF, FOAM, polionda, inox, alumínio), letreiros e letras caixa (acrílico, inox 304/430, galvanizada), totens, cavaletes, material de PDV.
+
+## Produtos com baixa oferta / sob consulta
+ACM em geral (placas, fachadas, totens em ACM, mega totens) — terceirizado quando solicitado. Requer espaço e mão de obra qualificada que a Croma não tem hoje. **Não usar como destaque em marketing/abertura.**
+
+## Terceirização
+- **Scan Revenda** → revenda gráfica (cartão de visita, banner, panfleto, folder).
+- **KWG Gráfica** → cartão de visitas e impressos similares (SPA Vue.js).
+- **ACM** → terceirizado pontualmente quando o cliente pede.
 
 ## Clientes de Referência
 Beira Rio, Renner, Paquetá, entre outros (redes, franquias, grandes varejistas).

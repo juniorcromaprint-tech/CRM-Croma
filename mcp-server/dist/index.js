@@ -33,6 +33,8 @@ import { registerImpressoraTools } from "./tools/impressora.js";
 import { registerFornecedoresTools } from "./tools/fornecedores.js";
 import { registerComprasTools } from "./tools/compras.js";
 import { registerPropostasAnexosTools } from "./tools/propostas-anexos.js";
+import { registerStoresTools } from "./tools/stores.js";
+import { registerEspelhamentoTools } from "./tools/espelhamento.js";
 // ─── Inicialização do servidor ──────────────────────────────────────────────
 const server = new McpServer({
     name: "croma-mcp-server",
@@ -54,7 +56,9 @@ registerImpressoraTools(server); // 8 ferramentas: HP Latex 365 — jobs, resumo
 registerFornecedoresTools(server); // 5 ferramentas: listar, detalhe, cadastrar, atualizar, historico_compras
 registerComprasTools(server); // 5 ferramentas: listar, detalhe, criar, atualizar_status, registrar_recebimento
 registerPropostasAnexosTools(server); // 3 ferramentas: listar_anexos, anexar_arquivo_url, remover_anexo (Claudete via MCP)
-// Total: 96 ferramentas
+registerStoresTools(server); // 3 ferramentas: listar_stores, criar_store, atualizar_store (lojas/pontos de instalação)
+registerEspelhamentoTools(server); // 1 ferramenta: croma_espelhar_os_mubisys (migração Mubisys → CRM)
+// Total: 100 ferramentas
 // ─── Validação de credenciais ───────────────────────────────────────────────
 function validateCredentials() {
     if (!process.env.SUPABASE_SERVICE_ROLE_KEY) {
@@ -85,7 +89,7 @@ async function main() {
     // Inicia o servidor via stdio (comunicação com Claude)
     const transport = new StdioServerTransport();
     await server.connect(transport);
-    process.stderr.write(`[croma-mcp] 🚀 Servidor Croma MCP iniciado (96 ferramentas)\n`);
+    process.stderr.write(`[croma-mcp] 🚀 Servidor Croma MCP iniciado (99 ferramentas)\n`);
 }
 main().catch((err) => {
     process.stderr.write(`[croma-mcp] Erro fatal: ${err instanceof Error ? err.message : String(err)}\n`);

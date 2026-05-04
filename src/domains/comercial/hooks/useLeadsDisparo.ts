@@ -1,9 +1,12 @@
 // src/domains/comercial/hooks/useLeadsDisparo.ts
 // Hooks de query para vw_leads_disparo: lista paginada, counts por sub-segmento
 // e status da campanha em andamento.
+// Fonte: PLANO-DISPAROS-PROSPECCAO.md seções 6.2 e redesign UX 2026-05-04L
 
 import { useQuery } from '@tanstack/react-query';
 import { supabase } from '@/integrations/supabase/client';
+
+// ─── Types ───────────────────────────────────────────────────────────────────
 
 export interface LeadsFilterState {
   segmentos?: string[];
@@ -14,15 +17,15 @@ export interface LeadsFilterState {
   estados?: string[];
   regioes?: string[];
   cidades?: string[];
-  temTelefone?: boolean | null;
+  temTelefone?: boolean | null;       // true | false | null (qualquer)
   temEmail?: boolean | null;
   emConversaAtiva?: boolean | null;
   scoreMin?: number;
   scoreMax?: number;
   vendedorId?: string | null;
-  cadastroDe?: string;
+  cadastroDe?: string;                // ISO date string
   cadastroAte?: string;
-  excluirBloqueados?: boolean;
+  excluirBloqueados?: boolean;        // default true
   busca?: string;
 }
 
@@ -64,7 +67,13 @@ export interface LeadsDisparoPage {
   pageSize: number;
 }
 
-function applyFilters(q: any, filters: LeadsFilterState, excluir: Array<keyof LeadsFilterState> = []) {
+// ─── Helper: aplica todos os filtros menos os listados em `excluir` ──────────
+
+function applyFilters(
+  q: ReturnType<typeof supabase['from']> extends (...a: any) => infer R ? R : never,
+  filters: LeadsFilterState,
+  excluir: Array<keyof LeadsFilterState> = [],
+) {
   const skip = new Set(excluir);
 
   if (!skip.has('segmentos')    && filters.segmentos?.length)    q = q.in('segmento',     filters.segmentos);
@@ -100,22 +109,29 @@ function applyFilters(q: any, filters: LeadsFilterState, excluir: Array<keyof Le
   }
 
   if (!skip.has('busca') && filters.busca) {
-    const b = filters.busca.trim().replace(/[%_]/g, '');
+    const b = filters.busca.trim().replace(/[%_]/g, ''); // sanitização leve
     if (b) {
-      q = q.or(`empresa.ilike.%${b}%,contato_nome.ilike.%${b}%,contato_telefone.ilike.%${b}%`);
+      q = q.or(
+        `empresa.ilike.%${b}%,contato_nome.ilike.%${b}%,contato_telefone.ilike.%${b}%`
+      );
     }
   }
 
   return q;
 }
 
+// ─── Hook principal: lista paginada ──────────────────────────────────────────
+
 export interface UseLeadsDisparoOptions {
-  page?: number;
-  pageSize?: number;
+  page?: number;     // 1-based
+  pageSize?: number; // default 50
   enabled?: boolean;
 }
 
-export function useLeadsDisparo(filters: LeadsFilterState, options: UseLeadsDisparoOptions = {}) {
+export function useLeadsDisparo(
+  filters: LeadsFilterState,
+  options: UseLeadsDisparoOptions = {},
+) {
   const page     = options.page     ?? 1;
   const pageSize = options.pageSize ?? 50;
   const from = (page - 1) * pageSize;
@@ -124,7 +140,10 @@ export function useLeadsDisparo(filters: LeadsFilterState, options: UseLeadsDisp
   return useQuery({
     queryKey: ['leads-disparo', filters, page, pageSize],
     queryFn: async (): Promise<LeadsDisparoPage> => {
-      let q: any = supabase.from('vw_leads_disparo').select('*', { count: 'exact' });
+      let q: any = supabase
+        .from('vw_leads_disparo')
+        .select('*', { count: 'exact' });
+
       q = applyFilters(q, filters);
       q = q.order('created_at', { ascending: false }).range(from, to);
 
@@ -142,11 +161,18 @@ export function useLeadsDisparo(filters: LeadsFilterState, options: UseLeadsDisp
   });
 }
 
+// ─── Counts por sub-segmento (para SegmentoPills) ────────────────────────────
+// Aplica todos os filtros EXCETO subSegmentos — assim cada pill mostra
+// quantos leads cairiam ali se Junior trocasse o sub-segmento.
+
 export function useLeadsDisparoCountsBySub(filters: LeadsFilterState) {
   return useQuery({
     queryKey: ['leads-disparo-counts-by-sub', { ...filters, subSegmentos: undefined }],
     queryFn: async () => {
-      let q: any = supabase.from('vw_leads_disparo').select('sub_segmento');
+      let q: any = supabase
+        .from('vw_leads_disparo')
+        .select('sub_segmento');
+
       q = applyFilters(q, filters, ['subSegmentos']);
 
       const { data, error } = await q;
@@ -169,11 +195,16 @@ export function useLeadsDisparoCountsBySub(filters: LeadsFilterState) {
   });
 }
 
+// ─── Counts por segmento (para barra superior de segmentos) ──────────────────
+
 export function useLeadsDisparoCountsBySegmento(filters: LeadsFilterState) {
   return useQuery({
     queryKey: ['leads-disparo-counts-by-segmento', { ...filters, segmentos: undefined, subSegmentos: undefined }],
     queryFn: async () => {
-      let q: any = supabase.from('vw_leads_disparo').select('segmento');
+      let q: any = supabase
+        .from('vw_leads_disparo')
+        .select('segmento');
+
       q = applyFilters(q, filters, ['segmentos', 'subSegmentos']);
 
       const { data, error } = await q;
@@ -193,31 +224,39 @@ export function useLeadsDisparoCountsBySegmento(filters: LeadsFilterState) {
   });
 }
 
+// ─── Status da campanha em andamento (para CampanhaBanner) ───────────────────
+// Resolve métricas de mensagens enviadas hoje (qualquer canal whatsapp),
+// total de leads do segmento informado, e infere "dia da rampa" pela
+// primeira mensagem aprovada do segmento.
+
 export interface CampanhaStatus {
   totalLeads: number;
-  totalDisparados: number;
-  enviadasHoje: number;
-  diaDaRampa: number | null;
-  limiteDiarioAtual: number;
-  totalEnfileiradas: number;
+  totalDisparados: number;        // leads que JÁ entraram numa conversa
+  enviadasHoje: number;           // agent_messages enviadas hoje (canal whatsapp)
+  diaDaRampa: number | null;      // 1, 2, 3...; null se ainda não houve disparo
+  limiteDiarioAtual: number;      // 15 nos primeiros 2 dias, depois 30
+  totalEnfileiradas: number;      // mensagens 'aprovada' aguardando envio
 }
 
 export function useCampanhaStatus(segmento = 'seguranca') {
   return useQuery<CampanhaStatus>({
     queryKey: ['campanha-status', segmento],
     queryFn: async () => {
+      // 1. Total de leads do segmento (não bloqueados)
       const { count: totalLeads } = await supabase
         .from('vw_leads_disparo')
         .select('id', { count: 'exact', head: true })
         .eq('segmento', segmento)
         .eq('bloqueado_disparo', false);
 
+      // 2. Total disparados — leads do segmento que já têm conversa
       const { count: totalDisparados } = await supabase
         .from('vw_leads_disparo')
         .select('id', { count: 'exact', head: true })
         .eq('segmento', segmento)
         .or('em_conversa_ativa.eq.true,ultima_conversa_em.not.is.null');
 
+      // 3. Mensagens enviadas hoje (canal whatsapp)
       const inicioHoje = new Date();
       inicioHoje.setHours(0, 0, 0, 0);
 
@@ -228,12 +267,15 @@ export function useCampanhaStatus(segmento = 'seguranca') {
         .eq('status', 'enviada')
         .gte('enviado_em', inicioHoje.toISOString());
 
+      // 4. Mensagens enfileiradas (aprovada, aguardando)
       const { count: totalEnfileiradas } = await supabase
         .from('agent_messages')
         .select('id', { count: 'exact', head: true })
         .eq('canal', 'whatsapp')
         .eq('status', 'aprovada');
 
+      // 5. Dia da rampa — quantos dias úteis desde a primeira mensagem enviada
+      //    Heurística simples: dias corridos desde 1ª enviada (canal whatsapp).
       const { data: primeiraMsg } = await supabase
         .from('agent_messages')
         .select('enviado_em')
@@ -247,10 +289,13 @@ export function useCampanhaStatus(segmento = 'seguranca') {
       if (primeiraMsg?.enviado_em) {
         const inicio = new Date(primeiraMsg.enviado_em);
         inicio.setHours(0, 0, 0, 0);
-        const diff = Math.floor((inicioHoje.getTime() - inicio.getTime()) / 86_400_000);
+        const diff = Math.floor(
+          (inicioHoje.getTime() - inicio.getTime()) / 86_400_000
+        );
         diaDaRampa = diff + 1;
       }
 
+      // 6. Limite diário pela rampa (15/dia × 2d → 30/dia depois)
       const limiteDiarioAtual = diaDaRampa == null || diaDaRampa <= 2 ? 15 : 30;
 
       return {
@@ -266,6 +311,8 @@ export function useCampanhaStatus(segmento = 'seguranca') {
   });
 }
 
+// ─── Helper antigo: valores únicos para dropdowns (mantido p/ compat) ────────
+
 export function useLeadsDisparoMeta() {
   return useQuery({
     queryKey: ['leads-disparo-meta'],
@@ -278,14 +325,14 @@ export function useLeadsDisparoMeta() {
       const uniq = <T,>(arr: (T | null)[]): T[] =>
         [...new Set(arr.filter((x): x is T => x !== null && (x as any) !== ''))] as T[];
       return {
-        segmentos:    uniq(rows.map((r: any) => r.segmento)),
-        subSegmentos: uniq(rows.map((r: any) => r.sub_segmento)),
-        origens:      uniq(rows.map((r: any) => r.origem_nome)),
-        status:       uniq(rows.map((r: any) => r.status)),
-        temperaturas: uniq(rows.map((r: any) => r.temperatura)),
-        estados:      uniq(rows.map((r: any) => r.estado)),
-        regioes:      uniq(rows.map((r: any) => r.regiao)),
-        cidades:      uniq(rows.map((r: any) => r.cidade)),
+        segmentos:    uniq(rows.map(r => r.segmento)),
+        subSegmentos: uniq(rows.map(r => r.sub_segmento)),
+        origens:      uniq(rows.map(r => r.origem_nome)),
+        status:       uniq(rows.map(r => r.status)),
+        temperaturas: uniq(rows.map(r => r.temperatura)),
+        estados:      uniq(rows.map(r => r.estado)),
+        regioes:      uniq(rows.map(r => r.regiao)),
+        cidades:      uniq(rows.map(r => r.cidade)),
       };
     },
     staleTime: 5 * 60_000,
