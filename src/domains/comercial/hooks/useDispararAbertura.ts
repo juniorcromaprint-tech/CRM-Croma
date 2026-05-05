@@ -13,6 +13,7 @@ export interface DispararParams {
   templateId: string;
   modo: 'imediato' | 'agendado';
   autoAprovar?: boolean;
+  incluirImagem?: boolean;
 }
 
 export interface DisparoResultRow {
@@ -31,11 +32,12 @@ export function useDispararAbertura() {
       const { data: userData } = await supabase.auth.getUser();
 
       const { data, error } = await supabase.rpc('fn_disparar_abertura_em_massa', {
-        p_lead_ids:     params.leadIds,
-        p_template_id:  params.templateId,
-        p_user_id:      userData.user?.id ?? null,
-        p_auto_aprovar: params.autoAprovar ?? true,
-        p_modo:         params.modo,
+        p_lead_ids:        params.leadIds,
+        p_template_id:     params.templateId,
+        p_user_id:         userData.user?.id ?? null,
+        p_auto_aprovar:    params.autoAprovar ?? true,
+        p_modo:            params.modo,
+        p_incluir_imagem:  params.incluirImagem ?? true,
       });
 
       if (error) throw error;
@@ -76,7 +78,7 @@ export function useTemplatesAbertura(canal: CanalDisparo = 'whatsapp') {
     queryFn: async () => {
       const { data, error } = await supabase
         .from('agent_templates')
-        .select('id, nome, etapa, segmento, sub_segmento, meta_template_name, conteudo, assunto, variaveis, vezes_usado, taxa_resposta, template_language')
+        .select('id, nome, etapa, segmento, sub_segmento, meta_template_name, conteudo, assunto, variaveis, vezes_usado, taxa_resposta, template_language, imagem_url')
         .eq('canal', canal)
         .eq('etapa', 'abertura')
         .eq('ativo', true)

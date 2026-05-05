@@ -12,8 +12,9 @@ import { createClient } from 'https://esm.sh/@supabase/supabase-js@2';
 const DEFAULT_EMAIL_FROM = 'Croma Print <junior@cromaprint.com.br>';
 const DEFAULT_EMAIL_REPLY_TO = 'junior@cromaprint.com.br';
 
-/** Convert plain text to basic HTML: split on blank lines → <p> tags */
-function textToHtml(text: string): string {
+/** Convert plain text to basic HTML: split on blank lines → <p> tags.
+ *  If imagemUrl is provided, renders it as a banner header above the text. */
+function textToHtml(text: string, imagemUrl?: string): string {
   const paragraphs = text
     .split(/\n\n+/)
     .map((p) => p.replace(/\n/g, '<br>'))
@@ -23,16 +24,26 @@ function textToHtml(text: string): string {
     )
     .join('\n');
 
+  const bannerHtml = imagemUrl
+    ? `<img src="${imagemUrl}" alt="Croma Print" style="width:100%;max-width:600px;height:auto;display:block;border-radius:8px 8px 0 0;margin-bottom:0;" />`
+    : '';
+
+  // When there's a banner, remove top padding from the content div so image sits flush
+  const contentPadding = imagemUrl ? 'padding:24px 32px 32px 32px' : 'padding:32px';
+
   return `<!DOCTYPE html>
 <html lang="pt-BR">
 <head><meta charset="UTF-8"><meta name="viewport" content="width=device-width,initial-scale=1"></head>
 <body style="margin:0;padding:32px 24px;background:#f5f5f5;">
-  <div style="max-width:600px;margin:0 auto;background:#fff;border-radius:8px;padding:32px;box-shadow:0 1px 4px rgba(0,0,0,0.08);">
-    ${paragraphs}
-    <hr style="border:none;border-top:1px solid #eee;margin:24px 0;">
-    <p style="font-family:Arial,sans-serif;font-size:12px;color:#999;margin:0;">
-      Croma Print Comunicação Visual — comunicação@cromaprint.com.br
-    </p>
+  <div style="max-width:600px;margin:0 auto;background:#fff;border-radius:8px;overflow:hidden;box-shadow:0 1px 4px rgba(0,0,0,0.08);">
+    ${bannerHtml}
+    <div style="${contentPadding};">
+      ${paragraphs}
+      <hr style="border:none;border-top:1px solid #eee;margin:24px 0;">
+      <p style="font-family:Arial,sans-serif;font-size:12px;color:#999;margin:0;">
+        Croma Print Comunicação Visual — comunicação@cromaprint.com.br
+      </p>
+    </div>
   </div>
 </body>
 </html>`;
@@ -141,8 +152,9 @@ serve(async (req: Request) => {
     const nomeRemetente = agentConfig?.nome_remetente || 'Croma Print';
     const fromAddress = `${nomeRemetente} <${emailRemetente}>`;
 
-    // 4. Build HTML body
-    const htmlBody = textToHtml(msg.conteudo || '');
+    // 4. Build HTML body (include banner image if present in metadata)
+    const imagemUrl = (msg.metadata as any)?.imagem_url || '';
+    const htmlBody = textToHtml(msg.conteudo || '', imagemUrl || undefined);
 
     // 5. Build email subject
     const subject =

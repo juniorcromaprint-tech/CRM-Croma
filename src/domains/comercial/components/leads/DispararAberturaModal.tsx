@@ -5,7 +5,7 @@
 import { useMemo, useState } from 'react';
 import {
   Loader2, Send, CheckCircle2, AlertTriangle, ChevronRight, ChevronLeft,
-  Sparkles, BarChart3, MessageCircle, Mail,
+  Sparkles, BarChart3, MessageCircle, Mail, ImageIcon,
 } from 'lucide-react';
 import {
   Dialog, DialogContent, DialogHeader, DialogTitle,
@@ -13,6 +13,7 @@ import {
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { RadioGroup, RadioGroupItem } from '@/components/ui/radio-group';
+import { Switch } from '@/components/ui/switch';
 import { Label } from '@/components/ui/label';
 import { useTemplatesAbertura, useDispararAbertura } from '../../hooks/useDispararAbertura';
 import type { CanalDisparo, DisparoResultRow } from '../../hooks/useDispararAbertura';
@@ -131,6 +132,7 @@ export function DispararAberturaModal({ open, onClose, leads, onSuccess }: Props
   const [canal, setCanal] = useState<CanalDisparo>('whatsapp');
   const [templateId, setTemplateId] = useState<string>('');
   const [modo, setModo] = useState<'imediato' | 'agendado'>('agendado');
+  const [incluirImagem, setIncluirImagem] = useState<boolean>(true);
   const [resultado, setResultado] = useState<DisparoResultRow[] | null>(null);
 
   const dispararMutation = useDispararAbertura();
@@ -176,6 +178,7 @@ export function DispararAberturaModal({ open, onClose, leads, onSuccess }: Props
       templateId,
       modo,
       autoAprovar: true,
+      incluirImagem: canal === 'email' ? incluirImagem : false,
     });
     setResultado(data);
     setStep('resultado');
@@ -187,6 +190,7 @@ export function DispararAberturaModal({ open, onClose, leads, onSuccess }: Props
     setCanal('whatsapp');
     setTemplateId('');
     setModo('agendado');
+    setIncluirImagem(true);
     setResultado(null);
     dispararMutation.reset();
     onClose();
@@ -328,6 +332,34 @@ export function DispararAberturaModal({ open, onClose, leads, onSuccess }: Props
                     </Badge>
                   )}
                 </div>
+
+                {/* Image toggle for email templates that have an image */}
+                {canal === 'email' && templateSelecionado.imagem_url && (
+                  <div className="flex items-center justify-between bg-white rounded-lg p-2 border border-blue-100">
+                    <div className="flex items-center gap-2">
+                      <img
+                        src={templateSelecionado.imagem_url}
+                        alt="Banner"
+                        className="w-16 h-10 object-cover rounded-md border border-slate-200"
+                      />
+                      <div>
+                        <p className="text-[11px] font-medium text-slate-700">Imagem de portfólio</p>
+                        <p className="text-[10px] text-slate-400">Banner no topo do email</p>
+                      </div>
+                    </div>
+                    <div className="flex items-center gap-2">
+                      <span className="text-[10px] text-slate-500">
+                        {incluirImagem ? 'Incluir' : 'Sem imagem'}
+                      </span>
+                      <Switch
+                        checked={incluirImagem}
+                        onCheckedChange={setIncluirImagem}
+                        className="data-[state=checked]:bg-blue-600"
+                      />
+                    </div>
+                  </div>
+                )}
+
                 <div className={`text-xs text-slate-700 whitespace-pre-line leading-relaxed bg-white rounded-lg p-2.5 border ${
                   canal === 'email' ? 'border-blue-100' : 'border-emerald-100'
                 }`}>
@@ -391,6 +423,12 @@ export function DispararAberturaModal({ open, onClose, leads, onSuccess }: Props
                 {canalLabel}
               </strong></div>
               <div>Template: <strong>{templateSelecionado?.nome}</strong></div>
+              {canal === 'email' && templateSelecionado?.imagem_url && (
+                <div className="flex items-center gap-1">
+                  <ImageIcon size={10} />
+                  Imagem: <strong>{incluirImagem ? 'Sim (banner no topo)' : 'Não'}</strong>
+                </div>
+              )}
               <div>Vão receber: <strong>{elegiveis.length}</strong> {elegiveis.length === 1 ? 'lead' : 'leads'}</div>
               {canal === 'email' && (
                 <div className="text-slate-400">
@@ -490,6 +528,7 @@ interface TemplateCardProps {
     variaveis: string[] | null;
     vezes_usado: number | null;
     taxa_resposta: number | null;
+    imagem_url?: string | null;
   };
   selected: boolean;
   onClick: () => void;
@@ -528,6 +567,13 @@ function TemplateCard({ template, selected, onClick, canal }: TemplateCardProps)
       {canal === 'email' && template.assunto && (
         <div className="text-[11px] text-blue-600 font-medium truncate">
           Assunto: {template.assunto}
+        </div>
+      )}
+
+      {/* Image indicator */}
+      {canal === 'email' && template.imagem_url && (
+        <div className="flex items-center gap-1.5 text-[10px] text-purple-600 bg-purple-50 rounded-md px-2 py-0.5 w-fit">
+          <ImageIcon size={10} /> Com imagem
         </div>
       )}
 
