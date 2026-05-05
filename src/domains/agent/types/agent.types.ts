@@ -62,6 +62,7 @@ export interface AgentTemplate {
   ativo: boolean;
   vezes_usado: number;
   taxa_resposta: number;
+  imagem_url: string | null;
   created_at: string;
 }
 

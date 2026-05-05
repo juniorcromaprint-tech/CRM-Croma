@@ -436,6 +436,35 @@ function EditTemplateForm({ template, onClose, onSave, isSaving }: EditTemplateF
   const [nome, setNome] = useState(template?.nome ?? '');
   const [assunto, setAssunto] = useState(template?.assunto ?? '');
   const [conteudo, setConteudo] = useState(template?.conteudo ?? '');
+  const [imagemUrl, setImagemUrl] = useState(template?.imagem_url ?? '');
+  const [uploading, setUploading] = useState(false);
+
+  const handleImageUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    if (file.size > 5 * 1024 * 1024) {
+      showError('Imagem muito grande (max 5MB)');
+      return;
+    }
+    setUploading(true);
+    try {
+      const ext = file.name.split('.').pop() ?? 'png';
+      const filename = `portfolio_${Date.now()}.${ext}`;
+      const { error: upErr } = await supabase.storage
+        .from('email-templates')
+        .upload(filename, file, { upsert: true, contentType: file.type });
+      if (upErr) throw upErr;
+      const { data: urlData } = supabase.storage
+        .from('email-templates')
+        .getPublicUrl(filename);
+      setImagemUrl(urlData.publicUrl);
+      showSuccess('Imagem enviada!');
+    } catch (err: any) {
+      showError('Erro no upload: ' + (err.message || 'desconhecido'));
+    } finally {
+      setUploading(false);
+    }
+  };
 
   return (
     <div className="bg-amber-50/50 border border-amber-200 rounded-2xl p-5 space-y-4">
@@ -474,10 +503,47 @@ function EditTemplateForm({ template, onClose, onSave, isSaving }: EditTemplateF
         <p className="text-xs text-slate-400">Variáveis disponíveis: {'{{empresa}}'}, {'{{contato}}'}, {'{{segmento}}'}</p>
       </div>
 
+      {/* Image upload for email portfolio banner */}
+      <div className="space-y-1.5">
+        <Label className="text-slate-700 text-sm font-medium">Imagem de Portfólio (opcional)</Label>
+        <p className="text-xs text-slate-400">Banner que aparece no topo do email. Recomendado: 600×300px, PNG ou JPG.</p>
+        <div className="flex items-center gap-3">
+          {imagemUrl && (
+            <div className="relative">
+              <img
+                src={imagemUrl}
+                alt="Preview"
+                className="w-24 h-14 object-cover rounded-lg border border-slate-200"
+              />
+              <button
+                type="button"
+                onClick={() => setImagemUrl('')}
+                className="absolute -top-1.5 -right-1.5 w-5 h-5 bg-red-500 text-white rounded-full flex items-center justify-center text-[10px] hover:bg-red-600"
+              >
+                <X size={10} />
+              </button>
+            </div>
+          )}
+          <label className="cursor-pointer">
+            <input
+              type="file"
+              accept="image/png,image/jpeg,image/webp"
+              className="hidden"
+              onChange={handleImageUpload}
+              disabled={uploading}
+            />
+            <span className="inline-flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium text-slate-600 bg-white border border-slate-200 rounded-lg hover:bg-slate-50 transition-colors">
+              {uploading ? <Loader2 size={12} className="animate-spin" /> : <Plus size={12} />}
+              {uploading ? 'Enviando...' : imagemUrl ? 'Trocar imagem' : 'Enviar imagem'}
+            </span>
+          </label>
+        </div>
+      </div>
+
       <div className="flex items-center gap-2">
         <Button
           size="sm"
-          onClick={() => onSave(template?.id ?? null, { nome, assunto, conteudo })}
+          onClick={() => onSave(template?.id ?? null, { nome, assunto, conteudo, imagem_url: imagemUrl || null })}
           disabled={isSaving || !nome.trim() || !conteudo.trim()}
           className="h-8 text-xs bg-amber-600 hover:bg-amber-700 text-white gap-1"
         >
@@ -549,6 +615,7 @@ function TabTemplates() {
             etapa: 'abertura',
             conteudo: data.conteudo ?? '',
             assunto: data.assunto ?? null,
+            imagem_url: data.imagem_url ?? null,
             variaveis: [],
             ativo: true,
             vezes_usado: 0,
