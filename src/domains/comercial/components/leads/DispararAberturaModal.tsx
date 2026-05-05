@@ -15,6 +15,8 @@ import { Badge } from '@/components/ui/badge';
 import { RadioGroup, RadioGroupItem } from '@/components/ui/radio-group';
 import { Switch } from '@/components/ui/switch';
 import { Label } from '@/components/ui/label';
+import { supabase } from '@/integrations/supabase/client';
+import { showSuccess, showError } from '@/utils/toast';
 import { useTemplatesAbertura, useDispararAbertura } from '../../hooks/useDispararAbertura';
 import type { CanalDisparo, DisparoResultRow } from '../../hooks/useDispararAbertura';
 import type { LeadDisparo } from '../../hooks/useLeadsDisparo';
@@ -133,7 +135,37 @@ export function DispararAberturaModal({ open, onClose, leads, onSuccess }: Props
   const [templateId, setTemplateId] = useState<string>('');
   const [modo, setModo] = useState<'imediato' | 'agendado'>('agendado');
   const [incluirImagem, setIncluirImagem] = useState<boolean>(true);
+  const [imagemCustomUrl, setImagemCustomUrl] = useState<string>('');
+  const [uploading, setUploading] = useState(false);
   const [resultado, setResultado] = useState<DisparoResultRow[] | null>(null);
+
+  // Upload de imagem direto no modal
+  const handleImageUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    if (file.size > 5 * 1024 * 1024) { showError('Imagem muito grande (max 5MB)'); return; }
+    setUploading(true);
+    try {
+      const ext = file.name.split('.').pop() ?? 'png';
+      const filename = `portfolio_${Date.now()}.${ext}`;
+      const { error: upErr } = await supabase.storage
+        .from('email-templates')
+        .upload(filename, file, { upsert: true, contentType: file.type });
+      if (upErr) throw upErr;
+      const { data: urlData } = supabase.storage.from('email-templates').getPublicUrl(filename);
+      setImagemCustomUrl(urlData.publicUrl);
+      setIncluirImagem(true);
+      // Salva a URL no template para uso futuro
+      if (templateId) {
+        await supabase.from('agent_templates').update({ imagem_url: urlData.publicUrl }).eq('id', templateId);
+      }
+      showSuccess('Imagem enviada!');
+    } catch (err: any) {
+      showError('Erro no upload: ' + (err.message || ''));
+    } finally {
+      setUploading(false);
+    }
+  };
 
   const dispararMutation = useDispararAbertura();
 
@@ -191,6 +223,7 @@ export function DispararAberturaModal({ open, onClose, leads, onSuccess }: Props
     setTemplateId('');
     setModo('agendado');
     setIncluirImagem(true);
+    setImagemCustomUrl('');
     setResultado(null);
     dispararMutation.reset();
     onClose();
@@ -333,32 +366,58 @@ export function DispararAberturaModal({ open, onClose, leads, onSuccess }: Props
                   )}
                 </div>
 
-                {/* Image toggle for email templates that have an image */}
-                {canal === 'email' && templateSelecionado.imagem_url && (
-                  <div className="flex items-center justify-between bg-white rounded-lg p-2 border border-blue-100">
-                    <div className="flex items-center gap-2">
-                      <img
-                        src={templateSelecionado.imagem_url}
-                        alt="Banner"
-                        className="w-16 h-10 object-cover rounded-md border border-slate-200"
-                      />
-                      <div>
-                        <p className="text-[11px] font-medium text-slate-700">Imagem de portfólio</p>
-                        <p className="text-[10px] text-slate-400">Banner no topo do email</p>
-                      </div>
+                {/* Image section for email: upload + toggle */}
+                {canal === 'email' && (() => {
+                  const imgUrl = imagemCustomUrl || templateSelecionado.imagem_url;
+                  return (
+                    <div className="bg-white rounded-lg p-2.5 border border-blue-100 space-y-2">
+                      {imgUrl ? (
+                        <div className="flex items-center justify-between">
+                          <div className="flex items-center gap-2">
+                            <img
+                              src={imgUrl}
+                              alt="Banner"
+                              className="w-20 h-12 object-cover rounded-md border border-slate-200"
+                            />
+                            <div>
+                              <p className="text-[11px] font-medium text-slate-700">Imagem de portfólio</p>
+                              <p className="text-[10px] text-slate-400">Banner no topo do email</p>
+                            </div>
+                          </div>
+                          <div className="flex items-center gap-2">
+                            <span className="text-[10px] text-slate-500">
+                              {incluirImagem ? 'Incluir' : 'Sem imagem'}
+                            </span>
+                            <Switch
+                              checked={incluirImagem}
+                              onCheckedChange={setIncluirImagem}
+                              className="data-[state=checked]:bg-blue-600"
+                            />
+                          </div>
+                        </div>
+                      ) : (
+                        <div className="flex items-center gap-2">
+                          <ImageIcon size={14} className="text-slate-400" />
+                          <span className="text-[11px] text-slate-500">Nenhuma imagem vinculada</span>
+                        </div>
+                      )}
+                      {/* Upload / trocar */}
+                      <label className="cursor-pointer inline-block">
+                        <input
+                          type="file"
+                          accept="image/png,image/jpeg,image/webp"
+                          className="hidden"
+                          onChange={handleImageUpload}
+                          disabled={uploading}
+                        />
+                        <span className="inline-flex items-center gap-1.5 px-2.5 py-1 text-[11px] font-medium text-blue-700 bg-blue-50 border border-blue-200 rounded-lg hover:bg-blue-100 transition-colors">
+                          {uploading ? <Loader2 size={11} className="animate-spin" /> : <ImageIcon size={11} />}
+                          {uploading ? 'Enviando...' : imgUrl ? 'Trocar imagem' : 'Anexar imagem'}
+                        </span>
+                      </label>
                     </div>
-                    <div className="flex items-center gap-2">
-                      <span className="text-[10px] text-slate-500">
-                        {incluirImagem ? 'Incluir' : 'Sem imagem'}
-                      </span>
-                      <Switch
-                        checked={incluirImagem}
-                        onCheckedChange={setIncluirImagem}
-                        className="data-[state=checked]:bg-blue-600"
-                      />
-                    </div>
-                  </div>
-                )}
+                  );
+                })()}
 
                 <div className={`text-xs text-slate-700 whitespace-pre-line leading-relaxed bg-white rounded-lg p-2.5 border ${
                   canal === 'email' ? 'border-blue-100' : 'border-emerald-100'
