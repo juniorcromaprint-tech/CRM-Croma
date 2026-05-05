@@ -1,9 +1,12 @@
 // src/domains/comercial/hooks/useDispararAbertura.ts
 // Mutation que chama RPC fn_disparar_abertura_em_massa.
+// Suporta canal whatsapp e email.
 
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { supabase } from '@/integrations/supabase/client';
 import { showSuccess, showError } from '@/utils/toast';
+
+export type CanalDisparo = 'whatsapp' | 'email';
 
 export interface DispararParams {
   leadIds: string[];
@@ -39,16 +42,20 @@ export function useDispararAbertura() {
       return (data ?? []) as DisparoResultRow[];
     },
 
-    onSuccess: (data) => {
+    onSuccess: (data, variables) => {
       const criados   = data.filter(d => d.status === 'criado').length;
       const bloqueados = data.filter(d => d.status === 'bloqueado').length;
       const pulados   = data.filter(d => d.status === 'pulado').length;
       const dups      = data.filter(d => d.status === 'duplicado').length;
 
+      const labelContato = pulados
+        ? `${pulados} sem contato.`
+        : '';
+
       const msg = [
         `${criados} disparo${criados !== 1 ? 's' : ''} enfileirado${criados !== 1 ? 's' : ''}.`,
         bloqueados ? `${bloqueados} bloqueado${bloqueados !== 1 ? 's' : ''}.` : '',
-        pulados    ? `${pulados} sem telefone.` : '',
+        labelContato,
         dups       ? `${dups} ja em conversa.` : '',
       ].filter(Boolean).join(' ');
 
@@ -60,17 +67,17 @@ export function useDispararAbertura() {
   });
 }
 
-// Templates de abertura ativos.
-// IMPORTANTE: traz TODOS (independente do segmento). O modal marca como
+// Templates de abertura ativos por canal.
+// IMPORTANTE: traz TODOS do canal (independente do segmento). O modal marca como
 // "recomendado" o que casa com o segmento dos leads selecionados.
-export function useTemplatesAbertura() {
+export function useTemplatesAbertura(canal: CanalDisparo = 'whatsapp') {
   return useQuery({
-    queryKey: ['templates-abertura-todos'],
+    queryKey: ['templates-abertura', canal],
     queryFn: async () => {
       const { data, error } = await supabase
         .from('agent_templates')
-        .select('id, nome, etapa, segmento, sub_segmento, meta_template_name, conteudo, variaveis, vezes_usado, taxa_resposta, template_language')
-        .eq('canal', 'whatsapp')
+        .select('id, nome, etapa, segmento, sub_segmento, meta_template_name, conteudo, assunto, variaveis, vezes_usado, taxa_resposta, template_language')
+        .eq('canal', canal)
         .eq('etapa', 'abertura')
         .eq('ativo', true)
         .order('segmento', { nullsFirst: false })

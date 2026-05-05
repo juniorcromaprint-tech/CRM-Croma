@@ -162,10 +162,13 @@ Deno.serve(async (req) => {
       nightlyResults = await processNightlyCycle(supabase);
     }
 
-    // ── 4. FOLLOW-UP DE LEADS (lógica existente) ──
+    // ── 4. DISPATCH approved messages (created by RPC fn_disparar_abertura_em_massa) ──
+    const dispatchResults = await processApprovedMessages(supabase, config);
+
+    // ── 5. FOLLOW-UP DE LEADS (lógica existente) ──
     const followUpResults = await processLeadFollowUps(supabase, config);
 
-    // ── 5. Log execution ──
+    // ── 6. Log execution ──
     const duration = Date.now() - startTime;
 
     await supabase.from('ai_logs').insert({
@@ -194,6 +197,7 @@ Deno.serve(async (req) => {
         actions_success: ruleResults.reduce((s, r) => s + r.executed, 0),
         actions_failed: rulesErrors,
         rules_skipped: rulesSkipped,
+        dispatch: dispatchResults,
         followups: followUpResults,
         nightly: nightlyResults,
         brt_hour: brtHour,
@@ -212,6 +216,7 @@ Deno.serve(async (req) => {
         total_executadas: ruleResults.reduce((s, r) => s + r.executed, 0),
         detalhes: ruleResults,
       },
+      dispatch: dispatchResults,
       followups: followUpResults,
       nightly: nightlyResults,
     });
@@ -923,6 +928,125 @@ async function processNightlyCycle(supabase: SupabaseClient): Promise<any> {
   }
 
   return results;
+}
+
+// ══════════════════════════════════════════════════════════════════════
+// DISPATCH: envia mensagens pré-aprovadas (criadas pelo RPC fn_disparar_abertura_em_massa)
+// ══════════════════════════════════════════════════════════════════════
+
+interface DispatchResult {
+  total_pending: number;
+  whatsapp_sent: number;
+  email_sent: number;
+  errors: string[];
+}
+
+async function processApprovedMessages(supabase: SupabaseClient, config: any): Promise<DispatchResult> {
+  const result: DispatchResult = { total_pending: 0, whatsapp_sent: 0, email_sent: 0, errors: [] };
+
+  try {
+    // Check if we're inside the send windows (horarios config)
+    const now = new Date();
+    const brtHour = (now.getUTCHours() - 3 + 24) % 24;
+    const brtMin = now.getUTCMinutes();
+    const brtTime = brtHour * 60 + brtMin; // minutes since midnight BRT
+
+    const horarios: [string, string][] = config.horarios || [['09:00', '12:00'], ['14:00', '17:00']];
+    const inWindow = horarios.some(([start, end]) => {
+      const [sh, sm] = start.split(':').map(Number);
+      const [eh, em] = end.split(':').map(Number);
+      return brtTime >= (sh * 60 + sm) && brtTime < (eh * 60 + em);
+    });
+
+    if (!inWindow) {
+      return { ...result, errors: [`Fora das janelas de envio (${brtHour}:${String(brtMin).padStart(2, '0')} BRT)`] };
+    }
+
+    // Count messages already sent today (both channels)
+    const inicioHoje = new Date();
+    inicioHoje.setUTCHours(3, 0, 0, 0); // midnight BRT = 03:00 UTC
+    if (brtHour < 3) inicioHoje.setDate(inicioHoje.getDate() - 1); // handle pre-midnight UTC
+
+    const { count: sentToday } = await supabase
+      .from('agent_messages')
+      .select('id', { count: 'exact', head: true })
+      .eq('status', 'enviada')
+      .gte('enviado_em', inicioHoje.toISOString());
+
+    const maxDia = config.max_contatos_dia ?? 15;
+    const remaining = Math.max(0, maxDia - (sentToday ?? 0));
+
+    if (remaining === 0) {
+      return { ...result, errors: ['Limite diario atingido'] };
+    }
+
+    // Fetch approved messages waiting to be sent (ordered by creation, oldest first)
+    const { data: pending, error: pendErr } = await supabase
+      .from('agent_messages')
+      .select(`
+        id, canal, conversation_id,
+        agent_conversations!inner(id, lead_id, canal, status)
+      `)
+      .eq('status', 'aprovada')
+      .eq('direcao', 'enviada')
+      .order('created_at', { ascending: true })
+      .limit(remaining);
+
+    if (pendErr) {
+      result.errors.push(`Query error: ${pendErr.message}`);
+      return result;
+    }
+
+    if (!pending || pending.length === 0) return result;
+    result.total_pending = pending.length;
+
+    // Dispatch each message
+    for (const msg of pending) {
+      try {
+        const canal = msg.canal || (msg.agent_conversations as any)?.canal || 'whatsapp';
+        const dispatchFn = canal === 'email' ? 'agent-enviar-email' : 'whatsapp-enviar';
+
+        const { error: invokeErr } = await supabase.functions.invoke(dispatchFn, {
+          body: { message_id: msg.id },
+        });
+
+        if (invokeErr) {
+          result.errors.push(`${msg.id}: ${invokeErr.message}`);
+          continue;
+        }
+
+        if (canal === 'email') {
+          result.email_sent++;
+        } else {
+          result.whatsapp_sent++;
+        }
+
+        // Schedule next follow-up for this conversation (so processLeadFollowUps picks it up later)
+        const diasFollowup = config.dias_entre_followup ?? 3;
+        const proxFollowup = new Date();
+        proxFollowup.setDate(proxFollowup.getDate() + diasFollowup);
+
+        const convId = msg.conversation_id;
+        if (convId) {
+          await supabase.from('agent_conversations').update({
+            proximo_followup: proxFollowup.toISOString(),
+            tentativas: 1,
+            mensagens_enviadas: 1,
+          }).eq('id', convId);
+        }
+
+        // Small delay between sends (2s) to avoid rate limits
+        await new Promise(r => setTimeout(r, 2000));
+      } catch (sendErr) {
+        result.errors.push(`${msg.id}: ${(sendErr as Error).message}`);
+      }
+    }
+
+    return result;
+  } catch (err) {
+    result.errors.push(`processApprovedMessages: ${(err as Error).message}`);
+    return result;
+  }
 }
 
 // ══════════════════════════════════════════════════════════════════════

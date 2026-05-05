@@ -1,18 +1,27 @@
 # STATE — CRM Croma
 
-**Última sessão**: 2026-05-04 (sessão 2026-05-04M — Cowork/Claudete, pipeline E2E ativado)
+**Última sessão**: 2026-05-04 (sessão 2026-05-04N — Cowork, canal EMAIL adicionado)
 
-## Pipeline E2E OPERACIONAL ✅
+## Pipeline E2E OPERACIONAL ✅ (WhatsApp + Email)
 
-Sessão M corrigiu cadeia de erros do disparo:
-1. RPC `fn_disparar_abertura_em_massa` v4 (qualifica colunas + direcao='enviada')
-2. `vault.service_role_key` regravada para `sb_secret_...` (formato novo)
-3. `whatsapp-enviar` v22 com header IMAGE automático via `admin_config.WHATSAPP_MEDIA_<template>`
-4. `agent-cron-loop` v16 com `verify_jwt:false`
-5. Janelas 09:00-12:00 e 14:00-17:00 BRT
-6. Cron jobid 15 ATIVO
+Sessão N adicionou canal EMAIL ao pipeline de prospecção:
+1. RPC `fn_disparar_abertura_em_massa` v5 — valida email (regex), renderiza assunto com variáveis
+2. `agent-enviar-email` já funcional (Resend API, domínio cromaprint.com.br verificado)
+3. `agent-cron-loop` v17 — nova `processApprovedMessages()` despacha msg aprovadas pelo RPC
+4. Frontend: `DispararAberturaModal` v3 com toggle WhatsApp/Email, contagem de elegíveis
+5. 7 templates email ativos (4 abertura + 2 followup1 + 1 followup2)
+6. Remetente: `junior@cromaprint.com.br` (configurável via `admin_config.agent_config`)
 
-4 leads enviados + 1 E2E. 190 leads de Segurança aguardam fila. Junior dispara pela UI, cron processa.
+### Bug crítico corrigido (sessão N)
+O RPC criava mensagens `status='aprovada'` mas nada as despachava (proximo_followup=NULL).
+Adicionada `processApprovedMessages` ao cron que pega mensagens aprovadas e roteia para
+`whatsapp-enviar` ou `agent-enviar-email` respeitando janelas e limites diários.
+
+### Pipeline anterior (sessão M):
+- `whatsapp-enviar` v22 com header IMAGE automático
+- Janelas 09:00-12:00 e 14:00-17:00 BRT
+- Cron jobid 15 ATIVO
+- 4 leads WhatsApp enviados + 1 E2E
 
 
 **Último commit**: a commitar nesta sessão
@@ -86,11 +95,11 @@ cesta lateral sticky, galeria de aberturas, banner de campanha, paginação).
 
 ## Aguardando ação do Junior
 
-- [ ] `git pull` + `npm install` + `npm run build` para validar TypeScript local
-- [ ] `npm run dev` e teste visual da nova `/leads`
-- [ ] Selecionar leads de teste reais (não internos) e disparar — FASE 5 E2E
-- [ ] Após E2E OK: `SELECT cron.alter_job(15, active := true);`
-- [ ] Deletar v1 templates manualmente em business.facebook.com
+- [ ] Deploy edge function: `npx supabase functions deploy agent-cron-loop --no-verify-jwt --project-ref djwjmfgplnqyffdcgdaw`
+- [ ] `npm run dev` → testar toggle WhatsApp/Email no modal de disparo
+- [ ] Selecionar 2-3 leads com email válido → disparar canal Email → verificar inbox
+- [ ] Confirmar que cron (próxima execução) despacha as mensagens aprovadas
+- [ ] Verificar RESEND_API_KEY está configurado como secret na Edge Function
 
 ## TODO próxima sessão
 

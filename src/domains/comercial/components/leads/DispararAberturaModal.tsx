@@ -1,11 +1,11 @@
 // src/domains/comercial/components/leads/DispararAberturaModal.tsx
 // Wizard de 4 passos para disparar mensagem de abertura em lote.
-// v2 (2026-05-04L): galeria de templates em vez de dropdown + preview com lead real.
+// v3 (2026-05-04): suporte a canal WhatsApp + Email com toggle amigável.
 
 import { useMemo, useState } from 'react';
 import {
   Loader2, Send, CheckCircle2, AlertTriangle, ChevronRight, ChevronLeft,
-  Sparkles, BarChart3,
+  Sparkles, BarChart3, MessageCircle, Mail,
 } from 'lucide-react';
 import {
   Dialog, DialogContent, DialogHeader, DialogTitle,
@@ -15,7 +15,7 @@ import { Badge } from '@/components/ui/badge';
 import { RadioGroup, RadioGroupItem } from '@/components/ui/radio-group';
 import { Label } from '@/components/ui/label';
 import { useTemplatesAbertura, useDispararAbertura } from '../../hooks/useDispararAbertura';
-import type { DisparoResultRow } from '../../hooks/useDispararAbertura';
+import type { CanalDisparo, DisparoResultRow } from '../../hooks/useDispararAbertura';
 import type { LeadDisparo } from '../../hooks/useLeadsDisparo';
 
 // ─── Types ───────────────────────────────────────────────────────────────────
@@ -61,6 +61,56 @@ function StepDots({ current }: { current: Step }) {
   );
 }
 
+// ─── Canal toggle ───────────────────────────────────────────────────────────
+
+function CanalToggle({
+  canal, onChange, countWhatsapp, countEmail,
+}: {
+  canal: CanalDisparo;
+  onChange: (c: CanalDisparo) => void;
+  countWhatsapp: number;
+  countEmail: number;
+}) {
+  return (
+    <div className="flex items-center gap-1 p-1 bg-slate-100 rounded-xl w-fit">
+      <button
+        type="button"
+        onClick={() => onChange('whatsapp')}
+        className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-medium transition-all ${
+          canal === 'whatsapp'
+            ? 'bg-white shadow-sm text-emerald-700 ring-1 ring-slate-200'
+            : 'text-slate-500 hover:text-slate-700'
+        }`}
+      >
+        <MessageCircle size={13} />
+        WhatsApp
+        <span className={`ml-0.5 text-[10px] px-1.5 py-0.5 rounded-full ${
+          canal === 'whatsapp' ? 'bg-emerald-100 text-emerald-700' : 'bg-slate-200 text-slate-500'
+        }`}>
+          {countWhatsapp}
+        </span>
+      </button>
+      <button
+        type="button"
+        onClick={() => onChange('email')}
+        className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-medium transition-all ${
+          canal === 'email'
+            ? 'bg-white shadow-sm text-blue-700 ring-1 ring-slate-200'
+            : 'text-slate-500 hover:text-slate-700'
+        }`}
+      >
+        <Mail size={13} />
+        Email
+        <span className={`ml-0.5 text-[10px] px-1.5 py-0.5 rounded-full ${
+          canal === 'email' ? 'bg-blue-100 text-blue-700' : 'bg-slate-200 text-slate-500'
+        }`}>
+          {countEmail}
+        </span>
+      </button>
+    </div>
+  );
+}
+
 // ─── Substitui placeholders {{contato_nome}}, {{empresa}}, {{cidade}} ────────
 
 function renderPreview(conteudo: string | null, lead?: LeadDisparo): string {
@@ -69,13 +119,16 @@ function renderPreview(conteudo: string | null, lead?: LeadDisparo): string {
   return conteudo
     .replace(/\{\{contato_nome\}\}/g, lead.contato_nome ?? lead.empresa ?? 'Cliente')
     .replace(/\{\{empresa\}\}/g, lead.empresa ?? 'sua empresa')
-    .replace(/\{\{cidade\}\}/g, lead.cidade ?? 'sua região');
+    .replace(/\{\{cidade\}\}/g, lead.cidade ?? 'sua região')
+    .replace(/\{\{nome_remetente\}\}/g, 'Junior - Croma Print')
+    .replace(/\{\{telefone_empresa\}\}/g, '(11) 4200-3724');
 }
 
 // ─── Main component ─────────────────────────────────────────────────────────
 
 export function DispararAberturaModal({ open, onClose, leads, onSuccess }: Props) {
   const [step, setStep] = useState<Step>('confirmacao');
+  const [canal, setCanal] = useState<CanalDisparo>('whatsapp');
   const [templateId, setTemplateId] = useState<string>('');
   const [modo, setModo] = useState<'imediato' | 'agendado'>('agendado');
   const [resultado, setResultado] = useState<DisparoResultRow[] | null>(null);
@@ -94,16 +147,27 @@ export function DispararAberturaModal({ open, onClose, leads, onSuccess }: Props
     return sorted[0][1] / leads.length > 0.7 ? sorted[0][0] : undefined;
   }, [leads]);
 
-  const { data: templates = [], isLoading: loadingTemplates } = useTemplatesAbertura(segmentoPred);
+  const { data: templates = [], isLoading: loadingTemplates } = useTemplatesAbertura(canal);
 
-  // Stats da cesta
-  const elegiveis  = leads.filter(l => !l.bloqueado_disparo && l.tem_telefone_valido && !l.em_conversa_ativa);
-  const semTel     = leads.filter(l => !l.bloqueado_disparo && !l.tem_telefone_valido);
+  // Stats da cesta — dinâmicos conforme o canal selecionado
+  const elegiveisWhatsapp = leads.filter(l => !l.bloqueado_disparo && l.tem_telefone_valido && !l.em_conversa_ativa);
+  const elegiveisEmail    = leads.filter(l => !l.bloqueado_disparo && l.tem_email_valido && !l.em_conversa_ativa);
+  const elegiveis         = canal === 'whatsapp' ? elegiveisWhatsapp : elegiveisEmail;
+
+  const semContato  = canal === 'whatsapp'
+    ? leads.filter(l => !l.bloqueado_disparo && !l.tem_telefone_valido && !l.em_conversa_ativa)
+    : leads.filter(l => !l.bloqueado_disparo && !l.tem_email_valido && !l.em_conversa_ativa);
   const bloqueados = leads.filter(l => l.bloqueado_disparo);
   const emConv     = leads.filter(l => l.em_conversa_ativa);
 
   const templateSelecionado = templates.find(t => t.id === templateId);
   const leadAmostra = elegiveis[0] ?? leads[0];
+
+  // Quando troca de canal, limpa template selecionado
+  const handleCanalChange = (c: CanalDisparo) => {
+    setCanal(c);
+    setTemplateId('');
+  };
 
   const handleDisparar = async () => {
     if (!templateId) return;
@@ -120,12 +184,16 @@ export function DispararAberturaModal({ open, onClose, leads, onSuccess }: Props
 
   const handleClose = () => {
     setStep('confirmacao');
+    setCanal('whatsapp');
     setTemplateId('');
     setModo('agendado');
     setResultado(null);
     dispararMutation.reset();
     onClose();
   };
+
+  const labelSemContato = canal === 'whatsapp' ? 'Sem telefone válido' : 'Sem email válido';
+  const canalLabel = canal === 'whatsapp' ? 'WhatsApp' : 'Email';
 
   return (
     <Dialog open={open} onOpenChange={(o) => { if (!o) handleClose(); }}>
@@ -139,31 +207,42 @@ export function DispararAberturaModal({ open, onClose, leads, onSuccess }: Props
 
         <StepDots current={step} />
 
-        {/* ── Passo 1: Confirmação ────────────────────────────────────────── */}
+        {/* ── Passo 1: Confirmação + Seleção de Canal ──────────────────────── */}
         {step === 'confirmacao' && (
           <div className="space-y-4">
+            {/* Canal toggle */}
+            <div className="space-y-2">
+              <p className="text-xs font-medium text-slate-500 uppercase tracking-wide">Canal de envio</p>
+              <CanalToggle
+                canal={canal}
+                onChange={handleCanalChange}
+                countWhatsapp={elegiveisWhatsapp.length}
+                countEmail={elegiveisEmail.length}
+              />
+            </div>
+
             <p className="text-sm text-slate-600">
               <span className="font-semibold text-slate-800">{leads.length}</span>{' '}
-              {leads.length === 1 ? 'lead' : 'leads'} na cesta. Quem vai receber:
+              {leads.length === 1 ? 'lead' : 'leads'} na cesta. Quem vai receber via {canalLabel}:
             </p>
 
             <div className="grid grid-cols-2 gap-3">
               <StatCard
-                label="Receberão a mensagem"
+                label={`Receberão via ${canalLabel}`}
                 value={elegiveis.length}
                 tone="emerald"
               />
               <StatCard
                 label="Pulados"
-                value={semTel.length + bloqueados.length + emConv.length}
+                value={semContato.length + bloqueados.length + emConv.length}
                 tone="amber"
               />
             </div>
 
-            {(semTel.length + bloqueados.length + emConv.length) > 0 && (
+            {(semContato.length + bloqueados.length + emConv.length) > 0 && (
               <div className="bg-slate-50 rounded-xl p-3 space-y-1.5 text-xs">
-                {semTel.length > 0 && (
-                  <Row label="Sem telefone válido" value={semTel.length} tone="text-amber-600" />
+                {semContato.length > 0 && (
+                  <Row label={labelSemContato} value={semContato.length} tone="text-amber-600" />
                 )}
                 {bloqueados.length > 0 && (
                   <Row label="Bloqueados (NAO INCLUIR)" value={bloqueados.length} tone="text-red-500" />
@@ -177,7 +256,7 @@ export function DispararAberturaModal({ open, onClose, leads, onSuccess }: Props
             {elegiveis.length === 0 && (
               <div className="flex items-center gap-2 text-amber-700 bg-amber-50 rounded-xl p-3 text-sm">
                 <AlertTriangle size={15} />
-                Nenhum lead elegível. Ajuste a cesta antes de continuar.
+                Nenhum lead elegível para {canalLabel}. {canal === 'email' ? 'Tente WhatsApp ou cadastre emails.' : 'Tente Email ou cadastre telefones.'}
               </div>
             )}
 
@@ -201,9 +280,10 @@ export function DispararAberturaModal({ open, onClose, leads, onSuccess }: Props
               <p className="text-sm text-slate-600">
                 Escolha a abertura — clique no card para selecionar.
               </p>
-              <span className="text-xs text-slate-400">
-                {templates.length} {templates.length === 1 ? 'opção' : 'opções'}
-              </span>
+              <Badge variant="outline" className="text-[10px]">
+                {canal === 'whatsapp' ? <MessageCircle size={10} className="mr-1" /> : <Mail size={10} className="mr-1" />}
+                {canalLabel} · {templates.length} {templates.length === 1 ? 'opção' : 'opções'}
+              </Badge>
             </div>
 
             {loadingTemplates ? (
@@ -212,7 +292,7 @@ export function DispararAberturaModal({ open, onClose, leads, onSuccess }: Props
               </div>
             ) : templates.length === 0 ? (
               <div className="bg-amber-50 rounded-xl p-4 text-sm text-amber-700">
-                Nenhum template de abertura ativo para esse segmento. Cadastre um na página de templates.
+                Nenhum template de abertura ativo para {canalLabel}. Cadastre um na página de templates.
               </div>
             ) : (
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
@@ -222,6 +302,7 @@ export function DispararAberturaModal({ open, onClose, leads, onSuccess }: Props
                     template={t}
                     selected={t.id === templateId}
                     onClick={() => setTemplateId(t.id)}
+                    canal={canal}
                   />
                 ))}
               </div>
@@ -229,16 +310,27 @@ export function DispararAberturaModal({ open, onClose, leads, onSuccess }: Props
 
             {/* Preview ao vivo */}
             {templateSelecionado && (
-              <div className="bg-emerald-50 border border-emerald-100 rounded-xl p-3 space-y-2">
+              <div className={`border rounded-xl p-3 space-y-2 ${
+                canal === 'email' ? 'bg-blue-50 border-blue-100' : 'bg-emerald-50 border-emerald-100'
+              }`}>
                 <div className="flex items-center justify-between gap-2">
-                  <span className="text-xs font-medium text-emerald-700">
+                  <span className={`text-xs font-medium ${canal === 'email' ? 'text-blue-700' : 'text-emerald-700'}`}>
                     Preview {leadAmostra ? `(com ${leadAmostra.empresa ?? 'lead'})` : ''}
                   </span>
-                  <Badge variant="outline" className="text-[10px] text-slate-500 border-slate-200">
-                    {templateSelecionado.meta_template_name}
-                  </Badge>
+                  {canal === 'email' && templateSelecionado.assunto && (
+                    <Badge variant="outline" className="text-[10px] text-slate-600 border-slate-200">
+                      Assunto: {renderPreview(templateSelecionado.assunto, leadAmostra)}
+                    </Badge>
+                  )}
+                  {canal === 'whatsapp' && (
+                    <Badge variant="outline" className="text-[10px] text-slate-500 border-slate-200">
+                      {templateSelecionado.meta_template_name}
+                    </Badge>
+                  )}
                 </div>
-                <div className="text-xs text-slate-700 whitespace-pre-line leading-relaxed bg-white rounded-lg p-2.5 border border-emerald-100">
+                <div className={`text-xs text-slate-700 whitespace-pre-line leading-relaxed bg-white rounded-lg p-2.5 border ${
+                  canal === 'email' ? 'border-blue-100' : 'border-emerald-100'
+                }`}>
                   {renderPreview(templateSelecionado.conteudo, leadAmostra)}
                 </div>
               </div>
@@ -271,7 +363,9 @@ export function DispararAberturaModal({ open, onClose, leads, onSuccess }: Props
                 <Label htmlFor="agendado" className="cursor-pointer flex-1">
                   <div className="font-medium text-slate-800 text-sm">Cron com rampa de aquecimento (recomendado)</div>
                   <div className="text-xs text-slate-500 mt-0.5">
-                    Cron processa respeitando 15/dia nos primeiros 2 dias e 30/dia depois. Janelas 10–12h e 14–17h BRT.
+                    {canal === 'whatsapp'
+                      ? 'Cron processa respeitando 15/dia nos primeiros 2 dias e 30/dia depois. Janelas 10–12h e 14–17h BRT.'
+                      : 'Cron processa respeitando limites do Resend. Janelas 9–12h e 14–17h BRT.'}
                   </div>
                 </Label>
               </div>
@@ -292,10 +386,21 @@ export function DispararAberturaModal({ open, onClose, leads, onSuccess }: Props
               <div className="flex items-center gap-1.5 font-medium text-slate-700">
                 <BarChart3 size={12} /> Resumo do disparo
               </div>
+              <div>Canal: <strong className="inline-flex items-center gap-1">
+                {canal === 'whatsapp' ? <MessageCircle size={11} /> : <Mail size={11} />}
+                {canalLabel}
+              </strong></div>
               <div>Template: <strong>{templateSelecionado?.nome}</strong></div>
               <div>Vão receber: <strong>{elegiveis.length}</strong> {elegiveis.length === 1 ? 'lead' : 'leads'}</div>
+              {canal === 'email' && (
+                <div className="text-slate-400">
+                  Remetente: junior@cromaprint.com.br
+                </div>
+              )}
               <div className="text-slate-400">
-                Janelas: 10–12h e 14–17h BRT · limite atual 15/dia
+                {canal === 'whatsapp'
+                  ? 'Janelas: 10–12h e 14–17h BRT · limite atual 15/dia'
+                  : 'Janelas: 9–12h e 14–17h BRT · via Resend'}
               </div>
             </div>
 
@@ -348,12 +453,14 @@ export function DispararAberturaModal({ open, onClose, leads, onSuccess }: Props
 
             <div className="bg-slate-50 rounded-xl p-3 space-y-1.5 text-xs">
               <Row label="Bloqueados" value={resultado.filter(r => r.status === 'bloqueado').length} tone="text-red-500" />
-              <Row label="Sem telefone" value={resultado.filter(r => r.status === 'pulado').length} tone="text-amber-600" />
+              <Row label={labelSemContato} value={resultado.filter(r => r.status === 'pulado').length} tone="text-amber-600" />
               <Row label="Já em conversa" value={resultado.filter(r => r.status === 'duplicado').length} tone="text-blue-500" />
             </div>
 
             <p className="text-xs text-slate-500">
-              As mensagens serão enviadas dentro das janelas de horário configuradas.
+              {canal === 'whatsapp'
+                ? 'As mensagens serão enviadas dentro das janelas de horário configuradas via WhatsApp.'
+                : 'Os emails serão enviados via Resend dentro das janelas de horário configuradas.'}
             </p>
 
             <div className="flex justify-end pt-1">
@@ -379,15 +486,17 @@ interface TemplateCardProps {
     sub_segmento: string | null;
     meta_template_name: string | null;
     conteudo: string | null;
+    assunto?: string | null;
     variaveis: string[] | null;
     vezes_usado: number | null;
     taxa_resposta: number | null;
   };
   selected: boolean;
   onClick: () => void;
+  canal: CanalDisparo;
 }
 
-function TemplateCard({ template, selected, onClick }: TemplateCardProps) {
+function TemplateCard({ template, selected, onClick, canal }: TemplateCardProps) {
   const previewLen = 140;
   const preview = (template.conteudo ?? '').replace(/\s+/g, ' ').trim();
   const previewTrunc = preview.length > previewLen ? preview.slice(0, previewLen) + '…' : preview;
@@ -415,6 +524,13 @@ function TemplateCard({ template, selected, onClick }: TemplateCardProps) {
         )}
       </div>
 
+      {/* Show subject for email templates */}
+      {canal === 'email' && template.assunto && (
+        <div className="text-[11px] text-blue-600 font-medium truncate">
+          Assunto: {template.assunto}
+        </div>
+      )}
+
       <div className="text-xs text-slate-600 leading-relaxed border-l-2 border-slate-100 pl-2">
         {previewTrunc || <span className="text-slate-400 italic">sem conteúdo</span>}
       </div>
@@ -436,7 +552,11 @@ function TemplateCard({ template, selected, onClick }: TemplateCardProps) {
       </div>
 
       <div className="flex items-center justify-between text-[10px] text-slate-400 pt-1 border-t border-slate-100">
-        <span>Meta: <code className="font-mono">{template.meta_template_name ?? '—'}</code></span>
+        {canal === 'whatsapp' ? (
+          <span>Meta: <code className="font-mono">{template.meta_template_name ?? '—'}</code></span>
+        ) : (
+          <span className="flex items-center gap-1"><Mail size={9} /> Email</span>
+        )}
         <span>
           Usado {template.vezes_usado ?? 0}×
           {template.taxa_resposta != null && template.taxa_resposta > 0 && (
