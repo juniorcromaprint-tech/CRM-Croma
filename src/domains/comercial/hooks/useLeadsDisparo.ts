@@ -67,6 +67,27 @@ export interface LeadsDisparoPage {
   pageSize: number;
 }
 
+// ─── Helper: busca TODOS os rows em chunks de 1000 (bypass max_rows) ────────
+
+const PAGE_CHUNK = 1000;
+
+async function fetchAllRows<T = Record<string, unknown>>(
+  buildQuery: () => ReturnType<ReturnType<typeof supabase['from']>['select']>,
+): Promise<T[]> {
+  const all: T[] = [];
+  let offset = 0;
+  // eslint-disable-next-line no-constant-condition
+  while (true) {
+    const { data, error } = await buildQuery().range(offset, offset + PAGE_CHUNK - 1);
+    if (error) throw error;
+    const rows = (data ?? []) as T[];
+    all.push(...rows);
+    if (rows.length < PAGE_CHUNK) break;   // última página
+    offset += PAGE_CHUNK;
+  }
+  return all;
+}
+
 // ─── Helper: aplica todos os filtros menos os listados em `excluir` ──────────
 
 function applyFilters(
@@ -169,19 +190,18 @@ export function useLeadsDisparoCountsBySub(filters: LeadsFilterState) {
   return useQuery({
     queryKey: ['leads-disparo-counts-by-sub', { ...filters, subSegmentos: undefined }],
     queryFn: async () => {
-      let q: any = supabase
-        .from('vw_leads_disparo')
-        .select('sub_segmento');
-
-      q = applyFilters(q, filters, ['subSegmentos']);
-
-      const { data, error } = await q;
-      if (error) throw error;
+      const rows = await fetchAllRows<{ sub_segmento: string | null }>(() => {
+        let q: any = supabase
+          .from('vw_leads_disparo')
+          .select('sub_segmento');
+        q = applyFilters(q, filters, ['subSegmentos']);
+        return q;
+      });
 
       const counts: Record<string, number> = {};
       let semSub = 0;
       let total = 0;
-      for (const row of (data ?? []) as { sub_segmento: string | null }[]) {
+      for (const row of rows) {
         total++;
         if (row.sub_segmento) {
           counts[row.sub_segmento] = (counts[row.sub_segmento] ?? 0) + 1;
@@ -201,18 +221,17 @@ export function useLeadsDisparoCountsBySegmento(filters: LeadsFilterState) {
   return useQuery({
     queryKey: ['leads-disparo-counts-by-segmento', { ...filters, segmentos: undefined, subSegmentos: undefined }],
     queryFn: async () => {
-      let q: any = supabase
-        .from('vw_leads_disparo')
-        .select('segmento');
-
-      q = applyFilters(q, filters, ['segmentos', 'subSegmentos']);
-
-      const { data, error } = await q;
-      if (error) throw error;
+      const rows = await fetchAllRows<{ segmento: string | null }>(() => {
+        let q: any = supabase
+          .from('vw_leads_disparo')
+          .select('segmento');
+        q = applyFilters(q, filters, ['segmentos', 'subSegmentos']);
+        return q;
+      });
 
       const counts: Record<string, number> = {};
       let total = 0;
-      for (const row of (data ?? []) as { segmento: string | null }[]) {
+      for (const row of rows) {
         total++;
         if (row.segmento) {
           counts[row.segmento] = (counts[row.segmento] ?? 0) + 1;
@@ -317,11 +336,23 @@ export function useLeadsDisparoMeta() {
   return useQuery({
     queryKey: ['leads-disparo-meta'],
     queryFn: async () => {
-      const { data, error } = await supabase
-        .from('vw_leads_disparo')
-        .select('segmento, sub_segmento, origem_nome, status, temperatura, estado, regiao, cidade');
-      if (error) throw error;
-      const rows = data ?? [];
+      type MetaRow = {
+        segmento: string | null;
+        sub_segmento: string | null;
+        origem_nome: string | null;
+        status: string | null;
+        temperatura: string | null;
+        estado: string | null;
+        regiao: string | null;
+        cidade: string | null;
+      };
+
+      const rows = await fetchAllRows<MetaRow>(() =>
+        supabase
+          .from('vw_leads_disparo')
+          .select('segmento, sub_segmento, origem_nome, status, temperatura, estado, regiao, cidade') as any,
+      );
+
       const uniq = <T,>(arr: (T | null)[]): T[] =>
         [...new Set(arr.filter((x): x is T => x !== null && (x as any) !== ''))] as T[];
       return {
