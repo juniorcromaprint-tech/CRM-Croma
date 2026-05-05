@@ -3,6 +3,7 @@ import { useParams, Link, useNavigate } from "react-router-dom";
 import {
   ArrowLeft, Building2, Phone, Mail, Thermometer, Edit2, Save, X,
   TrendingUp, Calendar, FileText, UserCheck, Trash2,
+  Globe, MapPin, Hash, Star, Tag,
 } from "lucide-react";
 import { useAuth } from "@/contexts/AuthContext";
 import { Button } from "@/components/ui/button";
@@ -319,35 +320,146 @@ export default function LeadDetailPage() {
         {/* View mode */}
         {!editing && (
           <div className="space-y-4">
+            {/* Contato principal */}
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
               {lead.contato_nome && (
                 <div className="flex items-center gap-3">
                   <Building2 size={16} className="text-slate-400 shrink-0" />
                   <div>
                     <p className="text-xs text-slate-500">Contato</p>
-                    <p className="text-sm font-medium text-slate-700">{lead.contato_nome}</p>
+                    <p className="text-sm font-medium text-slate-700">
+                      {lead.contato_nome}
+                      {lead.cargo && <span className="text-slate-400 ml-1">({lead.cargo})</span>}
+                    </p>
                   </div>
                 </div>
               )}
-              {lead.contato_telefone && (
+              {(lead.contato_telefone || lead.telefone) && (
                 <div className="flex items-center gap-3">
                   <Phone size={16} className="text-slate-400 shrink-0" />
                   <div>
                     <p className="text-xs text-slate-500">Telefone</p>
-                    <p className="text-sm font-medium text-slate-700">{lead.contato_telefone}</p>
+                    <p className="text-sm font-medium text-slate-700">{lead.contato_telefone || lead.telefone}</p>
+                    {lead.telefone2 && (
+                      <p className="text-xs text-slate-500 mt-0.5">{lead.telefone2}</p>
+                    )}
                   </div>
                 </div>
               )}
-              {lead.contato_email && (
+              {(lead.contato_email || lead.email) && (
                 <div className="flex items-center gap-3">
                   <Mail size={16} className="text-slate-400 shrink-0" />
                   <div>
                     <p className="text-xs text-slate-500">Email</p>
-                    <p className="text-sm font-medium text-slate-700">{lead.contato_email}</p>
+                    <p className="text-sm font-medium text-slate-700">{lead.contato_email || lead.email}</p>
+                    {lead.email2 && (
+                      <p className="text-xs text-slate-500 mt-0.5">{lead.email2}</p>
+                    )}
+                  </div>
+                </div>
+              )}
+              {lead.whatsapp && (
+                <div className="flex items-center gap-3">
+                  <Phone size={16} className="text-emerald-400 shrink-0" />
+                  <div>
+                    <p className="text-xs text-slate-500">WhatsApp</p>
+                    <p className="text-sm font-medium text-slate-700">{lead.whatsapp}</p>
                   </div>
                 </div>
               )}
             </div>
+
+            {/* Dados da empresa */}
+            {(lead.cnpj || lead.razao_social || lead.site || lead.classificacao) && (
+              <>
+                <hr className="border-slate-100" />
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                  {lead.cnpj && (
+                    <div className="flex items-center gap-3">
+                      <Hash size={16} className="text-slate-400 shrink-0" />
+                      <div>
+                        <p className="text-xs text-slate-500">CNPJ</p>
+                        <p className="text-sm font-medium text-slate-700">{lead.cnpj}</p>
+                      </div>
+                    </div>
+                  )}
+                  {lead.razao_social && lead.razao_social !== lead.empresa && (
+                    <div className="flex items-center gap-3">
+                      <Building2 size={16} className="text-slate-400 shrink-0" />
+                      <div>
+                        <p className="text-xs text-slate-500">Razão Social</p>
+                        <p className="text-sm font-medium text-slate-700">{lead.razao_social}</p>
+                      </div>
+                    </div>
+                  )}
+                  {lead.site && (
+                    <div className="flex items-center gap-3">
+                      <Globe size={16} className="text-slate-400 shrink-0" />
+                      <div>
+                        <p className="text-xs text-slate-500">Site</p>
+                        <a
+                          href={lead.site.startsWith('http') ? lead.site : `https://${lead.site}`}
+                          target="_blank"
+                          rel="noopener noreferrer"
+                          className="text-sm font-medium text-blue-600 hover:underline"
+                        >
+                          {lead.site}
+                        </a>
+                      </div>
+                    </div>
+                  )}
+                  {lead.classificacao && (
+                    <div className="flex items-center gap-3">
+                      <Tag size={16} className="text-slate-400 shrink-0" />
+                      <div>
+                        <p className="text-xs text-slate-500">Classificação / Porte</p>
+                        <p className="text-sm font-medium text-slate-700 capitalize">{lead.classificacao}</p>
+                      </div>
+                    </div>
+                  )}
+                  {lead.score != null && (
+                    <div className="flex items-center gap-3">
+                      <Star size={16} className="text-amber-400 shrink-0" />
+                      <div>
+                        <p className="text-xs text-slate-500">Score</p>
+                        <p className="text-sm font-medium text-slate-700">{lead.score}/100</p>
+                      </div>
+                    </div>
+                  )}
+                  {lead.origens && (
+                    <div className="flex items-center gap-3">
+                      <TrendingUp size={16} className="text-slate-400 shrink-0" />
+                      <div>
+                        <p className="text-xs text-slate-500">Origem</p>
+                        <p className="text-sm font-medium text-slate-700">{lead.origens}</p>
+                      </div>
+                    </div>
+                  )}
+                </div>
+              </>
+            )}
+
+            {/* Endereço */}
+            {(lead.endereco || lead.cidade || lead.uf || lead.cep) && (
+              <>
+                <hr className="border-slate-100" />
+                <div className="flex items-start gap-3">
+                  <MapPin size={16} className="text-slate-400 shrink-0 mt-0.5" />
+                  <div>
+                    <p className="text-xs text-slate-500 mb-1">Endereço</p>
+                    <p className="text-sm font-medium text-slate-700">
+                      {[lead.endereco, lead.bairro].filter(Boolean).join(', ')}
+                    </p>
+                    <p className="text-sm text-slate-600">
+                      {[lead.cidade, lead.uf].filter(Boolean).join(' - ')}
+                      {lead.cep && ` — CEP ${lead.cep}`}
+                    </p>
+                  </div>
+                </div>
+              </>
+            )}
+
+            {/* Observações */}
             {lead.observacoes && (
               <div className="flex items-start gap-3">
                 <FileText size={16} className="text-slate-400 shrink-0 mt-0.5" />

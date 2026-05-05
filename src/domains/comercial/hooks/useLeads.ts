@@ -37,6 +37,22 @@ export interface Lead {
   email: string | null;
   created_at: string;
   updated_at: string;
+  // Campos enriquecidos
+  razao_social: string | null;
+  nome_fantasia: string | null;
+  cnpj: string | null;
+  telefone2: string | null;
+  whatsapp: string | null;
+  email2: string | null;
+  site: string | null;
+  endereco: string | null;
+  bairro: string | null;
+  cidade: string | null;
+  uf: string | null;
+  cep: string | null;
+  classificacao: string | null;
+  prioridade: string | null;
+  origens: string | null;
 }
 
 export interface LeadCreate {
@@ -196,8 +212,9 @@ export function useLead(id: string | undefined) {
 
       const { data, error } = await supabase
         .from('leads')
-        .select('id, empresa, contato_nome, contato_email, contato_telefone, segmento, origem_id, vendedor_id, status, temperatura, valor_estimado, proximo_contato, observacoes, cargo, score, motivo_descarte, telefone, email, created_at, updated_at')
+        .select('*')
         .eq('id', id)
+        .is('excluido_em', null)
         .single();
 
       if (error) {
