@@ -127,9 +127,16 @@ function TimelineItem({ msg }: { msg: TimelineMessage }) {
           )}
           {/* Audio */}
           {msg.media_url && msg.media_type === 'audio' && (
-            <audio controls className="w-full max-w-[240px] mb-2">
-              <source src={msg.media_url} type={msg.media_mime || 'audio/ogg'} />
-            </audio>
+            <div className="mb-2">
+              <audio controls className="w-full max-w-[240px]">
+                <source src={msg.media_url} type={msg.media_mime || 'audio/ogg'} />
+              </audio>
+              {msg.media_transcription && (
+                <p className={`text-xs italic mt-1.5 leading-snug ${isSent ? 'text-blue-100' : 'text-slate-500'}`}>
+                  &ldquo;{msg.media_transcription}&rdquo;
+                </p>
+              )}
+            </div>
           )}
           {/* Video */}
           {msg.media_url && msg.media_type === 'video' && (

@@ -34,7 +34,7 @@ export function useAgentMessages(conversationId?: string) {
           'id, conversation_id, direcao, canal, conteudo, assunto, metadata, status, ' +
           'aprovado_por, aprovado_em, enviado_em, lido_em, respondido_em, erro_mensagem, ' +
           'custo_ia, modelo_ia, created_at, ' +
-          'media_url, media_type, media_mime, media_filename'
+          'media_url, media_type, media_mime, media_filename, media_transcription'
         )
         .eq('conversation_id', conversationId!)
         .order('created_at', { ascending: true });

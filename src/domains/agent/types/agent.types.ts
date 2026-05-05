@@ -53,6 +53,8 @@ export interface AgentMessage {
   media_type: 'image' | 'audio' | 'video' | 'document' | null;
   media_mime: string | null;
   media_filename: string | null;
+  /** Transcrição automática do áudio/vídeo via Groq Whisper. Null se não foi áudio ou se falhou. */
+  media_transcription: string | null;
 }
 
 export interface AgentTemplate {

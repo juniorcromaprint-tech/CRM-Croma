@@ -523,16 +523,34 @@ async function generateClaudeResponse(
 
     setFallbackModel(FALLBACK_MODEL);
 
-    // Load last 10 messages for context
+    // Load last 10 messages for context (including media fields)
     const { data: recentMsgs } = await supabase
       .from('agent_messages')
-      .select('direcao, conteudo, created_at')
+      .select('direcao, conteudo, created_at, media_type, media_url, media_transcription')
       .eq('conversation_id', conversation.id)
       .order('created_at', { ascending: false })
       .limit(10);
 
     const historico = (recentMsgs ?? []).reverse().map((m: Record<string, unknown>) => {
       const who = m.direcao === 'recebida' ? 'CLIENTE' : 'CROMA';
+      const transcription = (m.media_transcription as string | null) ?? null;
+      // Indicar mídia no contexto para o Claude entender o que o cliente enviou
+      if (m.media_type === 'image') {
+        const caption = m.conteudo && m.conteudo !== '[image]' ? `: "${m.conteudo}"` : '';
+        return `${who}: [Cliente enviou uma IMAGEM${caption}] (URL: ${m.media_url ?? 'não disponível'})`;
+      } else if (m.media_type === 'audio') {
+        if (transcription) {
+          return `${who}: [áudio do cliente, transcrito] "${transcription}"`;
+        }
+        return `${who}: [Cliente enviou um ÁUDIO — transcrição indisponível. Pergunte se ele pode escrever a mensagem.]`;
+      } else if (m.media_type === 'video') {
+        if (transcription) {
+          return `${who}: [vídeo do cliente, áudio transcrito] "${transcription}"`;
+        }
+        return `${who}: [Cliente enviou um VÍDEO]`;
+      } else if (m.media_type === 'document') {
+        return `${who}: [Cliente enviou um DOCUMENTO]`;
+      }
       return `${who}: ${m.conteudo}`;
     }).join('\n');
 
@@ -607,6 +625,144 @@ async function generateClaudeResponse(
     return { text: cleanText, intent };
   } catch (err) {
     console.error('whatsapp-webhook: Claude response failed:', err);
+    return null;
+  }
+}
+
+// ─────────────────────────────────────────────────────────────
+// downloadAndStoreMedia — baixa mídia da Meta Cloud API e salva no Storage
+// ─────────────────────────────────────────────────────────────
+async function downloadAndStoreMedia(
+  supabase: ReturnType<typeof getServiceClient>,
+  mediaId: string,
+  mediaType: string,
+  mimeType: string,
+): Promise<{ url: string | null; buffer: ArrayBuffer | null }> {
+  try {
+    const credsResult = await getWhatsAppCredentials(supabase);
+    if (!credsResult.ok) {
+      console.error('whatsapp-webhook: downloadAndStoreMedia — sem credenciais');
+      return { url: null, buffer: null };
+    }
+
+    // 1. Obter URL temporária da mídia (Meta Cloud API)
+    const metaRes = await fetch(
+      `https://graph.facebook.com/${credsResult.apiVersion}/${mediaId}`,
+      {
+        headers: { Authorization: `Bearer ${credsResult.accessToken}` },
+        signal: AbortSignal.timeout(15000),
+      },
+    );
+    if (!metaRes.ok) {
+      console.error('whatsapp-webhook: downloadAndStoreMedia — falha ao obter URL da mídia', metaRes.status);
+      return { url: null, buffer: null };
+    }
+    const metaData = await metaRes.json();
+    const downloadUrl = metaData.url as string | undefined;
+    if (!downloadUrl) return { url: null, buffer: null };
+
+    // 2. Baixar o arquivo binário
+    const fileRes = await fetch(downloadUrl, {
+      headers: { Authorization: `Bearer ${credsResult.accessToken}` },
+      signal: AbortSignal.timeout(15000),
+    });
+    if (!fileRes.ok) {
+      console.error('whatsapp-webhook: downloadAndStoreMedia — falha ao baixar arquivo', fileRes.status);
+      return { url: null, buffer: null };
+    }
+    const fileBuffer = await fileRes.arrayBuffer();
+
+    // 3. Determinar extensão pelo MIME type
+    const ext = mimeType.includes('jpeg') ? 'jpg'
+      : mimeType.includes('png') ? 'png'
+      : mimeType.includes('webp') ? 'webp'
+      : mimeType.includes('gif') ? 'gif'
+      : mimeType.includes('ogg') ? 'ogg'
+      : mimeType.includes('mpeg') ? 'mp3'
+      : mimeType.includes('mp4') ? 'mp4'
+      : mimeType.includes('pdf') ? 'pdf'
+      : mimeType.includes('msword') ? 'doc'
+      : mimeType.includes('spreadsheet') ? 'xlsx'
+      : 'bin';
+
+    // 4. Upload para Supabase Storage
+    const filename = `${mediaType}_${Date.now()}_${mediaId.slice(-8)}.${ext}`;
+    const { error: uploadErr } = await supabase.storage
+      .from('whatsapp-media')
+      .upload(filename, fileBuffer, { contentType: mimeType, upsert: false });
+
+    if (uploadErr) {
+      console.error('whatsapp-webhook: Storage upload failed:', uploadErr.message);
+      return { url: null, buffer: fileBuffer };
+    }
+
+    // 5. Retornar URL pública e buffer (buffer reusado para transcrição se for áudio)
+    const { data: urlData } = supabase.storage
+      .from('whatsapp-media')
+      .getPublicUrl(filename);
+
+    return { url: urlData?.publicUrl ?? null, buffer: fileBuffer };
+  } catch (err) {
+    console.error('whatsapp-webhook: downloadAndStoreMedia error:', err);
+    return { url: null, buffer: null };
+  }
+}
+
+// ─────────────────────────────────────────────────────────────
+// transcribeAudio — transcreve áudio via Groq Whisper (whisper-large-v3, pt-BR)
+// Reusa a chave do admin_config.GROQ_API_KEY ou env var, mesmo padrão do OpenRouter.
+// ─────────────────────────────────────────────────────────────
+async function transcribeAudio(
+  supabase: ReturnType<typeof getServiceClient>,
+  buffer: ArrayBuffer,
+  mimeType: string,
+): Promise<string | null> {
+  try {
+    let groqKey = Deno.env.get('GROQ_API_KEY');
+    if (!groqKey) {
+      const { data } = await supabase
+        .from('admin_config')
+        .select('valor')
+        .eq('chave', 'GROQ_API_KEY')
+        .single();
+      groqKey = (data?.valor as string) || '';
+    }
+    if (!groqKey) {
+      console.log('whatsapp-webhook: GROQ_API_KEY ausente — pulando transcrição. Configure em admin_config ou supabase secrets.');
+      return null;
+    }
+
+    const ext = mimeType.includes('ogg') ? 'ogg'
+      : mimeType.includes('mpeg') || mimeType.includes('mp3') ? 'mp3'
+      : mimeType.includes('mp4') || mimeType.includes('m4a') ? 'm4a'
+      : mimeType.includes('wav') ? 'wav'
+      : mimeType.includes('webm') ? 'webm'
+      : 'ogg';
+
+    const formData = new FormData();
+    formData.append('file', new Blob([buffer], { type: mimeType || 'audio/ogg' }), `audio.${ext}`);
+    formData.append('model', 'whisper-large-v3');
+    formData.append('language', 'pt');
+    formData.append('response_format', 'json');
+
+    const resp = await fetch('https://api.groq.com/openai/v1/audio/transcriptions', {
+      method: 'POST',
+      headers: { Authorization: `Bearer ${groqKey}` },
+      body: formData,
+      signal: AbortSignal.timeout(60000),
+    });
+
+    if (!resp.ok) {
+      const errTxt = await resp.text();
+      console.error('whatsapp-webhook: Groq transcription falhou', resp.status, errTxt.slice(0, 300));
+      return null;
+    }
+    const data = await resp.json();
+    const text = (data?.text as string | undefined)?.trim() ?? null;
+    console.log('whatsapp-webhook: transcricao Groq ok,', text?.length ?? 0, 'chars');
+    return text;
+  } catch (err) {
+    console.error('whatsapp-webhook: transcribeAudio error:', err);
     return null;
   }
 }
@@ -697,8 +853,10 @@ serve(async (req: Request) => {
     //  - text:        { type: 'text',        text: { body } }
     //  - button:      { type: 'button',      button: { text, payload } }                  ← Quick Reply de TEMPLATE
     //  - interactive: { type: 'interactive', interactive: { type: 'button_reply'|'list_reply', button_reply: { id, title } } }
+    //  - image/audio/video/document: baixar da Meta Cloud API e salvar no Storage
     let textBody = '';
-    let messageOrigin: 'text' | 'button' | 'interactive' | 'other' = 'other';
+    let messageOrigin: 'text' | 'button' | 'interactive' | 'media' | 'other' = 'other';
+    let mediaInfo: { url: string | null; type: string; mime: string; filename?: string; transcription?: string | null } | null = null;
 
     if (message.type === 'text') {
       textBody = (message.text as Record<string, string>)?.body ?? '';
@@ -718,12 +876,44 @@ serve(async (req: Request) => {
         textBody = lr?.title ?? lr?.id ?? '';
       }
       messageOrigin = 'interactive';
+    } else if (['image', 'audio', 'video', 'document'].includes(message.type as string)) {
+      // Mídia recebida — buscar URL na Meta, baixar e salvar no Storage
+      const mediaObj = message[message.type as string] as Record<string, string> | undefined;
+      const mediaId = mediaObj?.id;
+      const mimeType = mediaObj?.mime_type ?? '';
+      const caption = mediaObj?.caption ?? '';
+      const originalFilename = mediaObj?.filename ?? '';
+
+      let mediaUrl: string | null = null;
+      let transcription: string | null = null;
+      if (mediaId) {
+        const supabaseMedia = getServiceClient();
+        const dl = await downloadAndStoreMedia(supabaseMedia, mediaId, message.type as string, mimeType);
+        mediaUrl = dl.url;
+
+        // Transcrever áudio (e voz dentro de vídeo) via Groq Whisper
+        if (dl.buffer && (message.type === 'audio' || message.type === 'video')) {
+          transcription = await transcribeAudio(supabaseMedia, dl.buffer, mimeType);
+        }
+      }
+
+      mediaInfo = {
+        url: mediaUrl,
+        type: message.type as string,
+        mime: mimeType,
+        filename: originalFilename,
+        transcription,
+      };
+      // Se houver caption do cliente, prevalece. Senão usar transcrição de áudio (assim a IA
+      // processa o conteúdo natural). Para outras mídias sem caption, usa placeholder.
+      textBody = caption || transcription || `[${message.type}]`;
+      messageOrigin = 'media';
     } else {
       console.log('whatsapp-webhook: ignoring unsupported message type', message.type);
       return new Response('OK', { status: 200 });
     }
 
-    if (!textBody) {
+    if (!textBody && !mediaInfo) {
       console.log('whatsapp-webhook: empty textBody for type', message.type);
       return new Response('OK', { status: 200 });
     }
@@ -827,6 +1017,11 @@ serve(async (req: Request) => {
       canal: 'whatsapp',
       conteudo: textBody,
       status: 'respondida',
+      media_url: mediaInfo?.url ?? null,
+      media_type: mediaInfo?.type ?? null,
+      media_mime: mediaInfo?.mime ?? null,
+      media_filename: mediaInfo?.filename ?? null,
+      media_transcription: mediaInfo?.transcription ?? null,
       metadata: {
         whatsapp_message_id: messageId,
         from_phone: fromPhone,

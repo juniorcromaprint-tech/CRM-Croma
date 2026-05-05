@@ -368,10 +368,17 @@ function MessageBubble({
             )}
             {/* Audio */}
             {message.media_url && message.media_type === 'audio' && (
-              <audio controls className="w-full max-w-[260px] mb-2">
-                <source src={message.media_url} type={message.media_mime || 'audio/ogg'} />
-                Seu navegador nao suporta audio.
-              </audio>
+              <div className="mb-2">
+                <audio controls className="w-full max-w-[260px]">
+                  <source src={message.media_url} type={message.media_mime || 'audio/ogg'} />
+                  Seu navegador nao suporta audio.
+                </audio>
+                {message.media_transcription && (
+                  <p className={`text-xs italic mt-1.5 leading-snug ${isSent ? 'text-blue-100' : 'text-slate-500'}`}>
+                    &ldquo;{message.media_transcription}&rdquo;
+                  </p>
+                )}
+              </div>
             )}
             {/* Video */}
             {message.media_url && message.media_type === 'video' && (

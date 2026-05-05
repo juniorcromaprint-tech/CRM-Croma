@@ -131,7 +131,7 @@ export function useLeadTimeline(leadId: string | undefined) {
           'id, conversation_id, direcao, canal, conteudo, assunto, metadata, status, ' +
           'aprovado_por, aprovado_em, enviado_em, lido_em, respondido_em, erro_mensagem, ' +
           'custo_ia, modelo_ia, created_at, ' +
-          'media_url, media_type, media_mime, media_filename'
+          'media_url, media_type, media_mime, media_filename, media_transcription'
         )
         .in('conversation_id', conversationIds)
         .order('created_at', { ascending: true });
