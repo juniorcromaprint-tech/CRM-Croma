@@ -29,9 +29,11 @@ import {
   Eye,
   CornerDownRight,
   Bot,
+  Image as ImageIcon,
+  Paperclip,
 } from 'lucide-react';
 import { formatDate } from '@/shared/utils/format';
-import { useAgentMessages, useEscalateConversation, useResumeConversation, useSendManualWhatsApp } from '../hooks/useAgentMessages';
+import { useAgentMessages, useEscalateConversation, useResumeConversation, useSendManualWhatsApp, useSendManualImage } from '../hooks/useAgentMessages';
 import type { AgentConversation, AgentCanal, AgentMessageStatus } from '../types/agent.types';
 
 // ─── Props ────────────────────────────────────────────────────────────────────
@@ -97,7 +99,53 @@ function MessageBubble({ message }: { message: ReturnType<typeof useAgentMessage
             ? 'bg-blue-600 text-white rounded-tr-md'
             : 'bg-slate-100 text-slate-700 rounded-tl-md'
         }`}>
-          {message.conteudo}
+          {/* Imagem */}
+          {message.media_url && message.media_type === 'image' && (
+            <img
+              src={message.media_url}
+              alt="Imagem recebida"
+              className="rounded-lg max-w-full max-h-48 object-cover mb-2 cursor-pointer hover:opacity-90 transition-opacity"
+              onClick={() => window.open(message.media_url!, '_blank')}
+            />
+          )}
+          {/* Áudio */}
+          {message.media_url && message.media_type === 'audio' && (
+            <audio controls className="w-full max-w-[240px] mb-2">
+              <source src={message.media_url} type={message.media_mime || 'audio/ogg'} />
+              Seu navegador não suporta áudio.
+            </audio>
+          )}
+          {/* Vídeo */}
+          {message.media_url && message.media_type === 'video' && (
+            <video controls className="rounded-lg max-w-full max-h-48 mb-2">
+              <source src={message.media_url} type={message.media_mime || 'video/mp4'} />
+              Seu navegador não suporta vídeo.
+            </video>
+          )}
+          {/* Documento */}
+          {message.media_url && message.media_type === 'document' && (
+            <a
+              href={message.media_url}
+              target="_blank"
+              rel="noopener noreferrer"
+              className={`inline-flex items-center gap-2 px-3 py-2 rounded-lg text-sm mb-2 ${
+                isSent ? 'bg-blue-500 text-white hover:bg-blue-400' : 'bg-slate-200 text-blue-600 hover:bg-slate-300'
+              }`}
+            >
+              <Paperclip size={14} />
+              {message.media_filename || 'Documento'}
+            </a>
+          )}
+          {/* Texto (caption ou conteúdo normal) */}
+          {message.conteudo && !['[image]', '[audio]', '[video]', '[document]'].includes(message.conteudo) && (
+            <span>{message.conteudo}</span>
+          )}
+          {/* Sem conteúdo textual e sem mídia carregada */}
+          {!message.media_url && !message.conteudo && (
+            <span className="opacity-60 italic">
+              {message.media_type ? `[${message.media_type} — erro ao carregar]` : '(sem conteúdo)'}
+            </span>
+          )}
         </div>
 
         {/* Meta */}
@@ -137,8 +185,10 @@ export default function ConversationDetail({
   const escalate = useEscalateConversation();
   const resume = useResumeConversation();
   const sendManual = useSendManualWhatsApp();
+  const sendImage = useSendManualImage();
   const [manualText, setManualText] = useState('');
   const messagesEndRef = useRef<HTMLDivElement>(null);
+  const imageInputRef = useRef<HTMLInputElement>(null);
 
   const lead = conversation?.leads;
   const isEscalated = conversation?.status === 'escalada';
@@ -165,6 +215,27 @@ export default function ConversationDetail({
     sendManual.mutate(
       { conversationId: conversation.id, conteudo: manualText.trim() },
       { onSuccess: () => setManualText('') }
+    );
+  }
+
+  function handleImageUpload(e: React.ChangeEvent<HTMLInputElement>) {
+    const file = e.target.files?.[0];
+    if (!file || !conversation) return;
+    sendImage.mutate(
+      {
+        conversationId: conversation.id,
+        file,
+        caption: manualText.trim() || undefined,
+      },
+      {
+        onSuccess: () => {
+          setManualText('');
+          if (imageInputRef.current) imageInputRef.current.value = '';
+        },
+        onSettled: () => {
+          if (imageInputRef.current) imageInputRef.current.value = '';
+        },
+      }
     );
   }
 
@@ -283,7 +354,7 @@ export default function ConversationDetail({
                 <Button
                   size="sm"
                   onClick={handleSendManual}
-                  disabled={!manualText.trim() || sendManual.isPending}
+                  disabled={!manualText.trim() || sendManual.isPending || sendImage.isPending}
                   className="h-9 bg-green-600 hover:bg-green-700 text-white gap-1.5 flex-1"
                 >
                   {sendManual.isPending ? (
@@ -293,6 +364,26 @@ export default function ConversationDetail({
                   )}
                   {sendManual.isPending ? 'Enviando...' : 'Enviar via WhatsApp'}
                 </Button>
+
+                {/* Botão upload de imagem */}
+                <label className={`cursor-pointer h-9 w-9 flex items-center justify-center rounded-xl border border-slate-200 hover:bg-slate-100 transition-colors ${sendImage.isPending ? 'opacity-50 pointer-events-none' : ''}`}
+                  title="Enviar imagem"
+                >
+                  <input
+                    ref={imageInputRef}
+                    type="file"
+                    accept="image/*"
+                    className="hidden"
+                    onChange={handleImageUpload}
+                    disabled={sendImage.isPending || sendManual.isPending}
+                  />
+                  {sendImage.isPending ? (
+                    <Loader2 size={16} className="animate-spin text-slate-400" />
+                  ) : (
+                    <ImageIcon size={16} className="text-slate-500" />
+                  )}
+                </label>
+
                 <Button
                   size="sm"
                   variant="outline"

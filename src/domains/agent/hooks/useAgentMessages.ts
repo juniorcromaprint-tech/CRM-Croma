@@ -33,7 +33,8 @@ export function useAgentMessages(conversationId?: string) {
         .select(
           'id, conversation_id, direcao, canal, conteudo, assunto, metadata, status, ' +
           'aprovado_por, aprovado_em, enviado_em, lido_em, respondido_em, erro_mensagem, ' +
-          'custo_ia, modelo_ia, created_at'
+          'custo_ia, modelo_ia, created_at, ' +
+          'media_url, media_type, media_mime, media_filename'
         )
         .eq('conversation_id', conversationId!)
         .order('created_at', { ascending: true });
@@ -338,6 +339,84 @@ export function useSendManualWhatsApp() {
       queryClient.invalidateQueries({ queryKey: messagesQueryKey(conversationId) });
       queryClient.invalidateQueries({ queryKey: ['agent', 'conversations'] });
       showSuccess('Mensagem manual enviada via WhatsApp');
+    },
+    onError: (error: Error) => {
+      showError(error.message);
+    },
+  });
+}
+
+/**
+ * Envia uma imagem manual num conversa escalada.
+ * Faz upload para o bucket whatsapp-media, cria a mensagem e chama whatsapp-enviar.
+ */
+export function useSendManualImage() {
+  const queryClient = useQueryClient();
+
+  return useMutation({
+    mutationFn: async ({
+      conversationId,
+      file,
+      caption,
+    }: {
+      conversationId: string;
+      file: File;
+      caption?: string;
+    }) => {
+      const {
+        data: { session },
+      } = await supabase.auth.getSession();
+
+      // 1. Upload para Storage
+      const filename = `manual_${Date.now()}_${file.name.replace(/[^a-zA-Z0-9._-]/g, '_')}`;
+      const { error: upErr } = await supabase.storage
+        .from('whatsapp-media')
+        .upload(filename, file, { contentType: file.type, upsert: false });
+
+      if (upErr) throw new Error(`Erro ao fazer upload: ${upErr.message}`);
+
+      const { data: urlData } = supabase.storage
+        .from('whatsapp-media')
+        .getPublicUrl(filename);
+
+      const mediaUrl = urlData.publicUrl;
+
+      // 2. Criar mensagem no banco
+      const { data: msg, error: insertErr } = await supabase
+        .from('agent_messages')
+        .insert({
+          conversation_id: conversationId,
+          direcao: 'enviada',
+          canal: 'whatsapp',
+          conteudo: caption || '',
+          status: 'aprovada',
+          aprovado_por: session?.user?.id ?? null,
+          aprovado_em: new Date().toISOString(),
+          media_url: mediaUrl,
+          media_type: 'image',
+          media_mime: file.type || 'image/jpeg',
+          media_filename: file.name,
+          metadata: { manual: true, sent_by: session?.user?.id },
+        })
+        .select('id')
+        .single();
+
+      if (insertErr || !msg) throw new Error(`Erro ao criar mensagem: ${insertErr?.message}`);
+
+      // 3. Enviar via Edge Function
+      const res = await supabase.functions.invoke('whatsapp-enviar', {
+        body: { message_id: msg.id },
+      });
+
+      if (res.error) throw new Error(res.error.message);
+
+      return { conversationId };
+    },
+    onSuccess: ({ conversationId }) => {
+      queryClient.invalidateQueries({ queryKey: MESSAGES_KEY });
+      queryClient.invalidateQueries({ queryKey: messagesQueryKey(conversationId) });
+      queryClient.invalidateQueries({ queryKey: ['agent', 'conversations'] });
+      showSuccess('Imagem enviada via WhatsApp');
     },
     onError: (error: Error) => {
       showError(error.message);

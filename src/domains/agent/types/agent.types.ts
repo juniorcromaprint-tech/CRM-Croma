@@ -48,6 +48,11 @@ export interface AgentMessage {
   custo_ia: number;
   modelo_ia: string | null;
   created_at: string;
+  // Campos de mídia (WhatsApp)
+  media_url: string | null;
+  media_type: 'image' | 'audio' | 'video' | 'document' | null;
+  media_mime: string | null;
+  media_filename: string | null;
 }
 
 export interface AgentTemplate {
