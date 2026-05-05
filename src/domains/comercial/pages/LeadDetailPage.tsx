@@ -75,6 +75,18 @@ export default function LeadDetailPage() {
     temperatura: string;
     valor_estimado: string;
     observacoes: string;
+    cargo: string;
+    cnpj: string;
+    site: string;
+    whatsapp: string;
+    email2: string;
+    telefone2: string;
+    endereco: string;
+    bairro: string;
+    cidade: string;
+    uf: string;
+    cep: string;
+    classificacao: string;
   } | null>(null);
 
   const handleEdit = () => {
@@ -89,6 +101,18 @@ export default function LeadDetailPage() {
       temperatura: lead.temperatura,
       valor_estimado: lead.valor_estimado != null ? String(lead.valor_estimado) : "",
       observacoes: lead.observacoes ?? "",
+      cargo: lead.cargo ?? "",
+      cnpj: lead.cnpj ?? "",
+      site: lead.site ?? "",
+      whatsapp: lead.whatsapp ?? "",
+      email2: lead.email2 ?? "",
+      telefone2: lead.telefone2 ?? "",
+      endereco: lead.endereco ?? "",
+      bairro: lead.bairro ?? "",
+      cidade: lead.cidade ?? "",
+      uf: lead.uf ?? "",
+      cep: lead.cep ?? "",
+      classificacao: lead.classificacao ?? "",
     });
     setEditing(true);
   };
@@ -126,6 +150,18 @@ export default function LeadDetailPage() {
         temperatura: form.temperatura as any,
         valor_estimado: form.valor_estimado ? Math.max(0, Number(form.valor_estimado)) : null,
         observacoes: form.observacoes || null,
+        cargo: form.cargo || null,
+        cnpj: form.cnpj || null,
+        site: form.site || null,
+        whatsapp: form.whatsapp || null,
+        email2: form.email2 || null,
+        telefone2: form.telefone2 || null,
+        endereco: form.endereco || null,
+        bairro: form.bairro || null,
+        cidade: form.cidade || null,
+        uf: form.uf || null,
+        cep: form.cep || null,
+        classificacao: form.classificacao || null,
       },
       { onSuccess: () => setEditing(false) }
     );
@@ -504,16 +540,147 @@ export default function LeadDetailPage() {
                 />
               </div>
             </div>
+            <div className="grid grid-cols-2 gap-3">
+              <div>
+                <Label htmlFor="contato_email">Email</Label>
+                <Input
+                  id="contato_email"
+                  type="email"
+                  value={form.contato_email}
+                  onChange={e => setForm({ ...form, contato_email: e.target.value })}
+                  placeholder="contato@empresa.com"
+                />
+              </div>
+              <div>
+                <Label htmlFor="cargo">Cargo</Label>
+                <Input
+                  id="cargo"
+                  value={form.cargo}
+                  onChange={e => setForm({ ...form, cargo: e.target.value })}
+                  placeholder="Gerente, Diretor..."
+                />
+              </div>
+            </div>
+            <div className="grid grid-cols-2 gap-3">
+              <div>
+                <Label htmlFor="whatsapp">WhatsApp</Label>
+                <Input
+                  id="whatsapp"
+                  value={form.whatsapp}
+                  onChange={e => setForm({ ...form, whatsapp: e.target.value })}
+                  placeholder="(51) 99999-9999"
+                />
+              </div>
+              <div>
+                <Label htmlFor="telefone2">Telefone 2</Label>
+                <Input
+                  id="telefone2"
+                  value={form.telefone2}
+                  onChange={e => setForm({ ...form, telefone2: e.target.value })}
+                  placeholder="Telefone alternativo"
+                />
+              </div>
+            </div>
             <div>
-              <Label htmlFor="contato_email">Email</Label>
+              <Label htmlFor="email2">Email 2</Label>
               <Input
-                id="contato_email"
+                id="email2"
                 type="email"
-                value={form.contato_email}
-                onChange={e => setForm({ ...form, contato_email: e.target.value })}
-                placeholder="contato@empresa.com"
+                value={form.email2}
+                onChange={e => setForm({ ...form, email2: e.target.value })}
+                placeholder="Email alternativo"
               />
             </div>
+
+            <hr className="border-slate-100 my-1" />
+            <p className="text-xs font-semibold text-slate-500 uppercase tracking-wide">Dados da Empresa</p>
+
+            <div className="grid grid-cols-2 gap-3">
+              <div>
+                <Label htmlFor="cnpj">CNPJ</Label>
+                <Input
+                  id="cnpj"
+                  value={form.cnpj}
+                  onChange={e => setForm({ ...form, cnpj: e.target.value })}
+                  placeholder="00.000.000/0000-00"
+                />
+              </div>
+              <div>
+                <Label htmlFor="site">Site</Label>
+                <Input
+                  id="site"
+                  value={form.site}
+                  onChange={e => setForm({ ...form, site: e.target.value })}
+                  placeholder="www.empresa.com.br"
+                />
+              </div>
+            </div>
+            <div>
+              <Label htmlFor="classificacao">Classificação / Porte</Label>
+              <Input
+                id="classificacao"
+                value={form.classificacao}
+                onChange={e => setForm({ ...form, classificacao: e.target.value })}
+                placeholder="MEI, ME, EPP, Grande..."
+              />
+            </div>
+
+            <hr className="border-slate-100 my-1" />
+            <p className="text-xs font-semibold text-slate-500 uppercase tracking-wide">Endereço</p>
+
+            <div>
+              <Label htmlFor="endereco">Logradouro</Label>
+              <Input
+                id="endereco"
+                value={form.endereco}
+                onChange={e => setForm({ ...form, endereco: e.target.value })}
+                placeholder="Rua, Avenida, nº"
+              />
+            </div>
+            <div className="grid grid-cols-2 gap-3">
+              <div>
+                <Label htmlFor="bairro">Bairro</Label>
+                <Input
+                  id="bairro"
+                  value={form.bairro}
+                  onChange={e => setForm({ ...form, bairro: e.target.value })}
+                  placeholder="Bairro"
+                />
+              </div>
+              <div>
+                <Label htmlFor="cidade">Cidade</Label>
+                <Input
+                  id="cidade"
+                  value={form.cidade}
+                  onChange={e => setForm({ ...form, cidade: e.target.value })}
+                  placeholder="Cidade"
+                />
+              </div>
+            </div>
+            <div className="grid grid-cols-2 gap-3">
+              <div>
+                <Label htmlFor="uf">UF</Label>
+                <Input
+                  id="uf"
+                  value={form.uf}
+                  onChange={e => setForm({ ...form, uf: e.target.value })}
+                  placeholder="RS"
+                  maxLength={2}
+                />
+              </div>
+              <div>
+                <Label htmlFor="cep">CEP</Label>
+                <Input
+                  id="cep"
+                  value={form.cep}
+                  onChange={e => setForm({ ...form, cep: e.target.value })}
+                  placeholder="00000-000"
+                />
+              </div>
+            </div>
+
+            <hr className="border-slate-100 my-1" />
+
             <div className="grid grid-cols-2 gap-3">
               <div>
                 <Label>Status</Label>

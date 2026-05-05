@@ -68,6 +68,20 @@ export interface LeadCreate {
   valor_estimado?: number | null;
   proximo_contato?: string | null;
   observacoes?: string | null;
+  // Campos enriquecidos editáveis
+  cargo?: string | null;
+  cnpj?: string | null;
+  site?: string | null;
+  whatsapp?: string | null;
+  email?: string | null;
+  email2?: string | null;
+  telefone2?: string | null;
+  endereco?: string | null;
+  bairro?: string | null;
+  cidade?: string | null;
+  uf?: string | null;
+  cep?: string | null;
+  classificacao?: string | null;
 }
 
 export interface LeadUpdate extends Partial<LeadCreate> {
