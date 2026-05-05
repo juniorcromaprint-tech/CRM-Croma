@@ -5,7 +5,7 @@
 // Fonte: redesign UX 2026-05-04L (mockup aprovado).
 
 import { useState } from 'react';
-import { Send, X, Trash2, ShoppingBasket, AlertTriangle, Phone, Ban } from 'lucide-react';
+import { Send, X, Trash2, ShoppingBasket, AlertTriangle, Phone, Mail, Ban } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { ScrollArea } from '@/components/ui/scroll-area';
 import {
@@ -25,11 +25,14 @@ interface Props {
 
 function useEstatisticas(leads: LeadDisparo[]) {
   const total      = leads.length;
-  const semTel     = leads.filter(l => !l.tem_telefone_valido && !l.bloqueado_disparo).length;
   const bloqueados = leads.filter(l => l.bloqueado_disparo).length;
-  const emConv     = leads.filter(l => l.em_conversa_ativa).length;
-  const elegiveis  = total - semTel - bloqueados - emConv;
-  return { total, semTel, bloqueados, emConv, elegiveis };
+  const emConv     = leads.filter(l => l.em_conversa_ativa && !l.bloqueado_disparo).length;
+  // Elegível = tem telefone OU email (canal é escolhido no modal)
+  const semContato = leads.filter(l => !l.bloqueado_disparo && !l.em_conversa_ativa && !l.tem_telefone_valido && !l.tem_email_valido).length;
+  const comWhatsapp = leads.filter(l => !l.bloqueado_disparo && !l.em_conversa_ativa && l.tem_telefone_valido).length;
+  const comEmail   = leads.filter(l => !l.bloqueado_disparo && !l.em_conversa_ativa && l.tem_email_valido).length;
+  const elegiveis  = leads.filter(l => !l.bloqueado_disparo && !l.em_conversa_ativa && (l.tem_telefone_valido || l.tem_email_valido)).length;
+  return { total, semContato, bloqueados, emConv, elegiveis, comWhatsapp, comEmail };
 }
 
 // ─── Componente principal ────────────────────────────────────────────────────
@@ -75,19 +78,30 @@ function DesktopCesta({ leads, onRemove, onClear, onDisparar, isDisparando }: Pr
               value={stats.elegiveis}
               tone="text-emerald-600"
             />
-            {stats.semTel > 0 && (
+            <StatLine
+              label="WhatsApp"
+              value={stats.comWhatsapp}
+              tone="text-emerald-600"
+              icon={<Phone size={11} />}
+            />
+            <StatLine
+              label="Email"
+              value={stats.comEmail}
+              tone="text-blue-600"
+              icon={<Mail size={11} />}
+            />
+            {stats.semContato > 0 && (
               <StatLine
-                label="Sem telefone"
-                value={stats.semTel}
+                label="Sem contato"
+                value={stats.semContato}
                 tone="text-amber-600"
-                icon={<Phone size={11} />}
               />
             )}
             {stats.emConv > 0 && (
               <StatLine
                 label="Em conversa"
                 value={stats.emConv}
-                tone="text-blue-600"
+                tone="text-slate-500"
               />
             )}
             {stats.bloqueados > 0 && (
@@ -124,7 +138,7 @@ function DesktopCesta({ leads, onRemove, onClear, onDisparar, isDisparando }: Pr
           <div className="px-4 py-2 bg-amber-50 border-t border-amber-100 flex items-start gap-1.5 text-[11px] text-amber-700">
             <AlertTriangle size={11} className="mt-0.5 shrink-0" />
             <span>
-              {stats.total - stats.elegiveis} {stats.total - stats.elegiveis === 1 ? 'lead' : 'leads'} {stats.total - stats.elegiveis === 1 ? 'será pulado' : 'serão pulados'} no disparo.
+              {stats.total - stats.elegiveis} {stats.total - stats.elegiveis === 1 ? 'lead não tem contato válido' : 'leads não têm contato válido'}.
             </span>
           </div>
         )}
@@ -231,7 +245,13 @@ function MobileCestaBar({ leads, onRemove, onClear, onDisparar, isDisparando }: 
 // ─── Item da cesta ───────────────────────────────────────────────────────────
 
 function CestaItem({ lead, onRemove }: { lead: LeadDisparo; onRemove: () => void }) {
-  const isElegivel = !lead.bloqueado_disparo && lead.tem_telefone_valido && !lead.em_conversa_ativa;
+  const hasContato = lead.tem_telefone_valido || lead.tem_email_valido;
+  const isElegivel = !lead.bloqueado_disparo && hasContato && !lead.em_conversa_ativa;
+
+  // Canal badges
+  const canais: string[] = [];
+  if (lead.tem_telefone_valido) canais.push('WhatsApp');
+  if (lead.tem_email_valido) canais.push('Email');
 
   return (
     <li className="px-4 py-2 flex items-center gap-2 text-xs">
@@ -240,11 +260,13 @@ function CestaItem({ lead, onRemove }: { lead: LeadDisparo; onRemove: () => void
           {lead.empresa ?? lead.contato_nome ?? '—'}
         </div>
         <div className="text-[10px] text-slate-400 truncate">
-          {!lead.tem_telefone_valido && 'Sem telefone'}
+          {!hasContato && !lead.bloqueado_disparo && !lead.em_conversa_ativa && 'Sem contato'}
           {lead.bloqueado_disparo && 'Bloqueado'}
           {lead.em_conversa_ativa && !lead.bloqueado_disparo && 'Em conversa ativa'}
-          {isElegivel && (lead.cidade || lead.sub_segmento) && (
+          {isElegivel && (
             <>
+              {canais.join(' · ')}
+              {(lead.cidade || lead.sub_segmento) && ' · '}
               {lead.cidade}
               {lead.cidade && lead.sub_segmento && ' · '}
               {lead.sub_segmento}

@@ -1,7 +1,7 @@
 // src/domains/comercial/components/leads/LeadCard.tsx
 // Card visual de um lead — substitui linha da tabela densa.
 
-import { Phone, MessageCircle, Ban, ChevronRight } from 'lucide-react';
+import { Phone, Mail, MessageCircle, Ban, ChevronRight } from 'lucide-react';
 import { Checkbox } from '@/components/ui/checkbox';
 import {
   Tooltip, TooltipContent, TooltipProvider, TooltipTrigger,
@@ -124,18 +124,19 @@ export function LeadCard({ lead, selected, onToggle, onOpen }: Props) {
                   <MessageCircle size={10} /> Conversa
                 </span>
               )}
-              {lead.contato_telefone ? (
-                <span className={`inline-flex items-center gap-1 text-[10px] px-1.5 py-0.5 rounded-md font-medium ${
-                  lead.tem_telefone_valido
-                    ? 'bg-emerald-50 text-emerald-700'
-                    : 'bg-red-50 text-red-600'
-                }`}>
-                  <Phone size={10} />
-                  {lead.tem_telefone_valido ? 'Tel ok' : 'Tel ?'}
+              {lead.tem_telefone_valido && (
+                <span className="inline-flex items-center gap-1 text-[10px] px-1.5 py-0.5 rounded-md font-medium bg-emerald-50 text-emerald-700">
+                  <Phone size={10} /> WhatsApp
                 </span>
-              ) : (
+              )}
+              {lead.tem_email_valido && (
+                <span className="inline-flex items-center gap-1 text-[10px] px-1.5 py-0.5 rounded-md font-medium bg-blue-50 text-blue-700">
+                  <Mail size={10} /> Email
+                </span>
+              )}
+              {!lead.tem_telefone_valido && !lead.tem_email_valido && (
                 <span className="text-[10px] px-1.5 py-0.5 rounded-md font-medium bg-red-50 text-red-600">
-                  sem tel
+                  sem contato
                 </span>
               )}
               {/* Botao para abrir detalhe — separado do toggle do card */}
