@@ -19,6 +19,7 @@ import {
   Loader2,
   Bot,
   TrendingUp,
+  Paperclip,
 } from 'lucide-react';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
@@ -115,7 +116,50 @@ function TimelineItem({ msg }: { msg: TimelineMessage }) {
             ? 'bg-blue-600 text-white rounded-tr-md'
             : 'bg-slate-100 text-slate-700 rounded-tl-md'
         }`}>
-          <p className="whitespace-pre-wrap break-words">{msg.conteudo}</p>
+          {/* Imagem */}
+          {msg.media_url && msg.media_type === 'image' && (
+            <img
+              src={msg.media_url}
+              alt="Imagem"
+              className="rounded-lg max-w-full max-h-48 object-cover mb-2 cursor-pointer hover:opacity-90 transition-opacity"
+              onClick={() => window.open(msg.media_url!, '_blank')}
+            />
+          )}
+          {/* Audio */}
+          {msg.media_url && msg.media_type === 'audio' && (
+            <audio controls className="w-full max-w-[240px] mb-2">
+              <source src={msg.media_url} type={msg.media_mime || 'audio/ogg'} />
+            </audio>
+          )}
+          {/* Video */}
+          {msg.media_url && msg.media_type === 'video' && (
+            <video controls className="rounded-lg max-w-full max-h-48 mb-2">
+              <source src={msg.media_url} type={msg.media_mime || 'video/mp4'} />
+            </video>
+          )}
+          {/* Documento */}
+          {msg.media_url && msg.media_type === 'document' && (
+            <a
+              href={msg.media_url}
+              target="_blank"
+              rel="noopener noreferrer"
+              className={`inline-flex items-center gap-2 px-3 py-2 rounded-lg text-sm mb-2 ${
+                isSent ? 'bg-blue-500 text-white hover:bg-blue-400' : 'bg-slate-200 text-blue-600 hover:bg-slate-300'
+              }`}
+            >
+              <Paperclip size={12} />
+              {msg.media_filename || 'Documento'}
+            </a>
+          )}
+          {/* Texto: oculta placeholder se houver media */}
+          {msg.conteudo && (!msg.media_type || !['[image]', '[audio]', '[video]', '[document]'].includes(msg.conteudo.trim())) && (
+            <p className="whitespace-pre-wrap break-words">{msg.conteudo}</p>
+          )}
+          {!msg.media_url && !msg.conteudo && (
+            <p className="italic opacity-60">
+              {msg.media_type ? `[${msg.media_type} - erro ao carregar]` : '(sem conteudo)'}
+            </p>
+          )}
         </div>
 
         {/* Meta */}

@@ -123,7 +123,16 @@ export default function WhatsAppStatusCard() {
                   <p className="text-sm font-medium text-slate-700 truncate">
                     {lead?.empresa ?? lead?.contato_nome ?? 'Desconhecido'}
                   </p>
-                  <p className="text-xs text-slate-400 truncate">{msg.conteudo?.slice(0, 80)}</p>
+                  <p className="text-xs text-slate-400 truncate">
+                    {(() => {
+                      const c = (msg.conteudo ?? '').trim();
+                      if (msg.media_type === 'image' && (!c || c === '[image]')) return '📷 Imagem';
+                      if (msg.media_type === 'audio' && (!c || c === '[audio]')) return '🎵 Audio';
+                      if (msg.media_type === 'video' && (!c || c === '[video]')) return '🎬 Video';
+                      if (msg.media_type === 'document' && (!c || c === '[document]')) return '📎 Documento';
+                      return c.slice(0, 80);
+                    })()}
+                  </p>
                 </div>
                 <span className="text-xs text-slate-400 shrink-0">
                   {msg.created_at ? formatDate(msg.created_at) : ''}

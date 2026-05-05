@@ -32,6 +32,7 @@ import {
   Briefcase,
   ChevronDown,
   ChevronUp,
+  Paperclip,
 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
@@ -356,7 +357,54 @@ function MessageBubble({
               ? 'bg-blue-600 text-white rounded-tr-md'
               : 'bg-slate-100 text-slate-700 rounded-tl-md'
           }`}>
-            {message.conteudo}
+            {/* Imagem */}
+            {message.media_url && message.media_type === 'image' && (
+              <img
+                src={message.media_url}
+                alt="Imagem"
+                className="rounded-lg max-w-full max-h-64 object-cover mb-2 cursor-pointer hover:opacity-90 transition-opacity"
+                onClick={() => window.open(message.media_url!, '_blank')}
+              />
+            )}
+            {/* Audio */}
+            {message.media_url && message.media_type === 'audio' && (
+              <audio controls className="w-full max-w-[260px] mb-2">
+                <source src={message.media_url} type={message.media_mime || 'audio/ogg'} />
+                Seu navegador nao suporta audio.
+              </audio>
+            )}
+            {/* Video */}
+            {message.media_url && message.media_type === 'video' && (
+              <video controls className="rounded-lg max-w-full max-h-64 mb-2">
+                <source src={message.media_url} type={message.media_mime || 'video/mp4'} />
+                Seu navegador nao suporta video.
+              </video>
+            )}
+            {/* Documento */}
+            {message.media_url && message.media_type === 'document' && (
+              <a
+                href={message.media_url}
+                target="_blank"
+                rel="noopener noreferrer"
+                className={`inline-flex items-center gap-2 px-3 py-2 rounded-lg text-sm mb-2 ${
+                  isSent ? 'bg-blue-500 text-white hover:bg-blue-400' : 'bg-slate-200 text-blue-600 hover:bg-slate-300'
+                }`}
+              >
+                <Paperclip size={14} />
+                {message.media_filename || 'Documento'}
+              </a>
+            )}
+            {/* Texto (caption ou conteudo normal). Se houver media, so renderiza
+                texto se nao for placeholder; se nao houver media, sempre renderiza */}
+            {message.conteudo && (!message.media_type || !['[image]', '[audio]', '[video]', '[document]'].includes(message.conteudo.trim())) && (
+              <span>{message.conteudo}</span>
+            )}
+            {/* Sem conteudo textual e sem media carregada */}
+            {!message.media_url && !message.conteudo && (
+              <span className="opacity-60 italic">
+                {message.media_type ? `[${message.media_type} - erro ao carregar]` : '(sem conteudo)'}
+              </span>
+            )}
           </div>
           {onDelete && (
             <button

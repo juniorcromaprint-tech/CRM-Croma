@@ -141,6 +141,7 @@ export function useRecentWhatsAppMessages() {
         .from('agent_messages')
         .select(`
           id, direcao, conteudo, canal, status, created_at,
+          media_url, media_type, media_mime, media_filename,
           agent_conversations!inner(
             id,
             leads!inner(empresa, contato_nome)
