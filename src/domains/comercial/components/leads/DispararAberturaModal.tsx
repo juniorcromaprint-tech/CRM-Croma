@@ -124,7 +124,7 @@ function renderPreview(conteudo: string | null, lead?: LeadDisparo): string {
     .replace(/\{\{empresa\}\}/g, lead.empresa ?? 'sua empresa')
     .replace(/\{\{cidade\}\}/g, lead.cidade ?? 'sua região')
     .replace(/\{\{nome_remetente\}\}/g, 'Junior - Croma Print')
-    .replace(/\{\{telefone_empresa\}\}/g, '(11) 4200-3724');
+    .replace(/\{\{telefone_empresa\}\}/g, '(11) 3399-4517');
 }
 
 // ─── Main component ─────────────────────────────────────────────────────────
