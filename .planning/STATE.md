@@ -1,6 +1,100 @@
 # STATE — CRM Croma
 
-**Última sessão**: 2026-05-05 (Cowork — Limpeza completa de 2810 leads)
+**Última sessão**: 2026-05-06 (Cowork — Pipeline de disparos destravado + UX de exclusão de leads)
+
+## Sessão 2026-05-06 — PIPELINE DESTRAVADO + EXCLUIR LEADS
+
+### Causa raiz identificada e corrigida (CRÍTICA)
+Supabase migrou `service_role_key` para o novo formato `sb_secret_xxx`, mas o gateway das
+Edge Functions (`verify_jwt: true`) ainda exige JWT legacy `eyJ...`. Resultado: TODAS as
+invocações `agent-cron-loop → whatsapp-enviar` retornavam `401 INVALID_JWT_FORMAT` e as
+mensagens ficavam presas em `status='aprovada'` indefinidamente (63 mensagens travadas).
+
+### Solução em camadas (commit `05d19b5` + `e6f9524`)
+
+**FASE 2 — Auth segura**
+- JWT legacy guardado em `vault.secrets.service_role_key_legacy_jwt` (nao em texto puro)
+- `private.get_service_role_key()` prefere vault legacy, fallback para sb_secret
+- `public.get_service_role_key_for_dispatch()` RPC restrita a service_role via GRANT
+- Edge `whatsapp-enviar` v25: aceita JWT legacy (decodifica role do payload, gateway ja
+  validou assinatura) + sb_secret env match + user JWT
+- Edge `agent-enviar-email` v20: mesma logica de auth
+- Edge nova `dispatch-approved-messages` v1: dispatcher dedicado com fetch direto +
+  Authorization JWT legacy + apikey sb_secret
+
+**FASE 3 — Retry e tratamento de erro**
+- `agent_messages.tentativas_envio` + `max_tentativas_envio` + `proximo_envio` (cols novas)
+- Backoff exponencial: 5min → 15min → 45min entre tentativas
+- Apos `max_tentativas` (3): status → `'falha_envio'` (nao tenta mais)
+- Index `idx_agent_messages_dispatch_ready` para query rapida
+
+**FASE 4 — Validado com mensagem real**
+- 1 mensagem teste enviada via JWT legacy → wamid retornado, status=enviada
+- 12 mensagens reais disparadas em sequencia (15:00–15:01 BRT)
+- 5 erros do Meta foram numeros invalidos (Apify Google Maps)
+
+**FASE 5 — Rampa progressiva**
+- `public.fn_calcular_limite_diario()` calcula 15→30→60/dia
+- `useCampanhaStatus` le do RPC backend (fonte unica da verdade)
+
+**FASE 6 — Janelas BRT consistentes**
+- `CampanhaBanner.tsx` le `agent_config.horarios` em vez de hardcoded "10–12 / 14–17"
+
+**FASE 7 — Tabela `agent_campanhas`**
+- Schema completo com contadores, status, datas
+- `agent_messages.campanha_id` (FK opcional)
+- Trigger `fn_atualizar_contadores_campanha` mantem totais sincronizados
+- RLS por role (admin/diretor/comercial/comercial_senior)
+
+**Bonus — Header IMAGE em templates**
+- Bug separado: template `croma_poste_seg_abertura_v2` foi criado no Meta com header IMAGE.
+- `whatsapp-enviar` v25 agora le `admin_config.WHATSAPP_MEDIA_<template_name>` e injeta
+  `component type=header parameter type=image` no payload Meta.
+
+**pg_cron**
+- Job `dispatch-approved-messages-30min`: `*/30 12-14,17-19 * * 1-6` (BRT 09–12 e 14–17)
+- Removido `agent-cron-loop` antigo do dispatch (mantido para regras/follow-ups)
+
+### Excluir leads na tela `/leads` (commits `77f1e89` + `e6f9524`)
+- Botao lixeira individual SEMPRE visivel na linha do lead (cinza, fica vermelho ao hover)
+- Click → AlertDialog vermelho "⚠ Excluir lead permanentemente?" com bloco vermelho
+  destacando "Esta acao e PERMANENTE e IRREVERSIVEL"
+- Botao em lote no rodape da `LeadsCesta` (desktop sticky + mobile sheet) com mesma confirmacao
+- Hook novo `useExcluirLead` + `useExcluirLeadsEmLote` em `src/domains/comercial/hooks/`
+- Soft delete: `UPDATE leads SET excluido_em=now(), excluido_por=user_id` — `vw_leads_disparo`
+  ja filtra `excluido_em IS NULL`, leads excluidos somem da listagem automaticamente
+- RLS `leads_update`: admin/diretor/comercial/comercial_senior
+
+### Telefone errado em mensagens (commit `037f0b7`)
+- 3 lugares com `(11) 4200-3724` hardcoded: `DispararAberturaModal.tsx::renderPreview` +
+  2 overloads da RPC `fn_disparar_abertura_em_massa`. Corrigido para `(11) 3399-4517`.
+
+### Deploy Vercel
+- Auto-deploy GitHub→Vercel estava parado (motivo nao identificado, possivelmente webhook)
+- Deploy disparado manualmente via `vercel --prod --force` → build completo (789 deps,
+  vite build, 22.14s) → `dpl_HgGBv8ECtG4skqvaV4uTzm5TXVGY` (`crm-croma-a9srq81mg`) Ready
+- Aliased para `crm-croma.vercel.app`
+- Service Worker do PWA segurava bundle antigo no browser → precisa aba anonima ou
+  desregistrar SW para ver mudancas (anotado nos aprendizados)
+
+### Migrations aplicadas hoje
+- `138_fix_telefone_disparo_abertura.sql` (drop+recreate ambos overloads da RPC)
+- `139_fix_agent_dispatch_pipeline.sql` (consolidada — JWT legacy + retry + rampa + campanhas)
+- + migrations diretas: `fix_service_role_key_legacy_jwt`, `store_jwt_legacy_in_vault_secure`,
+  `agent_messages_retry_columns`, `rpc_rampa_progressiva_e_jwt_dispatch`,
+  `agent_campanhas_table`, `cron_dispatch_approved_messages`, `fix_rpc_jwt_dispatch_grant_only`
+
+### Commits desta sessao
+```
+e6f9524 feat(leads): icone excluir sempre visivel + aviso PERMANENTE/IRREVERSIVEL
+77f1e89 feat(leads): permite excluir lead direto da tela /leads (individual + lote)
+05d19b5 fix(agent): destrava pipeline de disparos WhatsApp + rampa progressiva
+037f0b7 fix: corrige telefone (11) 3399-4517 em disparo de abertura
+```
+
+---
+
+## Sessoes anteriores
 
 ## Base de Leads LIMPA E PRONTA PARA DISPARO ✅
 
@@ -39,7 +133,22 @@ Adicionada `processApprovedMessages` ao cron que pega mensagens aprovadas e rote
 
 ## Status atual
 
-### O que foi feito nesta sessão (2026-05-04L) — REDESIGN UX
+### O que foi feito nesta sessão (2026-05-05) — EMAIL COM IMAGEM INLINE
+
+1. ✅ `agent-enviar-email` v18 deployed — imagem de portfólio renderiza DEPOIS do texto
+2. ✅ `DispararAberturaModal` — upload de imagem + toggle "incluir imagem" direto no modal
+3. ✅ `AgentConfigPage` EditTemplateForm — upload de imagem no formulário de template
+4. ✅ `useDispararAbertura` — passa `p_incluir_imagem` para o RPC
+5. ✅ `fn_disparar_abertura_em_massa` v5 — persiste `imagem_url` no metadata da mensagem
+6. ✅ Teste E2E: email enviado via Resend para junior@cromaprint.com.br com layout correto
+7. ✅ Layout final: texto da abertura → imagem de portfólio (CID inline) → rodapé
+8. ✅ v19: imagem embutida como CID attachment (exibe sem "permitir imagens remotas")
+
+**Nota técnica**: Para invocar `agent-enviar-email` fora do horário do cron, usar
+`pg_net` direto chamando Resend API (o gateway Supabase requer service_role JWT
+que não está acessível via vault — o cron-loop usa internamente).
+
+### O que foi feito na sessão anterior (2026-05-04L) — REDESIGN UX
 
 Junior reportou "interface fraca/ruim, usuário precisa poder selecionar quais
 leads e qual abertura". Mockup visual aprovado antes de codar (cards de lead,
@@ -102,7 +211,7 @@ cesta lateral sticky, galeria de aberturas, banner de campanha, paginação).
 - Templates ativos: **2 WhatsApp** (croma_poste_seg_*) + **7 email** (4 abertura + 2 followup1 + 1 followup2)
 - `cron.job` 15: **active** (agent-cron-loop v17)
 - `whatsapp-enviar`: v22 (header IMAGE automático)
-- `agent-enviar-email`: funcional (Resend API)
+- `agent-enviar-email`: v19 (imagem CID inline após texto, Resend API)
 - `buscar-leads-google`: v14 (timeout 120s)
 
 ## Aguardando ação do Junior
@@ -114,6 +223,12 @@ cesta lateral sticky, galeria de aberturas, banner de campanha, paginação).
 
 ## TODO próxima sessão
 
+- [ ] **PRIORIDADE ALTA**: Mídia no WhatsApp (ver/ouvir mensagens de clientes + enviar imagem)
+  - Expandir `agent_messages` com `media_url`, `media_type` (image/audio/video/document)
+  - Webhook de recebimento deve salvar mídia do cliente (baixar do WhatsApp API → Storage)
+  - UI: renderizar `<img>` para fotos, `<audio>` player para áudios na timeline
+  - UI: botão de upload de imagem no chat manual (quando assume conversa)
+  - Motivo: clientes mandam foto de referência/áudio perguntando sobre serviços — sem ver isso no CRM, Junior fica cego e precisa abrir outro WhatsApp
 - [ ] Aplicar `e.preventDefault()` em `src/pages/Produtos.tsx:656`
   (mesmo bug do AlertDialog, fora do escopo desta sessão)
 - [ ] Criar templates de abertura para os outros 16 segmentos
