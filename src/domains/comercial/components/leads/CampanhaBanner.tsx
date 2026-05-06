@@ -80,7 +80,7 @@ export function CampanhaBanner({
           <Stat
             icon={<Clock size={11} />}
             label="Janelas BRT"
-            value="10–12 / 14–17"
+            value={formatJanelas(data.janelas)}
           />
         </div>
       </div>
@@ -96,6 +96,18 @@ export function CampanhaBanner({
       )}
     </div>
   );
+}
+
+// Formata janelas BRT para o banner: [['09:00','12:00'],['14:00','17:00']] → "9–12 / 14–17"
+function formatJanelas(janelas: [string, string][]): string {
+  if (!janelas || janelas.length === 0) return '—';
+  return janelas
+    .map(([s, e]) => {
+      const sh = parseInt(s.split(':')[0], 10);
+      const eh = parseInt(e.split(':')[0], 10);
+      return `${sh}–${eh}`;
+    })
+    .join(' / ');
 }
 
 function Stat({

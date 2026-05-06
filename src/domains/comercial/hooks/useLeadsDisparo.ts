@@ -253,8 +253,9 @@ export interface CampanhaStatus {
   totalDisparados: number;        // leads que JÁ entraram numa conversa
   enviadasHoje: number;           // agent_messages enviadas hoje (canal whatsapp)
   diaDaRampa: number | null;      // 1, 2, 3...; null se ainda não houve disparo
-  limiteDiarioAtual: number;      // 15 nos primeiros 2 dias, depois 30
+  limiteDiarioAtual: number;      // calculado pelo backend via fn_calcular_limite_diario()
   totalEnfileiradas: number;      // mensagens 'aprovada' aguardando envio
+  janelas: [string, string][];    // janelas BRT do agent_config (fonte real do backend)
 }
 
 export function useCampanhaStatus(segmento = 'seguranca') {
@@ -293,8 +294,7 @@ export function useCampanhaStatus(segmento = 'seguranca') {
         .eq('canal', 'whatsapp')
         .eq('status', 'aprovada');
 
-      // 5. Dia da rampa — quantos dias úteis desde a primeira mensagem enviada
-      //    Heurística simples: dias corridos desde 1ª enviada (canal whatsapp).
+      // 5. Dia da rampa — dias corridos desde 1ª mensagem WA enviada
       const { data: primeiraMsg } = await supabase
         .from('agent_messages')
         .select('enviado_em')
@@ -314,8 +314,37 @@ export function useCampanhaStatus(segmento = 'seguranca') {
         diaDaRampa = diff + 1;
       }
 
-      // 6. Limite diário pela rampa (15/dia × 2d → 30/dia depois)
-      const limiteDiarioAtual = diaDaRampa == null || diaDaRampa <= 2 ? 15 : 30;
+      // 6. Limite diário — FONTE ÚNICA: backend RPC fn_calcular_limite_diario()
+      //    O backend usa esse mesmo cálculo no dispatch-approved-messages.
+      //    Frontend apenas reflete a regra real, não recalcula.
+      let limiteDiarioAtual = 15; // fallback
+      try {
+        const { data: limiteRpc } = await supabase.rpc('fn_calcular_limite_diario');
+        if (typeof limiteRpc === 'number' && limiteRpc > 0) {
+          limiteDiarioAtual = limiteRpc;
+        }
+      } catch {
+        // Fallback heurístico se RPC indisponível (mantém compatibilidade)
+        limiteDiarioAtual = diaDaRampa == null || diaDaRampa <= 2 ? 15 : diaDaRampa <= 5 ? 30 : 60;
+      }
+
+      // 7. Janelas BRT — lê do agent_config (fonte real do backend)
+      let janelas: [string, string][] = [['09:00', '12:00'], ['14:00', '17:00']]; // fallback
+      try {
+        const { data: cfgRow } = await supabase
+          .from('admin_config')
+          .select('valor')
+          .eq('chave', 'agent_config')
+          .single();
+        const cfg = (cfgRow?.valor && typeof cfgRow.valor === 'object'
+          ? cfgRow.valor
+          : typeof cfgRow?.valor === 'string'
+            ? JSON.parse(cfgRow.valor)
+            : {}) as Record<string, unknown>;
+        if (Array.isArray(cfg.horarios) && cfg.horarios.length > 0) {
+          janelas = cfg.horarios as [string, string][];
+        }
+      } catch { /* usa fallback */ }
 
       return {
         totalLeads:          totalLeads          ?? 0,
@@ -324,6 +353,7 @@ export function useCampanhaStatus(segmento = 'seguranca') {
         totalEnfileiradas:   totalEnfileiradas   ?? 0,
         diaDaRampa,
         limiteDiarioAtual,
+        janelas,
       };
     },
     staleTime: 60_000,
