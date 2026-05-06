@@ -244,20 +244,20 @@ export function LeadsTable({ leads, isLoading, selection }: Props) {
                           )}
                         </td>
 
-                        {/* Acoes (excluir + chevron) */}
+                        {/* Acoes (excluir + chevron) — botao SEMPRE visivel */}
                         <td className="w-20 px-2 py-3">
                           <div className="flex items-center justify-end gap-1">
                             <button
                               type="button"
-                              title="Excluir lead"
+                              title="Excluir lead permanentemente"
                               aria-label={`Excluir ${lead.empresa ?? 'lead'}`}
                               onClick={(e) => {
                                 e.stopPropagation();
                                 setLeadParaExcluir(lead);
                               }}
-                              className="p-1.5 rounded-lg text-slate-300 hover:text-red-600 hover:bg-red-50 opacity-0 group-hover:opacity-100 transition-all"
+                              className="p-1.5 rounded-lg text-slate-400 hover:text-red-600 hover:bg-red-50 transition-colors"
                             >
-                              <Trash2 size={14} />
+                              <Trash2 size={15} />
                             </button>
                             {!isBlocked && (
                               <ChevronRight size={15} className="text-slate-300 group-hover:text-blue-500 transition-colors" />
@@ -286,15 +286,24 @@ export function LeadsTable({ leads, isLoading, selection }: Props) {
       >
         <AlertDialogContent>
           <AlertDialogHeader>
-            <AlertDialogTitle>Excluir lead?</AlertDialogTitle>
-            <AlertDialogDescription>
-              {leadParaExcluir && (
-                <>
-                  O lead <strong>{leadParaExcluir.empresa ?? leadParaExcluir.contato_nome ?? '—'}</strong>
-                  {' '}será removido da listagem. Conversas, propostas e historico permanecem,
-                  mas o lead nao aparecera mais nos disparos.
-                </>
-              )}
+            <AlertDialogTitle className="text-red-700">
+              ⚠ Excluir lead permanentemente?
+            </AlertDialogTitle>
+            <AlertDialogDescription asChild>
+              <div className="space-y-3">
+                {leadParaExcluir && (
+                  <div className="text-slate-700">
+                    Você está prestes a excluir o lead{' '}
+                    <strong className="text-slate-900">
+                      {leadParaExcluir.empresa ?? leadParaExcluir.contato_nome ?? '—'}
+                    </strong>.
+                  </div>
+                )}
+                <div className="bg-red-50 border border-red-200 rounded-lg px-3 py-2 text-sm text-red-800">
+                  <strong>Esta ação é PERMANENTE e IRREVERSÍVEL.</strong><br />
+                  O lead vai sumir da listagem para sempre e não pode ser recuperado pela tela.
+                </div>
+              </div>
             </AlertDialogDescription>
           </AlertDialogHeader>
           <AlertDialogFooter>
@@ -312,7 +321,7 @@ export function LeadsTable({ leads, isLoading, selection }: Props) {
               disabled={excluirMutation.isPending}
               className="bg-red-600 hover:bg-red-700 text-white"
             >
-              {excluirMutation.isPending ? 'Excluindo...' : 'Excluir'}
+              {excluirMutation.isPending ? 'Excluindo...' : 'Excluir permanentemente'}
             </AlertDialogAction>
           </AlertDialogFooter>
         </AlertDialogContent>

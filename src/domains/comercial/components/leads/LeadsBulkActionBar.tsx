@@ -74,15 +74,23 @@ export function LeadsBulkActionBar({
       <AlertDialog open={confirmDelete} onOpenChange={setConfirmDelete}>
         <AlertDialogContent>
           <AlertDialogHeader>
-            <AlertDialogTitle>
-              Excluir {count} lead{count !== 1 ? 's' : ''}?
+            <AlertDialogTitle className="text-red-700">
+              ⚠ Excluir {count} lead{count !== 1 ? 's' : ''} permanentemente?
             </AlertDialogTitle>
-            <AlertDialogDescription>
-              {count} lead{count !== 1 ? 's' : ''} selecionado{count !== 1 ? 's' : ''}
-              {' '}{count !== 1 ? 'serão removidos' : 'será removido'} da listagem.
-              Conversas, propostas e historico permanecem, mas
-              {' '}{count !== 1 ? 'eles não aparecerão' : 'ele não aparecerá'}
-              {' '}mais nos disparos.
+            <AlertDialogDescription asChild>
+              <div className="space-y-3">
+                <div className="text-slate-700">
+                  Você está prestes a excluir{' '}
+                  <strong className="text-slate-900">
+                    {count} lead{count !== 1 ? 's' : ''}
+                  </strong>{' '}
+                  da listagem.
+                </div>
+                <div className="bg-red-50 border border-red-200 rounded-lg px-3 py-2 text-sm text-red-800">
+                  <strong>Esta ação é PERMANENTE e IRREVERSÍVEL.</strong><br />
+                  {count !== 1 ? 'Os leads' : 'O lead'} {count !== 1 ? 'vão sumir' : 'vai sumir'} da listagem para sempre e não {count !== 1 ? 'podem' : 'pode'} ser {count !== 1 ? 'recuperados' : 'recuperado'} pela tela.
+                </div>
+              </div>
             </AlertDialogDescription>
           </AlertDialogHeader>
           <AlertDialogFooter>
@@ -100,7 +108,7 @@ export function LeadsBulkActionBar({
               disabled={excluirEmLote.isPending}
               className="bg-red-600 hover:bg-red-700 text-white"
             >
-              {excluirEmLote.isPending ? 'Excluindo...' : `Excluir ${count}`}
+              {excluirEmLote.isPending ? 'Excluindo...' : `Excluir ${count} permanentemente`}
             </AlertDialogAction>
           </AlertDialogFooter>
         </AlertDialogContent>
