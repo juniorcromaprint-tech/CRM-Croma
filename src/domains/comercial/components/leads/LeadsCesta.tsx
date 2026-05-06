@@ -11,7 +11,12 @@ import { ScrollArea } from '@/components/ui/scroll-area';
 import {
   Sheet, SheetContent, SheetHeader, SheetTitle, SheetTrigger,
 } from '@/components/ui/sheet';
+import {
+  AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent,
+  AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle,
+} from '@/components/ui/alert-dialog';
 import type { LeadDisparo } from '../../hooks/useLeadsDisparo';
+import { useExcluirLeadsEmLote } from '../../hooks/useExcluirLead';
 
 interface Props {
   leads: LeadDisparo[];           // só os selecionados
@@ -38,17 +43,70 @@ function useEstatisticas(leads: LeadDisparo[]) {
 // ─── Componente principal ────────────────────────────────────────────────────
 
 export function LeadsCesta(props: Props) {
+  const [confirmDeleteAll, setConfirmDeleteAll] = useState(false);
+  const excluirEmLote = useExcluirLeadsEmLote();
+  const ids = props.leads.map(l => l.id);
+
+  const handleExcluirSelecionados = async () => {
+    try {
+      await excluirEmLote.mutateAsync(ids);
+      props.onClear();
+    } finally {
+      setConfirmDeleteAll(false);
+    }
+  };
+
+  const enriched = {
+    ...props,
+    onExcluirSelecionados: () => setConfirmDeleteAll(true),
+    isExcluindo: excluirEmLote.isPending,
+  };
+
   return (
     <>
-      <DesktopCesta {...props} />
-      <MobileCestaBar {...props} />
+      <DesktopCesta {...enriched} />
+      <MobileCestaBar {...enriched} />
+
+      {/* Confirmacao de exclusao em lote */}
+      <AlertDialog open={confirmDeleteAll} onOpenChange={setConfirmDeleteAll}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>
+              Excluir {ids.length} lead{ids.length !== 1 ? 's' : ''}?
+            </AlertDialogTitle>
+            <AlertDialogDescription>
+              {ids.length} lead{ids.length !== 1 ? 's' : ''} {ids.length !== 1 ? 'serão removidos' : 'será removido'} da listagem.
+              Conversas, propostas e historico permanecem,
+              mas {ids.length !== 1 ? 'eles não aparecerão' : 'ele não aparecerá'} mais nos disparos.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel disabled={excluirEmLote.isPending}>Cancelar</AlertDialogCancel>
+            <AlertDialogAction
+              onClick={async (e) => {
+                e.preventDefault();
+                await handleExcluirSelecionados();
+              }}
+              disabled={excluirEmLote.isPending}
+              className="bg-red-600 hover:bg-red-700 text-white"
+            >
+              {excluirEmLote.isPending ? 'Excluindo...' : `Excluir ${ids.length}`}
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </>
   );
 }
 
+interface PropsEnriched extends Props {
+  onExcluirSelecionados: () => void;
+  isExcluindo: boolean;
+}
+
 // ─── Desktop: coluna sticky ──────────────────────────────────────────────────
 
-function DesktopCesta({ leads, onRemove, onClear, onDisparar, isDisparando }: Props) {
+function DesktopCesta({ leads, onRemove, onClear, onDisparar, isDisparando, onExcluirSelecionados, isExcluindo }: PropsEnriched) {
   const stats = useEstatisticas(leads);
 
   return (
@@ -154,12 +212,22 @@ function DesktopCesta({ leads, onRemove, onClear, onDisparar, isDisparando }: Pr
             Disparar abertura
           </Button>
           {stats.total > 0 && (
-            <button
-              onClick={onClear}
-              className="w-full text-xs text-slate-500 hover:text-red-600 transition-colors py-1 flex items-center justify-center gap-1.5"
-            >
-              <Trash2 size={11} /> Limpar cesta
-            </button>
+            <>
+              <button
+                onClick={onExcluirSelecionados}
+                disabled={isExcluindo}
+                className="w-full text-xs text-red-600 hover:bg-red-50 transition-colors py-1.5 flex items-center justify-center gap-1.5 rounded-lg border border-red-100 disabled:opacity-50"
+              >
+                <Trash2 size={11} />
+                {isExcluindo ? 'Excluindo...' : `Excluir ${stats.total} lead${stats.total !== 1 ? 's' : ''}`}
+              </button>
+              <button
+                onClick={onClear}
+                className="w-full text-xs text-slate-500 hover:text-slate-700 transition-colors py-1 flex items-center justify-center gap-1.5"
+              >
+                <X size={11} /> Limpar seleção
+              </button>
+            </>
           )}
         </div>
       </div>
@@ -169,7 +237,7 @@ function DesktopCesta({ leads, onRemove, onClear, onDisparar, isDisparando }: Pr
 
 // ─── Mobile: barra inferior + sheet com lista completa ───────────────────────
 
-function MobileCestaBar({ leads, onRemove, onClear, onDisparar, isDisparando }: Props) {
+function MobileCestaBar({ leads, onRemove, onClear, onDisparar, isDisparando, onExcluirSelecionados, isExcluindo }: PropsEnriched) {
   const [open, setOpen] = useState(false);
   const stats = useEstatisticas(leads);
 
@@ -210,10 +278,18 @@ function MobileCestaBar({ leads, onRemove, onClear, onDisparar, isDisparando }: 
                 <Send size={14} /> Disparar abertura
               </Button>
               <button
-                onClick={() => { onClear(); setOpen(false); }}
-                className="w-full text-xs text-slate-500 hover:text-red-600 py-1 flex items-center justify-center gap-1.5"
+                onClick={() => { setOpen(false); onExcluirSelecionados(); }}
+                disabled={isExcluindo}
+                className="w-full text-xs text-red-600 hover:bg-red-50 py-1.5 flex items-center justify-center gap-1.5 rounded-lg border border-red-100 disabled:opacity-50"
               >
-                <Trash2 size={11} /> Limpar cesta
+                <Trash2 size={11} />
+                {isExcluindo ? 'Excluindo...' : `Excluir ${stats.total} lead${stats.total !== 1 ? 's' : ''}`}
+              </button>
+              <button
+                onClick={() => { onClear(); setOpen(false); }}
+                className="w-full text-xs text-slate-500 hover:text-slate-700 py-1 flex items-center justify-center gap-1.5"
+              >
+                <X size={11} /> Limpar seleção
               </button>
             </div>
           </SheetContent>

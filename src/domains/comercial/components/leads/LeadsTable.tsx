@@ -2,15 +2,21 @@
 // Tabela de leads com checkbox de seleção múltipla para disparos.
 // Fonte: PLANO-DISPAROS-PROSPECCAO.md seção 6.4
 
+import { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { Phone, MessageCircle, Ban, ChevronRight, Loader2 } from 'lucide-react';
+import { Phone, MessageCircle, Ban, ChevronRight, Loader2, Trash2 } from 'lucide-react';
 import { Checkbox } from '@/components/ui/checkbox';
 import { Badge } from '@/components/ui/badge';
 import {
   Tooltip, TooltipContent, TooltipProvider, TooltipTrigger,
 } from '@/components/ui/tooltip';
+import {
+  AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent,
+  AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle,
+} from '@/components/ui/alert-dialog';
 import type { LeadDisparo } from '../../hooks/useLeadsDisparo';
 import type { useLeadsSelection } from '../../hooks/useLeadsSelection';
+import { useExcluirLead } from '../../hooks/useExcluirLead';
 
 // ─── Status badge config ─────────────────────────────────────────────────────
 
@@ -64,6 +70,10 @@ export function LeadsTable({ leads, isLoading, selection }: Props) {
   const navigate = useNavigate();
   const allIds = leads.map(l => l.id);
 
+  // Estado do dialog de exclusao individual
+  const [leadParaExcluir, setLeadParaExcluir] = useState<LeadDisparo | null>(null);
+  const excluirMutation = useExcluirLead();
+
   if (isLoading) {
     return (
       <div className="bg-white rounded-2xl border border-slate-200 p-12 flex items-center justify-center">
@@ -107,7 +117,7 @@ export function LeadsTable({ leads, isLoading, selection }: Props) {
                 <th className="px-4 py-3 text-left font-medium text-slate-500 whitespace-nowrap">Score</th>
                 <th className="px-4 py-3 text-left font-medium text-slate-500 whitespace-nowrap">Cidade</th>
                 <th className="px-4 py-3 text-left font-medium text-slate-500 whitespace-nowrap">Conversa</th>
-                <th className="w-8 px-2 py-3" />
+                <th className="w-20 px-2 py-3" />
               </tr>
             </thead>
             <tbody>
@@ -234,11 +244,25 @@ export function LeadsTable({ leads, isLoading, selection }: Props) {
                           )}
                         </td>
 
-                        {/* Chevron */}
-                        <td className="w-8 px-2 py-3">
-                          {!isBlocked && (
-                            <ChevronRight size={15} className="text-slate-300 group-hover:text-blue-500 transition-colors" />
-                          )}
+                        {/* Acoes (excluir + chevron) */}
+                        <td className="w-20 px-2 py-3">
+                          <div className="flex items-center justify-end gap-1">
+                            <button
+                              type="button"
+                              title="Excluir lead"
+                              aria-label={`Excluir ${lead.empresa ?? 'lead'}`}
+                              onClick={(e) => {
+                                e.stopPropagation();
+                                setLeadParaExcluir(lead);
+                              }}
+                              className="p-1.5 rounded-lg text-slate-300 hover:text-red-600 hover:bg-red-50 opacity-0 group-hover:opacity-100 transition-all"
+                            >
+                              <Trash2 size={14} />
+                            </button>
+                            {!isBlocked && (
+                              <ChevronRight size={15} className="text-slate-300 group-hover:text-blue-500 transition-colors" />
+                            )}
+                          </div>
                         </td>
                       </tr>
                     </TooltipTrigger>
@@ -254,6 +278,45 @@ export function LeadsTable({ leads, isLoading, selection }: Props) {
           </table>
         </div>
       </div>
+
+      {/* Dialog de confirmacao de exclusao individual */}
+      <AlertDialog
+        open={leadParaExcluir !== null}
+        onOpenChange={(open) => { if (!open) setLeadParaExcluir(null); }}
+      >
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Excluir lead?</AlertDialogTitle>
+            <AlertDialogDescription>
+              {leadParaExcluir && (
+                <>
+                  O lead <strong>{leadParaExcluir.empresa ?? leadParaExcluir.contato_nome ?? '—'}</strong>
+                  {' '}será removido da listagem. Conversas, propostas e historico permanecem,
+                  mas o lead nao aparecera mais nos disparos.
+                </>
+              )}
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel disabled={excluirMutation.isPending}>Cancelar</AlertDialogCancel>
+            <AlertDialogAction
+              onClick={async (e) => {
+                e.preventDefault();
+                if (!leadParaExcluir) return;
+                try {
+                  await excluirMutation.mutateAsync({ leadId: leadParaExcluir.id });
+                } finally {
+                  setLeadParaExcluir(null);
+                }
+              }}
+              disabled={excluirMutation.isPending}
+              className="bg-red-600 hover:bg-red-700 text-white"
+            >
+              {excluirMutation.isPending ? 'Excluindo...' : 'Excluir'}
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </TooltipProvider>
   );
 }
