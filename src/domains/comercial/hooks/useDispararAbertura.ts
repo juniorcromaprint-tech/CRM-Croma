@@ -14,6 +14,15 @@ export interface DispararParams {
   modo: 'imediato' | 'agendado';
   autoAprovar?: boolean;
   incluirImagem?: boolean;
+  /**
+   * UUID de uma campanha em `agent_campanhas` para vincular este disparo.
+   * Quando ausente/null/undefined, a chamada cai no overload de 6 args da RPC
+   * (wrapper de compatibilidade da migration 140) e a mensagem é gravada com
+   * `campanha_id IS NULL` — comportamento idêntico ao da migration 138.
+   * Quando presente, a RPC grava o vínculo em agent_messages, agent_conversations
+   * e incrementa total_leads em agent_campanhas (via trigger).
+   */
+  campanhaId?: string | null;
 }
 
 export interface DisparoResultRow {
@@ -31,14 +40,26 @@ export function useDispararAbertura() {
     mutationFn: async (params: DispararParams): Promise<DisparoResultRow[]> => {
       const { data: userData } = await supabase.auth.getUser();
 
-      const { data, error } = await supabase.rpc('fn_disparar_abertura_em_massa', {
+      // Construção do payload com SPREAD CONDICIONAL no campanha_id.
+      // Se campanhaId é falsy, a chave `p_campanha_id` NÃO entra no objeto:
+      //   → PostgREST resolve para o overload de 6 args (wrapper de compat)
+      //   → comportamento bit-a-bit idêntico ao da migration 138 (validado em prod 2026-05-06).
+      // Se campanhaId é UUID, a chave entra:
+      //   → resolve para o overload de 7 args
+      //   → grava vínculo em agent_messages/agent_conversations e dispara trigger de total_leads.
+      const args: Record<string, unknown> = {
         p_lead_ids:        params.leadIds,
         p_template_id:     params.templateId,
         p_user_id:         userData.user?.id ?? null,
         p_auto_aprovar:    params.autoAprovar ?? true,
         p_modo:            params.modo,
         p_incluir_imagem:  params.incluirImagem ?? true,
-      });
+      };
+      if (params.campanhaId) {
+        args.p_campanha_id = params.campanhaId;
+      }
+
+      const { data, error } = await supabase.rpc('fn_disparar_abertura_em_massa', args);
 
       if (error) throw error;
       return (data ?? []) as DisparoResultRow[];
