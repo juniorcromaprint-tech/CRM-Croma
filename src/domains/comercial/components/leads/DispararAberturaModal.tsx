@@ -20,6 +20,8 @@ import { showSuccess, showError } from '@/utils/toast';
 import { useTemplatesAbertura, useDispararAbertura } from '../../hooks/useDispararAbertura';
 import type { CanalDisparo, DisparoResultRow } from '../../hooks/useDispararAbertura';
 import type { LeadDisparo } from '../../hooks/useLeadsDisparo';
+import { useFeatureFlag } from '@/shared/hooks/useFeatureFlag';
+import { CampanhaSelector } from './CampanhaSelector';
 
 // ─── Types ───────────────────────────────────────────────────────────────────
 
@@ -139,6 +141,11 @@ export function DispararAberturaModal({ open, onClose, leads, onSuccess }: Props
   const [uploading, setUploading] = useState(false);
   const [resultado, setResultado] = useState<DisparoResultRow[] | null>(null);
 
+  // Vínculo opcional com campanha (atrás de feature flag).
+  // Default null = "Sem campanha (disparo avulso)" → comportamento legacy preservado.
+  const [campanhaId, setCampanhaId] = useState<string | null>(null);
+  const { enabled: campanhasLinkEnabled } = useFeatureFlag('feature_campanhas_link_disparo');
+
   // Upload de imagem direto no modal
   const handleImageUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
@@ -211,6 +218,9 @@ export function DispararAberturaModal({ open, onClose, leads, onSuccess }: Props
       modo,
       autoAprovar: true,
       incluirImagem: canal === 'email' ? incluirImagem : false,
+      // Cinto + suspensório: só envia campanhaId quando a flag está ativa.
+      // Mesmo se um estado residual ficar populado, com flag OFF a chave não vai pra RPC.
+      campanhaId: campanhasLinkEnabled ? campanhaId : null,
     });
     setResultado(data);
     setStep('resultado');
@@ -224,6 +234,7 @@ export function DispararAberturaModal({ open, onClose, leads, onSuccess }: Props
     setModo('agendado');
     setIncluirImagem(true);
     setImagemCustomUrl('');
+    setCampanhaId(null);
     setResultado(null);
     dispararMutation.reset();
     onClose();
@@ -445,6 +456,22 @@ export function DispararAberturaModal({ open, onClose, leads, onSuccess }: Props
         {/* ── Passo 3: Cadência ───────────────────────────────────────────── */}
         {step === 'cadencia' && (
           <div className="space-y-4">
+            {/* Vincular a campanha (opcional). Só aparece com feature flag ON.
+                Com flag OFF, este bloco inteiro não é renderizado e nada muda no fluxo. */}
+            {campanhasLinkEnabled && (
+              <div className="space-y-1.5">
+                <p className="text-xs font-medium text-slate-500 uppercase tracking-wide">
+                  Vincular a campanha (opcional)
+                </p>
+                <CampanhaSelector
+                  value={campanhaId}
+                  onChange={setCampanhaId}
+                  canal={canal === 'whatsapp' ? 'whatsapp' : 'email'}
+                  disabled={dispararMutation.isPending}
+                />
+              </div>
+            )}
+
             <p className="text-sm text-slate-600">Como enviar?</p>
 
             <RadioGroup value={modo} onValueChange={(v) => setModo(v as typeof modo)}>
