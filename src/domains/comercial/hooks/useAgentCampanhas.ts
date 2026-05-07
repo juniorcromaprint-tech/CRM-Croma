@@ -121,3 +121,70 @@ export function useCriarCampanhaRapida() {
     },
   });
 }
+
+// ─── Banner de campanha ativa (Entrega 2) ────────────────────────────────────
+// Busca a campanha em status='ativa' mais recente e calcula métricas REAIS
+// vinculadas (não mais por segmento). Retorna null se não houver campanha
+// ativa — nesse caso o banner usa fallback legacy (useCampanhaStatus por segmento).
+
+export interface CampanhaAtivaBannerData {
+  campanha: AgentCampanhaResumo;
+  totalLeads: number;          // count distinct lead em agent_conversations.campanha_id
+  totalDisparados: number;     // count distinct lead em agent_messages enviada/aprovada
+  totalEnfileiradas: number;   // count em agent_messages status='aprovada'
+  totalEnviadas: number;       // count em agent_messages status='enviada'
+}
+
+export function useCampanhaAtivaResumo() {
+  return useQuery<CampanhaAtivaBannerData | null>({
+    queryKey: ['agent_campanha_ativa_resumo'],
+    queryFn: async () => {
+      // 1. Pegar a campanha ativa mais recente
+      const { data: campanha, error } = await supabase
+        .from('agent_campanhas')
+        .select('id, nome, canal, status, total_alvo, data_inicio, data_fim')
+        .eq('status', 'ativa')
+        .order('created_at', { ascending: false })
+        .limit(1)
+        .maybeSingle();
+
+      if (error) {
+        console.warn('[useCampanhaAtivaResumo] erro:', error.message);
+        return null;
+      }
+      if (!campanha) return null;
+
+      // 2. Métricas vinculadas
+      const [convs, enfileiradas, enviadas, disparadas] = await Promise.all([
+        supabase
+          .from('agent_conversations')
+          .select('lead_id', { count: 'exact', head: true })
+          .eq('campanha_id', campanha.id),
+        supabase
+          .from('agent_messages')
+          .select('id', { count: 'exact', head: true })
+          .eq('campanha_id', campanha.id)
+          .eq('status', 'aprovada'),
+        supabase
+          .from('agent_messages')
+          .select('id', { count: 'exact', head: true })
+          .eq('campanha_id', campanha.id)
+          .eq('status', 'enviada'),
+        supabase
+          .from('agent_messages')
+          .select('lead_id', { count: 'exact', head: true })
+          .eq('campanha_id', campanha.id)
+          .in('status', ['enviada', 'aprovada']),
+      ]);
+
+      return {
+        campanha: campanha as AgentCampanhaResumo,
+        totalLeads:        convs.count        ?? 0,
+        totalDisparados:   disparadas.count   ?? 0,
+        totalEnfileiradas: enfileiradas.count ?? 0,
+        totalEnviadas:     enviadas.count     ?? 0,
+      };
+    },
+    staleTime: 60_000,
+  });
+}
