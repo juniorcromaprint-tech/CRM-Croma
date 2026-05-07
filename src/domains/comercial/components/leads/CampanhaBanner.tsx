@@ -1,13 +1,25 @@
 // src/domains/comercial/components/leads/CampanhaBanner.tsx
 // Banner do topo da tela /leads — mostra status agregado da campanha em andamento.
-// Fonte: redesign UX 2026-05-04L (mockup aprovado).
+//
+// v2 (2026-05-06 Entrega 2): lógica DUAL.
+//   - Se houver campanha em status='ativa' em agent_campanhas → mostra ela com
+//     métricas REAIS (totalLeads, totalDisparados, totalEnfileiradas vindo de
+//     agent_conversations.campanha_id e agent_messages.campanha_id).
+//   - Se NÃO houver → fallback para o cálculo legacy por segmento (preserva UX
+//     atual antes de migrar todos os disparos para campanhas reais).
+//
+// Métricas operacionais (dia da rampa, enviadas hoje, janelas BRT) continuam
+// vindo do hook useCampanhaStatus que lê dados globais do dia.
 
 import { Megaphone, TrendingUp, Clock, Send } from 'lucide-react';
 import { useCampanhaStatus } from '../../hooks/useLeadsDisparo';
+import { useCampanhaAtivaResumo } from '../../hooks/useAgentCampanhas';
 
 interface Props {
-  segmento?: string;       // default 'seguranca'
-  titulo?: string;         // default 'Envelopamento de poste para segurança'
+  /** Usado APENAS no fallback legacy quando não há campanha ativa em agent_campanhas. */
+  segmento?: string;
+  /** Override do título — só usado no fallback. Quando há campanha real, usa o nome dela. */
+  titulo?: string;
   className?: string;
 }
 
@@ -16,9 +28,14 @@ export function CampanhaBanner({
   titulo = 'Envelopamento de poste para segurança',
   className = '',
 }: Props) {
-  const { data, isLoading } = useCampanhaStatus(segmento);
+  // Fonte 1 (preferida): campanha ativa real em agent_campanhas
+  const { data: ativa, isLoading: loadingAtiva } = useCampanhaAtivaResumo();
+  // Fonte 2 (fallback + métricas operacionais sempre): cálculo legacy por segmento
+  const { data: status, isLoading: loadingStatus } = useCampanhaStatus(segmento);
 
-  if (isLoading || !data) {
+  const isLoading = loadingAtiva || loadingStatus;
+
+  if (isLoading || !status) {
     return (
       <div className={`bg-blue-50 border border-blue-100 rounded-2xl px-5 py-4 animate-pulse ${className}`}>
         <div className="h-4 bg-blue-100 rounded w-1/3 mb-2" />
@@ -27,8 +44,15 @@ export function CampanhaBanner({
     );
   }
 
-  const pctConcluido = data.totalLeads > 0
-    ? Math.round((data.totalDisparados / data.totalLeads) * 100)
+  // Decide a fonte de verdade do nome e dos números primários
+  const usandoCampanhaReal = !!ativa;
+  const tituloExibido    = usandoCampanhaReal ? ativa!.campanha.nome : titulo;
+  const totalLeads       = usandoCampanhaReal ? ativa!.totalLeads        : status.totalLeads;
+  const totalDisparados  = usandoCampanhaReal ? ativa!.totalDisparados   : status.totalDisparados;
+  const totalEnfileiradas= usandoCampanhaReal ? ativa!.totalEnfileiradas : status.totalEnfileiradas;
+
+  const pctConcluido = totalLeads > 0
+    ? Math.round((totalDisparados / totalLeads) * 100)
     : 0;
 
   return (
@@ -40,25 +64,33 @@ export function CampanhaBanner({
           </div>
           <div className="min-w-0">
             <div className="text-xs font-medium text-blue-700 uppercase tracking-wide">
-              Campanha em andamento
+              {usandoCampanhaReal ? `Campanha ativa · ${ativa!.campanha.canal}` : 'Campanha em andamento'}
             </div>
             <div className="text-sm font-semibold text-slate-800 mt-0.5 truncate">
-              {titulo}
+              {tituloExibido}
             </div>
             <div className="text-xs text-slate-500 mt-1 flex items-center gap-x-3 gap-y-1 flex-wrap">
               <span>
-                <strong className="text-slate-700">{data.totalLeads}</strong> leads totais
+                <strong className="text-slate-700">{totalLeads}</strong> leads totais
               </span>
               <span>·</span>
               <span>
-                <strong className="text-slate-700">{data.totalDisparados}</strong> já disparados
+                <strong className="text-slate-700">{totalDisparados}</strong> já disparados
                 <span className="text-slate-400 ml-1">({pctConcluido}%)</span>
               </span>
-              {data.totalEnfileiradas > 0 && (
+              {totalEnfileiradas > 0 && (
                 <>
                   <span>·</span>
                   <span>
-                    <strong className="text-slate-700">{data.totalEnfileiradas}</strong> na fila
+                    <strong className="text-slate-700">{totalEnfileiradas}</strong> na fila
+                  </span>
+                </>
+              )}
+              {usandoCampanhaReal && ativa!.campanha.total_alvo != null && ativa!.campanha.total_alvo > 0 && (
+                <>
+                  <span>·</span>
+                  <span>
+                    meta <strong className="text-slate-700">{ativa!.campanha.total_alvo}</strong>
                   </span>
                 </>
               )}
@@ -70,23 +102,23 @@ export function CampanhaBanner({
           <Stat
             icon={<TrendingUp size={11} />}
             label="Dia da rampa"
-            value={data.diaDaRampa != null ? `${data.diaDaRampa}/8` : '—'}
+            value={status.diaDaRampa != null ? `${status.diaDaRampa}/8` : '—'}
           />
           <Stat
             icon={<Send size={11} />}
             label="Enviadas hoje"
-            value={`${data.enviadasHoje}/${data.limiteDiarioAtual}`}
+            value={`${status.enviadasHoje}/${status.limiteDiarioAtual}`}
           />
           <Stat
             icon={<Clock size={11} />}
             label="Janelas BRT"
-            value={formatJanelas(data.janelas)}
+            value={formatJanelas(status.janelas)}
           />
         </div>
       </div>
 
       {/* Barra de progresso geral */}
-      {data.totalLeads > 0 && (
+      {totalLeads > 0 && (
         <div className="mt-3 h-1 bg-blue-100 rounded-full overflow-hidden">
           <div
             className="h-full bg-blue-500 transition-all"
