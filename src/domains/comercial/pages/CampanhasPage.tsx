@@ -292,7 +292,7 @@ function CampanhaDetailsSheet({
             <Row label="Início"  value={fmtDate(campanha.data_inicio)} />
             <Row label="Fim"     value={fmtDate(campanha.data_fim)} />
             <Row label="Meta"    value={campanha.total_alvo ? `${campanha.total_alvo} leads` : '—'} />
-            <Row label="Criada"  value={fmtDateTime(campanha.created_at)} />
+            <Row label="Criada"  value={fmtDateTime(campanha.criada_em)} />
             <div className="pt-2 flex justify-end">
               <Button size="sm" variant="outline" onClick={startEdit} className="gap-1">
                 <Edit2 size={12} /> Editar
@@ -396,7 +396,7 @@ export default function CampanhasPage() {
       const ordA = STATUS_CFG[a.status].ord;
       const ordB = STATUS_CFG[b.status].ord;
       if (ordA !== ordB) return ordA - ordB;
-      return new Date(b.created_at).getTime() - new Date(a.created_at).getTime();
+      return new Date(b.criada_em).getTime() - new Date(a.criada_em).getTime();
     });
   }, [campanhas]);
 

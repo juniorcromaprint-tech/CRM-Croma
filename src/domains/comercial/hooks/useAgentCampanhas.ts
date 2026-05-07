@@ -103,7 +103,7 @@ export function useCriarCampanhaRapida() {
           canal: input.canal,
           status: 'rascunho',
           data_fim: input.data_fim ?? null,
-          created_by: userData.user?.id ?? null,
+          criada_por: userData.user?.id ?? null,
         })
         .select('id, nome, canal, status, total_alvo, data_inicio, data_fim')
         .single();
@@ -144,7 +144,7 @@ export function useCampanhaAtivaResumo() {
         .from('agent_campanhas')
         .select('id, nome, canal, status, total_alvo, data_inicio, data_fim')
         .eq('status', 'ativa')
-        .order('created_at', { ascending: false })
+        .order('criada_em', { ascending: false })
         .limit(1)
         .maybeSingle();
 
@@ -198,7 +198,7 @@ export interface AgentCampanhaListagem extends AgentCampanhaResumo {
   total_lidas: number;
   total_respondidas: number;
   total_erros: number;
-  created_at: string;
+  criada_em: string;
 }
 
 /** Lista TODAS as campanhas (qualquer status) com agregados — ordem: ativa primeiro, depois mais recente. */
@@ -208,9 +208,9 @@ export function useCampanhasListagem() {
     queryFn: async () => {
       const { data, error } = await supabase
         .from('agent_campanhas')
-        .select('id, nome, canal, status, total_alvo, data_inicio, data_fim, total_leads, total_mensagens_criadas, total_enviadas, total_lidas, total_respondidas, total_erros, created_at')
+        .select('id, nome, canal, status, total_alvo, data_inicio, data_fim, total_leads, total_mensagens_criadas, total_enviadas, total_lidas, total_respondidas, total_erros, criada_em')
         .order('status', { ascending: true })
-        .order('created_at', { ascending: false });
+        .order('criada_em', { ascending: false });
       if (error) {
         console.warn('[useCampanhasListagem] erro:', error.message);
         return [];
