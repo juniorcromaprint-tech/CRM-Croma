@@ -188,3 +188,132 @@ export function useCampanhaAtivaResumo() {
     staleTime: 60_000,
   });
 }
+
+// ─── Listagem completa para CampanhasPage (Entrega 3) ────────────────────────
+
+export interface AgentCampanhaListagem extends AgentCampanhaResumo {
+  total_leads: number;
+  total_mensagens_criadas: number;
+  total_enviadas: number;
+  total_lidas: number;
+  total_respondidas: number;
+  total_erros: number;
+  created_at: string;
+}
+
+/** Lista TODAS as campanhas (qualquer status) com agregados — ordem: ativa primeiro, depois mais recente. */
+export function useCampanhasListagem() {
+  return useQuery<AgentCampanhaListagem[]>({
+    queryKey: ['agent_campanhas_listagem'],
+    queryFn: async () => {
+      const { data, error } = await supabase
+        .from('agent_campanhas')
+        .select('id, nome, canal, status, total_alvo, data_inicio, data_fim, total_leads, total_mensagens_criadas, total_enviadas, total_lidas, total_respondidas, total_erros, created_at')
+        .order('status', { ascending: true })
+        .order('created_at', { ascending: false });
+      if (error) {
+        console.warn('[useCampanhasListagem] erro:', error.message);
+        return [];
+      }
+      return (data ?? []) as AgentCampanhaListagem[];
+    },
+    staleTime: 30_000,
+  });
+}
+
+/** Atualiza apenas o status de uma campanha (pausar/ativar/concluir/cancelar). */
+export function useAtualizarStatusCampanha() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: async ({ id, status }: { id: string; status: AgentCampanhaStatus }) => {
+      const { data, error } = await supabase
+        .from('agent_campanhas')
+        .update({ status })
+        .eq('id', id)
+        .select('id, status')
+        .single();
+      if (error) throw error;
+      return data;
+    },
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: ['agent_campanhas_listagem'] });
+      qc.invalidateQueries({ queryKey: ['agent_campanhas_ativas'] });
+      qc.invalidateQueries({ queryKey: ['agent_campanha_ativa_resumo'] });
+      showSuccess('Status atualizado.');
+    },
+    onError: (e: any) => showError('Falha ao atualizar status: ' + (e?.message ?? 'erro')),
+  });
+}
+
+/** Atualiza nome, datas, total_alvo de uma campanha. */
+export interface AtualizarCampanhaInput {
+  id: string;
+  nome?: string;
+  total_alvo?: number | null;
+  data_inicio?: string | null;
+  data_fim?: string | null;
+}
+export function useAtualizarCampanhaMeta() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: async (input: AtualizarCampanhaInput) => {
+      const patch: Record<string, unknown> = {};
+      if (input.nome !== undefined)        patch.nome        = input.nome.trim();
+      if (input.total_alvo !== undefined)  patch.total_alvo  = input.total_alvo;
+      if (input.data_inicio !== undefined) patch.data_inicio = input.data_inicio;
+      if (input.data_fim !== undefined)    patch.data_fim    = input.data_fim;
+      const { data, error } = await supabase
+        .from('agent_campanhas')
+        .update(patch)
+        .eq('id', input.id)
+        .select('id')
+        .single();
+      if (error) throw error;
+      return data;
+    },
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: ['agent_campanhas_listagem'] });
+      qc.invalidateQueries({ queryKey: ['agent_campanha_ativa_resumo'] });
+      showSuccess('Campanha atualizada.');
+    },
+    onError: (e: any) => showError('Falha ao salvar: ' + (e?.message ?? 'erro')),
+  });
+}
+
+/** Lista de leads vinculados a uma campanha (via agent_conversations). */
+export interface LeadDeCampanha {
+  lead_id: string;
+  empresa: string | null;
+  contato_nome: string | null;
+  cidade: string | null;
+  ultima_mensagem_em: string | null;
+  conversation_id: string;
+}
+export function useLeadsDaCampanha(campanhaId: string | null) {
+  return useQuery<LeadDeCampanha[]>({
+    queryKey: ['agent_campanha_leads', campanhaId],
+    queryFn: async () => {
+      if (!campanhaId) return [];
+      const { data, error } = await supabase
+        .from('agent_conversations')
+        .select('id, lead_id, ultima_mensagem_em, leads!inner(empresa, contato_nome, cidade)')
+        .eq('campanha_id', campanhaId)
+        .order('ultima_mensagem_em', { ascending: false, nullsFirst: false })
+        .limit(200);
+      if (error) {
+        console.warn('[useLeadsDaCampanha] erro:', error.message);
+        return [];
+      }
+      return ((data ?? []) as any[]).map((row) => ({
+        lead_id: row.lead_id,
+        empresa: row.leads?.empresa ?? null,
+        contato_nome: row.leads?.contato_nome ?? null,
+        cidade: row.leads?.cidade ?? null,
+        ultima_mensagem_em: row.ultima_mensagem_em,
+        conversation_id: row.id,
+      })) as LeadDeCampanha[];
+    },
+    enabled: !!campanhaId,
+    staleTime: 30_000,
+  });
+}
