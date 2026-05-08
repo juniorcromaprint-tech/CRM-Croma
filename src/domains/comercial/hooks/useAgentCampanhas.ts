@@ -183,6 +183,59 @@ export function useCampanhaAtivaResumo() {
   });
 }
 
+// ─── Banner: lista de TODAS as campanhas ativas (plural) ─────────────────────
+// 2026-05-08: substitui o uso de useCampanhaAtivaResumo no banner do header.
+// Retorna 1 entry por campanha em status='ativa' com agregados materializados +
+// totalEnfileiradas calculado em runtime. Permite empilhar cards (email + whatsapp
+// + qualquer outra campanha ativa simultânea) em vez de sobrescrever.
+
+export function useCampanhasAtivasResumo() {
+  return useQuery<CampanhaAtivaBannerData[]>({
+    queryKey: ['agent_campanhas_ativas_resumo'],
+    queryFn: async () => {
+      const { data: campanhas, error } = await supabase
+        .from('agent_campanhas')
+        .select('id, nome, canal, status, total_alvo, data_inicio, data_fim, total_leads, total_enviadas, total_lidas, total_respondidas, total_erros')
+        .eq('status', 'ativa')
+        .order('canal', { ascending: true })       // email antes de whatsapp (alfabético)
+        .order('criada_em', { ascending: false }); // mais recente primeiro dentro do canal
+
+      if (error) {
+        console.warn('[useCampanhasAtivasResumo] erro:', error.message);
+        return [];
+      }
+      if (!campanhas || campanhas.length === 0) return [];
+
+      // Buscar enfileiradas (status='aprovada') de todas as campanhas em uma query só
+      const ids = campanhas.map((c: any) => c.id);
+      const { data: pendentes } = await supabase
+        .from('agent_messages')
+        .select('campanha_id')
+        .in('campanha_id', ids)
+        .eq('status', 'aprovada');
+
+      const enfileiradasPorCampanha: Record<string, number> = {};
+      for (const p of (pendentes ?? []) as any[]) {
+        enfileiradasPorCampanha[p.campanha_id] = (enfileiradasPorCampanha[p.campanha_id] ?? 0) + 1;
+      }
+
+      return campanhas.map((c: any) => ({
+        campanha: {
+          id: c.id, nome: c.nome, canal: c.canal, status: c.status,
+          total_alvo: c.total_alvo, data_inicio: c.data_inicio, data_fim: c.data_fim,
+        } as AgentCampanhaResumo,
+        totalLeads:        c.total_leads        ?? 0,
+        totalEnfileiradas: enfileiradasPorCampanha[c.id] ?? 0,
+        totalEnviadas:     c.total_enviadas     ?? 0,
+        totalLidas:        c.total_lidas        ?? 0,
+        totalRespondidas:  c.total_respondidas  ?? 0,
+        totalErros:        c.total_erros        ?? 0,
+      }));
+    },
+    staleTime: 60_000,
+  });
+}
+
 // ─── Listagem completa para CampanhasPage (Entrega 3) ────────────────────────
 
 export interface AgentCampanhaListagem extends AgentCampanhaResumo {

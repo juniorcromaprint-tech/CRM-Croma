@@ -1,4 +1,12 @@
 // supabase/functions/whatsapp-webhook/index.ts
+// v17 — P0+P1+P2+P3+P4 consolidados.
+//   P0 — bot/URA/loop detector + automacao_pausada early-return
+//   P1 — extração estruturada de dados via Claude (JSON) + gravarDadosExtraidos
+//        (validação CNPJ/email, blocklist nome=cargo, anti-sobrescrita por confiança)
+//   P2 — catálogo + lições aprendidas vindos de admin_config (editável sem deploy)
+//   P3 — counter atômico via RPC incrementar_contador_conversa (race fix)
+//   P4 — memória por lead (lead_memoria) lida e atualizada a cada conversa
+// v15 — P0: bot/URA/loop detector + automacao_pausada early-return.
 // v14 — Claude-powered WhatsApp auto-responder with full Croma CRM integration.
 //   - Uses Claude (via OpenRouter) for intelligent responses
 //   - Rich system prompt with real product catalog + company info
@@ -42,6 +50,140 @@ const FALLBACK_MODEL = 'openai/gpt-4.1-mini';
 
 // Palavras que indicam escalação (não responder automaticamente)
 const ESCALATION_KEYWORDS = /\b(cancelar|cancelamento|reclamação|reclamar|insatisfeito|problema grave|advogado|procon|processo|jurídico|péssimo|horrível|nunca mais|devolver|reembolso)\b/i;
+
+// ─────────────────────────────────────────────────────────────
+// P0 — Bot/URA/loop detection patterns
+// Detecta quando o "cliente" do outro lado é, na verdade, um bot, URA,
+// assistente virtual ou menu automático. Pausar auto-resposta nesses casos
+// para evitar loop bot vs bot e desperdício de tokens.
+// ─────────────────────────────────────────────────────────────
+const BOT_PATTERNS: { regex: RegExp; tipo: string }[] = [
+  // Saudações automáticas de URA / chatbot empresarial
+  { regex: /agradecemos?\s+(o\s+)?seu\s+contato/i, tipo: 'saudacao_automatica' },
+  { regex: /obrigad[oa]\s+por\s+entrar\s+em\s+contato/i, tipo: 'saudacao_automatica' },
+  { regex: /agradece\s+seu\s+contato/i, tipo: 'saudacao_automatica' },
+
+  // Identificação explícita de bot / assistente virtual
+  { regex: /\bsou\s+(o|a)?\s*(assistente|atendente)\s+virtual\b/i, tipo: 'assistente_virtual' },
+  { regex: /\b(assistente|atendente)\s+virtual\s+d[ao]\b/i, tipo: 'assistente_virtual' },
+  { regex: /\batendimento\s+autom[aá]tico\b/i, tipo: 'atendimento_automatico' },
+  { regex: /\bbot\s+d[ao]\s+atendimento\b/i, tipo: 'assistente_virtual' },
+  { regex: /\b(eu\s+)?vou\s+te\s+enviar\s+algumas\s+perguntas\b/i, tipo: 'assistente_virtual' },
+
+  // Menus / URA
+  { regex: /por\s+gentileza,?\s+(escolha|selecione|digite)/i, tipo: 'menu_ura' },
+  { regex: /escolha\s+(uma\s+|a\s+)?op[cç][aã]o/i, tipo: 'menu_ura' },
+  { regex: /selecione\s+(uma\s+|a\s+)?op[cç][aã]o/i, tipo: 'menu_ura' },
+  { regex: /digite\s+\d+\s+para/i, tipo: 'menu_ura' },
+  { regex: /clicar\s+na\s+op[cç][aã]o\s+que\s+mais\s+se\s+encaixa/i, tipo: 'menu_ura' },
+  // 2+ opções numeradas em sequência: "*1* - Comercial ... *2* - Boleto"
+  { regex: /\*?\s*1\s*\*?\s*[-–]\s*\w[^\n]{0,40}[\s\S]{0,80}\*?\s*2\s*\*?\s*[-–]\s*\w/i, tipo: 'menu_ura' },
+
+  // Horário de atendimento automático
+  { regex: /(nosso\s+)?hor[aá]rio\s+de\s+atendimento\s+(via\s+whatsapp\s+)?[éeè]/i, tipo: 'horario_automatico' },
+  { regex: /atendimento\s+via\s+whatsapp\s+(de|é)\s+(seg|2)/i, tipo: 'horario_automatico' },
+  { regex: /fora\s+do\s+(nosso\s+)?hor[aá]rio\s+(de\s+)?atendimento/i, tipo: 'horario_automatico' },
+  { regex: /central\s+24h/i, tipo: 'horario_automatico' },
+];
+
+// Caracteres invisíveis (LRM/RLM/PDI/etc.) que muitos bots de WhatsApp Business
+// inserem no início das mensagens — assinatura forte de bot.
+// U+200E LRM, U+200F RLM, U+202A-U+202E (embedding/override), U+2066-U+2069 (isolates).
+const BOT_INVISIBLE_PREFIX = /^[‎‏‪-‮⁦-⁩]/;
+
+function normalizarTexto(s: string): string {
+  return (s ?? '')
+    .toLowerCase()
+    .normalize('NFD')
+    .replace(/[̀-ͯ]/g, '') // remove diacríticos
+    .replace(/[^a-z0-9 ]/g, ' ')
+    .replace(/\s+/g, ' ')
+    .trim();
+}
+
+// Similaridade simples (Jaccard de tokens + substring overlap).
+// Suficiente pra detectar URA mandando o mesmo menu repetido.
+function similaridade(a: string, b: string): number {
+  const na = normalizarTexto(a);
+  const nb = normalizarTexto(b);
+  if (!na || !nb) return 0;
+  if (na === nb) return 1;
+  // Substring forte (uma é prefixo da outra)
+  const min = Math.min(na.length, nb.length);
+  if (min >= 40) {
+    const slice = Math.min(120, min);
+    if (na.startsWith(nb.slice(0, slice)) || nb.startsWith(na.slice(0, slice))) return 0.95;
+  }
+  const tokensA = new Set(na.split(' '));
+  const tokensB = new Set(nb.split(' '));
+  let inter = 0;
+  for (const t of tokensA) if (tokensB.has(t)) inter++;
+  const union = new Set([...tokensA, ...tokensB]).size;
+  return union ? inter / union : 0;
+}
+
+interface DeteccaoBot {
+  blocked: true;
+  motivo: string;
+  tipo: string;
+}
+
+// Retorna não-null se a conversa deve ter auto-resposta PAUSADA.
+async function detectarBotOuLoop(
+  supabase: ReturnType<typeof getServiceClient>,
+  conversationId: string,
+  mensagemAtual: string,
+): Promise<DeteccaoBot | null> {
+  const texto = (mensagemAtual ?? '').trim();
+  if (!texto) return null;
+
+  // (a) Caracter invisível típico de bot WhatsApp Business
+  if (BOT_INVISIBLE_PREFIX.test(texto)) {
+    return { blocked: true, motivo: 'Mensagem com caracter invisível típico de bot WhatsApp Business', tipo: 'bot_signature_char' };
+  }
+
+  // (b) Padrões de bot/URA conhecidos
+  for (const { regex, tipo } of BOT_PATTERNS) {
+    if (regex.test(texto)) {
+      return { blocked: true, motivo: `Padrão detectado: ${tipo}`, tipo };
+    }
+  }
+
+  // (c) Repetição: 2+ das últimas 3 recebidas são praticamente iguais
+  const { data: ultimas } = await supabase
+    .from('agent_messages')
+    .select('conteudo, created_at')
+    .eq('conversation_id', conversationId)
+    .eq('direcao', 'recebida')
+    .order('created_at', { ascending: false })
+    .limit(3);
+
+  if (ultimas && ultimas.length >= 2) {
+    const conteudos = ultimas.map((m: Record<string, unknown>) => (m.conteudo as string) ?? '');
+    let pares = 0;
+    if (similaridade(conteudos[0], conteudos[1]) >= 0.9) pares++;
+    if (conteudos.length >= 3 && similaridade(conteudos[0], conteudos[2]) >= 0.9) pares++;
+    if (conteudos.length >= 3 && similaridade(conteudos[1], conteudos[2]) >= 0.9) pares++;
+    if (pares >= 1 && conteudos.length >= 3) {
+      return { blocked: true, motivo: 'Contraparte enviou mensagens praticamente idênticas em sequência', tipo: 'loop_repeticao' };
+    }
+  }
+
+  // (d) Circuit breaker volumétrico: 5+ enviadas pelo nosso bot nos últimos 5 min
+  const cincoMinAtras = new Date(Date.now() - 5 * 60_000).toISOString();
+  const { count: enviadasRecentes } = await supabase
+    .from('agent_messages')
+    .select('id', { count: 'exact', head: true })
+    .eq('conversation_id', conversationId)
+    .eq('direcao', 'enviada')
+    .gte('created_at', cincoMinAtras);
+
+  if ((enviadasRecentes ?? 0) >= 5) {
+    return { blocked: true, motivo: `Circuit breaker: ${enviadasRecentes} respostas enviadas em 5min`, tipo: 'circuit_breaker' };
+  }
+
+  return null;
+}
 
 // ─────────────────────────────────────────────────────────────
 // Phone normalization
@@ -151,8 +293,14 @@ async function sendWhatsApp(
 
 // ─────────────────────────────────────────────────────────────
 // Build Claude system prompt with full Croma context
+// v17 (P1+P2): catálogo carregado de admin_config, lições aprendidas,
+// JSON estruturado de saída com dados_extraidos + confianca.
 // ─────────────────────────────────────────────────────────────
-function buildCromaSystemPrompt(dadosFaltantes: string[]): string {
+function buildCromaSystemPrompt(
+  dadosFaltantes: string[],
+  catalogo: CatalogoConfig | null,
+  licoes: LicoesConfig | null,
+): string {
   const coletaDados = dadosFaltantes.length > 0
     ? `\n## COLETA DE DADOS — PRIORIDADE
 Antes de gerar qualquer orçamento formal, você PRECISA coletar os seguintes dados que ainda faltam do cliente:
@@ -160,6 +308,22 @@ ${dadosFaltantes.map(d => `- ${d}`).join('\n')}
 
 Peça essas informações de forma natural e amigável na conversa. Exemplo: "Para formalizar o orçamento, preciso de alguns dados: seu nome completo, email para envio e a cidade/estado de vocês."
 NÃO gere orçamento sem ter pelo menos: nome completo, email e cidade/estado.\n`
+    : '';
+
+  // Catálogo dinâmico de admin_config.agent_catalogo (fallback hardcoded curto)
+  const produtosLista = catalogo?.produtos?.length
+    ? catalogo.produtos.map(p => `- ${p}`).join('\n')
+    : `- Banners, lonas, adesivos, placas, fachadas ACM, letras caixa, cavaletes, totens, material PDV, envelopamento veicular, postes de monitoramento, comunicação visual para empresas de segurança, projetos sob medida`;
+  const diferenciaisLista = catalogo?.diferenciais?.length
+    ? catalogo.diferenciais.map(d => `- ${d}`).join('\n')
+    : '- Produção própria, atendimento nacional, solução do projeto à instalação';
+  const regraInclusao = catalogo?.regra_inclusao
+    ?? 'Se o cliente perguntar por algo que não está na lista, NÃO afirmar categoricamente que não fazemos. Responder: "A Croma trabalha com comunicação visual e projetos sob medida. Consigo verificar com a equipe e confirmar a melhor solução para você."';
+
+  // Lições aprendidas globais (admin_config.agente_licoes)
+  const licoesBloco = licoes?.licoes?.length
+    ? `\n## LIÇÕES APRENDIDAS (regras globais — sempre respeitar)
+${licoes.licoes.map(l => `- ${l}`).join('\n')}\n`
     : '';
 
   return `Você é o vendedor consultivo da *Croma Print Comunicação Visual*, respondendo clientes via WhatsApp.
@@ -171,27 +335,15 @@ NÃO gere orçamento sem ter pelo menos: nome completo, email e cidade/estado.\n
 - 6 funcionários de produção, faturamento médio R$ 110.000/mês
 - Responsável: Junior (dono)
 
-## CATÁLOGO DE PRODUTOS (resumo)
-- *Banners e Lonas*: diversos tamanhos (40x60 a 120x200cm), personalizado por m². Acabamentos: ilhós, bastão, corda
-- *Fachadas/Revestimento ACM*: alumínio composto, alta durabilidade, projeto personalizado
-- *Adesivos*: blackout, leitoso, perfurado, recorte eletrônico (1ª e 2ª linha)
-- *Placas*: ACM, PS, PVC expandido, acrílico (branco e transparente)
-- *Letras Caixa*: galvanizada, com/sem acrílico, diversos tamanhos
-- *Luminosos*: caixa 1ª linha, frente acrílico + laterais ACM
-- *Cavaletes*: madeira+lona, metálico (P/M/G, 1 ou 2 faces)
-- *Totens ACM*: projeto personalizado
-- *Material PDV*: displays, móbiles, precificadores, faixas de gôndola, bolsas PETG
-- *Envelopamento veicular*
-- *Cartões de visita*: 2ª linha, 1ª linha (laminação fosca + verniz), premium (hot stamping)
-- *Corte em Router CNC*
-- *Criação e Arte Final*
-- *Serviços*: instalação, laminação, acabamentos especiais
+## CATÁLOGO DE PRODUTOS (atualizado de admin_config)
+${produtosLista}
 
-## DIFERENCIAS
-1. Produção própria = controle total de qualidade e prazo
-2. Experiência com redes = padronização para múltiplas lojas
-3. Atendimento personalizado = cada projeto é único
-4. Desde o projeto até a instalação = solução completa
+## DIFERENCIAIS
+${diferenciaisLista}
+
+## REGRA DE INCLUSÃO (IMPORTANTE)
+${regraInclusao}
+${licoesBloco}
 
 ## FAIXAS DE PREÇO (referência — orçamento formal calculado pelo sistema)
 - *Banners/Lonas*: a partir de R$ 25/m² (lona 280g) até R$ 55/m² (lona 440g frontlit)
@@ -233,19 +385,60 @@ ${coletaDados}
 - Comercial: 8h-18h (seg-sex)
 - Fora do horário: responda normalmente mas mencione que detalhes técnicos serão confirmados no próximo dia útil
 
-## DETECÇÃO DE INTENÇÃO
-Ao final da sua resposta, adicione numa linha separada uma tag invisível com a intenção detectada:
-[INTENT:conversa] — saudação, dúvida geral, informação
-[INTENT:coleta_dados] — preciso coletar dados faltantes antes de orçar
-[INTENT:orcamento] — cliente já forneceu produto+dimensões+quantidade E eu tenho os dados cadastrais dele (nome, email, cidade)
-[INTENT:formalizar] — cliente pediu para formalizar/gerar/enviar orçamento E eu tenho os dados cadastrais dele
-[INTENT:suporte] — problema com pedido existente
-[INTENT:reclamacao] — insatisfação
+## FORMATO DA RESPOSTA — JSON OBRIGATÓRIO (sem markdown, sem texto antes/depois)
+Retorne EXATAMENTE este JSON:
+{
+  "resposta_texto": "texto curto e natural que será enviado ao cliente via WhatsApp (max 3 parágrafos)",
+  "intent": "conversa|coleta_dados|orcamento|formalizar|suporte|reclamacao",
+  "dados_extraidos": {
+    "nome": null,
+    "email": null,
+    "telefone": null,
+    "empresa": null,
+    "cnpj": null,
+    "cidade": null,
+    "uf": null,
+    "cargo": null,
+    "segmento": null,
+    "endereco": null,
+    "necessidade": null,
+    "urgencia": null,
+    "produto_interesse": null
+  },
+  "confianca": {
+    "nome": "alta|media|baixa",
+    "email": "alta|media|baixa",
+    "telefone": "alta|media|baixa",
+    "empresa": "alta|media|baixa",
+    "cnpj": "alta|media|baixa",
+    "cidade": "alta|media|baixa",
+    "uf": "alta|media|baixa"
+  },
+  "memoria_atualizar": {
+    "produto_interesse": null,
+    "necessidade": null,
+    "urgencia": null,
+    "proximos_passos": null,
+    "resumo_curto": null
+  }
+}
 
-IMPORTANTE: Só marque [INTENT:orcamento] ou [INTENT:formalizar] se os dados cadastrais (nome completo, email, cidade/estado) JÁ foram coletados. Se faltarem dados, use [INTENT:coleta_dados].
+REGRAS DE INTENT:
+- Só marque "orcamento" ou "formalizar" se nome+email+cidade JÁ foram coletados.
+- Se faltam dados cadastrais use "coleta_dados".
 
-## FORMATO DA RESPOSTA
-Responda o texto da mensagem + a tag [INTENT:xxx] na última linha. Sem JSON, sem metadata. Apenas o texto puro da resposta seguido da tag de intenção.`;
+REGRAS DE EXTRAÇÃO (dados_extraidos):
+- Preencha SOMENTE com informação dita pelo cliente NA MENSAGEM ATUAL ou no histórico recente. Nunca invente.
+- "nome": APENAS pessoa real. NUNCA cargo/função/bot ("assistente virtual", "atendimento", "comercial", "financeiro", "suporte", "bot", "URA", "atendente"). Se for esse caso, deixe null.
+- "email": valide se contém @ e domínio. Se duvidoso, null.
+- "cnpj": apenas se 14 dígitos numéricos válidos. Senão null.
+- "uf": 2 letras maiúsculas (RS, SP, etc.).
+- Se o dado já está confirmado em conversa anterior (ver "MEMÓRIA") e o cliente não repetiu, deixe null (não duplica).
+- "confianca": "alta" se cliente afirmou explicitamente; "media" se claramente inferido; "baixa" se incerto.
+
+REGRAS DE MEMÓRIA (memoria_atualizar):
+- "resumo_curto": 1-2 frases resumindo o estado atual da conversa (interesse, dores, próximo passo). Sobrescreve o resumo anterior.
+- Outros campos: preencher só se mudaram. Se não mudou, null.`;
 }
 
 // ─────────────────────────────────────────────────────────────
@@ -324,8 +517,263 @@ async function tryUpdateLeadFromMessage(
   if (Object.keys(updates).length > 0) {
     updates.updated_at = new Date().toISOString();
     await supabase.from('leads').update(updates).eq('id', leadId);
-    console.log('whatsapp-webhook: Lead data updated from message:', Object.keys(updates));
+    console.log('whatsapp-webhook: Lead data updated from message (regex fallback):', Object.keys(updates));
   }
+}
+
+// ─────────────────────────────────────────────────────────────
+// P2 — Carregar catálogo + lições aprendidas de admin_config
+// ─────────────────────────────────────────────────────────────
+interface CatalogoConfig {
+  produtos: string[];
+  diferenciais: string[];
+  regra_inclusao: string;
+}
+interface LicoesConfig {
+  licoes: string[];
+}
+
+async function loadCatalogoELicoes(
+  supabase: ReturnType<typeof getServiceClient>,
+): Promise<{ catalogo: CatalogoConfig | null; licoes: LicoesConfig | null }> {
+  try {
+    const { data } = await supabase
+      .from('admin_config')
+      .select('chave, valor')
+      .in('chave', ['agent_catalogo', 'agente_licoes']);
+    let catalogo: CatalogoConfig | null = null;
+    let licoes: LicoesConfig | null = null;
+    for (const row of data ?? []) {
+      const v = typeof row.valor === 'string' ? JSON.parse(row.valor) : row.valor;
+      if (row.chave === 'agent_catalogo') catalogo = v as CatalogoConfig;
+      if (row.chave === 'agente_licoes') licoes = v as LicoesConfig;
+    }
+    return { catalogo, licoes };
+  } catch (err) {
+    console.error('loadCatalogoELicoes:', err);
+    return { catalogo: null, licoes: null };
+  }
+}
+
+// ─────────────────────────────────────────────────────────────
+// P4 — Memória por lead (lê e injeta no contexto)
+// ─────────────────────────────────────────────────────────────
+interface LeadMemoria {
+  resumo: string;
+  dados_confirmados: Record<string, unknown>;
+  produto_interesse: string | null;
+  necessidade: string | null;
+  urgencia: string | null;
+  proximos_passos: string | null;
+  mensagens_processadas: number;
+}
+
+async function lerMemoriaLead(
+  supabase: ReturnType<typeof getServiceClient>,
+  leadId: string,
+): Promise<LeadMemoria | null> {
+  try {
+    const { data } = await supabase
+      .from('lead_memoria')
+      .select('resumo, dados_confirmados, produto_interesse, necessidade, urgencia, proximos_passos, mensagens_processadas')
+      .eq('lead_id', leadId)
+      .maybeSingle();
+    return data as LeadMemoria | null;
+  } catch (err) {
+    console.error('lerMemoriaLead:', err);
+    return null;
+  }
+}
+
+async function atualizarMemoriaLead(
+  supabase: ReturnType<typeof getServiceClient>,
+  leadId: string,
+  patch: Partial<LeadMemoria> & { incrementar_processadas?: boolean },
+): Promise<void> {
+  try {
+    const atual = await lerMemoriaLead(supabase, leadId);
+    const novoResumo = patch.resumo ?? atual?.resumo ?? '';
+    const novosDados = { ...(atual?.dados_confirmados ?? {}), ...(patch.dados_confirmados ?? {}) };
+    const upsert = {
+      lead_id: leadId,
+      resumo: novoResumo.substring(0, 2000), // limite pra não inflar contexto
+      dados_confirmados: novosDados,
+      produto_interesse: patch.produto_interesse ?? atual?.produto_interesse ?? null,
+      necessidade: patch.necessidade ?? atual?.necessidade ?? null,
+      urgencia: patch.urgencia ?? atual?.urgencia ?? null,
+      proximos_passos: patch.proximos_passos ?? atual?.proximos_passos ?? null,
+      mensagens_processadas: (atual?.mensagens_processadas ?? 0) + (patch.incrementar_processadas ? 1 : 0),
+      atualizado_em: new Date().toISOString(),
+    };
+    const { error } = await supabase.from('lead_memoria').upsert(upsert, { onConflict: 'lead_id' }).select().single();
+    if (error) console.error('atualizarMemoriaLead upsert:', error.message);
+  } catch (err) {
+    console.error('atualizarMemoriaLead:', err);
+  }
+}
+
+// ─────────────────────────────────────────────────────────────
+// P1 — Extração inteligente: validar e gravar dados extraídos pela IA
+// Aplica regras de blocklist, validação de formato, anti-sobrescrita.
+// ─────────────────────────────────────────────────────────────
+const NOMES_BLOCKLIST = /^(assistente|atendente|atendimento|comercial|financeiro|suporte|bot|ura|robo|virtual|automatico|sac|callcenter|cobranca|recepcao|vendas|administracao|secretaria|gerencia)\b/i;
+
+function isValidEmail(email: string): boolean {
+  return /^[\w.+-]+@[\w-]+(\.[\w-]+)+$/.test(email.trim());
+}
+function digitsOnly(s: string): string {
+  return (s ?? '').replace(/\D/g, '');
+}
+function isValidCNPJ(cnpj: string): boolean {
+  const d = digitsOnly(cnpj);
+  if (d.length !== 14) return false;
+  if (/^(\d)\1{13}$/.test(d)) return false; // todos iguais
+  return true; // checagem completa de DV é opcional, formato OK
+}
+
+interface DadosExtraidos {
+  nome?: string | null;
+  email?: string | null;
+  telefone?: string | null;
+  empresa?: string | null;
+  cnpj?: string | null;
+  cidade?: string | null;
+  uf?: string | null;
+  cargo?: string | null;
+  segmento?: string | null;
+  endereco?: string | null;
+  necessidade?: string | null;
+  urgencia?: string | null;
+  produto_interesse?: string | null;
+}
+type ConfiancaLevel = 'alta' | 'media' | 'baixa';
+type Confiancas = Partial<Record<keyof DadosExtraidos, ConfiancaLevel>>;
+
+async function gravarDadosExtraidos(
+  supabase: ReturnType<typeof getServiceClient>,
+  leadId: string,
+  currentLead: Record<string, unknown>,
+  dados: DadosExtraidos,
+  confianca: Confiancas,
+): Promise<{ ok: boolean; gravados: string[]; bloqueados: string[]; observacao_extra: string[] }> {
+  const updates: Record<string, unknown> = {};
+  const bloqueados: string[] = [];
+  const obsExtras: string[] = [];
+
+  const conf = (k: keyof DadosExtraidos): ConfiancaLevel => (confianca[k] as ConfiancaLevel) ?? 'baixa';
+
+  // Nome — anti-cargo, anti-bot
+  if (dados.nome) {
+    const nome = dados.nome.trim();
+    if (NOMES_BLOCKLIST.test(nome)) {
+      bloqueados.push(`nome:"${nome}" (parece cargo/bot)`);
+    } else if (conf('nome') !== 'baixa') {
+      const palavras = nome.split(/\s+/).filter(Boolean);
+      const nomeAtual = (currentLead.contato_nome as string) ?? '';
+      if (palavras.length === 1) {
+        // Primeiro nome só — aceita só se atual está vazio ou é placeholder WhatsApp
+        if (!nomeAtual || nomeAtual.startsWith('WhatsApp ')) updates.contato_nome = nome;
+        else bloqueados.push(`nome:"${nome}" (só primeiro nome, atual já tem mais)`);
+      } else if (palavras.length >= 2) {
+        // Nome completo — sobrescreve se atual está fraco ou se confiança alta
+        const atualPalavras = nomeAtual.split(/\s+/).filter(Boolean).length;
+        if (atualPalavras < 2 || conf('nome') === 'alta') updates.contato_nome = nome;
+      }
+    } else {
+      bloqueados.push(`nome:"${nome}" (confiança baixa)`);
+    }
+  }
+
+  // Email
+  if (dados.email && isValidEmail(dados.email)) {
+    if (!currentLead.contato_email || conf('email') === 'alta') {
+      updates.contato_email = dados.email.toLowerCase().trim();
+    }
+  } else if (dados.email) {
+    bloqueados.push(`email:"${dados.email}" (formato inválido)`);
+  }
+
+  // CNPJ
+  if (dados.cnpj) {
+    if (isValidCNPJ(dados.cnpj)) {
+      if (!currentLead.cnpj || conf('cnpj') === 'alta') updates.cnpj = digitsOnly(dados.cnpj);
+    } else {
+      bloqueados.push(`cnpj:"${dados.cnpj}" (formato inválido)`);
+    }
+  }
+
+  // Empresa
+  if (dados.empresa) {
+    const empresa = dados.empresa.trim();
+    const empresaAtual = (currentLead.empresa as string) ?? '';
+    if (NOMES_BLOCKLIST.test(empresa)) {
+      bloqueados.push(`empresa:"${empresa}" (parece cargo)`);
+    } else if (!empresaAtual || empresaAtual.startsWith('WhatsApp ') || (conf('empresa') === 'alta' && empresa.toLowerCase() !== empresaAtual.toLowerCase())) {
+      updates.empresa = empresa.substring(0, 200);
+    }
+  }
+
+  // Cidade — coluna própria
+  if (dados.cidade) {
+    if (!currentLead.cidade || conf('cidade') === 'alta') {
+      updates.cidade = dados.cidade.trim().substring(0, 100);
+    }
+  }
+  // UF — coluna própria, valida 2 letras
+  if (dados.uf && /^[A-Za-z]{2}$/.test(dados.uf.trim())) {
+    if (!currentLead.uf || conf('uf') === 'alta') updates.uf = dados.uf.trim().toUpperCase();
+  }
+
+  // Cargo
+  if (dados.cargo && !currentLead.cargo) updates.cargo = dados.cargo.trim().substring(0, 100);
+
+  // Segmento
+  if (dados.segmento && !currentLead.segmento) updates.segmento = dados.segmento.trim().substring(0, 100);
+
+  // Telefone alternativo (não sobrescreve contato_telefone principal)
+  if (dados.telefone) {
+    const telD = digitsOnly(dados.telefone);
+    if (telD.length >= 10 && !currentLead.telefone2) updates.telefone2 = telD;
+  }
+
+  // Necessidade / urgência / produto / endereço — vão pra observações estruturadas
+  if (dados.necessidade) obsExtras.push(`Necessidade: ${dados.necessidade}`);
+  if (dados.urgencia) obsExtras.push(`Urgência: ${dados.urgencia}`);
+  if (dados.produto_interesse) obsExtras.push(`Interesse: ${dados.produto_interesse}`);
+  if (dados.endereco) obsExtras.push(`Endereço: ${dados.endereco}`);
+
+  if (obsExtras.length > 0) {
+    const obsAtual = (currentLead.observacoes as string) ?? '';
+    const novas = obsExtras.filter(o => !obsAtual.includes(o.split(':')[0] + ':'));
+    if (novas.length > 0) {
+      const merged = obsAtual ? `${obsAtual} | ${novas.join(' | ')}` : novas.join(' | ');
+      updates.observacoes = merged.substring(0, 2000);
+    }
+  }
+
+  if (Object.keys(updates).length === 0) {
+    return { ok: true, gravados: [], bloqueados, observacao_extra: obsExtras };
+  }
+
+  updates.updated_at = new Date().toISOString();
+  const { error } = await supabase.from('leads').update(updates).eq('id', leadId).select().single();
+  if (error) {
+    console.error('gravarDadosExtraidos:', error.message);
+    return { ok: false, gravados: [], bloqueados, observacao_extra: obsExtras };
+  }
+
+  // Auditoria
+  const camposGravados = Object.keys(updates).filter(k => k !== 'updated_at');
+  await supabase.from('atividades_comerciais').insert({
+    entidade_tipo: 'lead',
+    entidade_id: leadId,
+    tipo: 'sistema',
+    descricao: `[IA-Extração] Atualizou: ${camposGravados.join(', ')}` + (bloqueados.length > 0 ? ` | Bloqueado: ${bloqueados.join('; ')}` : ''),
+    resultado: 'sucesso',
+    data_atividade: new Date().toISOString(),
+  });
+
+  return { ok: true, gravados: camposGravados, bloqueados, observacao_extra: obsExtras };
 }
 
 // ─────────────────────────────────────────────────────────────
@@ -498,13 +946,27 @@ async function enviarEmailProposta(
   }
 }
 
+interface ClaudeStructuredResponse {
+  text: string;
+  intent: string;
+  dados: DadosExtraidos;
+  confianca: Confiancas;
+  memoria: {
+    produto_interesse?: string | null;
+    necessidade?: string | null;
+    urgencia?: string | null;
+    proximos_passos?: string | null;
+    resumo_curto?: string | null;
+  };
+}
+
 async function generateClaudeResponse(
   supabase: ReturnType<typeof getServiceClient>,
   lead: Record<string, unknown>,
   conversation: Record<string, unknown>,
   incomingMessage: string,
   contactName: string,
-): Promise<{ text: string; intent: string } | null> {
+): Promise<ClaudeStructuredResponse | null> {
   try {
     // Check API key
     let apiKey = Deno.env.get('OPENROUTER_API_KEY');
@@ -522,6 +984,10 @@ async function generateClaudeResponse(
     }
 
     setFallbackModel(FALLBACK_MODEL);
+
+    // P2: catálogo + lições; P4: memória do lead
+    const { catalogo, licoes } = await loadCatalogoELicoes(supabase);
+    const memoria = await lerMemoriaLead(supabase, lead.id as string);
 
     // Load last 10 messages for context (including media fields)
     const { data: recentMsgs } = await supabase
@@ -572,6 +1038,19 @@ async function generateClaudeResponse(
     // Determine missing customer data
     const dadosFaltantes = checkDadosFaltantes(fullLead || lead);
 
+    // P4: bloco de memória pra injetar no contexto
+    const memoriaBloco = memoria
+      ? [
+          `## MEMÓRIA DESTE LEAD (de conversas anteriores)`,
+          memoria.resumo ? `Resumo: ${memoria.resumo}` : '',
+          memoria.produto_interesse ? `Produto/interesse: ${memoria.produto_interesse}` : '',
+          memoria.necessidade ? `Necessidade: ${memoria.necessidade}` : '',
+          memoria.urgencia ? `Urgência: ${memoria.urgencia}` : '',
+          memoria.proximos_passos ? `Próximos passos: ${memoria.proximos_passos}` : '',
+          `Mensagens já processadas: ${memoria.mensagens_processadas ?? 0}`,
+        ].filter(Boolean).join('\n')
+      : '## MEMÓRIA DESTE LEAD\n(primeiro contato — sem memória prévia)';
+
     // Build user prompt with all context
     const userPrompt = [
       `## DADOS DO LEAD`,
@@ -584,6 +1063,8 @@ async function generateClaudeResponse(
       fullLead?.observacoes ? `Observações: ${fullLead.observacoes}` : '',
       dadosFaltantes.length > 0 ? `\n⚠️ DADOS FALTANTES PARA ORÇAMENTO: ${dadosFaltantes.join(', ')}` : '\n✅ Todos os dados cadastrais coletados — pode gerar orçamento',
       ``,
+      memoriaBloco,
+      ``,
       pedidos && pedidos.length > 0 ? `## PEDIDOS ANTERIORES\n${pedidos.map((p: Record<string, unknown>) => `- Pedido #${p.numero}: ${p.status} (R$ ${p.valor_total})`).join('\n')}` : '## PEDIDOS ANTERIORES\nNenhum pedido anterior (lead novo)',
       ``,
       `## HISTÓRICO DA CONVERSA`,
@@ -592,17 +1073,17 @@ async function generateClaudeResponse(
       `## MENSAGEM RECEBIDA AGORA`,
       incomingMessage,
       ``,
-      `Responda como Junior da Croma Print. Texto da mensagem + tag [INTENT:xxx] na última linha.`,
+      `Responda como Junior da Croma Print. Retorne SOMENTE o JSON estruturado especificado no system prompt.`,
     ].filter(Boolean).join('\n');
 
     const aiResult = await callOpenRouter(
-      buildCromaSystemPrompt(dadosFaltantes),
+      buildCromaSystemPrompt(dadosFaltantes, catalogo, licoes),
       userPrompt,
       {
         model: CLAUDE_MODEL,
         temperature: 0.7,
-        max_tokens: 600,
-        text_mode: true,
+        max_tokens: 1200, // mais espaço pro JSON estruturado
+        text_mode: false, // queremos JSON
       }
     );
 
@@ -621,8 +1102,42 @@ async function generateClaudeResponse(
 
     console.log(`whatsapp-webhook: Claude response generated (${aiResult.duration_ms}ms, $${aiResult.cost_usd.toFixed(4)})`);
 
-    const { cleanText, intent } = extractIntent(aiResult.content);
-    return { text: cleanText, intent };
+    // Parse JSON estruturado (P1)
+    let parsed: Record<string, unknown> = {};
+    try {
+      parsed = JSON.parse(aiResult.content);
+    } catch (e) {
+      console.error('whatsapp-webhook: Claude JSON parse failed, fallback p/ texto puro:', e);
+      // Fallback gracioso: usa o conteúdo como texto direto, intent=conversa
+      const fallbackText = String(aiResult.content || '').replace(/\[INTENT:\w+\]\s*$/, '').trim();
+      return {
+        text: fallbackText || 'Recebi sua mensagem! Em instantes te respondo melhor.',
+        intent: 'conversa',
+        dados: {},
+        confianca: {},
+        memoria: {},
+      };
+    }
+
+    const text = String(parsed.resposta_texto ?? '').trim();
+    const intent = String(parsed.intent ?? 'conversa');
+    const dados = (parsed.dados_extraidos as DadosExtraidos) ?? {};
+    const confianca = (parsed.confianca as Confiancas) ?? {};
+    const memoriaUpdate = (parsed.memoria_atualizar as Record<string, unknown>) ?? {};
+
+    return {
+      text: text || 'Recebi sua mensagem! Em instantes te respondo melhor.',
+      intent,
+      dados,
+      confianca,
+      memoria: {
+        produto_interesse: (memoriaUpdate.produto_interesse as string) ?? null,
+        necessidade: (memoriaUpdate.necessidade as string) ?? null,
+        urgencia: (memoriaUpdate.urgencia as string) ?? null,
+        proximos_passos: (memoriaUpdate.proximos_passos as string) ?? null,
+        resumo_curto: (memoriaUpdate.resumo_curto as string) ?? null,
+      },
+    };
   } catch (err) {
     console.error('whatsapp-webhook: Claude response failed:', err);
     return null;
@@ -962,7 +1477,7 @@ serve(async (req: Request) => {
     // ── 2. Find or create conversation ──────────────────────
     const { data: convRows } = await supabase
       .from('agent_conversations')
-      .select('id, status, mensagens_recebidas, score_engajamento')
+      .select('id, status, mensagens_recebidas, mensagens_enviadas, score_engajamento, automacao_pausada, metadata')
       .eq('lead_id', lead.id)
       .eq('canal', 'whatsapp')
       .in('status', ['ativa', 'escalada'])
@@ -983,7 +1498,7 @@ serve(async (req: Request) => {
           mensagens_enviadas: 0,
           score_engajamento: 0,
         })
-        .select('id, status, mensagens_recebidas, score_engajamento')
+        .select('id, status, mensagens_recebidas, mensagens_enviadas, score_engajamento, automacao_pausada, metadata')
         .single();
 
       if (convErr || !newConv) {
@@ -1031,15 +1546,13 @@ serve(async (req: Request) => {
       },
     });
 
-    // ── 5. Update counters ──────────────────────────────────
-    await supabase
-      .from('agent_conversations')
-      .update({
-        mensagens_recebidas: (conversation.mensagens_recebidas ?? 0) + 1,
-        ultima_mensagem_em: now,
-        score_engajamento: (conversation.score_engajamento ?? 0) + 15,
-      })
-      .eq('id', conversation.id);
+    // ── 5. Update counters (P3 — incremento atômico via RPC) ──
+    await supabase.rpc('incrementar_contador_conversa', {
+      p_id: conversation.id,
+      p_enviadas: 0,
+      p_recebidas: 1,
+      p_score: 15,
+    });
 
     // ── 6. Log activity ─────────────────────────────────────
     await supabase.from('atividades_comerciais').insert({
@@ -1051,7 +1564,7 @@ serve(async (req: Request) => {
       data_atividade: now,
     });
 
-    // ── 7. Check for escalation ─────────────────────────────
+    // ── 7. Check for escalation (palavras-chave) ───────────
     if (ESCALATION_KEYWORDS.test(textBody) || conversation.status === 'escalada') {
       // Don't auto-respond — escalate to Junior
       await supabase
@@ -1059,22 +1572,78 @@ serve(async (req: Request) => {
         .update({ status: 'escalada' })
         .eq('id', conversation.id);
 
-      const leadLabel = isNewLead ? '🆕 NOVO' : '⚠️';
-      await notifyTelegram(supabase,
-        `${leadLabel} *ESCALAÇÃO WhatsApp*\n\n` +
-        `👤 *${contactName || 'Sem nome'}*\n` +
-        `📞 +${normalizedPhone}\n\n` +
-        `💬 ${textBody.substring(0, 300)}\n\n` +
-        `⚠️ *Detectei reclamação/urgência — NÃO respondi automaticamente.*\n` +
-        `_Responda manualmente via Cowork ou ERP_`
-      );
+      // Se já estava escalada antes, não spammar Telegram a cada nova msg.
+      const jaEstavaEscalada = conversation.status === 'escalada';
+      if (!jaEstavaEscalada) {
+        const leadLabel = isNewLead ? '🆕 NOVO' : '⚠️';
+        await notifyTelegram(supabase,
+          `${leadLabel} *ESCALAÇÃO WhatsApp*\n\n` +
+          `👤 *${contactName || 'Sem nome'}*\n` +
+          `📞 +${normalizedPhone}\n\n` +
+          `💬 ${textBody.substring(0, 300)}\n\n` +
+          `⚠️ *Detectei reclamação/urgência — NÃO respondi automaticamente.*\n` +
+          `_Responda manualmente via Cowork ou ERP_`
+        );
+      }
 
       console.log('whatsapp-webhook: ESCALATED — not auto-responding');
       return new Response('OK', { status: 200 });
     }
 
+    // ── 7.1. Auto-resposta pausada para esta conversa ───────
+    // Junior (ou o próprio detector) pausou. Salvar a mensagem (já feito) e sair.
+    if ((conversation as Record<string, unknown>).automacao_pausada === true) {
+      console.log(`whatsapp-webhook: automacao_pausada=true for ${conversation.id} — skipping auto-response`);
+      return new Response('OK', { status: 200 });
+    }
+
     // ── 7.5. Try to extract data from incoming message ────
     await tryUpdateLeadFromMessage(supabase, lead.id as string, textBody, lead);
+
+    // ── 7.6. P0 — Detectar bot/URA/loop ANTES de gastar token ──
+    const deteccao = await detectarBotOuLoop(supabase, conversation.id as string, textBody);
+    if (deteccao) {
+      const metaAtual = ((conversation as Record<string, unknown>).metadata as Record<string, unknown>) ?? {};
+      await supabase
+        .from('agent_conversations')
+        .update({
+          status: 'escalada',
+          automacao_pausada: true,
+          metadata: {
+            ...metaAtual,
+            escalado_por: 'bot_loop_detector',
+            motivo_escalacao: deteccao.motivo,
+            tipo_escalacao: deteccao.tipo,
+            escalado_em: new Date().toISOString(),
+          },
+          updated_at: new Date().toISOString(),
+        })
+        .eq('id', conversation.id);
+
+      await supabase.from('atividades_comerciais').insert({
+        entidade_tipo: 'lead',
+        entidade_id: lead.id,
+        tipo: 'sistema',
+        descricao: `[Auto-resposta PAUSADA] ${deteccao.motivo}`,
+        resultado: 'escalado',
+        data_atividade: new Date().toISOString(),
+      });
+
+      const empresa = (lead as Record<string, unknown>).empresa as string | undefined;
+      await notifyTelegram(supabase,
+        `🛑 *Auto-resposta PAUSADA — ${deteccao.tipo}*\n\n` +
+        `👤 *${contactName || (lead as Record<string, unknown>).contato_nome || 'Sem nome'}*\n` +
+        `📞 +${normalizedPhone}\n` +
+        (empresa ? `🏢 ${empresa}\n` : '') +
+        `\n🤖 *Motivo:* ${deteccao.motivo}\n\n` +
+        `💬 _Última msg:_ ${textBody.substring(0, 250)}\n\n` +
+        `_Conversa marcada como ESCALADA + automação PAUSADA._\n` +
+        `_Responda manualmente. Para reativar: zerar automacao_pausada na conversa._`
+      );
+
+      console.log(`whatsapp-webhook: PAUSED — ${deteccao.tipo}: ${deteccao.motivo}`);
+      return new Response('OK', { status: 200 });
+    }
 
     // ── 8. Generate Claude response ─────────────────────────
     const claudeResult = await generateClaudeResponse(
@@ -1096,6 +1665,40 @@ serve(async (req: Request) => {
     let resposta = claudeResult.text;
     const intent = claudeResult.intent;
     let orcamentoGerado = false;
+
+    // ── 8.1. P1 — Gravar dados extraídos pela IA (com regras de confiança/blocklist) ──
+    try {
+      const { data: leadAtual } = await supabase
+        .from('leads')
+        .select('contato_nome, contato_email, empresa, cnpj, cidade, uf, cargo, segmento, telefone2, observacoes')
+        .eq('id', lead.id)
+        .single();
+      const leadCtx = (leadAtual ?? lead) as Record<string, unknown>;
+      const resultado = await gravarDadosExtraidos(supabase, lead.id as string, leadCtx, claudeResult.dados, claudeResult.confianca);
+      if (resultado.gravados.length > 0) {
+        console.log('whatsapp-webhook: P1 dados gravados:', resultado.gravados.join(', '));
+      }
+      if (resultado.bloqueados.length > 0) {
+        console.log('whatsapp-webhook: P1 dados bloqueados:', resultado.bloqueados.join(' | '));
+      }
+    } catch (err) {
+      console.error('whatsapp-webhook: gravarDadosExtraidos falhou (não bloqueia resposta):', err);
+    }
+
+    // ── 8.2. P4 — Atualizar memória do lead com o resumo da conversa ──
+    try {
+      await atualizarMemoriaLead(supabase, lead.id as string, {
+        resumo: claudeResult.memoria.resumo_curto ?? undefined,
+        produto_interesse: claudeResult.memoria.produto_interesse ?? undefined,
+        necessidade: claudeResult.memoria.necessidade ?? undefined,
+        urgencia: claudeResult.memoria.urgencia ?? undefined,
+        proximos_passos: claudeResult.memoria.proximos_passos ?? undefined,
+        dados_confirmados: Object.fromEntries(Object.entries(claudeResult.dados).filter(([_, v]) => v !== null && v !== undefined)),
+        incrementar_processadas: true,
+      });
+    } catch (err) {
+      console.error('whatsapp-webhook: atualizarMemoriaLead falhou (não bloqueia resposta):', err);
+    }
 
     // ── 8.5. If intent is orcamento/formalizar → create real proposal via CRM ──
     if (intent === 'orcamento' || intent === 'formalizar') {
@@ -1166,13 +1769,13 @@ serve(async (req: Request) => {
       },
     });
 
-    // Update conversation counters
-    await supabase
-      .from('agent_conversations')
-      .update({
-        mensagens_enviadas: (conversation.mensagens_enviadas ?? 0) + 1,
-      })
-      .eq('id', conversation.id);
+    // Update conversation counter (P3 — incremento atômico via RPC)
+    await supabase.rpc('incrementar_contador_conversa', {
+      p_id: conversation.id,
+      p_enviadas: 1,
+      p_recebidas: 0,
+      p_score: 0,
+    });
 
     // ── 11. Notify Junior on Telegram ───────────────────────
     const statusEmoji = sent ? '✅' : '❌';
