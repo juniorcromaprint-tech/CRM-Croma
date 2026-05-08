@@ -129,20 +129,24 @@ export function useCriarCampanhaRapida() {
 
 export interface CampanhaAtivaBannerData {
   campanha: AgentCampanhaResumo;
-  totalLeads: number;          // count distinct lead em agent_conversations.campanha_id
-  totalDisparados: number;     // count distinct lead em agent_messages enviada/aprovada
-  totalEnfileiradas: number;   // count em agent_messages status='aprovada'
-  totalEnviadas: number;       // count em agent_messages status='enviada'
+  totalLeads: number;          // distinct leads vinculados via agent_conversations.campanha_id
+  totalEnfileiradas: number;   // mensagens em status='aprovada' aguardando dispatch
+  totalEnviadas: number;       // total_enviadas agregado em agent_campanhas
+  totalLidas: number;
+  totalRespondidas: number;
+  totalErros: number;
 }
 
 export function useCampanhaAtivaResumo() {
   return useQuery<CampanhaAtivaBannerData | null>({
     queryKey: ['agent_campanha_ativa_resumo'],
     queryFn: async () => {
-      // 1. Pegar a campanha ativa mais recente
+      // 1. Pegar a campanha ativa mais recente, com agregados já materializados na tabela.
+      //    Os contadores total_enviadas / total_lidas / total_respondidas / total_erros são
+      //    mantidos pelo trigger fn_atualizar_contadores_campanha em agent_messages.
       const { data: campanha, error } = await supabase
         .from('agent_campanhas')
-        .select('id, nome, canal, status, total_alvo, data_inicio, data_fim')
+        .select('id, nome, canal, status, total_alvo, data_inicio, data_fim, total_leads, total_enviadas, total_lidas, total_respondidas, total_erros')
         .eq('status', 'ativa')
         .order('criada_em', { ascending: false })
         .limit(1)
@@ -154,35 +158,25 @@ export function useCampanhaAtivaResumo() {
       }
       if (!campanha) return null;
 
-      // 2. Métricas vinculadas
-      const [convs, enfileiradas, enviadas, disparadas] = await Promise.all([
-        supabase
-          .from('agent_conversations')
-          .select('lead_id', { count: 'exact', head: true })
-          .eq('campanha_id', campanha.id),
-        supabase
-          .from('agent_messages')
-          .select('id', { count: 'exact', head: true })
-          .eq('campanha_id', campanha.id)
-          .eq('status', 'aprovada'),
-        supabase
-          .from('agent_messages')
-          .select('id', { count: 'exact', head: true })
-          .eq('campanha_id', campanha.id)
-          .eq('status', 'enviada'),
-        supabase
-          .from('agent_messages')
-          .select('id', { count: 'exact', head: true })
-          .eq('campanha_id', campanha.id)
-          .in('status', ['enviada', 'aprovada']),
-      ]);
+      // 2. totalEnfileiradas calculado em runtime (não há agregado na tabela para "aprovada").
+      const { count: enfileiradas } = await supabase
+        .from('agent_messages')
+        .select('id', { count: 'exact', head: true })
+        .eq('campanha_id', (campanha as any).id)
+        .eq('status', 'aprovada');
 
+      const c = campanha as any;
       return {
-        campanha: campanha as AgentCampanhaResumo,
-        totalLeads:        convs.count        ?? 0,
-        totalDisparados:   disparadas.count   ?? 0,
-        totalEnfileiradas: enfileiradas.count ?? 0,
-        totalEnviadas:     enviadas.count     ?? 0,
+        campanha: {
+          id: c.id, nome: c.nome, canal: c.canal, status: c.status,
+          total_alvo: c.total_alvo, data_inicio: c.data_inicio, data_fim: c.data_fim,
+        } as AgentCampanhaResumo,
+        totalLeads:        c.total_leads        ?? 0,
+        totalEnfileiradas: enfileiradas         ?? 0,
+        totalEnviadas:     c.total_enviadas     ?? 0,
+        totalLidas:        c.total_lidas        ?? 0,
+        totalRespondidas:  c.total_respondidas  ?? 0,
+        totalErros:        c.total_erros        ?? 0,
       };
     },
     staleTime: 60_000,

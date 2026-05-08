@@ -44,16 +44,22 @@ export function CampanhaBanner({
     );
   }
 
-  // Decide a fonte de verdade do nome e dos números primários
+  // Decide a fonte de verdade do nome e dos números primários.
+  // Quando há campanha ativa em agent_campanhas, usamos os agregados materializados na tabela.
+  // Caso contrário, fallback do useCampanhaStatus (legacy por segmento).
   const usandoCampanhaReal = !!ativa;
-  const tituloExibido    = usandoCampanhaReal ? ativa!.campanha.nome : titulo;
-  const totalLeads       = usandoCampanhaReal ? ativa!.totalLeads        : status.totalLeads;
-  const totalDisparados  = usandoCampanhaReal ? ativa!.totalDisparados   : status.totalDisparados;
-  const totalEnfileiradas= usandoCampanhaReal ? ativa!.totalEnfileiradas : status.totalEnfileiradas;
-
-  const pctConcluido = totalLeads > 0
-    ? Math.round((totalDisparados / totalLeads) * 100)
+  const tituloExibido     = usandoCampanhaReal ? ativa!.campanha.nome : titulo;
+  const totalLeads        = usandoCampanhaReal ? ativa!.totalLeads        : status.totalLeads;
+  const totalEnviadas     = usandoCampanhaReal ? ativa!.totalEnviadas     : status.totalDisparados;
+  const totalEnfileiradas = usandoCampanhaReal ? ativa!.totalEnfileiradas : status.totalEnfileiradas;
+  const totalRespondidas  = usandoCampanhaReal ? ativa!.totalRespondidas  : 0;
+  const taxaResposta      = totalEnviadas > 0
+    ? Math.round((totalRespondidas / totalEnviadas) * 100)
     : 0;
+  const meta              = ativa?.campanha.total_alvo ?? null;
+  const progressoLeads    = (meta && meta > 0)
+    ? Math.round((totalLeads / meta) * 100)
+    : (totalLeads > 0 ? 100 : 0);
 
   return (
     <div className={`bg-blue-50 border border-blue-100 rounded-2xl px-5 py-4 ${className}`}>
@@ -71,26 +77,31 @@ export function CampanhaBanner({
             </div>
             <div className="text-xs text-slate-500 mt-1 flex items-center gap-x-3 gap-y-1 flex-wrap">
               <span>
-                <strong className="text-slate-700">{totalLeads}</strong> leads totais
+                <strong className="text-slate-700">{totalLeads}</strong>
+                {meta && meta > 0 ? (
+                  <> / <strong className="text-slate-700">{meta}</strong> leads</>
+                ) : (
+                  <> leads totais</>
+                )}
               </span>
               <span>·</span>
               <span>
-                <strong className="text-slate-700">{totalDisparados}</strong> já disparados
-                <span className="text-slate-400 ml-1">({pctConcluido}%)</span>
+                <strong className="text-slate-700">{totalEnviadas}</strong> enviadas
               </span>
+              {usandoCampanhaReal && totalRespondidas > 0 && (
+                <>
+                  <span>·</span>
+                  <span>
+                    <strong className="text-emerald-700">{totalRespondidas}</strong> respostas
+                    <span className="text-emerald-600 ml-1">({taxaResposta}%)</span>
+                  </span>
+                </>
+              )}
               {totalEnfileiradas > 0 && (
                 <>
                   <span>·</span>
                   <span>
                     <strong className="text-slate-700">{totalEnfileiradas}</strong> na fila
-                  </span>
-                </>
-              )}
-              {usandoCampanhaReal && ativa!.campanha.total_alvo != null && ativa!.campanha.total_alvo > 0 && (
-                <>
-                  <span>·</span>
-                  <span>
-                    meta <strong className="text-slate-700">{ativa!.campanha.total_alvo}</strong>
                   </span>
                 </>
               )}
@@ -117,12 +128,12 @@ export function CampanhaBanner({
         </div>
       </div>
 
-      {/* Barra de progresso geral */}
+      {/* Barra de progresso de leads (vs meta quando definida) */}
       {totalLeads > 0 && (
         <div className="mt-3 h-1 bg-blue-100 rounded-full overflow-hidden">
           <div
             className="h-full bg-blue-500 transition-all"
-            style={{ width: `${pctConcluido}%` }}
+            style={{ width: `${Math.min(progressoLeads, 100)}%` }}
           />
         </div>
       )}
