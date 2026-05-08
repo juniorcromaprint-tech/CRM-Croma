@@ -172,7 +172,7 @@ export function useCampanhaAtivaResumo() {
           .eq('status', 'enviada'),
         supabase
           .from('agent_messages')
-          .select('lead_id', { count: 'exact', head: true })
+          .select('id', { count: 'exact', head: true })
           .eq('campanha_id', campanha.id)
           .in('status', ['enviada', 'aprovada']),
       ]);
