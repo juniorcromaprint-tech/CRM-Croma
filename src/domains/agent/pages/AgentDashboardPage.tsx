@@ -471,72 +471,78 @@ export default function AgentDashboardPage() {
           />
         )}
 
-        {/* Column headers */}
-        {!convsLoading && conversations.length > 0 && (
-          <div className="flex items-center gap-4 px-5 py-2 bg-slate-50 border-b border-slate-100 text-xs font-medium text-slate-400 uppercase tracking-wide">
-            <div className="flex-1">Empresa</div>
-            <div className="w-28 hidden sm:block">Canal</div>
-            <div className="w-28 hidden md:block">Etapa</div>
-            <div className="w-36 hidden lg:block">Status</div>
-            <div className="w-24 hidden xl:block">Score</div>
-            <div className="w-28 text-right hidden lg:block">Último contato</div>
-            <div className="w-4" />
-          </div>
-        )}
+        {/* Lista com scroll interno (Entrega 4.1).
+            max-h-[60vh] limita a altura ~60% da viewport. Resto da página
+            (header, KPIs, WhatsApp, filtros) fica fixo. Em telas pequenas
+            o scroll da página continua funcionando normalmente. */}
+        <div className="max-h-[60vh] overflow-y-auto">
+          {/* Column headers (STICKY dentro do scroll) */}
+          {!convsLoading && conversations.length > 0 && (
+            <div className="sticky top-0 z-10 flex items-center gap-4 px-5 py-2 bg-slate-50 border-b border-slate-100 text-xs font-medium text-slate-400 uppercase tracking-wide">
+              <div className="flex-1">Empresa</div>
+              <div className="w-28 hidden sm:block">Canal</div>
+              <div className="w-28 hidden md:block">Etapa</div>
+              <div className="w-36 hidden lg:block">Status</div>
+              <div className="w-24 hidden xl:block">Score</div>
+              <div className="w-28 text-right hidden lg:block">Último contato</div>
+              <div className="w-4" />
+            </div>
+          )}
 
-        {/* Rows */}
-        {convsLoading ? (
-          <div className="divide-y divide-slate-100">
-            {[1, 2, 3].map((i) => (
-              <div key={i} className="flex items-center gap-4 px-5 py-4 animate-pulse">
-                <div className="flex-1 space-y-2">
-                  <div className="h-4 bg-slate-100 rounded w-1/3" />
-                  <div className="h-3 bg-slate-100 rounded w-1/4" />
+          {/* Rows */}
+          {convsLoading ? (
+            <div className="divide-y divide-slate-100">
+              {[1, 2, 3].map((i) => (
+                <div key={i} className="flex items-center gap-4 px-5 py-4 animate-pulse">
+                  <div className="flex-1 space-y-2">
+                    <div className="h-4 bg-slate-100 rounded w-1/3" />
+                    <div className="h-3 bg-slate-100 rounded w-1/4" />
+                  </div>
+                  <div className="w-16 h-5 bg-slate-100 rounded-full hidden sm:block" />
+                  <div className="w-20 h-5 bg-slate-100 rounded-full hidden md:block" />
+                  <div className="w-24 h-5 bg-slate-100 rounded-full hidden lg:block" />
                 </div>
-                <div className="w-16 h-5 bg-slate-100 rounded-full hidden sm:block" />
-                <div className="w-20 h-5 bg-slate-100 rounded-full hidden md:block" />
-                <div className="w-24 h-5 bg-slate-100 rounded-full hidden lg:block" />
+              ))}
+            </div>
+          ) : conversations.length === 0 ? (
+            conversationsForCounts.length > 0 ? (
+              <div className="p-10 text-center">
+                <Search size={32} className="mx-auto text-slate-300 mb-2" />
+                <h3 className="font-semibold text-slate-600">Nenhuma conversa bate com esses filtros</h3>
+                <p className="text-sm text-slate-400 mt-1">Tente afrouxar a busca ou limpar os filtros.</p>
+                <button
+                  onClick={handleClearFilters}
+                  className="mt-3 inline-flex items-center gap-1 text-xs text-blue-600 hover:text-blue-700"
+                >
+                  <X size={11} /> Limpar filtros
+                </button>
               </div>
-            ))}
-          </div>
-        ) : conversations.length === 0 ? (
-          conversationsForCounts.length > 0 ? (
-            <div className="p-10 text-center">
-              <Search size={32} className="mx-auto text-slate-300 mb-2" />
-              <h3 className="font-semibold text-slate-600">Nenhuma conversa bate com esses filtros</h3>
-              <p className="text-sm text-slate-400 mt-1">Tente afrouxar a busca ou limpar os filtros.</p>
-              <button
-                onClick={handleClearFilters}
-                className="mt-3 inline-flex items-center gap-1 text-xs text-blue-600 hover:text-blue-700"
-              >
-                <X size={11} /> Limpar filtros
-              </button>
-            </div>
+            ) : (
+              <div className="p-12 text-center">
+                <Bot size={40} className="mx-auto text-slate-300 mb-3" />
+                <h3 className="font-semibold text-slate-600">Nenhuma conversa ativa</h3>
+                <p className="text-sm text-slate-400 mt-1">
+                  Clique em &quot;Nova Prospecção&quot; para começar.
+                </p>
+              </div>
+            )
           ) : (
-            <div className="p-12 text-center">
-              <Bot size={40} className="mx-auto text-slate-300 mb-3" />
-              <h3 className="font-semibold text-slate-600">Nenhuma conversa ativa</h3>
-              <p className="text-sm text-slate-400 mt-1">
-                Clique em &quot;Nova Prospecção&quot; para começar.
-              </p>
+            <div>
+              {conversations.map((conv) => (
+                <ConversationRow
+                  key={conv.id}
+                  conv={conv}
+                  onClick={() => navigate(`/agente/conversa/${conv.id}`)}
+                  onDelete={() => {
+                    if (window.confirm(`Excluir conversa com ${conv.leads?.empresa ?? 'este lead'}?`)) {
+                      deleteConversation.mutate({ conversationId: conv.id });
+                    }
+                  }}
+                />
+              ))}
             </div>
-          )
-        ) : (
-          <div>
-            {conversations.map((conv) => (
-              <ConversationRow
-                key={conv.id}
-                conv={conv}
-                onClick={() => navigate(`/agente/conversa/${conv.id}`)}
-                onDelete={() => {
-                  if (window.confirm(`Excluir conversa com ${conv.leads?.empresa ?? 'este lead'}?`)) {
-                    deleteConversation.mutate({ conversationId: conv.id });
-                  }
-                }}
-              />
-            ))}
-          </div>
-        )}
+          )}
+        </div>
       </div>
 
       {/* ── Nova Prospecção Dialog ───────────────────────────────────────── */}
