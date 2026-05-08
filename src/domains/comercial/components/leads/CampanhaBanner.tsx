@@ -11,7 +11,7 @@
 // v2 (2026-05-06): lógica DUAL (campanha real vs fallback por segmento).
 
 import { Megaphone, TrendingUp, Clock, Send, MessageCircle, Mail, Sparkles } from 'lucide-react';
-import { useCampanhaStatus } from '../../hooks/useLeadsDisparo';
+import { useCampanhaStatus, useEmailStatus, type CampanhaStatus, type EmailStatus } from '../../hooks/useLeadsDisparo';
 import { useCampanhasAtivasResumo, CampanhaAtivaBannerData } from '../../hooks/useAgentCampanhas';
 
 interface Props {
@@ -29,10 +29,12 @@ export function CampanhaBanner({
 }: Props) {
   // Fonte 1 (preferida): TODAS as campanhas ativas
   const { data: ativas, isLoading: loadingAtivas } = useCampanhasAtivasResumo();
-  // Fonte 2 (fallback + métricas operacionais sempre): cálculo legacy por segmento
+  // Fonte 2 (fallback + métricas operacionais WhatsApp): cálculo legacy por segmento
   const { data: status, isLoading: loadingStatus } = useCampanhaStatus(segmento);
+  // Fonte 3 (métricas operacionais Email): status de email global do dia
+  const { data: emailStatus, isLoading: loadingEmail } = useEmailStatus();
 
-  const isLoading = loadingAtivas || loadingStatus;
+  const isLoading = loadingAtivas || loadingStatus || loadingEmail;
 
   if (isLoading || !status) {
     return (
@@ -44,17 +46,16 @@ export function CampanhaBanner({
   }
 
   // Se há campanhas em agent_campanhas, renderiza um card por campanha (empilhado).
+  // Cada card recebe métricas globais do SEU canal (WA tem rampa, Email não).
   if (ativas && ativas.length > 0) {
     return (
       <div className={`flex flex-col gap-2 ${className}`}>
-        {ativas.map((c, idx) => (
+        {ativas.map((c) => (
           <CampanhaCard
             key={c.campanha.id}
             data={c}
-            // Métricas globais (rampa, enviadas hoje, janelas) só no primeiro card
-            // para não duplicar — são do dia, não da campanha.
-            mostrarMetricasGlobais={idx === 0}
-            statusGlobal={status}
+            statusWhatsApp={status}
+            statusEmail={emailStatus}
           />
         ))}
       </div>
@@ -74,12 +75,12 @@ export function CampanhaBanner({
 // ─── Card de uma campanha real (agent_campanhas) ────────────────────────────
 function CampanhaCard({
   data,
-  mostrarMetricasGlobais,
-  statusGlobal,
+  statusWhatsApp,
+  statusEmail,
 }: {
   data: CampanhaAtivaBannerData;
-  mostrarMetricasGlobais: boolean;
-  statusGlobal: ReturnType<typeof useCampanhaStatus>['data'];
+  statusWhatsApp: CampanhaStatus | undefined;
+  statusEmail: EmailStatus | undefined;
 }) {
   const { campanha, totalLeads, totalEnfileiradas, totalEnviadas, totalRespondidas } = data;
 
@@ -145,25 +146,66 @@ function CampanhaCard({
           </div>
         </div>
 
-        {/* Métricas globais só no primeiro card (rampa, enviadas hoje, janelas BRT). */}
-        {mostrarMetricasGlobais && statusGlobal && (
+        {/* Métricas globais por CANAL — cada card mostra as métricas DELE. */}
+        {/* WhatsApp: rampa + enviadas hoje (WA) + janelas */}
+        {campanha.canal === 'whatsapp' && statusWhatsApp && (
           <div className="flex items-center gap-2 shrink-0">
             <Stat
               icon={<TrendingUp size={11} />}
               label="Dia da rampa"
-              value={statusGlobal.diaDaRampa != null ? `${statusGlobal.diaDaRampa}/8` : '—'}
+              value={statusWhatsApp.diaDaRampa != null ? `${statusWhatsApp.diaDaRampa}/8` : '—'}
               tone={canalConfig.tone}
             />
             <Stat
               icon={<Send size={11} />}
               label="Enviadas hoje"
-              value={`${statusGlobal.enviadasHoje}/${statusGlobal.limiteDiarioAtual}`}
+              value={`${statusWhatsApp.enviadasHoje}/${statusWhatsApp.limiteDiarioAtual}`}
               tone={canalConfig.tone}
             />
             <Stat
               icon={<Clock size={11} />}
               label="Janelas BRT"
-              value={formatJanelas(statusGlobal.janelas)}
+              value={formatJanelas(statusWhatsApp.janelas)}
+              tone={canalConfig.tone}
+            />
+          </div>
+        )}
+        {/* Email: enviadas hoje (email) + janelas. SEM rampa (Resend não precisa). */}
+        {campanha.canal === 'email' && statusEmail && (
+          <div className="flex items-center gap-2 shrink-0">
+            <Stat
+              icon={<Send size={11} />}
+              label="Emails hoje"
+              value={`${statusEmail.enviadasHoje}/${statusEmail.limiteDiarioAtual}`}
+              tone={canalConfig.tone}
+            />
+            <Stat
+              icon={<Clock size={11} />}
+              label="Janelas BRT"
+              value={formatJanelas(statusEmail.janelas)}
+              tone={canalConfig.tone}
+            />
+          </div>
+        )}
+        {/* Misto: agrega ambos */}
+        {campanha.canal === 'misto' && statusWhatsApp && statusEmail && (
+          <div className="flex items-center gap-2 shrink-0">
+            <Stat
+              icon={<MessageCircle size={11} />}
+              label="WA hoje"
+              value={`${statusWhatsApp.enviadasHoje}/${statusWhatsApp.limiteDiarioAtual}`}
+              tone={canalConfig.tone}
+            />
+            <Stat
+              icon={<Mail size={11} />}
+              label="Email hoje"
+              value={`${statusEmail.enviadasHoje}/${statusEmail.limiteDiarioAtual}`}
+              tone={canalConfig.tone}
+            />
+            <Stat
+              icon={<Clock size={11} />}
+              label="Janelas BRT"
+              value={formatJanelas(statusWhatsApp.janelas)}
               tone={canalConfig.tone}
             />
           </div>

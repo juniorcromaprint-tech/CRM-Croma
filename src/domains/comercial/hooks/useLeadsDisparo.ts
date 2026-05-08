@@ -360,6 +360,73 @@ export function useCampanhaStatus(segmento = 'seguranca') {
   });
 }
 
+// ─── Status de email (para CampanhaBanner) ──────────────────────────────────
+// Email não tem rampa anti-bloqueio (Resend é mais permissivo).
+// Métricas: enviadas hoje (email), limite diário (max_emails_dia do admin_config),
+// fila (mensagens 'aprovada' canal email), janelas (mesmas que WhatsApp por enquanto).
+
+export interface EmailStatus {
+  enviadasHoje: number;
+  limiteDiarioAtual: number;       // max_emails_dia do admin_config (default 200)
+  totalEnfileiradas: number;       // mensagens 'aprovada' aguardando envio
+  janelas: [string, string][];     // janelas BRT do agent_config
+}
+
+export function useEmailStatus() {
+  return useQuery<EmailStatus>({
+    queryKey: ['email-status'],
+    queryFn: async () => {
+      // 1. Mensagens email enviadas hoje
+      const inicioHoje = new Date();
+      inicioHoje.setHours(0, 0, 0, 0);
+
+      const { count: enviadasHoje } = await supabase
+        .from('agent_messages')
+        .select('id', { count: 'exact', head: true })
+        .eq('canal', 'email')
+        .eq('status', 'enviada')
+        .gte('enviado_em', inicioHoje.toISOString());
+
+      // 2. Mensagens email enfileiradas (aprovada, aguardando)
+      const { count: totalEnfileiradas } = await supabase
+        .from('agent_messages')
+        .select('id', { count: 'exact', head: true })
+        .eq('canal', 'email')
+        .eq('status', 'aprovada');
+
+      // 3. Limite diário + janelas do admin_config
+      let limiteDiarioAtual = 200; // fallback
+      let janelas: [string, string][] = [['09:00', '12:00'], ['14:00', '17:00']];
+      try {
+        const { data: cfgRow } = await supabase
+          .from('admin_config')
+          .select('valor')
+          .eq('chave', 'agent_config')
+          .single();
+        const cfg = (cfgRow?.valor && typeof cfgRow.valor === 'object'
+          ? cfgRow.valor
+          : typeof cfgRow?.valor === 'string'
+            ? JSON.parse(cfgRow.valor)
+            : {}) as Record<string, unknown>;
+        if (typeof cfg.max_emails_dia === 'number' && cfg.max_emails_dia > 0) {
+          limiteDiarioAtual = cfg.max_emails_dia;
+        }
+        if (Array.isArray(cfg.horarios) && cfg.horarios.length > 0) {
+          janelas = cfg.horarios as [string, string][];
+        }
+      } catch { /* usa fallback */ }
+
+      return {
+        enviadasHoje:      enviadasHoje      ?? 0,
+        limiteDiarioAtual,
+        totalEnfileiradas: totalEnfileiradas ?? 0,
+        janelas,
+      };
+    },
+    staleTime: 60_000,
+  });
+}
+
 // ─── Helper antigo: valores únicos para dropdowns (mantido p/ compat) ────────
 
 export function useLeadsDisparoMeta() {
