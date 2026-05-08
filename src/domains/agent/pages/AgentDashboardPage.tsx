@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import {
   Bot,
@@ -13,6 +13,10 @@ import {
   Mail,
   Smartphone,
   Trash2,
+  Search,
+  Flame,
+  Snowflake,
+  X,
 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import KpiCard from '@/shared/components/KpiCard';
@@ -65,6 +69,167 @@ function ScoreBar({ score }: { score: number }) {
         <div className={`h-full rounded-full ${color}`} style={{ width: `${pct}%` }} />
       </div>
       <span className="text-xs tabular-nums text-slate-500">{pct}</span>
+    </div>
+  );
+}
+
+// ─── Filtros (Entrega 4) ──────────────────────────────────────────────────────
+//
+// O time de vendas relatou que conversas ficam perdidas quando há volume.
+// Adicionamos 3 dimensões de filtro NÃO-INVASIVAS: status, score (faixa) e busca por texto.
+// As escolhas são persistidas em localStorage para que o usuário não perca filtro entre sessões.
+
+type StatusFilter = 'todas' | AgentConversationStatus;
+type ScoreFilter  = 'todas' | 'quente' | 'morno' | 'frio';
+
+const STATUS_FILTERS: { id: StatusFilter; label: string }[] = [
+  { id: 'todas',                 label: 'Todas' },
+  { id: 'ativa',                 label: 'Ativas' },
+  { id: 'aguardando_aprovacao',  label: 'Aguard. Aprovação' },
+  { id: 'convertida',            label: 'Convertidas' },
+  { id: 'escalada',              label: 'Escaladas' },
+  { id: 'pausada',               label: 'Pausadas' },
+  { id: 'encerrada',             label: 'Encerradas' },
+];
+
+const SCORE_FILTERS: { id: ScoreFilter; label: string; icon?: JSX.Element; cls: string }[] = [
+  { id: 'todas',  label: 'Todos scores',                                              cls: 'border-slate-200 text-slate-600' },
+  { id: 'quente', label: 'Quente (>70)',  icon: <Flame size={11} />,                  cls: 'border-red-200 text-red-700 bg-red-50' },
+  { id: 'morno',  label: 'Morno (30-70)',                                             cls: 'border-amber-200 text-amber-700 bg-amber-50' },
+  { id: 'frio',   label: 'Frio (<30)',    icon: <Snowflake size={11} />,              cls: 'border-blue-200 text-blue-700 bg-blue-50' },
+];
+
+const FILTER_STORAGE_KEY = 'agent-dashboard-filters-v1';
+
+interface PersistedFilters {
+  status: StatusFilter;
+  score: ScoreFilter;
+  search: string;
+}
+
+function loadFilters(): PersistedFilters {
+  try {
+    const raw = localStorage.getItem(FILTER_STORAGE_KEY);
+    if (!raw) return { status: 'todas', score: 'todas', search: '' };
+    const parsed = JSON.parse(raw) as Partial<PersistedFilters>;
+    return {
+      status: (parsed.status ?? 'todas') as StatusFilter,
+      score:  (parsed.score  ?? 'todas') as ScoreFilter,
+      search: parsed.search ?? '',
+    };
+  } catch {
+    return { status: 'todas', score: 'todas', search: '' };
+  }
+}
+
+function saveFilters(f: PersistedFilters) {
+  try { localStorage.setItem(FILTER_STORAGE_KEY, JSON.stringify(f)); } catch { /* noop */ }
+}
+
+function FilterBar({
+  statusFilter, onStatus,
+  scoreFilter,  onScore,
+  search,       onSearch,
+  countsByStatus,
+  totalAfterFilter,
+  totalBeforeFilter,
+  onClear,
+}: {
+  statusFilter: StatusFilter;
+  onStatus: (s: StatusFilter) => void;
+  scoreFilter: ScoreFilter;
+  onScore: (s: ScoreFilter) => void;
+  search: string;
+  onSearch: (s: string) => void;
+  countsByStatus: Record<StatusFilter, number>;
+  totalAfterFilter: number;
+  totalBeforeFilter: number;
+  onClear: () => void;
+}) {
+  const algumFiltroAtivo = statusFilter !== 'todas' || scoreFilter !== 'todas' || search.trim() !== '';
+
+  return (
+    <div className="border-b border-slate-100 bg-slate-50/30 px-5 py-3 space-y-3">
+      {/* Linha 1: status + contagem */}
+      <div className="flex items-center justify-between gap-3 flex-wrap">
+        <div className="flex items-center gap-1.5 flex-wrap">
+          {STATUS_FILTERS.map((f) => {
+            const count = countsByStatus[f.id] ?? 0;
+            const active = statusFilter === f.id;
+            return (
+              <button
+                key={f.id}
+                onClick={() => onStatus(f.id)}
+                className={`text-xs px-2.5 py-1 rounded-lg border transition-colors ${
+                  active
+                    ? 'border-blue-400 bg-blue-50 text-blue-700 font-medium'
+                    : 'border-slate-200 text-slate-600 hover:bg-white'
+                }`}
+              >
+                {f.label}
+                {count > 0 && (
+                  <span className={`ml-1.5 text-[10px] tabular-nums ${active ? 'text-blue-500' : 'text-slate-400'}`}>
+                    {count}
+                  </span>
+                )}
+              </button>
+            );
+          })}
+        </div>
+
+        {algumFiltroAtivo && (
+          <button
+            onClick={onClear}
+            className="text-xs text-slate-500 hover:text-slate-700 inline-flex items-center gap-1"
+          >
+            <X size={11} /> Limpar filtros
+          </button>
+        )}
+      </div>
+
+      {/* Linha 2: score + busca */}
+      <div className="flex items-center justify-between gap-3 flex-wrap">
+        <div className="flex items-center gap-1.5 flex-wrap">
+          {SCORE_FILTERS.map((f) => {
+            const active = scoreFilter === f.id;
+            return (
+              <button
+                key={f.id}
+                onClick={() => onScore(f.id)}
+                className={`text-xs px-2.5 py-1 rounded-lg border transition-colors inline-flex items-center gap-1 ${
+                  active
+                    ? f.cls + ' font-medium'
+                    : 'border-slate-200 text-slate-500 hover:bg-white'
+                }`}
+              >
+                {f.icon}
+                {f.label}
+              </button>
+            );
+          })}
+        </div>
+
+        <div className="relative w-full sm:w-64">
+          <Search size={13} className="absolute left-2.5 top-1/2 -translate-y-1/2 text-slate-400 pointer-events-none" />
+          <input
+            type="text"
+            value={search}
+            onChange={(e) => onSearch(e.target.value)}
+            placeholder="Buscar empresa ou contato..."
+            className="w-full pl-8 pr-3 py-1.5 text-xs border border-slate-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-200 focus:border-blue-300 bg-white"
+          />
+        </div>
+      </div>
+
+      {/* Resultado da filtragem */}
+      {algumFiltroAtivo && (
+        <div className="text-[11px] text-slate-500">
+          Mostrando <strong className="text-slate-700">{totalAfterFilter}</strong>
+          {' de '}
+          <strong className="text-slate-700">{totalBeforeFilter}</strong>
+          {' '}{totalBeforeFilter === 1 ? 'conversa' : 'conversas'}
+        </div>
+      )}
     </div>
   );
 }
@@ -148,7 +313,62 @@ export default function AgentDashboardPage() {
   const [showNovaProspeccao, setShowNovaProspeccao] = useState(false);
 
   const { data: stats, isLoading: statsLoading } = useAgentStats();
-  const { data: conversations = [], isLoading: convsLoading } = useAgentConversations();
+
+  // Filtros (status enviado pro backend, score+search aplicados client-side)
+  const initial = loadFilters();
+  const [statusFilter, setStatusFilter] = useState<StatusFilter>(initial.status);
+  const [scoreFilter,  setScoreFilter]  = useState<ScoreFilter>(initial.score);
+  const [search,       setSearch]       = useState<string>(initial.search);
+
+  useEffect(() => { saveFilters({ status: statusFilter, score: scoreFilter, search }); },
+    [statusFilter, scoreFilter, search]);
+
+  // Quando status === 'todas' não passa filtro pro hook (backend retorna tudo).
+  const { data: conversationsAll = [], isLoading: convsLoading } = useAgentConversations(
+    statusFilter === 'todas' ? undefined : { status: statusFilter }
+  );
+  // Para a contagem por status (pills), precisamos da lista TOTAL sem filtro de status.
+  // Reaproveita o cache do react-query — se 'todas' está sendo usado, é a mesma query.
+  const { data: conversationsForCounts = [] } = useAgentConversations();
+
+  // Contagens por status (sempre da lista total)
+  const countsByStatus = useMemo(() => {
+    const c: Record<StatusFilter, number> = {
+      todas: conversationsForCounts.length,
+      ativa: 0, aguardando_aprovacao: 0, convertida: 0,
+      escalada: 0, pausada: 0, encerrada: 0,
+    };
+    for (const conv of conversationsForCounts) {
+      if (conv.status in c) c[conv.status as StatusFilter]++;
+    }
+    return c;
+  }, [conversationsForCounts]);
+
+  // Aplicar filtros client-side: score + busca (status já vem filtrado do hook)
+  const conversations = useMemo(() => {
+    const q = search.trim().toLowerCase();
+    return conversationsAll.filter((conv) => {
+      // score
+      const s = conv.score_engajamento ?? 0;
+      if (scoreFilter === 'quente' && s <= 70) return false;
+      if (scoreFilter === 'morno'  && (s < 30 || s > 70)) return false;
+      if (scoreFilter === 'frio'   && s >= 30) return false;
+      // busca
+      if (q) {
+        const empresa = (conv.leads?.empresa ?? '').toLowerCase();
+        const contato = (conv.leads?.contato_nome ?? '').toLowerCase();
+        if (!empresa.includes(q) && !contato.includes(q)) return false;
+      }
+      return true;
+    });
+  }, [conversationsAll, scoreFilter, search]);
+
+  const handleClearFilters = () => {
+    setStatusFilter('todas');
+    setScoreFilter('todas');
+    setSearch('');
+  };
+
   const runOrchestrator = useRunOrchestrator();
   const deleteConversation = useDeleteConversation();
 
@@ -235,6 +455,22 @@ export default function AgentDashboardPage() {
           )}
         </div>
 
+        {/* Filtros (Entrega 4) */}
+        {!convsLoading && conversationsForCounts.length > 0 && (
+          <FilterBar
+            statusFilter={statusFilter}
+            onStatus={setStatusFilter}
+            scoreFilter={scoreFilter}
+            onScore={setScoreFilter}
+            search={search}
+            onSearch={setSearch}
+            countsByStatus={countsByStatus}
+            totalAfterFilter={conversations.length}
+            totalBeforeFilter={conversationsForCounts.length}
+            onClear={handleClearFilters}
+          />
+        )}
+
         {/* Column headers */}
         {!convsLoading && conversations.length > 0 && (
           <div className="flex items-center gap-4 px-5 py-2 bg-slate-50 border-b border-slate-100 text-xs font-medium text-slate-400 uppercase tracking-wide">
@@ -264,13 +500,27 @@ export default function AgentDashboardPage() {
             ))}
           </div>
         ) : conversations.length === 0 ? (
-          <div className="p-12 text-center">
-            <Bot size={40} className="mx-auto text-slate-300 mb-3" />
-            <h3 className="font-semibold text-slate-600">Nenhuma conversa ativa</h3>
-            <p className="text-sm text-slate-400 mt-1">
-              Clique em &quot;Nova Prospecção&quot; para começar.
-            </p>
-          </div>
+          conversationsForCounts.length > 0 ? (
+            <div className="p-10 text-center">
+              <Search size={32} className="mx-auto text-slate-300 mb-2" />
+              <h3 className="font-semibold text-slate-600">Nenhuma conversa bate com esses filtros</h3>
+              <p className="text-sm text-slate-400 mt-1">Tente afrouxar a busca ou limpar os filtros.</p>
+              <button
+                onClick={handleClearFilters}
+                className="mt-3 inline-flex items-center gap-1 text-xs text-blue-600 hover:text-blue-700"
+              >
+                <X size={11} /> Limpar filtros
+              </button>
+            </div>
+          ) : (
+            <div className="p-12 text-center">
+              <Bot size={40} className="mx-auto text-slate-300 mb-3" />
+              <h3 className="font-semibold text-slate-600">Nenhuma conversa ativa</h3>
+              <p className="text-sm text-slate-400 mt-1">
+                Clique em &quot;Nova Prospecção&quot; para começar.
+              </p>
+            </div>
+          )
         ) : (
           <div>
             {conversations.map((conv) => (
