@@ -12,6 +12,25 @@ import { createClient } from 'https://esm.sh/@supabase/supabase-js@2';
 const DEFAULT_EMAIL_FROM = 'Croma Print <junior@cromaprint.com.br>';
 const DEFAULT_EMAIL_REPLY_TO = 'junior@cromaprint.com.br';
 
+/**
+ * Renderiza placeholders {{var}} no conteudo/assunto do template usando dados
+ * reais do lead + agent_config. Bug fix 2026-05-09: antes os placeholders
+ * chegavam literais no email (ex: "Olá {{contato_nome}}").
+ */
+function renderTemplate(
+  text: string,
+  lead: { contato_nome?: string | null; empresa?: string | null; cidade?: string | null },
+  agentConfig: Record<string, string>,
+): string {
+  if (!text) return '';
+  return text
+    .replace(/\{\{contato_nome\}\}/g, lead.contato_nome || lead.empresa || 'Cliente')
+    .replace(/\{\{empresa\}\}/g, lead.empresa || 'sua empresa')
+    .replace(/\{\{cidade\}\}/g, lead.cidade || 'sua região')
+    .replace(/\{\{nome_remetente\}\}/g, agentConfig?.nome_remetente || 'Junior - Croma Print')
+    .replace(/\{\{telefone_empresa\}\}/g, agentConfig?.telefone_empresa || '(11) 3399-4517');
+}
+
 /** Convert plain text to basic HTML: split on blank lines → <p> tags.
  *  If hasInlineImage is true, renders a CID-referenced image AFTER the text body. */
 function textToHtml(text: string, hasInlineImage: boolean): string {
@@ -209,12 +228,15 @@ serve(async (req: Request) => {
     if (imagemUrl) {
       imageAttachment = await fetchImageAsBase64(imagemUrl);
     }
-    const htmlBody = textToHtml(msg.conteudo || '', !!imageAttachment);
+    // Renderiza placeholders {{var}} antes de virar HTML (bugfix 2026-05-09)
+    const conteudoRender = renderTemplate(msg.conteudo || '', lead, agentConfig);
+    const htmlBody = textToHtml(conteudoRender, !!imageAttachment);
 
-    // 5. Build email subject
-    const subject =
+    // 5. Build email subject (também renderiza placeholders por defesa)
+    const subjectRaw =
       msg.assunto ||
       `Comunicação visual profissional — ${lead.empresa || lead.contato_nome || 'sua empresa'}`;
+    const subject = renderTemplate(subjectRaw, lead, agentConfig);
 
     const RESEND_API_KEY = Deno.env.get('RESEND_API_KEY');
     const now = new Date().toISOString();
