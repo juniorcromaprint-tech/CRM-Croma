@@ -129,6 +129,64 @@ function renderPreview(conteudo: string | null, lead?: LeadDisparo): string {
     .replace(/\{\{telefone_empresa\}\}/g, '(11) 3399-4517');
 }
 
+// ─── Próxima janela do cron de dispatch ─────────────────────────────────────
+// O cron `dispatch-approved-messages-30min` roda em janelas BRT 9–12h e 14–17h,
+// a cada 30 min. Fora dessas janelas o dispatch ignora a fila. Esse helper
+// calcula em texto humano quando a próxima execução vai pegar a mensagem.
+
+function calcularProximaJanela(now: Date = new Date()): string {
+  // BRT = UTC-3
+  const brt = new Date(now.getTime() - 3 * 60 * 60 * 1000);
+  const h = brt.getUTCHours();
+  const m = brt.getUTCMinutes();
+  const mins = h * 60 + m;
+
+  const proximoSlotEm = (slotMins: number): string => {
+    const totalMin = Math.max(0, slotMins - mins);
+    if (totalMin === 0) return 'agora';
+    if (totalMin < 60) return `em ${totalMin} min`;
+    const hh = Math.floor(totalMin / 60);
+    const mm = totalMin % 60;
+    return mm === 0 ? `em ${hh}h` : `em ${hh}h${mm}min`;
+  };
+
+  // Janela manhã 9–12h BRT (cron */30 nos minutos 0 e 30)
+  if (mins >= 9 * 60 && mins < 12 * 60) {
+    const proxMin = m < 30 ? h * 60 + 30 : (h + 1) * 60;
+    if (proxMin < 12 * 60) {
+      const ph = Math.floor(proxMin / 60);
+      const pm = proxMin % 60;
+      return `hoje ${String(ph).padStart(2, '0')}:${String(pm).padStart(2, '0')} BRT (${proximoSlotEm(proxMin)})`;
+    }
+    // ultrapassa 12:00 → janela tarde
+    return `hoje 14:00 BRT (${proximoSlotEm(14 * 60)})`;
+  }
+
+  // Janela tarde 14–17h BRT
+  if (mins >= 14 * 60 && mins < 17 * 60) {
+    const proxMin = m < 30 ? h * 60 + 30 : (h + 1) * 60;
+    if (proxMin < 17 * 60) {
+      const ph = Math.floor(proxMin / 60);
+      const pm = proxMin % 60;
+      return `hoje ${String(ph).padStart(2, '0')}:${String(pm).padStart(2, '0')} BRT (${proximoSlotEm(proxMin)})`;
+    }
+    return `amanhã 09:00 BRT`;
+  }
+
+  // Gap almoço 12–14h BRT
+  if (mins >= 12 * 60 && mins < 14 * 60) {
+    return `hoje 14:00 BRT (${proximoSlotEm(14 * 60)})`;
+  }
+
+  // Antes das 9h
+  if (mins < 9 * 60) {
+    return `hoje 09:00 BRT (${proximoSlotEm(9 * 60)})`;
+  }
+
+  // Depois das 17h ou madrugada
+  return `amanhã 09:00 BRT`;
+}
+
 // ─── Main component ─────────────────────────────────────────────────────────
 
 export function DispararAberturaModal({ open, onClose, leads, onSuccess }: Props) {
@@ -492,9 +550,11 @@ export function DispararAberturaModal({ open, onClose, leads, onSuccess }: Props
                 onClick={() => setModo('imediato')}>
                 <RadioGroupItem value="imediato" id="imediato" className="mt-0.5" />
                 <Label htmlFor="imediato" className="cursor-pointer flex-1">
-                  <div className="font-medium text-slate-800 text-sm">Imediato</div>
+                  <div className="font-medium text-slate-800 text-sm">Enviar na próxima janela</div>
                   <div className="text-xs text-slate-500 mt-0.5">
-                    Mensagens entram na fila agora e são enviadas dentro da próxima janela. Respeita o limite diário.
+                    Mensagem fica pronta para envio agora e sai automaticamente na próxima execução do cron.
+                    Próxima janela: <strong className="text-slate-700">{calcularProximaJanela()}</strong>.
+                    Pula a rampa, mas respeita o limite diário.
                   </div>
                 </Label>
               </div>
