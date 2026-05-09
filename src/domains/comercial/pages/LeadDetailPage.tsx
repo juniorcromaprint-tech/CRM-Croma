@@ -133,10 +133,17 @@ export default function LeadDetailPage() {
       showError("Email inválido. Verifique o formato.");
       return;
     }
-    // M-01: Validação de telefone (aceita formatos brasileiros)
-    if (form.contato_telefone && !/^\(?\d{2}\)?\s?\d{4,5}-?\d{4}$/.test(form.contato_telefone.replace(/\s/g, ""))) {
-      showError("Telefone inválido. Use o formato (XX) XXXXX-XXXX.");
-      return;
+    // Validação de telefone: aceita qualquer formato BR válido (com/sem DDI, com/sem máscara)
+    // Exemplos aceitos: (11) 98154-9118, 11981549118, +5511981549118, +55 11 98154-9118, 11 9 8154-9118
+    if (form.contato_telefone) {
+      const digitsOnly = form.contato_telefone.replace(/\D/g, "");
+      const isValidBR =
+        /^\d{10,11}$/.test(digitsOnly) ||           // sem DDI: DDD + 8 ou 9 dígitos
+        /^55\d{10,11}$/.test(digitsOnly);           // com DDI 55
+      if (!isValidBR) {
+        showError("Telefone inválido. Use formato BR: (XX) XXXXX-XXXX ou +5511XXXXXXXXX.");
+        return;
+      }
     }
     updateLead.mutate(
       {

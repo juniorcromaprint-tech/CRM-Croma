@@ -5,7 +5,8 @@ export const showSuccess = (message: string, options?: ExternalToast) => {
 };
 
 export const showError = (message: string, options?: ExternalToast) => {
-  toast.error(message, options);
+  // Erros precisam ficar visíveis tempo suficiente pro usuário ler (padrão sonner = 4s, muito curto)
+  toast.error(message, { duration: 8000, ...options });
 };
 
 export const showWarning = (message: string, options?: ExternalToast) => {

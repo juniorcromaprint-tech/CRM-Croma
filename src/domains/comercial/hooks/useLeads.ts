@@ -279,7 +279,8 @@ export function useUpdateLead() {
 
   return useMutation({
     mutationFn: async ({ id, ...payload }: LeadUpdate): Promise<Lead> => {
-      // Validate status transition if status is being changed
+      // Validate status transition ONLY if status is being CHANGED (not just resent unchanged)
+      // Bug fix: form submetia status mesmo sem alteração → validação bloqueava "novo → novo"
       if (payload.status) {
         const { data: current, error: fetchError } = await supabase
           .from('leads')
@@ -292,12 +293,16 @@ export function useUpdateLead() {
         }
 
         const currentStatus = current?.status as string;
-        const allowed = LEAD_VALID_TRANSITIONS[currentStatus];
-        if (allowed && !allowed.includes(payload.status)) {
-          throw new Error(
-            `Transição de status inválida: "${currentStatus}" → "${payload.status}". ` +
-            `Transições permitidas: ${allowed.length > 0 ? allowed.join(', ') : 'nenhuma (status terminal)'}`
-          );
+
+        // Só validar transição se o status realmente mudou
+        if (currentStatus !== payload.status) {
+          const allowed = LEAD_VALID_TRANSITIONS[currentStatus];
+          if (allowed && !allowed.includes(payload.status)) {
+            throw new Error(
+              `Transição de status inválida: "${currentStatus}" → "${payload.status}". ` +
+              `Transições permitidas: ${allowed.length > 0 ? allowed.join(', ') : 'nenhuma (status terminal)'}`
+            );
+          }
         }
       }
 
