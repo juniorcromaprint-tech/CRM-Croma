@@ -1,0 +1,3 @@
+# Resend webhook NÃO envia JWT do Supabase. Precisa rodar sem verificação.
+# Auth é feita por assinatura svix dentro da função.
+verify_jwt = false
