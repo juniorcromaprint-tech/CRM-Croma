@@ -12,10 +12,51 @@ import { createClient } from 'https://esm.sh/@supabase/supabase-js@2';
 const DEFAULT_EMAIL_FROM = 'Croma Print <junior@cromaprint.com.br>';
 const DEFAULT_EMAIL_REPLY_TO = 'junior@cromaprint.com.br';
 
+// Lista de "nomes" genéricos importados pelo Apollo/prospecção que NÃO são pessoas reais.
+// Quando contato_nome é um desses, a saudação cai no fallback natural.
+const PLACEHOLDERS_GENERICOS = new Set([
+  'responsavel comercial', 'responsável comercial',
+  'comercial', 'compras', 'financeiro', 'atendimento',
+  'contato', 'cliente', 'lead',
+  'rh', 'recursos humanos',
+]);
+
+function normalizar(s: string | null | undefined): string {
+  if (!s) return '';
+  return s.trim().toLowerCase()
+    .normalize('NFD').replace(/[̀-ͯ]/g, '') // remove acentos
+    .replace(/\s+/g, ' ');
+}
+
 /**
- * Renderiza placeholders {{var}} no conteudo/assunto do template usando dados
- * reais do lead + agent_config. Bug fix 2026-05-09: antes os placeholders
- * chegavam literais no email (ex: "Olá {{contato_nome}}").
+ * Decide se o contato_nome é "utilizável" pra saudação personalizada.
+ * Retorna false se: vazio, genérico (Responsável Comercial etc), ou igual ao remetente.
+ */
+function isContatoUtilizavel(
+  contatoNome: string | null | undefined,
+  nomeRemetente: string,
+): boolean {
+  if (!contatoNome || contatoNome.trim() === '') return false;
+  const norm = normalizar(contatoNome);
+  if (PLACEHOLDERS_GENERICOS.has(norm)) return false;
+  if (norm === normalizar(nomeRemetente)) return false;
+  return true;
+}
+
+/**
+ * Renderiza placeholders {{var}} no conteudo/assunto.
+ *
+ * v24 (2026-05-09): variáveis derivadas + tratamento de genérico/duplicado.
+ *
+ * Variáveis preferenciais (templates novos):
+ * - {{saudacao}}             → "Olá Maria," (se nome bom) ou "Olá, tudo bem?" (fallback)
+ * - {{contato_nome_formatado}} → nome só se utilizável, senão string vazia
+ * - {{assinatura_nome}}      → agent_config.nome_remetente (= "Junior")
+ * - {{assinatura_empresa}}   → "Croma Print Comunicação Visual" (fixo)
+ * - {{telefone_empresa}}     → agent_config.telefone_empresa
+ *
+ * Variáveis legadas (backward compat — templates antigos continuam funcionando):
+ * - {{contato_nome}}, {{empresa}}, {{cidade}}, {{nome_remetente}}
  */
 function renderTemplate(
   text: string,
@@ -23,12 +64,40 @@ function renderTemplate(
   agentConfig: Record<string, string>,
 ): string {
   if (!text) return '';
+
+  const nomeRemetente = agentConfig?.nome_remetente || 'Junior';
+  const telefoneEmpresa = agentConfig?.telefone_empresa || '(11) 3399-4517';
+  const assinaturaEmpresa = 'Croma Print Comunicação Visual';
+
+  const utilizavel = isContatoUtilizavel(lead.contato_nome, nomeRemetente);
+
+  const saudacao = utilizavel
+    ? `Olá ${lead.contato_nome},`
+    : 'Olá, tudo bem?';
+  const contatoNomeFormatado = utilizavel ? (lead.contato_nome as string) : '';
+
   return text
-    .replace(/\{\{contato_nome\}\}/g, lead.contato_nome || lead.empresa || 'Cliente')
+    // Variáveis derivadas (preferenciais)
+    .replace(/\{\{saudacao\}\}/g, saudacao)
+    .replace(/\{\{contato_nome_formatado\}\}/g, contatoNomeFormatado)
+    .replace(/\{\{assinatura_nome\}\}/g, nomeRemetente)
+    .replace(/\{\{assinatura_empresa\}\}/g, assinaturaEmpresa)
+    // Variáveis legadas (backward compat)
+    .replace(/\{\{contato_nome\}\}/g, utilizavel ? (lead.contato_nome as string) : 'Cliente')
     .replace(/\{\{empresa\}\}/g, lead.empresa || 'sua empresa')
     .replace(/\{\{cidade\}\}/g, lead.cidade || 'sua região')
-    .replace(/\{\{nome_remetente\}\}/g, agentConfig?.nome_remetente || 'Junior - Croma Print')
-    .replace(/\{\{telefone_empresa\}\}/g, agentConfig?.telefone_empresa || '(11) 3399-4517');
+    .replace(/\{\{nome_remetente\}\}/g, nomeRemetente)
+    .replace(/\{\{telefone_empresa\}\}/g, telefoneEmpresa);
+}
+
+/**
+ * Detecta se ainda há placeholder não renderizado no texto. Usado como guarda
+ * antes de mandar pro Resend, para evitar repetir o desastre dos 44 emails
+ * que foram com {{contato_nome}} literal.
+ */
+function temPlaceholderNaoRenderizado(text: string): boolean {
+  if (!text) return false;
+  return /\{\{[^}]*\}\}/.test(text);
 }
 
 /** Convert plain text to basic HTML: split on blank lines → <p> tags.
@@ -176,7 +245,7 @@ serve(async (req: Request) => {
         agent_conversations (
           id, lead_id, mensagens_enviadas,
           leads (
-            id, empresa, contato_nome, contato_email, status
+            id, empresa, contato_nome, contato_email, status, cidade
           )
         )
       `)
@@ -237,6 +306,26 @@ serve(async (req: Request) => {
       msg.assunto ||
       `Comunicação visual profissional — ${lead.empresa || lead.contato_nome || 'sua empresa'}`;
     const subject = renderTemplate(subjectRaw, lead, agentConfig);
+
+    // ✨ GUARDA ANTI-PLACEHOLDER (v24, 2026-05-09): bloqueia envio se ainda restar {{...}}
+    // Garante que nunca mais um email sai com {{contato_nome}} literal (bug dos 44 leads).
+    if (temPlaceholderNaoRenderizado(conteudoRender) || temPlaceholderNaoRenderizado(subject)) {
+      const placeholderInfo = [
+        ...(conteudoRender.match(/\{\{[^}]*\}\}/g) || []),
+        ...(subject.match(/\{\{[^}]*\}\}/g) || []),
+      ].join(', ');
+      const errMsg = `Template contem placeholder nao renderizado: ${placeholderInfo}`;
+      await supabase
+        .from('agent_messages')
+        .update({ status: 'erro', erro_mensagem: errMsg.substring(0, 500) })
+        .eq('id', message_id);
+      console.error('[agent-enviar-email] BLOCKED:', errMsg, 'message_id=', message_id);
+      return jsonResponse(
+        { error: 'Placeholder nao renderizado', detail: errMsg },
+        422,
+        corsHeaders,
+      );
+    }
 
     const RESEND_API_KEY = Deno.env.get('RESEND_API_KEY');
     const now = new Date().toISOString();
