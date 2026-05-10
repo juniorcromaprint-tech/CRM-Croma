@@ -57,8 +57,16 @@ function countAvancados(f: LeadsFilterState) {
     Boolean(f.cadastroDe || f.cadastroAte),
     Boolean(f.vendedorId),
     f.excluirBloqueados === false, // toggle off é considerado "ajustado"
+    Boolean(f.emailEngajamento),
   ].filter(Boolean).length;
 }
+
+const ENGAJAMENTO_LABELS: Record<string, string> = {
+  abriu:        '📧 Abriu email',
+  clicou:       '🎯 Clicou em link',
+  bounce:       '⚠️ Bounce',
+  sem_abertura: 'Recebeu mas não abriu',
+};
 
 // ─── Componente principal ────────────────────────────────────────────────────
 
@@ -182,6 +190,28 @@ export function LeadsFilters({ filters, onChange, onReset }: Props) {
                   ))}
                 </SelectContent>
               </Select>
+            </div>
+
+            {/* Engajamento de email (client-side, na pagina visivel) */}
+            <div>
+              <Label className="text-xs text-slate-500 mb-1 block">Engajamento de email</Label>
+              <Select
+                value={filters.emailEngajamento ?? 'all'}
+                onValueChange={v => onChange({ emailEngajamento: v !== 'all' ? (v as any) : undefined })}
+              >
+                <SelectTrigger className="h-8 text-xs">
+                  <SelectValue placeholder="Qualquer" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="all">Qualquer</SelectItem>
+                  {Object.entries(ENGAJAMENTO_LABELS).map(([k, v]) => (
+                    <SelectItem key={k} value={k}>{v}</SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+              <p className="text-[10px] text-slate-400 mt-1">
+                Filtra os leads visíveis na página atual (use também a tela <strong>Email Engajamento</strong> pra ver tudo).
+              </p>
             </div>
 
             {/* Score range */}

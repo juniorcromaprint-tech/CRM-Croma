@@ -275,6 +275,7 @@ export default function LeadsPage() {
           onPageChange={setPage}
           isLoading={isLoading}
           selection={selection}
+          emailEngajamentoFiltro={filters.emailEngajamento}
         />
 
         <LeadsCesta

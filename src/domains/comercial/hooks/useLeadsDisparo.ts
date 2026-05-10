@@ -27,6 +27,8 @@ export interface LeadsFilterState {
   cadastroAte?: string;
   excluirBloqueados?: boolean;        // default true
   busca?: string;
+  /** Filtro client-side de engajamento de email (aplicado no LeadsCardList). */
+  emailEngajamento?: 'abriu' | 'clicou' | 'bounce' | 'sem_abertura' | null;
 }
 
 export type LeadDisparo = {

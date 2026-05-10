@@ -23,10 +23,13 @@ interface Props {
   onPageChange: (next: number) => void;
   isLoading: boolean;
   selection: ReturnType<typeof useLeadsSelection>;
+  /** Filtro de engajamento de email (aplicado client-side na página visível). */
+  emailEngajamentoFiltro?: 'abriu' | 'clicou' | 'bounce' | 'sem_abertura' | null;
 }
 
 export function LeadsCardList({
   leads, totalCount, page, pageSize, onPageChange, isLoading, selection,
+  emailEngajamentoFiltro,
 }: Props) {
   const navigate = useNavigate();
   const totalPages = Math.max(1, Math.ceil(totalCount / pageSize));
@@ -92,6 +95,7 @@ export function LeadsCardList({
         leads={leads}
         selection={selection}
         onOpen={(id) => navigate(`/leads/${id}`)}
+        emailEngajamentoFiltro={emailEngajamentoFiltro}
       />
 
 
@@ -149,17 +153,41 @@ function LeadsCardsRender({
   leads,
   selection,
   onOpen,
+  emailEngajamentoFiltro,
 }: {
   leads: LeadDisparo[];
   selection: ReturnType<typeof useLeadsSelection>;
   onOpen: (id: string) => void;
+  emailEngajamentoFiltro?: 'abriu' | 'clicou' | 'bounce' | 'sem_abertura' | null;
 }) {
   const leadIds = leads.map(l => l.id);
   const { data: engajamentoMap } = useEmailEngajamentoLeads(leadIds);
 
+  // Aplica filtro client-side por engajamento (só leads visíveis na página)
+  const leadsVisiveis = emailEngajamentoFiltro
+    ? leads.filter(lead => {
+        const r = engajamentoMap?.get(lead.id);
+        switch (emailEngajamentoFiltro) {
+          case 'abriu':        return r?.ultimo_status === 'opened' || r?.ultimo_status === 'clicked';
+          case 'clicou':       return r?.ultimo_status === 'clicked';
+          case 'bounce':       return r?.ultimo_status === 'bounced';
+          case 'sem_abertura': return r?.ultimo_status === 'delivered' || r?.ultimo_status === 'enviada';
+          default: return true;
+        }
+      })
+    : leads;
+
   return (
     <div className="space-y-1.5">
-      {leads.map(lead => (
+      {emailEngajamentoFiltro && (
+        <div className="text-xs bg-blue-50 border border-blue-100 text-blue-800 rounded-xl px-3 py-2 flex items-center justify-between">
+          <span>
+            Filtro <strong>{emailEngajamentoFiltro}</strong> aplicado nesta página: <strong>{leadsVisiveis.length}</strong> de {leads.length} leads.
+          </span>
+          <span className="text-blue-600">Use a tela <strong>/email/engajamento</strong> pra ver todos.</span>
+        </div>
+      )}
+      {leadsVisiveis.map(lead => (
         <LeadCard
           key={lead.id}
           lead={lead}
@@ -169,6 +197,11 @@ function LeadsCardsRender({
           emailResumo={engajamentoMap?.get(lead.id)}
         />
       ))}
+      {emailEngajamentoFiltro && leadsVisiveis.length === 0 && (
+        <div className="bg-white rounded-2xl border border-slate-200 p-8 text-center text-sm text-slate-400">
+          Nenhum lead nesta página com esse engajamento.
+        </div>
+      )}
     </div>
   );
 }
