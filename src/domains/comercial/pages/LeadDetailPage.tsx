@@ -27,6 +27,7 @@ import { validarCNPJ } from '@/shared/utils/cnpj';
 import { TEMPERATURA_CONFIG } from "../constants/temperatura";
 import { LEAD_STATUS_CONFIG, getStatusConfig } from "@/shared/constants/status";
 import { supabase } from "@/integrations/supabase/client";
+import { EmailTimeline } from "../components/leads/EmailTimeline";
 
 export default function LeadDetailPage() {
   const { id } = useParams<{ id: string }>();
@@ -757,6 +758,17 @@ export default function LeadDetailPage() {
           </div>
         )}
       </div>
+
+      {/* Email tracking timeline (sent/delivered/opened/clicked/bounced) */}
+      {!editing && (
+        <div className="mt-4">
+          <h3 className="text-sm font-semibold text-slate-700 mb-3 flex items-center gap-2">
+            <Mail size={14} className="text-slate-500" />
+            Histórico de email
+          </h3>
+          <EmailTimeline leadId={id} />
+        </div>
+      )}
 
       {/* Convert dialog */}
       <AlertDialog open={convertOpen} onOpenChange={setConvertOpen}>

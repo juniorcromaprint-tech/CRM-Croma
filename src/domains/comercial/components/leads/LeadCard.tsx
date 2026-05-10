@@ -7,6 +7,8 @@ import {
   Tooltip, TooltipContent, TooltipProvider, TooltipTrigger,
 } from '@/components/ui/tooltip';
 import type { LeadDisparo } from '../../hooks/useLeadsDisparo';
+import type { EmailEngajamentoResumo } from '../../hooks/useEmailEngajamento';
+import { EmailStatusBadge } from '@/components/ui/email-status-badge';
 
 const SUB_SEGMENTO_AVATAR: Record<string, { bg: string; fg: string; label: string }> = {
   vigilancia_patrimonial: { bg: 'bg-purple-50', fg: 'text-purple-700', label: 'Vigilância' },
@@ -35,9 +37,11 @@ interface Props {
   selected: boolean;
   onToggle: () => void;
   onOpen: () => void;
+  /** Resumo de engajamento de email (último status, opens, clicks) — opcional. */
+  emailResumo?: EmailEngajamentoResumo;
 }
 
-export function LeadCard({ lead, selected, onToggle, onOpen }: Props) {
+export function LeadCard({ lead, selected, onToggle, onOpen, emailResumo }: Props) {
   const isBlocked = lead.bloqueado_disparo;
   const inicial = (lead.empresa ?? lead.contato_nome ?? '?')
     .replace(/[^a-zA-Z0-9 ]/g, '')
@@ -138,6 +142,16 @@ export function LeadCard({ lead, selected, onToggle, onOpen }: Props) {
                 <span className="text-[10px] px-1.5 py-0.5 rounded-md font-medium bg-red-50 text-red-600">
                   sem contato
                 </span>
+              )}
+              {/* Status do último email enviado (tracking Resend) */}
+              {emailResumo && emailResumo.ultimo_status && (
+                <EmailStatusBadge
+                  status={emailResumo.ultimo_status}
+                  qtdOpens={emailResumo.qtd_opens}
+                  qtdClicks={emailResumo.qtd_clicks}
+                  compact
+                  tooltip={`Último email: ${emailResumo.ultimo_em ? new Date(emailResumo.ultimo_em).toLocaleString('pt-BR') : '—'}`}
+                />
               )}
               {/* Botao para abrir detalhe — separado do toggle do card */}
               {!isBlocked && (

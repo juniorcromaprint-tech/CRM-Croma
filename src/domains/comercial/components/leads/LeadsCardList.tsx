@@ -13,6 +13,7 @@ import {
 import { LeadCard } from './LeadCard';
 import type { LeadDisparo } from '../../hooks/useLeadsDisparo';
 import type { useLeadsSelection } from '../../hooks/useLeadsSelection';
+import { useEmailEngajamentoLeads } from '../../hooks/useEmailEngajamento';
 
 interface Props {
   leads: LeadDisparo[];
@@ -86,18 +87,13 @@ export function LeadsCardList({
         </span>
       </div>
 
-      {/* Lista de cards */}
-      <div className="space-y-1.5">
-        {leads.map(lead => (
-          <LeadCard
-            key={lead.id}
-            lead={lead}
-            selected={selection.has(lead.id)}
-            onToggle={() => selection.toggle(lead.id)}
-            onOpen={() => navigate(`/leads/${lead.id}`)}
-          />
-        ))}
-      </div>
+      {/* Lista de cards — busca engajamento de email em batch (1 query pra página inteira) */}
+      <LeadsCardsRender
+        leads={leads}
+        selection={selection}
+        onOpen={(id) => navigate(`/leads/${id}`)}
+      />
+
 
       {/* Paginação */}
       {totalPages > 1 && (
@@ -144,6 +140,35 @@ export function LeadsCardList({
           </PaginationContent>
         </Pagination>
       )}
+    </div>
+  );
+}
+
+// Render interno isolado — fetch de engajamento em batch (1 query/página)
+function LeadsCardsRender({
+  leads,
+  selection,
+  onOpen,
+}: {
+  leads: LeadDisparo[];
+  selection: ReturnType<typeof useLeadsSelection>;
+  onOpen: (id: string) => void;
+}) {
+  const leadIds = leads.map(l => l.id);
+  const { data: engajamentoMap } = useEmailEngajamentoLeads(leadIds);
+
+  return (
+    <div className="space-y-1.5">
+      {leads.map(lead => (
+        <LeadCard
+          key={lead.id}
+          lead={lead}
+          selected={selection.has(lead.id)}
+          onToggle={() => selection.toggle(lead.id)}
+          onOpen={() => onOpen(lead.id)}
+          emailResumo={engajamentoMap?.get(lead.id)}
+        />
+      ))}
     </div>
   );
 }
