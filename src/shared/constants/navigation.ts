@@ -37,6 +37,7 @@ export const NAV_GROUPS: NavGroup[] = [
       // Rota /propostas continua funcional caso seja necessário no futuro.
       { name: 'Calendário', path: '/calendario', icon: 'Calendar', module: 'comercial' },
       { name: 'Campanhas', path: '/campanhas', icon: 'Megaphone', module: 'comercial' },
+      { name: 'Email Engajamento', path: '/email/engajamento', icon: 'MailOpen', module: 'comercial' },
       { name: 'Contratos', path: '/contratos', icon: 'RefreshCw', module: 'comercial' },
       // Templates removido — rota /orcamentos/templates não existe
     ],

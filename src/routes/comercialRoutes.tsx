@@ -14,6 +14,7 @@ const PropostasPage = lazy(() => import("@/domains/comercial/pages/PropostasPage
 const CalendarioPage = lazy(() => import("@/domains/comercial/pages/CalendarioPage"));
 const CampanhasPage = lazy(() => import("@/domains/comercial/pages/CampanhasPage"));
 const ContratosPage = lazy(() => import("@/domains/comercial/pages/ContratosPage"));
+const EmailEngajamentoPage = lazy(() => import("@/domains/comercial/pages/EmailEngajamentoPage"));
 
 export const comercialRoutes = (
   <>
@@ -28,6 +29,7 @@ export const comercialRoutes = (
     <Route path="propostas" element={<PermissionGuard module="comercial" action="ver"><LazyPage><PropostasPage /></LazyPage></PermissionGuard>} />
     <Route path="calendario" element={<PermissionGuard module="comercial" action="ver"><LazyPage><CalendarioPage /></LazyPage></PermissionGuard>} />
     <Route path="campanhas" element={<PermissionGuard module="comercial" action="ver"><LazyPage><CampanhasPage /></LazyPage></PermissionGuard>} />
+    <Route path="email/engajamento" element={<PermissionGuard module="comercial" action="ver"><LazyPage><EmailEngajamentoPage /></LazyPage></PermissionGuard>} />
     <Route path="contratos" element={<PermissionGuard module="comercial" action="ver"><LazyPage><ContratosPage /></LazyPage></PermissionGuard>} />
   </>
 );
