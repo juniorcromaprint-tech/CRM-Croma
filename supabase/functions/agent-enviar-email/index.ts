@@ -117,6 +117,8 @@ function textToHtml(text: string, hasInlineImage: boolean): string {
     ? `<img src="cid:portfolio_croma" alt="Croma Print - Portfolio" style="width:100%;max-width:600px;height:auto;display:block;border-radius:0 0 8px 8px;margin-top:8px;" />`
     : '';
 
+  // v25 (2026-05-09): rodape hardcoded "comunicação@cromaprint.com.br" removido
+  // (email nao existe). Assinatura agora vem so do template (renderTemplate).
   return `<!DOCTYPE html>
 <html lang="pt-BR">
 <head><meta charset="UTF-8"><meta name="viewport" content="width=device-width,initial-scale=1"></head>
@@ -126,12 +128,6 @@ function textToHtml(text: string, hasInlineImage: boolean): string {
       ${paragraphs}
     </div>
     ${imageHtml}
-    <div style="padding:0 32px 24px 32px;">
-      <hr style="border:none;border-top:1px solid #eee;margin:24px 0 16px 0;">
-      <p style="font-family:Arial,sans-serif;font-size:12px;color:#999;margin:0;">
-        Croma Print Comunicação Visual — comunicação@cromaprint.com.br
-      </p>
-    </div>
   </div>
 </body>
 </html>`;
