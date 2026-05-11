@@ -404,10 +404,22 @@ export default function LeadDetailPage() {
               )}
               {lead.whatsapp && (
                 <div className="flex items-center gap-3">
-                  <Phone size={16} className="text-emerald-400 shrink-0" />
+                  <Phone size={16} className={(lead as any).whatsapp_invalido ? "text-red-400 shrink-0" : "text-emerald-400 shrink-0"} />
                   <div>
                     <p className="text-xs text-slate-500">WhatsApp</p>
-                    <p className="text-sm font-medium text-slate-700">{lead.whatsapp}</p>
+                    <div className="flex items-center gap-2 flex-wrap">
+                      <p className={(lead as any).whatsapp_invalido ? "text-sm font-medium text-slate-400 line-through" : "text-sm font-medium text-slate-700"}>{lead.whatsapp}</p>
+                      {(lead as any).whatsapp_invalido && (
+                        <span
+                          className="inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium bg-red-50 text-red-700 border border-red-200"
+                          title={(lead as any).whatsapp_invalidado_motivo
+                            ? `Marcado em ${(lead as any).whatsapp_invalidado_em ? new Date((lead as any).whatsapp_invalidado_em).toLocaleDateString('pt-BR') : '—'}. Motivo: ${(lead as any).whatsapp_invalidado_motivo}`
+                            : 'Número confirmado sem WhatsApp ativo. Lead continua elegível para email.'}
+                        >
+                          WhatsApp inválido
+                        </span>
+                      )}
+                    </div>
                   </div>
                 </div>
               )}

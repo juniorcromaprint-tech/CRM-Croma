@@ -1,4 +1,7 @@
 // supabase/functions/whatsapp-webhook/index.ts
+// v18 (2026-05-11, migration 151) — captura errors[0].code + error_data.details em status='failed'.
+//                                    Permite RPC private.fn_auto_marcar_sem_whatsapp identificar
+//                                    leads com numero invalido permanente (codigo 131026 etc).
 // v17 — P0+P1+P2+P3+P4 consolidados.
 //   P0 — bot/URA/loop detector + automacao_pausada early-return
 //   P1 — extração estruturada de dados via Claude (JSON) + gravarDadosExtraidos
@@ -1353,7 +1356,13 @@ serve(async (req: Request) => {
             : (msgs[0] as any).status;
           const updateData: Record<string, unknown> = { status: newStatus };
           if (statusType === 'read') updateData.lido_em = new Date().toISOString();
-          if (statusType === 'failed') updateData.erro_mensagem = (status.errors as any)?.[0]?.message ?? 'Delivery failed';
+          if (statusType === 'failed') {
+            // v18 (migration 151): capturar codigo + detalhes Meta pra auto-marcacao de leads sem WhatsApp
+            const err = (status.errors as any)?.[0];
+            updateData.erro_mensagem = err?.message ?? 'Delivery failed';
+            updateData.erro_codigo = err?.code != null ? String(err.code) : null;
+            updateData.erro_detalhes = err?.error_data?.details ?? err?.title ?? null;
+          }
           await supabaseStatus.from('agent_messages').update(updateData).eq('id', (msgs[0] as any).id);
         }
       }
