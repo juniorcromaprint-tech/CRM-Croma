@@ -89,6 +89,14 @@ export default function WhatsAppStatusCard() {
             <Send size={14} className="text-blue-500" />
             <span className="text-slate-600">{status.todaySent}</span>
             <span className="text-slate-400 text-xs">/{status.dailyLimit} enviadas hoje</span>
+            {status.todayAttempts > status.todaySent && (
+              <span
+                className="text-amber-600 text-xs"
+                title={`${status.todayAttempts - status.todaySent} tentativa(s) com erro (número inválido, rate limit, etc)`}
+              >
+                ({status.todayAttempts} tentativas)
+              </span>
+            )}
           </div>
           <div className="flex items-center gap-2 text-sm">
             <Inbox size={14} className="text-green-500" />
@@ -153,17 +161,4 @@ export default function WhatsAppStatusCard() {
               <p className="mt-1">
                 Adicione as credenciais do WhatsApp Business em{' '}
                 <button
-                  onClick={() => navigate('/agente/config')}
-                  className="underline font-medium hover:text-amber-900"
-                >
-                  Configurações do Agente
-                </button>
-                {' '}ou diretamente no Supabase Dashboard (admin_config).
-              </p>
-            </div>
-          </div>
-        </div>
-      )}
-    </div>
-  );
-}
+                  onClick={() =

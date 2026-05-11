@@ -260,7 +260,7 @@ export interface CampanhaStatus {
   totalDisparados: number;        // leads que JÁ entraram numa conversa
   enviadasHoje: number;           // agent_messages enviadas hoje (canal whatsapp)
   diaDaRampa: number | null;      // 1, 2, 3...; null se ainda não houve disparo
-  limiteDiarioAtual: number;      // calculado pelo backend via fn_calcular_limite_diario()
+  limiteDiarioAtual: number;      // RPC fn_limite_diario_efetivo() = LEAST(rampa, max_contatos_dia)
   totalEnfileiradas: number;      // mensagens 'aprovada' aguardando envio
   janelas: [string, string][];    // janelas BRT do agent_config (fonte real do backend)
 }
@@ -283,16 +283,21 @@ export function useCampanhaStatus(segmento = 'seguranca') {
         .eq('segmento', segmento)
         .or('em_conversa_ativa.eq.true,ultima_conversa_em.not.is.null');
 
-      // 3. Mensagens enviadas hoje (canal whatsapp)
+      // 3. Mensagens enviadas hoje (canal whatsapp) — FONTE ÚNICA via RPC
+      //    fn_contar_enviadas_hoje filtra status IN (enviada,entregue,lida,respondida)
+      //    Fix do bug em que webhook avançava status e contador subestimava (2026-05-11).
       const inicioHoje = new Date();
       inicioHoje.setHours(0, 0, 0, 0);
 
-      const { count: enviadasHoje } = await supabase
-        .from('agent_messages')
-        .select('id', { count: 'exact', head: true })
-        .eq('canal', 'whatsapp')
-        .eq('status', 'enviada')
-        .gte('enviado_em', inicioHoje.toISOString());
+      let enviadasHoje = 0;
+      {
+        const { data: countRpc } = await supabase.rpc('fn_contar_enviadas_hoje', {
+          p_canal: 'whatsapp',
+        });
+        if (typeof countRpc === 'number') {
+          enviadasHoje = countRpc;
+        }
+      }
 
       // 4. Mensagens enfileiradas (aprovada, aguardando)
       const { count: totalEnfileiradas } = await supabase
@@ -321,12 +326,13 @@ export function useCampanhaStatus(segmento = 'seguranca') {
         diaDaRampa = diff + 1;
       }
 
-      // 6. Limite diário — FONTE ÚNICA: backend RPC fn_calcular_limite_diario()
-      //    O backend usa esse mesmo cálculo no dispatch-approved-messages.
-      //    Frontend apenas reflete a regra real, não recalcula.
+      // 6. Limite diário — FONTE ÚNICA: backend RPC fn_limite_diario_efetivo()
+      //    = LEAST(fn_calcular_limite_diario() rampa, max_contatos_dia freio manual).
+      //    Backend whatsapp-enviar usa o MESMO cálculo (sem divergência UI↔backend).
+      //    Para liberar a rampa: subir max_contatos_dia em /agent-config.
       let limiteDiarioAtual = 15; // fallback
       try {
-        const { data: limiteRpc } = await supabase.rpc('fn_calcular_limite_diario');
+        const { data: limiteRpc } = await supabase.rpc('fn_limite_diario_efetivo');
         if (typeof limiteRpc === 'number' && limiteRpc > 0) {
           limiteDiarioAtual = limiteRpc;
         }
@@ -463,13 +469,4 @@ export function useLeadsDisparoMeta() {
         segmentos:    uniq(rows.map(r => r.segmento)),
         subSegmentos: uniq(rows.map(r => r.sub_segmento)),
         origens:      uniq(rows.map(r => r.origem_nome)),
-        status:       uniq(rows.map(r => r.status)),
-        temperaturas: uniq(rows.map(r => r.temperatura)),
-        estados:      uniq(rows.map(r => r.estado)),
-        regioes:      uniq(rows.map(r => r.regiao)),
-        cidades:      uniq(rows.map(r => r.cidade)),
-      };
-    },
-    staleTime: 5 * 60_000,
-  });
-}
+    

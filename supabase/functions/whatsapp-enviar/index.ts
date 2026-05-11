@@ -1,4 +1,10 @@
 // supabase/functions/whatsapp-enviar/index.ts
+// v27 (2026-05-12, migration 157) — usa RPC fn_contar_enviadas_hoje + fn_limite_diario_efetivo
+//                                    como fonte ÚNICA de contador e limite (mesmo que UI).
+//                                    Antes: filtro inline `status='enviada'` subestimava (webhook
+//                                    avançava status) → backend permitia estourar limite Meta
+//                                    silenciosamente (caso real: 71 tentativas vs limite 15 em 11/05).
+//                                    Limite efetivo = LEAST(rampa_aquecimento, max_contatos_dia).
 // v26 (2026-05-11, migration 151) — captura error.code + error_data.details quando Meta retorna falha sincrona.
 //                                    Permite RPC private.fn_auto_marcar_sem_whatsapp identificar leads invalidos.
 // v22 (2026-05-06): aceita JWT legacy service_role + sb_secret novo formato + user JWT.
@@ -236,15 +242,19 @@ serve(async (req) => {
     const sb = getServiceClient();
 
     // Pre-check: limites e janela
+    // FONTE ÚNICA pós-migration 157:
+    //   - Contador: RPC fn_contar_enviadas_hoje (status IN enviada/entregue/lida/respondida)
+    //   - Limite : RPC fn_limite_diario_efetivo = LEAST(rampa, max_contatos_dia)
+    // Antes desse fix (v26-), filtro inline `status='enviada'` ignorava mensagens que
+    // avançaram via webhook → contador subestimava → backend permitia estourar limite Meta.
     {
       const { data: pc } = await sb.from('agent_messages').select('metadata').eq('id', message_id).single();
       const isManual = pc && pc.metadata && pc.metadata.manual === true;
       const { data: cr } = await sb.from('admin_config').select('valor').eq('chave', 'agent_config').single();
-      let cfg: any = { max_contatos_dia: 50, horario_inicio: '08:00', horario_fim: '18:00' };
+      let cfg: any = { horario_inicio: '08:00', horario_fim: '18:00' };
       if (cr && cr.valor) {
         try { cfg = { ...cfg, ...JSON.parse(cr.valor) }; } catch (_) {}
       }
-      const max = cfg.max_contatos_dia || 50;
       if (!isManual) {
         // Hora BRT = UTC - 3
         const now = new Date(Date.now() - 3 * 60 * 60 * 1000);
@@ -255,12 +265,17 @@ serve(async (req) => {
           return jsonResp({ error: 'Fora do horario (' + desc + ')' }, 429, ch);
         }
       }
-      const ts = new Date(); ts.setHours(0, 0, 0, 0);
-      const { count } = await sb.from('agent_messages')
-        .select('id', { count: 'exact', head: true })
-        .eq('canal', 'whatsapp').eq('status', 'enviada').gte('enviado_em', ts.toISOString());
-      if ((count || 0) >= max) {
-        return jsonResp({ error: 'Limite diario ' + max + ' atingido' }, 429, ch);
+      // Contador efetivo + limite efetivo via RPC (fonte única).
+      const { data: enviadasHoje, error: countErr } = await sb.rpc('fn_contar_enviadas_hoje', { p_canal: 'whatsapp' });
+      const { data: limiteEfetivo, error: limitErr } = await sb.rpc('fn_limite_diario_efetivo');
+      if (countErr || limitErr) {
+        console.error('[whatsapp-enviar] erro consultando RPCs de limite', { countErr, limitErr });
+        return jsonResp({ error: 'Falha ao consultar limite diario (RPC)' }, 500, ch);
+      }
+      const count = typeof enviadasHoje === 'number' ? enviadasHoje : 0;
+      const max   = typeof limiteEfetivo === 'number' && limiteEfetivo > 0 ? limiteEfetivo : 15;
+      if (count >= max) {
+        return jsonResp({ error: 'Limite diario ' + max + ' atingido (enviadas hoje: ' + count + ')' }, 429, ch);
       }
     }
 
@@ -349,71 +364,4 @@ serve(async (req) => {
 
     const mr = await postToMetaCloud(cr2, wp);
     if (!mr.ok) {
-      // v26 (migration 151): tentar parsear body Meta como JSON pra extrair code + error_data.details.
-      // Meta retorna {"error":{"code":131026,"message":"...","error_data":{"details":"..."}}} em falhas.
-      let erroCodigo: string | null = null;
-      let erroDetalhes: string | null = null;
-      let erroMensagem: string = mr.body;
-      try {
-        const parsed = JSON.parse(mr.body);
-        const e = parsed?.error;
-        if (e) {
-          if (e.code != null) erroCodigo = String(e.code);
-          erroMensagem = e.message ?? mr.body;
-          erroDetalhes = e.error_data?.details ?? e.error_subcode != null ? String(e.error_subcode) : null;
-        }
-      } catch (_) { /* body nao era JSON — fica com body raw */ }
-      await sb.from('agent_messages').update({
-        status: 'erro',
-        erro_mensagem: erroMensagem,
-        erro_codigo: erroCodigo,
-        erro_detalhes: erroDetalhes,
-      }).eq('id', message_id);
-      return jsonResp({ error: 'Falha Meta Cloud API', status: mr.status, detail: mr.body, code: erroCodigo }, 502, ch);
-    }
-    const wmid = mr.metaData?.messages?.[0]?.id;
-
-    const sentAs = (msg as any).media_url && (msg as any).media_type === 'image'
-      ? 'image'
-      : isFirst && !hasReply ? 'template' : 'text';
-
-    await sb.from('agent_messages').update({
-      status: 'enviada',
-      enviado_em: now,
-      metadata: {
-        ...(msg.metadata || {}),
-        whatsapp_message_id: wmid,
-        sent_as: sentAs,
-        template_used: sentAs === 'template' ? tn : null,
-      }
-    }).eq('id', message_id);
-
-    await sb.from('agent_conversations').update({
-      mensagens_enviadas: (cv.mensagens_enviadas || 0) + 1,
-      ultima_mensagem_em: now
-    }).eq('id', msg.conversation_id);
-
-    await sb.from('atividades_comerciais').insert({
-      entidade_tipo: 'lead', entidade_id: ld.id, tipo: 'whatsapp',
-      descricao: '[Agente] WhatsApp enviado: ' + (msg.conteudo || '').substring(0, 80),
-      resultado: 'enviado', data_atividade: now,
-    });
-
-    if (ld.status === 'novo') {
-      await sb.from('leads').update({ status: 'contatado' })
-        .eq('id', ld.id).eq('status', 'novo');
-    }
-
-    return jsonResp({
-      success: true,
-      message_id,
-      whatsapp_message_id: wmid,
-      to: tp,
-      sent_as: sentAs,
-      template_used: sentAs === 'template' ? tn : null,
-    }, 200, ch);
-  } catch (err: any) {
-    console.error('whatsapp-enviar v21 error:', err);
-    return jsonResp({ error: 'Erro interno', detail: err.message }, 500, ch);
-  }
-});
+      // v26 (migration 151): tentar parsear body Meta como JSON pra extrair code + error
