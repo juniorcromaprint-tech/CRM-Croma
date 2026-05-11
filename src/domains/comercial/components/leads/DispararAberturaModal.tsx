@@ -10,6 +10,10 @@ import {
 import {
   Dialog, DialogContent, DialogHeader, DialogTitle,
 } from '@/components/ui/dialog';
+import {
+  AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent,
+  AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle,
+} from '@/components/ui/alert-dialog';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { RadioGroup, RadioGroupItem } from '@/components/ui/radio-group';
@@ -20,8 +24,11 @@ import { showSuccess, showError } from '@/utils/toast';
 import { useTemplatesAbertura, useDispararAbertura } from '../../hooks/useDispararAbertura';
 import type { CanalDisparo, DisparoResultRow } from '../../hooks/useDispararAbertura';
 import type { LeadDisparo } from '../../hooks/useLeadsDisparo';
+import { useCreateLeadSegment } from '../../hooks/useLeadSegments';
 import { useFeatureFlag } from '@/shared/hooks/useFeatureFlag';
 import { CampanhaSelector } from './CampanhaSelector';
+import { Input } from '@/components/ui/input';
+import { BookmarkPlus } from 'lucide-react';
 
 // ─── Types ───────────────────────────────────────────────────────────────────
 
@@ -37,9 +44,9 @@ type Step = 'confirmacao' | 'template' | 'cadencia' | 'resultado';
 // ─── Step indicator ──────────────────────────────────────────────────────────
 
 const STEPS: { id: Step; label: string }[] = [
-  { id: 'confirmacao', label: 'Cesta'    },
-  { id: 'template',    label: 'Abertura' },
-  { id: 'cadencia',    label: 'Cadência' },
+  { id: 'confirmacao', label: 'Cesta'     },
+  { id: 'template',    label: 'Template'  },
+  { id: 'cadencia',    label: 'Cadência'  },
   { id: 'resultado',   label: 'Resultado' },
 ];
 
@@ -126,7 +133,61 @@ function renderPreview(conteudo: string | null, lead?: LeadDisparo): string {
     .replace(/\{\{empresa\}\}/g, lead.empresa ?? 'sua empresa')
     .replace(/\{\{cidade\}\}/g, lead.cidade ?? 'sua região')
     .replace(/\{\{nome_remetente\}\}/g, 'Junior - Croma Print')
-    .replace(/\{\{telefone_empresa\}\}/g, '(11) 3399-4517');
+    .replace(/\{\{telefone_empresa\}\}/g, '(11) 3399-4517')
+    .replace(/\{\{saudacao\}\}/g, lead.contato_nome ? `Olá ${lead.contato_nome}` : 'Olá, tudo bem?')
+    .replace(/\{\{assinatura_nome\}\}/g, 'Junior')
+    .replace(/\{\{assinatura_empresa\}\}/g, 'Croma Print Comunicação Visual');
+}
+
+// v3 UX (2026-05-11): monta HTML aproximado do email final pra preview em iframe.
+// Reflete o fluxo do agent-enviar-email v24: subject renderizado, body com
+// quebras de linha viradas <br>, imagem como banner topo (se incluir).
+function buildEmailPreviewHtml(
+  template: { nome: string; assunto: string | null; conteudo: string | null; imagem_url?: string | null } | null,
+  lead?: LeadDisparo,
+  incluirImagem: boolean = true,
+): string {
+  if (!template) return '';
+  const subject = renderPreview(template.assunto, lead);
+  const body = renderPreview(template.conteudo, lead)
+    .split('\n')
+    .map(line => line.length === 0 ? '<br/>' : `<p style="margin:0 0 12px 0;">${escapeHtml(line)}</p>`)
+    .join('');
+  const imgUrl = incluirImagem ? (template.imagem_url ?? '') : '';
+  return `<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width,initial-scale=1.0" />
+<title>${escapeHtml(subject || template.nome)}</title>
+<style>
+  body { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif; line-height: 1.5; color: #1f2937; max-width: 600px; margin: 0 auto; padding: 16px; background: #fff; }
+  .subject-bar { background: #f1f5f9; padding: 8px 12px; border-radius: 8px; font-size: 12px; color: #475569; margin-bottom: 16px; }
+  .subject-bar strong { color: #1e293b; }
+  .banner { width: 100%; max-width: 600px; border-radius: 8px; margin-bottom: 16px; }
+  .footer { margin-top: 24px; padding-top: 12px; border-top: 1px solid #e2e8f0; font-size: 12px; color: #64748b; }
+</style>
+</head>
+<body>
+  <div class="subject-bar">De: <strong>Junior &lt;junior@cromaprint.com.br&gt;</strong> · Assunto: <strong>${escapeHtml(subject)}</strong></div>
+  ${imgUrl ? `<img class="banner" src="${escapeAttr(imgUrl)}" alt="Croma Print" />` : ''}
+  <div>${body}</div>
+  <div class="footer">Email simulado pelo CRM Croma — preview do que o destinatário receberá via Resend.</div>
+</body>
+</html>`;
+}
+
+function escapeHtml(s: string): string {
+  return s
+    .replace(/&/g, '&amp;')
+    .replace(/</g, '&lt;')
+    .replace(/>/g, '&gt;')
+    .replace(/"/g, '&quot;')
+    .replace(/'/g, '&#39;');
+}
+
+function escapeAttr(s: string): string {
+  return s.replace(/"/g, '&quot;').replace(/</g, '&lt;');
 }
 
 // ─── Próxima janela do cron de dispatch ─────────────────────────────────────
@@ -198,6 +259,14 @@ export function DispararAberturaModal({ open, onClose, leads, onSuccess }: Props
   const [imagemCustomUrl, setImagemCustomUrl] = useState<string>('');
   const [uploading, setUploading] = useState(false);
   const [resultado, setResultado] = useState<DisparoResultRow[] | null>(null);
+  // v4 UX (2026-05-11): AlertDialog de confirmação antes do disparo definitivo.
+  const [confirmOpen, setConfirmOpen] = useState(false);
+  // v3 UX (2026-05-11): preview HTML real do email num iframe sandbox.
+  const [htmlPreviewOpen, setHtmlPreviewOpen] = useState(false);
+  // v8 UX (2026-05-11): salvar a cesta como segmento pra re-uso.
+  const [segmentoNome, setSegmentoNome] = useState('');
+  const [segmentoSalvo, setSegmentoSalvo] = useState(false);
+  const criarSegmento = useCreateLeadSegment();
 
   // Vínculo opcional com campanha (atrás de feature flag).
   // Default null = "Sem campanha (disparo avulso)" → comportamento legacy preservado.
@@ -294,8 +363,33 @@ export function DispararAberturaModal({ open, onClose, leads, onSuccess }: Props
     setImagemCustomUrl('');
     setCampanhaId(null);
     setResultado(null);
+    setSegmentoNome('');
+    setSegmentoSalvo(false);
     dispararMutation.reset();
     onClose();
+  };
+
+  // v8 UX (2026-05-11): salva os lead.ids do disparo como segmento reutilizável.
+  const handleSalvarSegmento = async () => {
+    if (!segmentoNome.trim() || !resultado) return;
+    // IDs dos que foram efetivamente enfileirados (status='criado')
+    const enfileiradosIds = resultado
+      .filter(r => r.status === 'criado')
+      .map(r => r.lead_id);
+    if (!enfileiradosIds.length) {
+      showError('Nenhum lead foi enfileirado pra salvar');
+      return;
+    }
+    try {
+      await criarSegmento.mutateAsync({
+        nome: segmentoNome,
+        descricao: `Disparo ${canalLabel} · ${new Date().toLocaleDateString('pt-BR')} · template ${templateSelecionado?.nome ?? ''}`,
+        lead_ids: enfileiradosIds,
+      });
+      setSegmentoSalvo(true);
+    } catch {
+      // erro já tratado pelo toast do hook
+    }
   };
 
   const labelSemContato = canal === 'whatsapp' ? 'Sem telefone válido' : 'Sem email válido';
@@ -419,20 +513,31 @@ export function DispararAberturaModal({ open, onClose, leads, onSuccess }: Props
               <div className={`border rounded-xl p-3 space-y-2 ${
                 canal === 'email' ? 'bg-blue-50 border-blue-100' : 'bg-emerald-50 border-emerald-100'
               }`}>
-                <div className="flex items-center justify-between gap-2">
+                <div className="flex items-center justify-between gap-2 flex-wrap">
                   <span className={`text-xs font-medium ${canal === 'email' ? 'text-blue-700' : 'text-emerald-700'}`}>
                     Preview {leadAmostra ? `(com ${leadAmostra.empresa ?? 'lead'})` : ''}
                   </span>
-                  {canal === 'email' && templateSelecionado.assunto && (
-                    <Badge variant="outline" className="text-[10px] text-slate-600 border-slate-200">
-                      Assunto: {renderPreview(templateSelecionado.assunto, leadAmostra)}
-                    </Badge>
-                  )}
-                  {canal === 'whatsapp' && (
-                    <Badge variant="outline" className="text-[10px] text-slate-500 border-slate-200">
-                      {templateSelecionado.meta_template_name}
-                    </Badge>
-                  )}
+                  <div className="flex items-center gap-2">
+                    {canal === 'email' && templateSelecionado.assunto && (
+                      <Badge variant="outline" className="text-[10px] text-slate-600 border-slate-200">
+                        Assunto: {renderPreview(templateSelecionado.assunto, leadAmostra)}
+                      </Badge>
+                    )}
+                    {canal === 'whatsapp' && (
+                      <Badge variant="outline" className="text-[10px] text-slate-500 border-slate-200">
+                        {templateSelecionado.meta_template_name}
+                      </Badge>
+                    )}
+                    {canal === 'email' && (
+                      <button
+                        type="button"
+                        onClick={() => setHtmlPreviewOpen(true)}
+                        className="text-[11px] font-medium text-blue-700 bg-white border border-blue-200 rounded-lg px-2 py-1 hover:bg-blue-50 transition-colors inline-flex items-center gap-1"
+                      >
+                        <Mail size={11} /> Ver email completo
+                      </button>
+                    )}
+                  </div>
                 </div>
 
                 {/* Image section for email: upload + toggle */}
@@ -593,8 +698,8 @@ export function DispararAberturaModal({ open, onClose, leads, onSuccess }: Props
                 <ChevronLeft size={14} className="mr-1" /> Voltar
               </Button>
               <Button
-                onClick={handleDisparar}
-                disabled={dispararMutation.isPending}
+                onClick={() => setConfirmOpen(true)}
+                disabled={dispararMutation.isPending || elegiveis.length === 0}
                 className="bg-blue-600 hover:bg-blue-700 gap-2"
               >
                 {dispararMutation.isPending ? (
@@ -647,6 +752,44 @@ export function DispararAberturaModal({ open, onClose, leads, onSuccess }: Props
                 : 'Os emails serão enviados via Resend dentro das janelas de horário configuradas.'}
             </p>
 
+            {/* v8 UX (2026-05-11): Salvar lista como segmento reutilizável */}
+            {resultado.filter(r => r.status === 'criado').length > 0 && (
+              <div className="bg-emerald-50 border border-emerald-100 rounded-xl p-3 space-y-2">
+                <div className="flex items-center gap-2 text-emerald-700 text-xs font-medium">
+                  <BookmarkPlus size={13} />
+                  Salvar essa lista pra re-usar
+                </div>
+                <p className="text-[11px] text-slate-500">
+                  Útil pra follow-up depois (ex: WhatsApp na quarta nos mesmos {resultado.filter(r => r.status === 'criado').length} leads que receberam email hoje).
+                </p>
+                {segmentoSalvo ? (
+                  <div className="flex items-center gap-1.5 text-emerald-700 text-xs">
+                    <CheckCircle2 size={13} /> Segmento <strong>{segmentoNome}</strong> salvo
+                  </div>
+                ) : (
+                  <div className="flex items-center gap-2">
+                    <Input
+                      value={segmentoNome}
+                      onChange={(e) => setSegmentoNome(e.target.value)}
+                      placeholder="Ex: Calçados Lote 1 — 11/05"
+                      className="text-xs h-8 flex-1"
+                      maxLength={80}
+                      disabled={criarSegmento.isPending}
+                    />
+                    <Button
+                      size="sm"
+                      onClick={handleSalvarSegmento}
+                      disabled={!segmentoNome.trim() || criarSegmento.isPending}
+                      className="bg-emerald-600 hover:bg-emerald-700 h-8 text-xs gap-1"
+                    >
+                      {criarSegmento.isPending ? <Loader2 size={11} className="animate-spin" /> : <BookmarkPlus size={11} />}
+                      Salvar
+                    </Button>
+                  </div>
+                )}
+              </div>
+            )}
+
             <div className="flex justify-end pt-1">
               <Button onClick={handleClose} className="bg-blue-600 hover:bg-blue-700">
                 Fechar
@@ -655,6 +798,112 @@ export function DispararAberturaModal({ open, onClose, leads, onSuccess }: Props
           </div>
         )}
       </DialogContent>
+
+      {/* v3 UX (2026-05-11): Preview HTML real do email num iframe sandbox.
+          Mostra exatamente o que o destinatário vai receber via Resend (com
+          imagem banner, formatação, assinatura). */}
+      <Dialog open={htmlPreviewOpen} onOpenChange={setHtmlPreviewOpen}>
+        <DialogContent className="sm:max-w-3xl max-h-[90vh] flex flex-col">
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2">
+              <Mail size={16} className="text-blue-600" />
+              Preview do email
+              {leadAmostra && (
+                <Badge variant="outline" className="text-[10px] text-slate-500 border-slate-200">
+                  Renderizado com {leadAmostra.empresa ?? 'lead'}
+                </Badge>
+              )}
+            </DialogTitle>
+          </DialogHeader>
+          <iframe
+            sandbox=""
+            title="Preview do email"
+            className="flex-1 w-full min-h-[500px] bg-white border border-slate-200 rounded-lg"
+            srcDoc={buildEmailPreviewHtml(
+              templateSelecionado ?? null,
+              leadAmostra,
+              incluirImagem,
+            )}
+          />
+          <div className="text-[11px] text-slate-400 pt-2 border-t border-slate-100">
+            Preview aproximado. A renderização final pode variar levemente entre clientes de email (Gmail, Outlook, etc).
+          </div>
+        </DialogContent>
+      </Dialog>
+
+      {/* v4 UX (2026-05-11): Confirm dialog antes do disparo final.
+          Regra do projeto: AlertDialogAction com mutation async DEVE usar
+          e.preventDefault() e fechar manualmente após settle. */}
+      <AlertDialog open={confirmOpen} onOpenChange={setConfirmOpen}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle className="flex items-center gap-2">
+              <Send size={16} className="text-blue-600" />
+              Confirmar disparo
+            </AlertDialogTitle>
+            <AlertDialogDescription asChild>
+              <div className="space-y-3">
+                <div className="text-slate-700">
+                  Vai disparar <strong className="text-slate-900">{elegiveis.length}</strong>{' '}
+                  {elegiveis.length === 1 ? 'mensagem' : 'mensagens'} via{' '}
+                  <strong className="text-slate-900">{canalLabel}</strong>.
+                </div>
+                <div className="bg-slate-50 rounded-xl p-3 space-y-1.5 text-sm">
+                  <div className="flex items-center justify-between">
+                    <span className="text-slate-500">Template</span>
+                    <span className="font-medium text-slate-800">{templateSelecionado?.nome}</span>
+                  </div>
+                  {canal === 'email' && templateSelecionado?.imagem_url && (
+                    <div className="flex items-center justify-between">
+                      <span className="text-slate-500">Imagem</span>
+                      <span className="font-medium text-slate-800">{incluirImagem ? 'Sim' : 'Não'}</span>
+                    </div>
+                  )}
+                  <div className="flex items-center justify-between">
+                    <span className="text-slate-500">Modo</span>
+                    <span className="font-medium text-slate-800">
+                      {modo === 'agendado' ? 'Cron com rampa' : 'Próxima janela'}
+                    </span>
+                  </div>
+                  {modo === 'imediato' && (
+                    <div className="flex items-center justify-between">
+                      <span className="text-slate-500">Próxima janela</span>
+                      <span className="font-medium text-slate-800">{calcularProximaJanela()}</span>
+                    </div>
+                  )}
+                </div>
+                <div className="bg-amber-50 border border-amber-200 rounded-lg px-3 py-2 text-xs text-amber-800">
+                  <strong>Esta ação é irreversível.</strong> Mensagens entram na fila e
+                  saem automaticamente — não há "desfazer". Verifique tudo antes de confirmar.
+                </div>
+              </div>
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel disabled={dispararMutation.isPending}>
+              Cancelar
+            </AlertDialogCancel>
+            <AlertDialogAction
+              onClick={async (e) => {
+                e.preventDefault(); // impede o close automático do Radix
+                try {
+                  await handleDisparar();
+                } finally {
+                  setConfirmOpen(false);
+                }
+              }}
+              disabled={dispararMutation.isPending}
+              className="bg-blue-600 hover:bg-blue-700 text-white"
+            >
+              {dispararMutation.isPending ? (
+                <><Loader2 size={14} className="animate-spin mr-1.5" />Disparando...</>
+              ) : (
+                <>Confirmar disparo</>
+              )}
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </Dialog>
   );
 }

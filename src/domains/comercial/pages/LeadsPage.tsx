@@ -36,6 +36,7 @@ import { LeadsFilters } from '../components/leads/LeadsFilters';
 import { LeadsCardList } from '../components/leads/LeadsCardList';
 import { LeadsCesta } from '../components/leads/LeadsCesta';
 import { DispararAberturaModal } from '../components/leads/DispararAberturaModal';
+import { SegmentoSalvoLoader } from '../components/leads/SegmentoSalvoLoader';
 import { ImportWizard } from '@/domains/dados/components/ImportWizard';
 import { ExportDialog } from '@/domains/dados/components/ExportDialog';
 
@@ -240,6 +241,7 @@ export default function LeadsPage() {
           </p>
         </div>
         <div className="flex items-center gap-2">
+          <SegmentoSalvoLoader selection={selection} />
           <ExportDialog
             entityKey="leads"
             trigger={

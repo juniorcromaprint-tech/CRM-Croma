@@ -134,8 +134,13 @@ function applyFilters(
   if (!skip.has('busca') && filters.busca) {
     const b = filters.busca.trim().replace(/[%_]/g, ''); // sanitização leve
     if (b) {
+      // v2 (2026-05-11): busca também em emails (qualquer um dos 3 campos) e telefone2,
+      // facilitando achar por domínio (ex: "lojasbecker" pega lead com @lojasbecker.com.br)
+      // ou por nome no email (ex: "marcelolopes").
       q = q.or(
-        `empresa.ilike.%${b}%,contato_nome.ilike.%${b}%,contato_telefone.ilike.%${b}%`
+        `empresa.ilike.%${b}%,contato_nome.ilike.%${b}%,` +
+        `contato_telefone.ilike.%${b}%,telefone.ilike.%${b}%,telefone2.ilike.%${b}%,whatsapp.ilike.%${b}%,` +
+        `email.ilike.%${b}%,email2.ilike.%${b}%,contato_email.ilike.%${b}%`
       );
     }
   }
