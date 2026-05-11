@@ -33,6 +33,7 @@ import {
   ChevronDown,
   ChevronUp,
   Paperclip,
+  UserPlus,
 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
@@ -53,6 +54,9 @@ import { supabase } from '@/integrations/supabase/client';
 import { formatDate } from '@/shared/utils/format';
 import { showSuccess, showError } from '@/utils/toast';
 import { useAgentMessages, useEscalateConversation, useResumeConversation, useSendManualWhatsApp, useDeleteConversation, useDeleteMessage } from '../hooks/useAgentMessages';
+import { useUpdateLead } from '@/domains/comercial/hooks/useLeads';
+import { useCreateCliente } from '@/domains/clientes/hooks/useClientes';
+import { validarCNPJ } from '@/shared/utils/cnpj';
 import type { AgentConversation, AgentCanal, AgentMessageStatus } from '../types/agent.types';
 
 // ─── Fetch single conversation ───────────────────────────────────────────────
@@ -474,8 +478,76 @@ export function AgentConversationView({
   const sendManual = useSendManualWhatsApp();
   const deleteConversation = useDeleteConversation();
   const deleteMessage = useDeleteMessage();
+  const updateLead = useUpdateLead();
+  const createCliente = useCreateCliente();
   const [manualText, setManualText] = useState('');
+  const [convertOpen, setConvertOpen] = useState(false);
+  const [converting, setConverting] = useState(false);
   const messagesEndRef = useRef<HTMLDivElement>(null);
+
+  // Converter lead em cliente direto da conversa (sem sair pra LeadDetailPage).
+  // Validacoes: empresa obrigatoria, CNPJ valido se preenchido, sem duplicata por CNPJ.
+  const handleConverterLead = async () => {
+    const lead = (conversation as any)?.leads;
+    if (!lead?.id) return;
+    if (!lead.empresa?.trim()) {
+      showError('Lead precisa ter nome da empresa para ser convertido.');
+      return;
+    }
+    const cnpjLimpo = (lead.cnpj || '').replace(/\D/g, '') || null;
+    if (cnpjLimpo && !validarCNPJ(cnpjLimpo)) {
+      showError('CNPJ do lead inválido. Edite no detalhe do lead antes de converter.');
+      return;
+    }
+    setConverting(true);
+    try {
+      // Bloqueio por CNPJ duplicado
+      if (cnpjLimpo) {
+        const { data: existingByCnpj } = await supabase
+          .from('clientes')
+          .select('id, razao_social')
+          .eq('cnpj', cnpjLimpo)
+          .is('excluido_em', null)
+          .maybeSingle();
+        if (existingByCnpj) {
+          showError(`Já existe cliente com este CNPJ: ${existingByCnpj.razao_social}`);
+          setConverting(false);
+          return;
+        }
+      }
+      // Bloqueio por razão social igual
+      const { data: existingByName } = await supabase
+        .from('clientes')
+        .select('id, razao_social')
+        .ilike('razao_social', lead.empresa.trim())
+        .is('excluido_em', null)
+        .maybeSingle();
+      if (existingByName) {
+        showError(`Já existe cliente com razão social parecida: ${existingByName.razao_social}. Edite no detalhe do lead antes de converter.`);
+        setConverting(false);
+        return;
+      }
+
+      const novoCliente = await createCliente.mutateAsync({
+        razao_social: lead.empresa,
+        nome_fantasia: lead.empresa,
+        email: lead.contato_email ?? null,
+        telefone: lead.contato_telefone ?? null,
+        segmento: lead.segmento ?? null,
+        origem: 'lead_convertido',
+        lead_id: lead.id,
+        cnpj: cnpjLimpo,
+      });
+      await updateLead.mutateAsync({ id: lead.id, status: 'convertido' });
+      setConvertOpen(false);
+      showSuccess('Lead convertido! Indo pro cliente para criar orçamento...');
+      navigate(`/clientes/${novoCliente.id}`);
+    } catch (err: any) {
+      showError(err?.message || 'Erro ao converter lead em cliente.');
+    } finally {
+      setConverting(false);
+    }
+  };
 
   // Auto-scroll to bottom when messages change
   useEffect(() => {
@@ -555,6 +627,67 @@ export function AgentConversationView({
             >
               {conversation.status}
             </Badge>
+            {/* Botao Converter em cliente — so quando lead ainda nao foi convertido nem perdido */}
+            {lead && lead.status !== 'convertido' && lead.status !== 'perdido' && (
+              <AlertDialog open={convertOpen} onOpenChange={setConvertOpen}>
+                <AlertDialogTrigger asChild>
+                  <Button
+                    variant="default"
+                    size="sm"
+                    className="h-8 gap-1.5 bg-emerald-600 hover:bg-emerald-700 text-white"
+                  >
+                    <UserPlus size={14} />
+                    Converter
+                  </Button>
+                </AlertDialogTrigger>
+                <AlertDialogContent>
+                  <AlertDialogHeader>
+                    <AlertDialogTitle>Converter em cliente?</AlertDialogTitle>
+                    <AlertDialogDescription asChild>
+                      <div className="space-y-2 text-sm text-slate-600">
+                        <p>
+                          <strong>{lead.empresa}</strong> será criado como cliente e marcado como convertido. Você será levado pra tela do cliente pra criar o orçamento.
+                        </p>
+                        <div className="rounded-lg bg-slate-50 p-3 text-xs space-y-1">
+                          <div><span className="text-slate-500">Empresa:</span> <strong>{lead.empresa}</strong></div>
+                          {lead.cnpj && <div><span className="text-slate-500">CNPJ:</span> {lead.cnpj}</div>}
+                          {lead.contato_nome && <div><span className="text-slate-500">Contato:</span> {lead.contato_nome}</div>}
+                          {lead.contato_email && <div><span className="text-slate-500">Email:</span> {lead.contato_email}</div>}
+                          {lead.contato_telefone && <div><span className="text-slate-500">Telefone:</span> {lead.contato_telefone}</div>}
+                          {(lead.cidade || lead.uf) && <div><span className="text-slate-500">Cidade:</span> {[lead.cidade, lead.uf].filter(Boolean).join('/')}</div>}
+                        </div>
+                        {!lead.cnpj && (
+                          <p className="text-amber-700 text-xs">⚠ Sem CNPJ — você pode completar na tela do cliente depois.</p>
+                        )}
+                      </div>
+                    </AlertDialogDescription>
+                  </AlertDialogHeader>
+                  <AlertDialogFooter>
+                    <AlertDialogCancel disabled={converting}>Cancelar</AlertDialogCancel>
+                    <AlertDialogAction
+                      disabled={converting}
+                      onClick={(e) => {
+                        e.preventDefault();
+                        handleConverterLead();
+                      }}
+                      className="bg-emerald-600 hover:bg-emerald-700"
+                    >
+                      {converting ? (
+                        <>
+                          <Loader2 className="animate-spin mr-2 h-4 w-4" />
+                          Convertendo...
+                        </>
+                      ) : (
+                        <>
+                          <UserPlus className="mr-2 h-4 w-4" />
+                          Converter e ir pro cliente
+                        </>
+                      )}
+                    </AlertDialogAction>
+                  </AlertDialogFooter>
+                </AlertDialogContent>
+              </AlertDialog>
+            )}
             <AlertDialog>
               <AlertDialogTrigger asChild>
                 <Button
