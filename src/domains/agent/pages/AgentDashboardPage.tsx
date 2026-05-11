@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useState } from 'react';
-import { useNavigate } from 'react-router-dom';
+import { useNavigate, useSearchParams } from 'react-router-dom';
 import {
   Bot,
   MessageSquare,
@@ -17,6 +17,8 @@ import {
   Flame,
   Snowflake,
   X,
+  Maximize2,
+  Inbox,
 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import KpiCard from '@/shared/components/KpiCard';
@@ -26,6 +28,7 @@ import { useRunOrchestrator } from '../hooks/useAgentActions';
 import { useDeleteConversation } from '../hooks/useAgentMessages';
 import LeadDiscoveryDialog from '../components/LeadDiscoveryDialog';
 import WhatsAppStatusCard from '../components/WhatsAppStatusCard';
+import { AgentConversationView } from './AgentConversationPage';
 import type { AgentConversation, AgentCanal, AgentConversationStatus, AgentEtapa } from '../types/agent.types';
 
 // ─── Badge helpers ───────────────────────────────────────────────────────────
@@ -306,11 +309,77 @@ function ConversationRow({ conv, onClick, onDelete }: { conv: AgentConversation;
   );
 }
 
+// ─── Row compact (split view) ─────────────────────────────────────────────────
+// v2 (2026-05-11): versão enxuta usada quando uma conversa está aberta à direita.
+// Em vez das colunas Canal/Etapa/Status/Score/Último em linhas separadas,
+// empilha tudo na vertical pra caber numa sidebar de ~360px.
+function ConversationRowCompact({
+  conv, active, onClick,
+}: {
+  conv: AgentConversation;
+  active: boolean;
+  onClick: () => void;
+}) {
+  const canalCfg  = CANAL_CONFIG[conv.canal]  ?? CANAL_CONFIG.interno;
+  const statusCfg = STATUS_CONFIG[conv.status] ?? STATUS_CONFIG.encerrada;
+  const CanalIcon = canalCfg.Icon;
+
+  return (
+    <div
+      onClick={onClick}
+      className={`px-3 py-2.5 cursor-pointer border-b border-slate-100 last:border-0 transition-colors ${
+        active ? 'bg-blue-50 border-l-2 border-l-blue-500' : 'hover:bg-slate-50 border-l-2 border-l-transparent'
+      }`}
+    >
+      <div className="flex items-start justify-between gap-2 mb-1">
+        <div className="flex-1 min-w-0">
+          <p className={`font-medium text-sm truncate ${active ? 'text-blue-900' : 'text-slate-800'}`}>
+            {conv.leads?.empresa ?? '—'}
+          </p>
+          {conv.leads?.contato_nome && (
+            <p className="text-[11px] text-slate-400 truncate">{conv.leads.contato_nome}</p>
+          )}
+        </div>
+        <span className="text-[10px] text-slate-400 shrink-0">
+          {conv.ultima_mensagem_em ? formatDate(conv.ultima_mensagem_em) : '—'}
+        </span>
+      </div>
+      <div className="flex items-center gap-1.5 flex-wrap">
+        <span className={`inline-flex items-center gap-1 px-1.5 py-0.5 rounded text-[10px] font-medium ${canalCfg.className}`}>
+          <CanalIcon size={9} />
+          {canalCfg.label}
+        </span>
+        <span className={`inline-flex items-center px-1.5 py-0.5 rounded text-[10px] font-medium ${statusCfg.className}`}>
+          {statusCfg.label}
+        </span>
+        <span className="text-[10px] text-slate-400 tabular-nums ml-auto">Score {conv.score_engajamento}</span>
+      </div>
+    </div>
+  );
+}
+
 // ─── Main page ────────────────────────────────────────────────────────────────
 
 export default function AgentDashboardPage() {
   const navigate = useNavigate();
+  const [searchParams, setSearchParams] = useSearchParams();
   const [showNovaProspeccao, setShowNovaProspeccao] = useState(false);
+
+  // v2 UX (2026-05-11): split view — quando ?conv=<id> está na URL, abre a
+  // conversa à direita inline. Sem perder contexto da lista. Click em outra
+  // conversa só troca o painel direito.
+  const selectedConvId = searchParams.get('conv');
+  const handleSelectConv = (id: string | null) => {
+    if (id) {
+      const sp = new URLSearchParams(searchParams);
+      sp.set('conv', id);
+      setSearchParams(sp, { replace: true });
+    } else {
+      const sp = new URLSearchParams(searchParams);
+      sp.delete('conv');
+      setSearchParams(sp, { replace: true });
+    }
+  };
 
   const { data: stats, isLoading: statsLoading } = useAgentStats();
 
@@ -375,6 +444,148 @@ export default function AgentDashboardPage() {
   const handleOrquestrador = () => {
     runOrchestrator.mutate();
   };
+
+  // v2 UX (2026-05-11): split view ativo quando há ?conv=<id> na URL.
+  // Renderiza sidebar compacta de conversas + thread inline à direita.
+  if (selectedConvId) {
+    return (
+      <div className="h-[calc(100vh-6rem)] flex flex-col gap-3">
+        {/* Header compacto — só botão fechar split + Nova Prospecção */}
+        <div className="flex items-center justify-between gap-4 flex-wrap">
+          <div className="flex items-center gap-2">
+            <Button
+              variant="ghost"
+              size="sm"
+              onClick={() => handleSelectConv(null)}
+              className="gap-1.5 text-slate-500"
+            >
+              <X size={14} /> Fechar conversa
+            </Button>
+            <h1 className="text-lg font-semibold text-slate-800">Agente de Vendas</h1>
+          </div>
+          <Button
+            onClick={() => setShowNovaProspeccao(true)}
+            className="bg-blue-600 hover:bg-blue-700 gap-2"
+            size="sm"
+          >
+            <Plus size={15} />
+            Nova Prospecção
+          </Button>
+        </div>
+
+        {/* Split: sidebar de conversas à esquerda + thread à direita */}
+        <div className="flex-1 grid grid-cols-1 lg:grid-cols-[360px_minmax(0,1fr)] gap-3 min-h-0">
+          {/* Sidebar conversas */}
+          <div className="bg-white rounded-2xl border border-slate-200 flex flex-col min-h-0 overflow-hidden">
+            <div className="px-3 py-2.5 border-b border-slate-100 flex items-center justify-between">
+              <span className="text-sm font-semibold text-slate-700 inline-flex items-center gap-1.5">
+                <Inbox size={14} className="text-blue-600" />
+                Conversas
+              </span>
+              <span className="text-xs text-slate-400">{conversations.length}</span>
+            </div>
+            {/* Filtros compactos — só busca + score pills (status fica como pill agrupado) */}
+            <div className="px-3 py-2 border-b border-slate-100 bg-slate-50/50 space-y-2">
+              <div className="relative">
+                <Search size={12} className="absolute left-2.5 top-1/2 -translate-y-1/2 text-slate-400 pointer-events-none" />
+                <input
+                  type="text"
+                  value={search}
+                  onChange={(e) => setSearch(e.target.value)}
+                  placeholder="Buscar..."
+                  className="w-full pl-7 pr-2 py-1.5 text-xs border border-slate-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-200 focus:border-blue-300 bg-white"
+                />
+              </div>
+              <div className="flex items-center gap-1 flex-wrap">
+                {SCORE_FILTERS.map((f) => {
+                  const active = scoreFilter === f.id;
+                  return (
+                    <button
+                      key={f.id}
+                      onClick={() => setScoreFilter(f.id)}
+                      className={`text-[10px] px-1.5 py-0.5 rounded border transition-colors inline-flex items-center gap-1 ${
+                        active ? f.cls + ' font-medium' : 'border-slate-200 text-slate-500 hover:bg-white'
+                      }`}
+                    >
+                      {f.icon} {f.label}
+                    </button>
+                  );
+                })}
+              </div>
+              <div className="flex items-center gap-1 flex-wrap">
+                {STATUS_FILTERS.slice(0, 4).map((f) => {
+                  const count = countsByStatus[f.id] ?? 0;
+                  const active = statusFilter === f.id;
+                  return (
+                    <button
+                      key={f.id}
+                      onClick={() => setStatusFilter(f.id)}
+                      className={`text-[10px] px-1.5 py-0.5 rounded border transition-colors ${
+                        active
+                          ? 'border-blue-400 bg-blue-50 text-blue-700 font-medium'
+                          : 'border-slate-200 text-slate-600 hover:bg-white'
+                      }`}
+                    >
+                      {f.label}
+                      {count > 0 && <span className={`ml-1 ${active ? 'text-blue-500' : 'text-slate-400'}`}>{count}</span>}
+                    </button>
+                  );
+                })}
+              </div>
+            </div>
+            {/* Lista scrollable */}
+            <div className="flex-1 overflow-y-auto">
+              {convsLoading ? (
+                <div className="p-6 flex items-center justify-center gap-2 text-slate-400 text-xs">
+                  <Loader2 size={12} className="animate-spin" /> Carregando...
+                </div>
+              ) : conversations.length === 0 ? (
+                <div className="p-6 text-center text-xs text-slate-400">
+                  Nenhuma conversa nesse filtro
+                </div>
+              ) : (
+                conversations.map((conv) => (
+                  <ConversationRowCompact
+                    key={conv.id}
+                    conv={conv}
+                    active={conv.id === selectedConvId}
+                    onClick={() => handleSelectConv(conv.id)}
+                  />
+                ))
+              )}
+            </div>
+          </div>
+
+          {/* Thread direita */}
+          <div className="bg-slate-50/50 rounded-2xl border border-slate-200 overflow-y-auto min-h-0">
+            <div className="flex items-center justify-end p-2 border-b border-slate-100 bg-white sticky top-0 z-10">
+              <Button
+                variant="ghost"
+                size="sm"
+                onClick={() => navigate(`/agente/conversa/${selectedConvId}`)}
+                className="gap-1.5 text-xs text-slate-500"
+                title="Abrir em tela cheia"
+              >
+                <Maximize2 size={12} /> Tela cheia
+              </Button>
+            </div>
+            <div className="p-4">
+              <AgentConversationView
+                id={selectedConvId}
+                embedded
+                onAfterDelete={() => handleSelectConv(null)}
+              />
+            </div>
+          </div>
+        </div>
+
+        <LeadDiscoveryDialog
+          open={showNovaProspeccao}
+          onOpenChange={setShowNovaProspeccao}
+        />
+      </div>
+    );
+  }
 
   return (
     <div className="space-y-6">
@@ -532,7 +743,7 @@ export default function AgentDashboardPage() {
                 <ConversationRow
                   key={conv.id}
                   conv={conv}
-                  onClick={() => navigate(`/agente/conversa/${conv.id}`)}
+                  onClick={() => handleSelectConv(conv.id)}
                   onDelete={() => {
                     if (window.confirm(`Excluir conversa com ${conv.leads?.empresa ?? 'este lead'}?`)) {
                       deleteConversation.mutate({ conversationId: conv.id });

@@ -448,8 +448,24 @@ function MessageBubble({
 
 // ─── Main Page ───────────────────────────────────────────────────────────────
 
-export default function AgentConversationPage() {
-  const { id } = useParams<{ id: string }>();
+// v2 (2026-05-11): export nomeado pra reuso no split-view do dashboard.
+// Default export continua sendo a página standalone via useParams.
+//
+// Props:
+// - id: UUID da conversa (obrigatório)
+// - embedded: quando true, esconde header "Voltar ao Agente" e ações de página
+//   completa (Ir para Aprovação), usado no split view do dashboard.
+// - onAfterDelete: callback após deletar a conversa (em standalone, navega pra
+//   /agente; em embedded, fecha o painel direito).
+export function AgentConversationView({
+  id,
+  embedded = false,
+  onAfterDelete,
+}: {
+  id: string;
+  embedded?: boolean;
+  onAfterDelete?: () => void;
+}) {
   const navigate = useNavigate();
   const { data: conversation, isLoading: convLoading, error: convError } = useConversationById(id);
   const { data: messages = [], isLoading: msgsLoading } = useAgentMessages(id);
@@ -480,10 +496,12 @@ export default function AgentConversationPage() {
   if (convError || !conversation) {
     return (
       <div className="space-y-4">
-        <Button variant="ghost" onClick={() => navigate('/agente')} className="gap-2 text-slate-500 -ml-2">
-          <ArrowLeft size={16} />
-          Voltar
-        </Button>
+        {!embedded && (
+          <Button variant="ghost" onClick={() => navigate('/agente')} className="gap-2 text-slate-500 -ml-2">
+            <ArrowLeft size={16} />
+            Voltar
+          </Button>
+        )}
         <div className="bg-white rounded-2xl border border-slate-200 p-12 text-center">
           <MessageSquare size={40} className="mx-auto text-slate-300 mb-3" />
           <h3 className="font-semibold text-slate-600">Conversa nao encontrada</h3>
@@ -497,11 +515,13 @@ export default function AgentConversationPage() {
 
   return (
     <div className="space-y-6">
-      {/* Back button */}
-      <Button variant="ghost" onClick={() => navigate('/agente')} className="gap-2 text-slate-500 -ml-2">
-        <ArrowLeft size={16} />
-        Voltar ao Agente
-      </Button>
+      {/* Back button — escondido em modo embedded (já tem lista lateral pra navegar) */}
+      {!embedded && (
+        <Button variant="ghost" onClick={() => navigate('/agente')} className="gap-2 text-slate-500 -ml-2">
+          <ArrowLeft size={16} />
+          Voltar ao Agente
+        </Button>
+      )}
 
       {/* Conversation header card */}
       <div className="bg-white rounded-2xl border border-slate-200 px-6 py-5 space-y-3">
@@ -558,7 +578,10 @@ export default function AgentConversationPage() {
                     onClick={() =>
                       deleteConversation.mutate(
                         { conversationId: conversation.id },
-                        { onSuccess: () => navigate('/agente') }
+                        { onSuccess: () => {
+                          if (onAfterDelete) onAfterDelete();
+                          else navigate('/agente');
+                        } }
                       )
                     }
                     className="bg-red-600 hover:bg-red-700"
@@ -685,4 +708,11 @@ export default function AgentConversationPage() {
       )}
     </div>
   );
+}
+
+// Wrapper default — usado pela rota /agente/conversa/:id como página standalone.
+export default function AgentConversationPage() {
+  const { id } = useParams<{ id: string }>();
+  if (!id) return null;
+  return <AgentConversationView id={id} />;
 }
