@@ -112,14 +112,15 @@ export default function LeadsPage() {
   // Seleção
   const selection = useLeadsSelection();
 
+  // v2 (2026-05-11): NÃO limpamos seleção ao mudar filtro/busca/página.
+  // A cesta persiste por lead.id em sessionStorage (useLeadsSelection v2),
+  // então o usuário pode marcar leads em buscas diferentes e disparar tudo
+  // no fim. Pra limpar manualmente, use o botão "Limpar seleção" da cesta.
   const setFilters = useCallback((next: LeadsFilterState) => {
     setFiltersState(next);
     setPageState(1);
     setSearchParams(filtersToParams(next, 1), { replace: true });
-    selection.clear();
-    // selection.clear é estável (useCallback com [] no useLeadsSelection)
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, []);
+  }, [setSearchParams]);
 
   const patchFilters = useCallback((patch: Partial<LeadsFilterState>) => {
     setFilters({ ...filters, ...patch });

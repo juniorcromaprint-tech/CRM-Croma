@@ -1,9 +1,33 @@
 // supabase/functions/buscar-leads-google/index.ts
+// v15 (2026-05-11): aceita service_role JWT pra invocacao interna (pg_net),
+// mantendo fluxo user JWT normal pra UI. Padrao identico ao dispatch-approved-messages.
+//
 // Busca ativa de leads via Apify Google Maps Scraper (primary) or Google Places API (fallback)
 
 import { serve } from 'https://deno.land/std@0.168.0/http/server.ts';
 import { handleCorsOptions, getCorsHeaders, jsonResponse, getServiceClient } from '../ai-shared/ai-helpers.ts';
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2';
+
+// --- v15: helpers de auth service_role ---
+function decodeJwtPayload(token: string): Record<string, unknown> | null {
+  try {
+    const parts = token.split('.');
+    if (parts.length !== 3) return null;
+    const padded = parts[1].replace(/-/g, '+').replace(/_/g, '/');
+    const padding = padded.length % 4;
+    const b64 = padded + (padding ? '='.repeat(4 - padding) : '');
+    return JSON.parse(atob(b64));
+  } catch {
+    return null;
+  }
+}
+
+function isServiceRoleToken(token: string): boolean {
+  const envKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY');
+  if (envKey && token === envKey) return true;
+  const p = decodeJwtPayload(token);
+  return !!(p && p.role === 'service_role' && p.iss === 'supabase');
+}
 
 interface LeadResult {
   name: string;
@@ -207,29 +231,37 @@ serve(async (req: Request) => {
       return jsonResponse({ error: 'Nao autorizado' }, 401, corsHeaders);
     }
 
-    const supabaseAuth = createClient(
-      Deno.env.get('SUPABASE_URL')!,
-      Deno.env.get('SUPABASE_ANON_KEY')!,
-      { global: { headers: { Authorization: authHeader } } },
-    );
+    const token = authHeader.replace('Bearer ', '');
 
-    const { data: { user }, error: authError } = await supabaseAuth.auth.getUser();
-    if (authError || !user) {
-      return jsonResponse({ error: 'Token invalido' }, 401, corsHeaders);
-    }
+    // v15: branch service_role (invocacao interna via pg_net) — pula getUser/role check
+    const isServiceRole = isServiceRoleToken(token);
 
-    // Role check — only comercial, gerente, admin can search leads
-    const supabase = getServiceClient();
-    const { data: profile } = await supabase
-      .from('profiles')
-      .select('role')
-      .eq('id', user.id)
-      .single();
+    if (!isServiceRole) {
+      // Fluxo user JWT normal (UI /leads → "Buscar leads")
+      const supabaseAuth = createClient(
+        Deno.env.get('SUPABASE_URL')!,
+        Deno.env.get('SUPABASE_ANON_KEY')!,
+        { global: { headers: { Authorization: authHeader } } },
+      );
 
-    const role = profile?.role ?? 'comercial';
-    const allowedRoles = ['comercial', 'gerente', 'admin'];
-    if (!allowedRoles.includes(role)) {
-      return jsonResponse({ error: 'Sem permissao para buscar leads' }, 403, corsHeaders);
+      const { data: { user }, error: authError } = await supabaseAuth.auth.getUser();
+      if (authError || !user) {
+        return jsonResponse({ error: 'Token invalido' }, 401, corsHeaders);
+      }
+
+      // Role check — only comercial, gerente, admin can search leads
+      const supabase = getServiceClient();
+      const { data: profile } = await supabase
+        .from('profiles')
+        .select('role')
+        .eq('id', user.id)
+        .single();
+
+      const role = profile?.role ?? 'comercial';
+      const allowedRoles = ['comercial', 'gerente', 'admin'];
+      if (!allowedRoles.includes(role)) {
+        return jsonResponse({ error: 'Sem permissao para buscar leads' }, 403, corsHeaders);
+      }
     }
 
     // Parse request body
