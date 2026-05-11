@@ -529,18 +529,43 @@ export function AgentConversationView({
       }
 
       const novoCliente = await createCliente.mutateAsync({
-        razao_social: lead.empresa,
+        razao_social: lead.razao_social || lead.empresa,
         nome_fantasia: lead.empresa,
-        email: lead.contato_email ?? null,
-        telefone: lead.contato_telefone ?? null,
+        email: lead.contato_email ?? lead.email ?? null,
+        telefone: lead.contato_telefone ?? lead.telefone ?? null,
         segmento: lead.segmento ?? null,
+        classificacao: lead.classificacao ?? null,
         origem: 'lead_convertido',
         lead_id: lead.id,
         cnpj: cnpjLimpo,
+        // Endereco completo
+        cidade: lead.cidade ?? null,
+        estado: lead.uf ?? null,
+        bairro: lead.bairro ?? null,
+        endereco: lead.endereco ?? null,
+        cep: lead.cep ?? null,
+        observacoes: lead.observacoes ?? null,
       });
+
+      // Cria contato principal em cliente_contatos com os dados do lead
+      if (novoCliente?.id && (lead.contato_nome || lead.contato_email || lead.contato_telefone)) {
+        const { error: contatoErr } = await supabase.from('cliente_contatos').insert({
+          cliente_id: novoCliente.id,
+          nome: lead.contato_nome || lead.empresa,
+          cargo: lead.cargo ?? null,
+          email: lead.contato_email ?? null,
+          telefone: lead.contato_telefone ?? null,
+          whatsapp: lead.whatsapp ?? lead.contato_telefone ?? null,
+          principal: true,
+          e_decisor: true,
+          ativo: true,
+        });
+        if (contatoErr) console.error('Erro ao criar contato principal:', contatoErr.message);
+      }
+
       await updateLead.mutateAsync({ id: lead.id, status: 'convertido' });
       setConvertOpen(false);
-      showSuccess('Lead convertido! Indo pro cliente para criar orçamento...');
+      showSuccess('Lead convertido com endereço, observações e contato! Indo pro cliente...');
       navigate(`/clientes/${novoCliente.id}`);
     } catch (err: any) {
       showError(err?.message || 'Erro ao converter lead em cliente.');

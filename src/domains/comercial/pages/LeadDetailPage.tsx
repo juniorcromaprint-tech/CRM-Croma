@@ -229,18 +229,43 @@ export default function LeadDetailPage() {
     if (!id || !lead) return;
     try {
       const novoCliente = await createCliente.mutateAsync({
-        razao_social: lead.empresa,
+        razao_social: (lead as any).razao_social || lead.empresa,
         nome_fantasia: lead.empresa,
-        email: lead.contato_email ?? null,
-        telefone: lead.contato_telefone ?? null,
+        email: lead.contato_email ?? (lead as any).email ?? null,
+        telefone: lead.contato_telefone ?? (lead as any).telefone ?? null,
         segmento: lead.segmento ?? null,
+        classificacao: (lead as any).classificacao ?? null,
         origem: "lead_convertido",
         lead_id: id,
         cnpj: cnpjLimpo,
+        // Endereço completo (antes era ignorado)
+        cidade: (lead as any).cidade ?? null,
+        estado: (lead as any).uf ?? null,
+        bairro: (lead as any).bairro ?? null,
+        endereco: (lead as any).endereco ?? null,
+        cep: (lead as any).cep ?? null,
+        observacoes: lead.observacoes ?? null,
       });
+
+      // Cria contato principal em cliente_contatos
+      if (novoCliente?.id && (lead.contato_nome || lead.contato_email || lead.contato_telefone)) {
+        const { error: contatoErr } = await supabase.from('cliente_contatos').insert({
+          cliente_id: novoCliente.id,
+          nome: lead.contato_nome || lead.empresa,
+          cargo: (lead as any).cargo ?? null,
+          email: lead.contato_email ?? null,
+          telefone: lead.contato_telefone ?? null,
+          whatsapp: (lead as any).whatsapp ?? lead.contato_telefone ?? null,
+          principal: true,
+          e_decisor: true,
+          ativo: true,
+        });
+        if (contatoErr) console.error('Erro ao criar contato principal:', contatoErr.message);
+      }
+
       await updateLead.mutateAsync({ id, status: "convertido" });
       setConvertOpen(false);
-      showSuccess("Lead convertido! Complete o endereço e IE para emitir NF-e.");
+      showSuccess("Lead convertido com endereço, contato e observações! Complete IE para emitir NF-e.");
       navigate(`/clientes/${novoCliente.id}`);
     } catch (err: any) {
       showError(err?.message || "Erro ao converter lead em cliente.");
