@@ -133,3 +133,56 @@ export function useToggleWhatsAppChannel() {
       const { data: existing } = await supabase
         .from('admin_config')
         .select('valor')
+        .eq('chave', 'agent_config')
+        .single();
+
+      let config: Record<string, unknown> = {};
+      if (existing?.valor) {
+        try {
+          config = typeof existing.valor === 'string' ? JSON.parse(existing.valor) : existing.valor;
+        } catch { /* ignore */ }
+      }
+
+      const canais = new Set<string>((config.canais_ativos as string[]) ?? ['email']);
+      if (activate) canais.add('whatsapp');
+      else canais.delete('whatsapp');
+
+      config.canais_ativos = Array.from(canais);
+
+      const { error } = await supabase
+        .from('admin_config')
+        .upsert({ chave: 'agent_config', valor: config }, { onConflict: 'chave' });
+
+      if (error) throw error;
+    },
+    onSuccess: (_, activate) => {
+      qc.invalidateQueries({ queryKey: ['whatsapp-status'] });
+      showSuccess(activate ? 'WhatsApp ativado no agente' : 'WhatsApp desativado');
+    },
+    onError: () => showError('Erro ao alterar canal WhatsApp'),
+  });
+}
+
+export function useRecentWhatsAppMessages() {
+  return useQuery({
+    queryKey: ['whatsapp-recent-messages'],
+    queryFn: async () => {
+      const { data } = await supabase
+        .from('agent_messages')
+        .select(`
+          id, direcao, conteudo, canal, status, created_at,
+          media_url, media_type, media_mime, media_filename,
+          agent_conversations!inner(
+            id,
+            leads!inner(empresa, contato_nome)
+          )
+        `)
+        .eq('canal', 'whatsapp')
+        .order('created_at', { ascending: false })
+        .limit(5);
+
+      return data ?? [];
+    },
+    staleTime: 30_000,
+  });
+}

@@ -528,13 +528,19 @@ export function AgentConversationView({
         return;
       }
 
+      // clientes.classificacao tem CHECK IN ('A','B','C','D'). Lead aceita texto livre
+      // ("MEI", "EPP", "Grande" etc) → mapear: só passa se for A/B/C/D, senão null.
+      const classificacaoCliente = ['A', 'B', 'C', 'D'].includes(lead.classificacao as string)
+        ? (lead.classificacao as string)
+        : null;
+
       const novoCliente = await createCliente.mutateAsync({
         razao_social: lead.razao_social || lead.empresa,
         nome_fantasia: lead.empresa,
         email: lead.contato_email ?? lead.email ?? null,
         telefone: lead.contato_telefone ?? lead.telefone ?? null,
         segmento: lead.segmento ?? null,
-        classificacao: lead.classificacao ?? null,
+        classificacao: classificacaoCliente,
         origem: 'lead_convertido',
         lead_id: lead.id,
         cnpj: cnpjLimpo,

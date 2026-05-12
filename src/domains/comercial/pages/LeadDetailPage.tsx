@@ -228,13 +228,18 @@ export default function LeadDetailPage() {
   const doConvert = async (cnpjLimpo: string | null) => {
     if (!id || !lead) return;
     try {
+      // clientes.classificacao tem CHECK IN ('A','B','C','D'). Lead aceita texto livre
+      // ("MEI", "EPP", "Grande" etc) → mapear: só passa se for A/B/C/D, senão null.
+      const leadClass = (lead as any).classificacao;
+      const classificacaoCliente = ['A', 'B', 'C', 'D'].includes(leadClass) ? leadClass : null;
+
       const novoCliente = await createCliente.mutateAsync({
         razao_social: (lead as any).razao_social || lead.empresa,
         nome_fantasia: lead.empresa,
         email: lead.contato_email ?? (lead as any).email ?? null,
         telefone: lead.contato_telefone ?? (lead as any).telefone ?? null,
         segmento: lead.segmento ?? null,
-        classificacao: (lead as any).classificacao ?? null,
+        classificacao: classificacaoCliente,
         origem: "lead_convertido",
         lead_id: id,
         cnpj: cnpjLimpo,

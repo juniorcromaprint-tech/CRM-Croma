@@ -364,4 +364,71 @@ serve(async (req) => {
 
     const mr = await postToMetaCloud(cr2, wp);
     if (!mr.ok) {
-      // v26 (migration 151): tentar parsear body Meta como JSON pra extrair code + error
+      // v26 (migration 151): tentar parsear body Meta como JSON pra extrair code + error_data.details.
+      // Meta retorna {"error":{"code":131026,"message":"...","error_data":{"details":"..."}}} em falhas.
+      let erroCodigo: string | null = null;
+      let erroDetalhes: string | null = null;
+      let erroMensagem: string = mr.body;
+      try {
+        const parsed = JSON.parse(mr.body);
+        const e = parsed?.error;
+        if (e) {
+          if (e.code != null) erroCodigo = String(e.code);
+          erroMensagem = e.message ?? mr.body;
+          erroDetalhes = e.error_data?.details ?? e.error_subcode != null ? String(e.error_subcode) : null;
+        }
+      } catch (_) { /* body nao era JSON — fica com body raw */ }
+      await sb.from('agent_messages').update({
+        status: 'erro',
+        erro_mensagem: erroMensagem,
+        erro_codigo: erroCodigo,
+        erro_detalhes: erroDetalhes,
+      }).eq('id', message_id);
+      return jsonResp({ error: 'Falha Meta Cloud API', status: mr.status, detail: mr.body, code: erroCodigo }, 502, ch);
+    }
+    const wmid = mr.metaData?.messages?.[0]?.id;
+
+    const sentAs = (msg as any).media_url && (msg as any).media_type === 'image'
+      ? 'image'
+      : isFirst && !hasReply ? 'template' : 'text';
+
+    await sb.from('agent_messages').update({
+      status: 'enviada',
+      enviado_em: now,
+      metadata: {
+        ...(msg.metadata || {}),
+        whatsapp_message_id: wmid,
+        sent_as: sentAs,
+        template_used: sentAs === 'template' ? tn : null,
+      }
+    }).eq('id', message_id);
+
+    await sb.from('agent_conversations').update({
+      mensagens_enviadas: (cv.mensagens_enviadas || 0) + 1,
+      ultima_mensagem_em: now
+    }).eq('id', msg.conversation_id);
+
+    await sb.from('atividades_comerciais').insert({
+      entidade_tipo: 'lead', entidade_id: ld.id, tipo: 'whatsapp',
+      descricao: '[Agente] WhatsApp enviado: ' + (msg.conteudo || '').substring(0, 80),
+      resultado: 'enviado', data_atividade: now,
+    });
+
+    if (ld.status === 'novo') {
+      await sb.from('leads').update({ status: 'contatado' })
+        .eq('id', ld.id).eq('status', 'novo');
+    }
+
+    return jsonResp({
+      success: true,
+      message_id,
+      whatsapp_message_id: wmid,
+      to: tp,
+      sent_as: sentAs,
+      template_used: sentAs === 'template' ? tn : null,
+    }, 200, ch);
+  } catch (err: any) {
+    console.error('whatsapp-enviar v21 error:', err);
+    return jsonResp({ error: 'Erro interno', detail: err.message }, 500, ch);
+  }
+});

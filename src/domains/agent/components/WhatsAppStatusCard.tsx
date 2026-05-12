@@ -161,4 +161,17 @@ export default function WhatsAppStatusCard() {
               <p className="mt-1">
                 Adicione as credenciais do WhatsApp Business em{' '}
                 <button
-                  onClick={() =
+                  onClick={() => navigate('/agente/config')}
+                  className="underline font-medium hover:text-amber-900"
+                >
+                  Configurações do Agente
+                </button>
+                {' '}ou diretamente no Supabase Dashboard (admin_config).
+              </p>
+            </div>
+          </div>
+        </div>
+      )}
+    </div>
+  );
+}
