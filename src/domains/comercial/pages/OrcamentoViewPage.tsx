@@ -84,20 +84,8 @@ export default function OrcamentoViewPage() {
     });
   };
 
-  const handleEnviar = () => {
-    if (!id || !orc) return;
-    const itens = (orc as any).itens ?? [];
-    if (itens.length === 0) {
-      showError("Orçamento precisa de pelo menos 1 item para ser enviado.");
-      return;
-    }
-    const valorEfetivo = orc.total || orc.subtotal || 0;
-    if (valorEfetivo <= 0) {
-      showError("Orçamento precisa ter valor maior que R$ 0,00.");
-      return;
-    }
-    atualizar.mutate({ id, updates: { status: "enviada" } });
-  };
+  // handleEnviar removido — o ato de compartilhar (WhatsApp/email/copiar link)
+  // via SharePropostaModal já marca status como "enviada" através de activateToken().
 
   const handleAprovar = () => {
     if (!id || !orc) return;
@@ -359,16 +347,6 @@ export default function OrcamentoViewPage() {
           >
             <Send size={14} /> Enviar Proposta
           </Button>
-          {orc.status === "rascunho" && (
-            <Button
-              size="sm"
-              className="rounded-xl bg-blue-600 text-white hover:bg-blue-700 gap-1.5"
-              onClick={handleEnviar}
-              disabled={atualizar.isPending}
-            >
-              <Send size={14} /> Enviar
-            </Button>
-          )}
           {(orc.status === "enviada" || orc.status === "em_revisao") && (
             <>
               <AlertDialog open={approveOpen} onOpenChange={setApproveOpen}>
@@ -729,15 +707,25 @@ export default function OrcamentoViewPage() {
         <TrackingPanel propostaId={orc.id} />
       </div>
 
-      <SharePropostaModal
-        open={shareOpen}
-        onClose={() => setShareOpen(false)}
-        propostaId={orc.id}
-        propostaNumero={orc.numero}
-        shareToken={(orc as any).share_token ?? ''}
-        clienteTelefone={(orc.cliente as any)?.telefone}
-        clienteEmail={(orc.cliente as any)?.email}
-      />
+      {(() => {
+        const cli = orc.cliente as any;
+        const contatos: any[] = cli?.contatos ?? [];
+        const principal = contatos.find((c) => c.principal) ?? contatos[0] ?? null;
+        const telefoneFallback =
+          cli?.telefone ?? principal?.whatsapp ?? principal?.telefone ?? undefined;
+        const emailFallback = cli?.email ?? principal?.email ?? undefined;
+        return (
+          <SharePropostaModal
+            open={shareOpen}
+            onClose={() => setShareOpen(false)}
+            propostaId={orc.id}
+            propostaNumero={orc.numero}
+            shareToken={(orc as any).share_token ?? ''}
+            clienteTelefone={telefoneFallback}
+            clienteEmail={emailFallback}
+          />
+        );
+      })()}
     </div>
   );
 }

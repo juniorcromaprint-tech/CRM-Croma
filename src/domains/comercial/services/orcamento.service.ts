@@ -279,7 +279,10 @@ export const orcamentoService = {
         .from("propostas")
         .select(`
           *,
-          cliente:clientes(razao_social, nome_fantasia, cnpj),
+          cliente:clientes(
+            id, razao_social, nome_fantasia, cnpj, telefone, email,
+            contatos:cliente_contatos(nome, telefone, whatsapp, email, principal, e_decisor)
+          ),
           itens:proposta_itens(
             *,
             materiais:proposta_item_materiais(*),
