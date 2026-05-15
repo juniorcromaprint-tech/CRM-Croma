@@ -23,3 +23,22 @@ export function sanitizeSearch(term: string): string {
 export function ilikeTerm(term: string): string {
   return `%${sanitizeSearch(term)}%`;
 }
+
+/**
+ * Extrai apenas os dígitos de uma string. Útil para CNPJ/CPF/telefone.
+ */
+export function digitsOnly(term: string): string {
+  return term.replace(/\D/g, '');
+}
+
+/**
+ * Padrão ILIKE com wildcards entre cada dígito — casa com strings que tenham
+ * pontuação no meio (ex: CNPJ "64.668.836/0001-41" casado por "64668836").
+ * Retorna string vazia se não houver dígitos suficientes para evitar falsos
+ * positivos amplos. Mínimo padrão: 3 dígitos.
+ */
+export function digitsLooseTerm(term: string, min = 3): string | null {
+  const d = digitsOnly(term);
+  if (d.length < min) return null;
+  return `%${d.split('').join('%')}%`;
+}

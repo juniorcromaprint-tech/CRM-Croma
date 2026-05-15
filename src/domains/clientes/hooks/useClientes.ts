@@ -1,7 +1,7 @@
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { supabase } from '@/integrations/supabase/client';
 import { showSuccess, showError } from '@/utils/toast';
-import { ilikeTerm } from '@/shared/utils/searchUtils';
+import { ilikeTerm, digitsLooseTerm, digitsOnly } from '@/shared/utils/searchUtils';
 
 // ---------------------------------------------------------------------------
 // Types
@@ -95,10 +95,59 @@ export function useClientes(filters?: ClienteFilters) {
         query = query.eq('ativo', filters.ativo);
       }
       if (filters?.search) {
-        const term = ilikeTerm(filters.search);
-        query = query.or(
-          `razao_social.ilike.${term},nome_fantasia.ilike.${term},cnpj.ilike.${term},email.ilike.${term}`,
+        const raw = filters.search.trim();
+        const term = ilikeTerm(raw);
+        const looseDigits = digitsLooseTerm(raw); // casa CNPJ/telefone com pontuação
+
+        const conditions: string[] = [
+          // Texto livre nas colunas principais do cliente
+          `razao_social.ilike.${term}`,
+          `nome_fantasia.ilike.${term}`,
+          `cidade.ilike.${term}`,
+          `email.ilike.${term}`,
+          // Campos numéricos: tenta o termo cru primeiro
+          `cnpj.ilike.${term}`,
+          `cpf_cnpj.ilike.${term}`,
+          `telefone.ilike.${term}`,
+        ];
+
+        // Variante dígitos-intercalados: pega CNPJ formatado quando o usuário
+        // digita só os números ("64668836" -> casa "64.668.836/0001-41")
+        if (looseDigits) {
+          conditions.push(`cnpj.ilike.${looseDigits}`);
+          conditions.push(`cpf_cnpj.ilike.${looseDigits}`);
+          conditions.push(`telefone.ilike.${looseDigits}`);
+        }
+
+        // Busca também pelos contatos do cliente (nome do contato, telefone, whatsapp).
+        // Resolve "buscar por Marcos" quando o cliente tem razão social diferente.
+        const contatoFilters: string[] = [`nome.ilike.${term}`, `email.ilike.${term}`];
+        const onlyDigits = digitsOnly(raw);
+        if (onlyDigits.length >= 3) {
+          const dTerm = ilikeTerm(onlyDigits);
+          contatoFilters.push(`telefone.ilike.${dTerm}`);
+          contatoFilters.push(`whatsapp.ilike.${dTerm}`);
+        } else {
+          contatoFilters.push(`telefone.ilike.${term}`);
+          contatoFilters.push(`whatsapp.ilike.${term}`);
+        }
+
+        const { data: contatos, error: contatosErr } = await supabase
+          .from('cliente_contatos')
+          .select('cliente_id')
+          .or(contatoFilters.join(','))
+          .limit(200);
+
+        if (contatosErr) throw contatosErr;
+
+        const clienteIdsViaContato = Array.from(
+          new Set((contatos ?? []).map((c) => c.cliente_id).filter(Boolean) as string[]),
         );
+        if (clienteIdsViaContato.length > 0) {
+          conditions.push(`id.in.(${clienteIdsViaContato.join(',')})`);
+        }
+
+        query = query.or(conditions.join(','));
       }
 
       const { data, error } = await query;
