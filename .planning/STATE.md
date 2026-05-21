@@ -1,7 +1,37 @@
 
 # STATE — CRM Croma
 
-**Última sessão**: 2026-05-21 MANHÃ (Claude Code CLI autônomo — MIGRAÇÃO OpenRouter Onda 1: webhook v36 + ai-gerar-orcamento v12 agora chamam Anthropic API DIRETO. E2E PASS. Ondas 2-3 aguardam OK.)
+**Última sessão**: 2026-05-21 TARDE/NOITE (Cowork — OpenRouter 100% ELIMINADO das 18 funções; atendimento ao cliente em OPUS; ORÇAMENTO consertado e saindo de ponta a ponta; 401 dos follow-ups resolvido; 500 do cron instrumentado aguardando 1 ciclo.)
+
+## Sessão 2026-05-21 TARDE/NOITE — OPENROUTER 100% ELIMINADO + ORÇAMENTO + 401/500 ✅
+
+### Resultado
+✅ **OpenRouter ELIMINADO de TODAS as 18 funções** (auditoria `grep openrouter.ai|OPENROUTER_API_KEY` em todos os index.ts = ZERO). O plano falava em 11, mas havia +7 com fetch INLINE (ai-chat-erp, ai-chat-portal, ai-validar-nfe, ai-analisar-nps, ai-insights-diarios, ai-inteligencia-comercial, ai-analisar-foto-instalacao→vision Anthropic inline).
+- **Atendimento ao cliente em OPUS** (`claude-opus-4-7`); orçamento em Sonnet; análises de fundo em Haiku.
+- **Deploy migrou pro Supabase CLI** (`npx supabase functions deploy --project-ref djwjmfgplnqyffdcgdaw`, token PAT do Junior) — limpo, do disco, sem transcrição à mão.
+- Commits: `094e5f7` (Onda 2), `e3587ae` (Onda 3), `3346634` (Onda 4 inline), `ec1121a` (orçamento), `eb42ac6` (cron).
+
+### ORÇAMENTO CONSERTADO — sai 100% (commit ec1121a)
+Causa-raiz REAL (mais funda que cliente_id/JSON das sessões anteriores): `MODEL_SELECT` pedia colunas renomeadas → TODA query do `matchModelo` falhava silenciosamente:
+- `modelo_materiais.quantidade_por_m2` → `quantidade_por_unidade`
+- `modelo_processos.tempo_minutos` → `tempo_por_unidade_min`
+Além disso: matcher agora casa por `produtos.categoria` (ILIKE, 2 queries: produtos→ids→modelos por produto_id; banner→banners_lonas, adesivo→adesivos…), fallback IA entre 116 modelos p/ categorias sem match direto. Número saía "ORC-0NaN" → formato real `PROP-AAAA-NNNN` sequencial.
+- **Validado E2E**: banner R$80,70 (PROP-2026-0030), adesivo R$348,53 (0031), painel R$31,65 (0032, fallback). Propostas reais com itens+preço. Dados de teste limpos.
+
+### 401 ai-compor-mensagem + follow-ups (commit eb42ac6)
+- **401**: `agent-cron-loop` invocava `ai-compor-mensagem` SEM o header `X-Internal-Call: true` → `authenticateAndAuthorize` tentava validar a service key como usuário → 401 → o cron PULAVA (continue) a composição. **Efeito: follow-ups automáticos aos leads estavam silenciosamente DESLIGADOS.** Fix: `headers: { 'X-Internal-Call': 'true' }`. **Junior aprovou reativar os follow-ups.** (Resolve o bug ABERTO #2 da sessão NOITE.)
+- **500 do agent-cron-loop**: erro não capturado em lugar legível (nem ai_logs nem net._http_response). Instrumentei o catch p/ gravar em `admin_config.debug_cron_last_error` (chave UNIQUE). Cron roda */30 (job `agent-cron-loop-30min` ativo). **PENDENTE: ler `debug_cron_last_error` após o próximo ciclo p/ achar a causa** (suspeita: schema-drift). NÃO invocar o cron manualmente (envia msg real a leads).
+
+### ⚠️ verify_jwt / deploy gotcha
+Sem `supabase/config.toml`, o CLI força `verify_jwt=true` em todo deploy → flipou 5 funções da Onda 3 que eram false. Corrigido: redeployei todas as originalmente-false com `--no-verify-jwt`. **Recomendado criar `config.toml`** (resolve P0 #3 da auditoria 2026-05-20).
+
+### Pendências (decisão/ação do Junior)
+- **REVOGAR o token Supabase `sbp_db39...`** (está no chat) — usado nos deploys.
+- `OPENROUTER_API_KEY`: agora **seguro revogar** (nada usa). Plano sugeria validar 7 dias.
+- Ler `admin_config.debug_cron_last_error` no próximo ciclo do cron → consertar o 500.
+- Limpeza: deprecar `openrouter-provider.ts` (órfão), deletar `smoketest-anthropic`, criar `config.toml`.
+
+---
 
 ## Sessão 2026-05-21 MANHÃ — ELIMINAR OPENROUTER (ONDA 1) ✅
 
