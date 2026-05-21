@@ -92,12 +92,12 @@ function buildMatchResult(modelo: Record<string, unknown>, confianca: number, ma
       material_id: (mm.materiais as Record<string, unknown>)?.id as string || mm.material_id as string,
       nome: (mm.materiais as Record<string, unknown>)?.nome as string || 'Material',
       preco_medio: (mm.materiais as Record<string, unknown>)?.preco_medio as number || 0,
-      quantidade: mm.quantidade_por_m2 as number || 1,
+      quantidade: mm.quantidade_por_unidade as number || 1,
       unidade: (mm.materiais as Record<string, unknown>)?.unidade as string || 'm²',
     })),
     processos: ((modelo.modelo_processos as unknown[]) || []).map((mp: Record<string, unknown>) => ({
       etapa: mp.etapa as string,
-      tempo_minutos: mp.tempo_minutos as number,
+      tempo_minutos: mp.tempo_por_unidade_min as number,
       ordem: mp.ordem as number,
     })),
     markup_sugerido: markupSugerido || (modelo.markup_padrao as number) || 40,
@@ -109,29 +109,44 @@ async function matchModelo(
   item: ItemExtraido,
   regrasMap: Record<string, { markup_sugerido?: number }>,
 ): Promise<ModeloMatch | null> {
+  // 2026-05-21 FIX: nomes reais das colunas (schema mudou): quantidade_por_m2→quantidade_por_unidade,
+  // tempo_minutos→tempo_por_unidade_min. O embed quebrado fazia toda query do matchModelo falhar.
   const MODEL_SELECT = `
     id, nome, markup_padrao,
-    modelo_materiais(material_id, quantidade_por_m2, materiais(id, nome, preco_medio, unidade)),
-    modelo_processos(etapa, tempo_minutos, ordem)
+    modelo_materiais(material_id, quantidade_por_unidade, materiais(id, nome, preco_medio, unidade)),
+    modelo_processos(etapa, tempo_por_unidade_min, ordem)
   `;
 
   const markupSugerido = regrasMap[item.categoria_inferida]?.markup_sugerido
     || regrasMap['geral']?.markup_sugerido
     || 40;
 
-  // Tenta match direto por categoria
-  const { data: modelos } = await supabase
-    .from('produto_modelos')
-    .select(MODEL_SELECT)
-    .ilike('nome', `%${item.categoria_inferida}%`)
-    .limit(20);
+  // 2026-05-21 FIX: casar pela CATEGORIA do produto (produtos.categoria via join), NÃO pelo nome do modelo.
+  // produtos.categoria usa plural/variações (banners_lonas, adesivos, fachadas, placas, letreiros...) →
+  // ILIKE '%<categoria_inferida>%' resolve singular→plural (banner→banners_lonas, fachada→fachadas/Fachadas).
+  // 2 queries (sem embed PostgREST, mais robusto): produtos.categoria ILIKE → ids → modelos por produto_id.
+  const { data: prods } = await supabase
+    .from('produtos')
+    .select('id')
+    .ilike('categoria', `%${item.categoria_inferida}%`);
+  const prodIds = (prods ?? []).map((p: Record<string, unknown>) => p.id);
+
+  let modelos: Record<string, unknown>[] | null = null;
+  if (prodIds.length > 0) {
+    const { data } = await supabase
+      .from('produto_modelos')
+      .select(MODEL_SELECT)
+      .in('produto_id', prodIds)
+      .limit(30);
+    modelos = data as Record<string, unknown>[] | null;
+  }
 
   if (modelos?.length === 1) {
     return buildMatchResult(modelos[0] as Record<string, unknown>, 0.9, markupSugerido);
   }
 
   if (modelos && modelos.length > 1) {
-    // Usar IA para escolher entre modelos da categoria
+    // IA escolhe entre os modelos DA CATEGORIA (conjunto pequeno e relevante)
     const matchResult = await callOpenRouter(
       `Escolha o modelo mais similar ao pedido do cliente. Responda APENAS JSON: { "modelo_idx": 0, "confianca": 0.85 }
 Modelos: ${JSON.stringify(modelos.map((m: Record<string, unknown>, i: number) => `${i}: ${m.nome}`))}`,
@@ -140,15 +155,19 @@ Modelos: ${JSON.stringify(modelos.map((m: Record<string, unknown>, i: number) =>
     );
     const match = JSON.parse(matchResult.content);
     const modeloEscolhido = modelos[match.modelo_idx as number];
-    if (!modeloEscolhido) return null;
-    return buildMatchResult(modeloEscolhido as Record<string, unknown>, match.confianca as number, markupSugerido);
+    if (modeloEscolhido) {
+      // categoria já bate — piso de confiança 0.7 p/ não ser descartado pelo gate do chamador (< 0.5)
+      return buildMatchResult(modeloEscolhido as Record<string, unknown>, Math.max((match.confianca as number) ?? 0.7, 0.7), markupSugerido);
+    }
+    // se a IA devolveu índice inválido, cai no fallback abaixo
   }
 
-  // Fallback: buscar todos e deixar IA escolher
+  // Fallback (categorias sem match direto por nome: painel, totem, pdv, envelopamento, backdrop, geral):
+  // IA escolhe entre TODOS os modelos (116).
   const { data: todosModelos } = await supabase
     .from('produto_modelos')
     .select('id, nome')
-    .limit(50);
+    .limit(200);
 
   if (!todosModelos?.length) return null;
 
@@ -156,10 +175,10 @@ Modelos: ${JSON.stringify(modelos.map((m: Record<string, unknown>, i: number) =>
     `Escolha o modelo mais similar ao pedido do cliente. Responda APENAS JSON: { "modelo_idx": 0, "confianca": 0.8 }
 Modelos disponíveis: ${JSON.stringify(todosModelos.map((m: Record<string, unknown>, i: number) => `${i}: ${m.nome}`))}`,
     item.descricao_livre,
-    { model: 'openai/gpt-4.1-mini', temperature: 0.1, max_tokens: 200 },
+    { model: 'claude-sonnet-4-20250514', temperature: 0.1, max_tokens: 200 },
   );
   const match = JSON.parse(matchResult.content);
-  if ((match.confianca as number) < 0.7 || !todosModelos[match.modelo_idx as number]) return null;
+  if ((match.confianca as number) < 0.6 || !todosModelos[match.modelo_idx as number]) return null;
 
   const modeloId = todosModelos[match.modelo_idx as number].id;
   const { data: modeloCompleto } = await supabase
@@ -409,16 +428,23 @@ serve(async (req: Request) => {
     }
 
     // 3b. Gerar número da proposta
+    // 2026-05-21 FIX: número no formato real do ERP (PROP-AAAA-NNNN). O código antigo gerava 'ORC-0NaN'
+    // porque assumia 'ORC-NNNN' e o parseInt falhava no formato existente.
+    const anoProp = new Date().getFullYear();
     const { data: ultimaProposta } = await supabase
       .from('propostas')
       .select('numero')
-      .order('created_at', { ascending: false })
+      .ilike('numero', `PROP-${anoProp}-%`)
+      .order('numero', { ascending: false })
       .limit(1)
-      .single();
+      .maybeSingle();
 
-    const proximoNumero = ultimaProposta?.numero
-      ? `ORC-${(parseInt((ultimaProposta.numero as string).replace('ORC-', '')) + 1).toString().padStart(4, '0')}`
-      : 'ORC-0001';
+    let seqProp = 1;
+    if (ultimaProposta?.numero) {
+      const mNum = String(ultimaProposta.numero).match(/PROP-\d{4}-(\d+)/);
+      if (mNum) seqProp = parseInt(mNum[1]) + 1;
+    }
+    const proximoNumero = `PROP-${anoProp}-${String(seqProp).padStart(4, '0')}`;
 
     // 3c. Criar proposta
     const totalGeral = itensCalculados.reduce((sum, ic) => sum + ic.pricing.precoVenda, 0);
