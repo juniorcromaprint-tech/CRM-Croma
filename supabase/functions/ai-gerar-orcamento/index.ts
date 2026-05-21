@@ -136,7 +136,7 @@ async function matchModelo(
       `Escolha o modelo mais similar ao pedido do cliente. Responda APENAS JSON: { "modelo_idx": 0, "confianca": 0.85 }
 Modelos: ${JSON.stringify(modelos.map((m: Record<string, unknown>, i: number) => `${i}: ${m.nome}`))}`,
       item.descricao_livre,
-      { model: 'openai/gpt-4.1-mini', temperature: 0.1, max_tokens: 200 },
+      { model: 'claude-sonnet-4-20250514', temperature: 0.1, max_tokens: 200 },
     );
     const match = JSON.parse(matchResult.content);
     const modeloEscolhido = modelos[match.modelo_idx as number];
@@ -216,7 +216,7 @@ serve(async (req: Request) => {
     });
 
     const aiResult = await callOpenRouter(EXTRACTION_PROMPT, userPrompt, {
-      model: 'openai/gpt-4.1-mini',
+      model: 'claude-sonnet-4-20250514',
       temperature: 0.2,
       max_tokens: 2000,
     });
