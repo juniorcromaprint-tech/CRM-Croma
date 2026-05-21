@@ -36,6 +36,18 @@ function resolveModel(model?: string): string {
   return DEFAULT_MODEL;
 }
 
+// 2026-05-21: Anthropic não tem response_format json_object (que o OpenRouter forçava).
+// O Claude costuma embrulhar JSON em ```json ... ``` ou em prosa. Extrai o JSON do texto bruto
+// para manter compatibilidade drop-in com o openrouter-provider. Texto puro passa intacto.
+function extractJSON(raw: string): string {
+  try { JSON.parse(raw); return raw; } catch { /* continua */ }
+  const md = raw.match(/```(?:json)?\s*([\s\S]*?)```/);
+  if (md?.[1]) { const c = md[1].trim(); try { JSON.parse(c); return c; } catch { /* continua */ } }
+  const obj = raw.match(/(\{[\s\S]*\})/);
+  if (obj?.[1]) { try { JSON.parse(obj[1]); return obj[1]; } catch { /* continua */ } }
+  return raw;
+}
+
 export async function callAnthropic(
   systemPrompt: string,
   userPrompt: string,
@@ -72,7 +84,7 @@ export async function callAnthropic(
     }
 
     const data = await response.json();
-    const content = data.content?.[0]?.text ?? '';
+    const content = extractJSON(data.content?.[0]?.text ?? '');
     const usage = data.usage ?? { input_tokens: 0, output_tokens: 0 };
     const costs = ANTHROPIC_COSTS[model] ?? ANTHROPIC_COSTS[DEFAULT_MODEL];    const costUsd = (usage.input_tokens * costs.input + usage.output_tokens * costs.output) / 1_000_000;
 

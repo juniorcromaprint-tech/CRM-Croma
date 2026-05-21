@@ -195,7 +195,7 @@ serve(async (req: Request) => {
     // ── Carregar dados do lead ────────────────────────────────
     const { data: lead } = await supabase
       .from('leads')
-      .select('id, empresa, contato_nome, email, telefone, segmento, cliente_id')
+      .select('id, empresa, contato_nome, email, telefone, segmento')
       .eq('id', lead_id)
       .single();
 
@@ -371,19 +371,32 @@ serve(async (req: Request) => {
 
     // ── FASE 3: Persistência + Mensagem ──────────────────────
 
-    // 3a. Garantir que o lead tem cliente_id
-    let clienteId = lead.cliente_id as string | null;
-    if (!clienteId) {
+    // 3a. Resolver cliente da proposta.
+    // 2026-05-21 FIX: a tabela `leads` NÃO tem coluna `cliente_id` — o vínculo é `clientes.lead_id`
+    // (relação invertida). O código antigo selecionava/atualizava `leads.cliente_id` (inexistente),
+    // o que dava 404 "Lead não encontrado" e fazia o orçamento NUNCA ser gerado. Além disso, o insert
+    // antigo usava `contato_nome`/`status`, que também não existem em `clientes`.
+    let clienteId: string | null = null;
+    const { data: clienteExistente } = await supabase
+      .from('clientes')
+      .select('id')
+      .eq('lead_id', lead_id)
+      .limit(1)
+      .maybeSingle();
+    if (clienteExistente) {
+      clienteId = clienteExistente.id as string;
+    } else {
       const { data: novoCliente, error: clienteErr } = await supabase
         .from('clientes')
         .insert({
           nome_fantasia: lead.empresa || lead.contato_nome,
-          contato_nome: lead.contato_nome,
+          razao_social: lead.empresa || lead.contato_nome,
           telefone: lead.telefone,
           email: lead.email,
           segmento: lead.segmento,
-          status: 'ativo',
+          ativo: true,
           origem: 'agente_ia',
+          lead_id: lead_id,
         })
         .select('id')
         .single();
@@ -392,9 +405,7 @@ serve(async (req: Request) => {
         console.error('Erro ao criar cliente:', clienteErr);
         return json({ error: 'Erro ao criar cliente para proposta' }, 500);
       }
-
       clienteId = novoCliente.id as string;
-      await supabase.from('leads').update({ cliente_id: clienteId }).eq('id', lead_id);
     }
 
     // 3b. Gerar número da proposta
