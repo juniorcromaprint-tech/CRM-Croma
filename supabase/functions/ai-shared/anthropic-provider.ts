@@ -60,6 +60,14 @@ export async function callAnthropic(
   const startTime = Date.now();
   const controller = new AbortController();
   const timeoutId = setTimeout(() => controller.abort(), config?.timeout_ms ?? 30000);
+  // 2026-05-21: claude-opus-4-7 DEPRECOU o parâmetro `temperature` (retorna 400). Só envia p/ modelos que aceitam.
+  const reqBody: Record<string, unknown> = {
+    model,
+    max_tokens: config?.max_tokens ?? 2000,
+    system: systemPrompt,
+    messages: [{ role: 'user', content: userPrompt }],
+  };
+  if (!model.includes('opus-4-7')) reqBody.temperature = config?.temperature ?? 0.3;
   try {
     const response = await fetch(ANTHROPIC_URL, {
       method: 'POST',
@@ -68,13 +76,7 @@ export async function callAnthropic(
         'anthropic-version': '2023-06-01',
         'content-type': 'application/json',
       },
-      body: JSON.stringify({
-        model,
-        max_tokens: config?.max_tokens ?? 2000,
-        temperature: config?.temperature ?? 0.3,
-        system: systemPrompt,
-        messages: [{ role: 'user', content: userPrompt }],
-      }),
+      body: JSON.stringify(reqBody),
       signal: controller.signal,
     });
 

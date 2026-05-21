@@ -32,6 +32,7 @@ interface AIRequestConfig {
 }
 // 2026-05-21: preços Anthropic API direto (USD por 1M tokens). OpenRouter eliminado.
 const MODEL_COSTS: Record<string, { input: number; output: number }> = {
+  'claude-opus-4-7': { input: 15.00, output: 75.00 },
   'claude-sonnet-4-20250514': { input: 3.00, output: 15.00 },
   'claude-haiku-4-5-20251001': { input: 0.80, output: 4.00 },
 };
@@ -124,10 +125,13 @@ async function callOpenRouter(systemPrompt: string, userPrompt: string, config?:
     const ctrl = new AbortController();
     const tid = setTimeout(() => ctrl.abort(), config?.timeout_ms ?? 30000);
     try {
+      // 2026-05-21: claude-opus-4-7 DEPRECOU o parâmetro `temperature` (retorna 400). Só envia p/ modelos que aceitam.
+      const reqBody: Record<string, unknown> = { model: m, max_tokens: config?.max_tokens ?? 2000, system: systemPrompt, messages: [{ role: 'user', content: userPrompt }] };
+      if (!m.includes('opus-4-7')) reqBody.temperature = config?.temperature ?? 0.3;
       const resp = await fetch(ANTHROPIC_URL, {
         method: 'POST',
         headers: { 'x-api-key': apiKey, 'anthropic-version': '2023-06-01', 'content-type': 'application/json' },
-        body: JSON.stringify({ model: m, max_tokens: config?.max_tokens ?? 2000, temperature: config?.temperature ?? 0.3, system: systemPrompt, messages: [{ role: 'user', content: userPrompt }] }),
+        body: JSON.stringify(reqBody),
         signal: ctrl.signal,
       });
       if (!resp.ok) throw new Error(`Anthropic ${resp.status}: ${await resp.text()}`);
@@ -163,8 +167,8 @@ async function getTelegramToken(supabase: any): Promise<string> {
   }
   return _telegramToken;
 }
-const CLAUDE_MODEL = 'claude-sonnet-4-20250514';      // Anthropic API direto (era 'anthropic/claude-sonnet-4' via OpenRouter)
-const FALLBACK_MODEL = 'claude-haiku-4-5-20251001';   // fallback resiliente (era 'openai/gpt-4.1-mini')
+const CLAUDE_MODEL = 'claude-opus-4-7';               // 2026-05-21: Opus p/ respostas ao cliente (decisao Junior — qualidade > custo, baixo volume)
+const FALLBACK_MODEL = 'claude-haiku-4-5-20251001';   // fallback resiliente em falha transitoria do Opus
 const ESCALATION_KEYWORDS = /\b(cancelar|cancelamento|reclamação|reclamar|insatisfeito|problema grave|advogado|procon|processo|jurídico|péssimo|horrível|nunca mais|devolver|reembolso)\b/i;
 
 const BOT_PATTERNS: { regex: RegExp; tipo: string }[] = [
