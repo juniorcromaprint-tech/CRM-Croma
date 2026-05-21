@@ -222,6 +222,13 @@ Deno.serve(async (req) => {
     });
   } catch (err) {
     const duration = Date.now() - startTime;
+    // 2026-05-21 instrumentação 500: captura à prova de falha em admin_config (chave UNIQUE) p/ diagnóstico.
+    try {
+      await supabase.from('admin_config').upsert({
+        chave: 'debug_cron_last_error',
+        valor: JSON.stringify({ message: (err as Error)?.message ?? String(err), stack: ((err as Error)?.stack ?? '').slice(0, 1800), at: new Date().toISOString() }),
+      }, { onConflict: 'chave' });
+    } catch (e2) { console.error('debug_cron_last_error upsert failed:', e2); }
     await supabase.from('ai_logs').insert({
       function_name: 'agent-cron-loop',
       entity_type: 'geral',
@@ -1102,7 +1109,7 @@ async function processLeadFollowUps(supabase: SupabaseClient, config: any): Prom
         // Compor mensagem via ai-compor-mensagem (agora aceita service_role)
         const { data: msgResult, error: msgError } = await supabase.functions.invoke(
           'ai-compor-mensagem',
-          { body: { lead_id: conv.lead_id, canal: conv.canal, etapa: conv.etapa } }
+          { body: { lead_id: conv.lead_id, canal: conv.canal, etapa: conv.etapa }, headers: { 'X-Internal-Call': 'true' } }
         );
         if (msgError || !msgResult?.message_id) continue;
 
