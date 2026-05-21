@@ -3,7 +3,8 @@
 import { serve } from 'https://deno.land/std@0.168.0/http/server.ts';
 import { handleCorsOptions, getCorsHeaders, jsonResponse, getServiceClient } from '../ai-shared/ai-helpers.ts';
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2';
-import { callOpenRouter } from '../ai-shared/openrouter-provider.ts';
+// 2026-05-21: OpenRouter ELIMINADO (Onda 2) — callOpenRouter = alias drop-in de callAnthropic.
+import { callOpenRouter } from '../ai-shared/anthropic-provider.ts';
 import { buildSystemPrompt, buildUserPrompt } from '../ai-shared/prompt-builder.ts';
 import { logAICall } from '../ai-shared/ai-logger.ts';
 
