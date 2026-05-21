@@ -3,6 +3,8 @@
 
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2';
 import { getCorsHeaders, handleCorsOptions, authenticateAndAuthorize, jsonResponse } from '../ai-shared/ai-helpers.ts';
+// 2026-05-21: OpenRouter ELIMINADO — Anthropic via provider compartilhado.
+import { callOpenRouter } from '../ai-shared/anthropic-provider.ts';
 
 const SUPABASE_URL = Deno.env.get('SUPABASE_URL')!;
 const SERVICE_ROLE_KEY = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!;
@@ -76,13 +78,7 @@ Deno.serve(async (req) => {
     };
 
     // ── Generate AI summary ──────────────────────────────────────────
-    const { data: configRow } = await supabase
-      .from('admin_config')
-      .select('valor')
-      .eq('chave', 'OPENROUTER_API_KEY')
-      .single();
-
-    const apiKey = configRow?.valor as string;
+    const apiKey = Deno.env.get('ANTHROPIC_API_KEY');
 
     let resumo_executivo = '';
     let acoes_recomendadas: string[] = [];
@@ -109,28 +105,9 @@ Responda EXATAMENTE neste JSON:
 }`;
 
       try {
-        const aiResponse = await fetch('https://openrouter.ai/api/v1/chat/completions', {
-          method: 'POST',
-          headers: {
-            'Authorization': `Bearer ${apiKey}`,
-            'Content-Type': 'application/json',
-            'HTTP-Referer': 'https://crm-croma.vercel.app',
-          },
-          body: JSON.stringify({
-            model: 'openai/gpt-4.1-mini',
-            messages: [
-              { role: 'system', content: 'Você é um analista de negócios. Responda apenas em JSON válido.' },
-              { role: 'user', content: prompt },
-            ],
-            max_tokens: 400,
-            temperature: 0.3,
-          }),
-        });
-
-        if (aiResponse.ok) {
-          const aiData = await aiResponse.json();
-          const raw = aiData.choices?.[0]?.message?.content ?? '';
-          // Extract JSON from response
+        const aiResult = await callOpenRouter('Você é um analista de negócios. Responda apenas em JSON válido.', prompt, { model: 'claude-haiku-4-5-20251001', max_tokens: 400 });
+        {
+          const raw = aiResult.content ?? '';
           const jsonMatch = raw.match(/\{[\s\S]*\}/);
           if (jsonMatch) {
             const parsed = JSON.parse(jsonMatch[0]);

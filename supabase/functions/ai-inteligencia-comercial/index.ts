@@ -6,6 +6,8 @@
 // Auth: admin, diretor, gerente, comercial
 
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2';
+// 2026-05-21: OpenRouter ELIMINADO — Anthropic via provider compartilhado.
+import { callOpenRouter } from '../ai-shared/anthropic-provider.ts';
 import { getCorsHeaders, handleCorsOptions, jsonResponse } from '../ai-shared/ai-helpers.ts';
 
 const SUPABASE_URL = Deno.env.get('SUPABASE_URL')!;
@@ -204,13 +206,7 @@ Deno.serve(async (req) => {
     }
 
     // ── 5. Gerar insight com IA (OpenRouter) ──────────────────────────
-    const { data: configRow } = await supabase
-      .from('admin_config')
-      .select('valor')
-      .eq('chave', 'OPENROUTER_API_KEY')
-      .single();
-
-    const apiKey = configRow?.valor as string;
+    const apiKey = Deno.env.get('ANTHROPIC_API_KEY');
 
     let insightIA = '';
     let recomendacoes: string[] = [];
@@ -251,28 +247,9 @@ Gere análise estratégica em JSON:
 }`;
 
       try {
-        const aiRes = await fetch('https://openrouter.ai/api/v1/chat/completions', {
-          method: 'POST',
-          headers: {
-            'Authorization': `Bearer ${apiKey}`,
-            'Content-Type': 'application/json',
-            'HTTP-Referer': 'https://crm-croma.vercel.app',
-          },
-          body: JSON.stringify({
-            model: 'openai/gpt-4.1-mini',
-            messages: [
-              { role: 'system', content: 'Você é um analista comercial sênior da Croma Print. Responda apenas em JSON válido.' },
-              { role: 'user', content: prompt },
-            ],
-            max_tokens: 500,
-            temperature: 0.3,
-            response_format: { type: 'json_object' },
-          }),
-        });
-
-        if (aiRes.ok) {
-          const aiData = await aiRes.json();
-          const raw = aiData.choices?.[0]?.message?.content ?? '{}';
+        const aiResult = await callOpenRouter('Você é um analista comercial sênior da Croma Print. Responda apenas em JSON válido.', prompt, { model: 'claude-haiku-4-5-20251001', max_tokens: 500 });
+        {
+          const raw = aiResult.content ?? '{}';
           const jsonMatch = raw.match(/\{[\s\S]*\}/);
           if (jsonMatch) {
             const parsed = JSON.parse(jsonMatch[0]);
@@ -285,10 +262,10 @@ Gere análise estratégica em JSON:
               function_name: 'inteligencia-comercial',
               entity_type: 'geral',
               entity_id: null,
-              model_used: 'openai/gpt-4.1-mini',
-              tokens_input: aiData.usage?.prompt_tokens ?? 0,
-              tokens_output: aiData.usage?.completion_tokens ?? 0,
-              cost_usd: ((aiData.usage?.prompt_tokens ?? 0) * 0.40 + (aiData.usage?.completion_tokens ?? 0) * 1.60) / 1_000_000,
+              model_used: aiResult.model_used,
+              tokens_input: aiResult.tokens_input,
+              tokens_output: aiResult.tokens_output,
+              cost_usd: aiResult.cost_usd,
               duration_ms: 0,
               status: 'success',
             }).catch(() => {});

@@ -1,4 +1,6 @@
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2';
+// 2026-05-21: OpenRouter ELIMINADO — usa Anthropic via provider compartilhado (callOpenRouter = callAnthropic).
+import { callOpenRouter } from '../ai-shared/anthropic-provider.ts';
 
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
@@ -145,8 +147,8 @@ const QUERY_TEMPLATES: Record<string, Record<string, string>> = {
 
 // Stage 1: Classify intent using OpenRouter
 async function classifyIntent(message: string): Promise<ClassifyResponse> {
-  const openrouterKey = Deno.env.get('OPENROUTER_API_KEY');
-  if (!openrouterKey) {
+  const apiKey = Deno.env.get('ANTHROPIC_API_KEY');
+  if (!apiKey) {
     return {
       intent: 'geral',
       entities: [],
@@ -166,31 +168,8 @@ Classifique a mensagem do usuário em uma destas categorias:
 Responda em JSON puro com: {"intent": "...", "entities": [...], "confidence": 0.0-1.0}`;
 
   try {
-    const response = await fetch('https://openrouter.ai/api/v1/chat/completions', {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-        'Authorization': `Bearer ${openrouterKey}`,
-      },
-      body: JSON.stringify({
-        model: 'anthropic/claude-sonnet-4-20250514',
-        messages: [
-          { role: 'system', content: systemPrompt },
-          { role: 'user', content: message },
-        ],
-        response_format: { type: 'json_object' },
-        max_tokens: 300,
-      }),
-    });
-
-    if (!response.ok) {
-      console.error('OpenRouter error:', response.statusText);
-      return { intent: 'geral', entities: [], confidence: 0.5 };
-    }
-
-    const data = await response.json();
-    const content = data.choices?.[0]?.message?.content || '{}';
-    return JSON.parse(content);
+    const aiResult = await callOpenRouter(systemPrompt, message, { model: 'claude-sonnet-4-20250514', max_tokens: 300 });
+    return JSON.parse(aiResult.content || '{}');
   } catch (error) {
     console.error('Classify error:', error);
     return { intent: 'geral', entities: [], confidence: 0.5 };
@@ -278,9 +257,9 @@ async function generateResponse(
   intent: string,
   data: Record<string, unknown>
 ): Promise<string> {
-  const openrouterKey = Deno.env.get('OPENROUTER_API_KEY');
+  const apiKey = Deno.env.get('ANTHROPIC_API_KEY');
 
-  if (!openrouterKey) {
+  if (!apiKey) {
     // Fallback: format data directly
     return `Resposta para: ${message}\n\nDados disponíveis:\n${JSON.stringify(data, null, 2)}`;
   }
@@ -293,32 +272,9 @@ Você recebe dados brutos do banco de dados e gera respostas em português brasi
 - Sempre responda com confiança nos dados do banco`;
 
   try {
-    const response = await fetch('https://openrouter.ai/api/v1/chat/completions', {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-        'Authorization': `Bearer ${openrouterKey}`,
-      },
-      body: JSON.stringify({
-        model: 'anthropic/claude-sonnet-4-20250514',
-        messages: [
-          { role: 'system', content: systemPrompt },
-          {
-            role: 'user',
-            content: `Pergunta: "${message}"\n\nDados do banco:\n${JSON.stringify(data, null, 2)}`,
-          },
-        ],
-        max_tokens: 500,
-      }),
-    });
-
-    if (!response.ok) {
-      console.error('OpenRouter response error:', response.statusText);
-      return `Dados retornados: ${JSON.stringify(data, null, 2)}`;
-    }
-
-    const result = await response.json();
-    return result.choices?.[0]?.message?.content || 'Sem resposta disponível.';
+    const userContent = `Pergunta: "${message}"\n\nDados do banco:\n${JSON.stringify(data, null, 2)}`;
+    const aiResult = await callOpenRouter(systemPrompt, userContent, { model: 'claude-sonnet-4-20250514', max_tokens: 500 });
+    return aiResult.content || 'Sem resposta disponível.';
   } catch (error) {
     console.error('Generate response error:', error);
     return `Dados disponíveis:\n${JSON.stringify(data, null, 2)}`;

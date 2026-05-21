@@ -30,22 +30,16 @@ Deno.serve(async (req) => {
 
     const supabase = createClient(SUPABASE_URL, SERVICE_ROLE_KEY);
 
-    // Get OpenRouter API key
-    const { data: configRow } = await supabase
-      .from('admin_config')
-      .select('valor')
-      .eq('chave', 'OPENROUTER_API_KEY')
-      .single();
-
-    const apiKey = configRow?.valor as string;
+    // 2026-05-21: OpenRouter ELIMINADO. Vision via Anthropic API direto (ANTHROPIC_API_KEY).
+    const apiKey = Deno.env.get('ANTHROPIC_API_KEY');
     if (!apiKey) {
-      return jsonResponse({ error: 'OpenRouter API key não configurada' }, 500, corsHeaders);
+      return jsonResponse({ error: 'ANTHROPIC_API_KEY não configurada' }, 500, corsHeaders);
     }
 
-    // Build image content
+    // Build image content (formato Anthropic)
     const imageContent = foto_base64
-      ? { type: 'image_url' as const, image_url: { url: `data:image/jpeg;base64,${foto_base64}` } }
-      : { type: 'image_url' as const, image_url: { url: foto_url } };
+      ? { type: 'image' as const, source: { type: 'base64' as const, media_type: 'image/jpeg', data: foto_base64 } }
+      : { type: 'image' as const, source: { type: 'url' as const, url: foto_url } };
 
     const systemPrompt = `Você é um inspetor de qualidade de instalações de comunicação visual.
 Analise a foto da instalação e avalie:
@@ -70,17 +64,19 @@ Responda EXATAMENTE neste JSON:
 Se a foto não mostrar uma instalação de comunicação visual, responda com score 0 e observação explicando.
 Seja rigoroso mas justo. Score >= 70 = aprovado.`;
 
-    const aiResponse = await fetch('https://openrouter.ai/api/v1/chat/completions', {
+    const aiResponse = await fetch('https://api.anthropic.com/v1/messages', {
       method: 'POST',
       headers: {
-        'Authorization': `Bearer ${apiKey}`,
-        'Content-Type': 'application/json',
-        'HTTP-Referer': 'https://campo-croma.vercel.app',
+        'x-api-key': apiKey,
+        'anthropic-version': '2023-06-01',
+        'content-type': 'application/json',
       },
       body: JSON.stringify({
-        model: 'anthropic/claude-sonnet-4',
+        model: 'claude-sonnet-4-20250514',
+        max_tokens: 500,
+        temperature: 0.2,
+        system: systemPrompt,
         messages: [
-          { role: 'system', content: systemPrompt },
           {
             role: 'user',
             content: [
@@ -89,8 +85,6 @@ Seja rigoroso mas justo. Score >= 70 = aprovado.`;
             ],
           },
         ],
-        max_tokens: 500,
-        temperature: 0.2,
       }),
     });
 
@@ -104,7 +98,7 @@ Seja rigoroso mas justo. Score >= 70 = aprovado.`;
 
     if (aiResponse.ok) {
       const aiData = await aiResponse.json();
-      const raw = aiData.choices?.[0]?.message?.content ?? '';
+      const raw = aiData.content?.[0]?.text ?? '';
       const jsonMatch = raw.match(/\{[\s\S]*\}/);
       if (jsonMatch) {
         try {

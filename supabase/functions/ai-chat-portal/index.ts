@@ -4,6 +4,8 @@
 // Cannot: modify orders, give discounts, reveal margins
 
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2';
+// 2026-05-21: OpenRouter ELIMINADO — Anthropic via provider compartilhado.
+import { callOpenRouter } from '../ai-shared/anthropic-provider.ts';
 
 const SUPABASE_URL = Deno.env.get('SUPABASE_URL')!;
 const SERVICE_ROLE_KEY = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!;
@@ -145,13 +147,7 @@ ITENS:
 ${itensStr || 'Nenhum item'}${pedidoInfo}`;
 
     // ── 4. Call OpenRouter ────────────────────────────────────────────
-    const { data: configRows } = await supabase
-      .from('admin_config')
-      .select('valor')
-      .eq('chave', 'OPENROUTER_API_KEY')
-      .single();
-
-    const apiKey = configRows?.valor as string;
+    const apiKey = Deno.env.get('ANTHROPIC_API_KEY');
     if (!apiKey) {
       return new Response(
         JSON.stringify({ resposta: 'Chat indisponível no momento. Entre em contato conosco por WhatsApp ou e-mail.', tipo: 'info' }),
@@ -159,39 +155,24 @@ ${itensStr || 'Nenhum item'}${pedidoInfo}`;
       );
     }
 
-    const messages = [
-      { role: 'system', content: `${SYSTEM_PROMPT}\n\nCONTEXTO DO PEDIDO:\n${contexto}` },
-      ...(historico ?? []).slice(-8).map((m: Message) => ({
-        role: m.role,
-        content: m.content,
-      })),
-      { role: 'user', content: mensagem },
-    ];
+    // 2026-05-21: OpenRouter ELIMINADO. Anthropic via provider compartilhado (2-arg) → histórico achatado no prompt.
+    const systemContent = `${SYSTEM_PROMPT}\n\nCONTEXTO DO PEDIDO:\n${contexto}`;
+    const histStr = (historico ?? []).slice(-8)
+      .map((m: Message) => `${m.role === 'assistant' ? 'ATENDENTE' : 'CLIENTE'}: ${m.content}`)
+      .join('\n');
+    const userPrompt = (histStr ? `Histórico da conversa:\n${histStr}\n\n` : '') + `Mensagem atual do cliente: ${mensagem}`;
 
-    const aiResponse = await fetch('https://openrouter.ai/api/v1/chat/completions', {
-      method: 'POST',
-      headers: {
-        'Authorization': `Bearer ${apiKey}`,
-        'Content-Type': 'application/json',
-        'HTTP-Referer': 'https://crm-croma.vercel.app',
-      },
-      body: JSON.stringify({
-        model: 'openai/gpt-4.1-mini',
-        messages,
-        max_tokens: 500,
-        temperature: 0.3,
-      }),
-    });
-
-    if (!aiResponse.ok) {
+    let resposta = 'Desculpe, não entendi. Pode reformular?';
+    try {
+      const aiResult = await callOpenRouter(systemContent, userPrompt, { model: 'claude-haiku-4-5-20251001', max_tokens: 500 });
+      resposta = aiResult.content || resposta;
+    } catch (e) {
+      console.error('ai-chat-portal IA error:', e);
       return new Response(
         JSON.stringify({ resposta: 'Desculpe, não consegui processar sua pergunta. Tente novamente.', tipo: 'info' }),
         { status: 200, headers: cors }
       );
     }
-
-    const aiData = await aiResponse.json();
-    const resposta = aiData.choices?.[0]?.message?.content ?? 'Desculpe, não entendi. Pode reformular?';
 
     // Detect if response suggests escalation
     const tipo = resposta.toLowerCase().includes('comercial') || resposta.toLowerCase().includes('encaminhar')
