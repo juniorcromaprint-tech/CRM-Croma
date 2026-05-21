@@ -1,7 +1,34 @@
 
 # STATE — CRM Croma
 
-**Última sessão**: 2026-05-21 MADRUGADA (Claude Code CLI autônomo — investigação webhook v35. DESCOBERTA: o agente WhatsApp ESTÁ FUNCIONAL, comprovado 2× ao vivo. Causa-raiz assumida no plano estava ERRADA. Nenhum deploy feito — sistema OK, não arrisquei.)
+**Última sessão**: 2026-05-21 MANHÃ (Claude Code CLI autônomo — MIGRAÇÃO OpenRouter Onda 1: webhook v36 + ai-gerar-orcamento v12 agora chamam Anthropic API DIRETO. E2E PASS. Ondas 2-3 aguardam OK.)
+
+## Sessão 2026-05-21 MANHÃ — ELIMINAR OPENROUTER (ONDA 1) ✅
+
+### Resultado
+✅ **OpenRouter eliminado de 2 funções** (Fase 0 + Onda 1 do plano `docs/plano-ia/2026-05-21-eliminar-openrouter-prompt.md`):
+- `whatsapp-webhook` → **v36** (verify_jwt=false preservado): `callOpenRouter` inline reescrito p/ Anthropic API direto (`claude-sonnet-4-20250514`, fallback `claude-haiku-4-5-20251001`).
+- `ai-gerar-orcamento` → **v12** (verify_jwt=true): import trocado p/ `anthropic-provider.ts` (drop-in).
+- **E2E PASS**: POST simulado → `agent_messages.enviada` com `modelo_ia=claude-sonnet-4-20250514` (prova provider direto), resposta real, `sent_success=true`. Evidence: `outputs/2026-05-21-evidence-onda1.json`.
+
+### Hardening aplicado (na janela)
+- **Achado #2** (visibilidade no-reply): caminho `IA null` agora cria `agent_messages status='erro' erro_codigo='IA_NULL'` (antes só Telegram).
+- **Achado #1** (ai_logs vazio): **causa real era `user_id NOT NULL`** (não RLS — rls_forced=false). Migration **158**: `user_id` nullable + policy INSERT corrigida `public`→`service_role`. ai_logs voltou a capturar (comprovado: 2123/470 tokens, $0,0134).
+
+### Descobertas / pendências
+- ⚠️ **ai-gerar-orcamento: prod v11 era MAIS ANTIGA que o repo**. Deploy v12 trouxe a prod ao nível do repo. Fórmula de preço idêntica (totais não mudam); deltas = cota mais / pede menos esclarecimento. Snapshot v11 salvo p/ rollback (`%TEMP%\openrouter-migration\`).
+- ai-gerar-orcamento lookup de lead retornou 404 no teste leve (pré-existente, antes da IA, idêntico ao v11 — não é regressão). Investigar fluxo de orçamento em prod (degrada gracioso).
+- `OPENROUTER_API_KEY` **mantida** (secret + admin_config) — não revogar até validar 7 dias.
+- Função temp `smoketest-anthropic` deployada p/ smoke test, depois neutralizada (v2). Deletar pelo dashboard.
+
+### Aguardam OK explícito do Junior
+- **Onda 2**: ai-qualificar-lead, ai-compor-mensagem, ai-detectar-intencao-orcamento.
+- **Onda 3**: ai-analisar-orcamento, ai-resumo-cliente, ai-briefing-producao, ai-detectar-problemas, ai-composicao-produto, ai-classificar-extrato.
+- **Limpeza final** (após 7 dias OK): deprecar `openrouter-provider.ts`, remover `OPENROUTER_API_KEY`, revogar no painel OpenRouter, deletar `smoketest-anthropic`.
+
+Relatório completo: `outputs/2026-05-21-eliminar-openrouter-relatorio.md`.
+
+---
 
 ## Sessão 2026-05-21 MADRUGADA — INVESTIGAÇÃO WEBHOOK v35 (causa-raiz refutada, agente funcional)
 

@@ -1,12 +1,14 @@
-// supabase/functions/whatsapp-webhook/index.ts
+﻿// supabase/functions/whatsapp-webhook/index.ts
 // ⚠️ SYNCED FROM PRODUCTION 2026-05-21 — espelha a edge function DEPLOYADA (Supabase version 35).
 //    O repo guardava uma v18 antiga que divergiu da prod (v19-v35 foram deployadas sem commit).
 //    Investigacao 2026-05-21 (outputs/2026-05-21-fix-webhook-relatorio.md): o webhook ESTA FUNCIONAL.
 //    No-replies intermitentes = falha TRANSITORIA da chamada OpenRouter em generateClaudeResponse,
 //    invisivel por 3 motivos: (1) inbound grava status='respondida' hardcoded; (2) caminho null nao
 //    cria registro de erro; (3) insert em ai_logs e bloqueado silenciosamente por RLS.
-//    NENHUMA mudanca de codigo em producao foi feita nesta sessao (o sistema estava respondendo).
-//    Hardening recomendado (retry/visibilidade/async) aguarda OK do Junior — ver relatorio.
+//    >>> 2026-05-21 MIGRACAO ONDA 1: OpenRouter ELIMINADO. callOpenRouter (inline) agora chama
+//        Anthropic API direto (claude-sonnet-4-20250514, fallback claude-haiku-4-5-20251001).
+//        Hardening aplicado: (achado #2) caminho null cria agent_messages status='erro' erro_codigo='IA_NULL';
+//        (achado #1) ai_logs.user_id nullable + insert defensivo. NAO mexido: status='respondida' do inbound (fora de escopo).
 // ======================================================================
 // supabase/functions/whatsapp-webhook/index.ts
 // v18 (2026-05-11, migration 151) — captura errors[0].code + error_data.details em status='failed'.
@@ -28,9 +30,10 @@ interface AIRequestConfig {
   timeout_ms?: number;
   text_mode?: boolean;
 }
+// 2026-05-21: preços Anthropic API direto (USD por 1M tokens). OpenRouter eliminado.
 const MODEL_COSTS: Record<string, { input: number; output: number }> = {
-  'openai/gpt-4.1-mini': { input: 0.40, output: 1.60 },
-  'anthropic/claude-sonnet-4': { input: 3.00, output: 15.00 },
+  'claude-sonnet-4-20250514': { input: 3.00, output: 15.00 },
+  'claude-haiku-4-5-20251001': { input: 0.80, output: 4.00 },
 };
 
 function getServiceClient() {
@@ -80,38 +83,58 @@ async function postToMetaCloud(creds: WhatsAppCredentials, payload: Record<strin
   return { ok: true, metaData: await res.json() };
 }
 
-// ── OpenRouter provider ───────────────────────────────────────────────
-const OPENROUTER_URL = 'https://openrouter.ai/api/v1/chat/completions';
-const DEFAULT_MODEL: AIModel = 'openai/gpt-4.1-mini';
+// ── Anthropic provider (API direto — OpenRouter ELIMINADO 2026-05-21) ───────────────────────────────────────────────
+// Chama Anthropic API direto (1 ponto de falha em vez de 2). Nome `callOpenRouter` mantido (drop-in).
+const ANTHROPIC_URL = 'https://api.anthropic.com/v1/messages';
+const DEFAULT_MODEL: AIModel = 'claude-haiku-4-5-20251001';
+// Mapeia IDs antigos do OpenRouter → IDs Anthropic diretos (compat. com chamadores que ainda passam strings antigas)
+const MODEL_MAP: Record<string, string> = {
+  'openai/gpt-4.1-mini': 'claude-haiku-4-5-20251001',
+  'openai/gpt-4.1': 'claude-sonnet-4-20250514',
+  'anthropic/claude-haiku-3.5': 'claude-haiku-4-5-20251001',
+  'anthropic/claude-sonnet-4': 'claude-sonnet-4-20250514',
+};
+function resolveModel(m?: string): string {
+  if (!m) return DEFAULT_MODEL;
+  if (MODEL_MAP[m]) return MODEL_MAP[m];
+  if (m.startsWith('claude-')) return m;
+  return DEFAULT_MODEL;
+}
 let _fallbackOverride: AIModel | null = null;
 function setFallbackModel(m: AIModel) { _fallbackOverride = m; }
-function getFallbackModel(): AIModel { return _fallbackOverride ?? 'openai/gpt-4.1-mini'; }
-const SUPPORTS_JSON_FORMAT = new Set(['openai/gpt-4.1-mini','openai/gpt-4.1','openai/gpt-4.1-nano','openai/gpt-4o','openai/gpt-4o-mini','openai/gpt-3.5-turbo','anthropic/claude-sonnet-4','anthropic/claude-haiku-3.5','anthropic/claude-opus-4','google/gemini-2.0-flash-001','google/gemini-2.5-flash-preview','google/gemini-2.5-pro-preview','mistralai/mistral-large','mistralai/mistral-medium']);
+function getFallbackModel(): AIModel { return resolveModel(_fallbackOverride ?? 'claude-haiku-4-5-20251001'); }
 interface AICallResult { content: string; model_used: string; tokens_input: number; tokens_output: number; cost_usd: number; duration_ms: number; }
 
+// Anthropic não tem response_format json_object — extrai JSON do texto bruto (igual o openrouter-provider fazia).
+function extractJSON(raw: string): string {
+  try { JSON.parse(raw); return raw; } catch { /* continua */ }
+  const md = raw.match(/```(?:json)?\s*([\s\S]*?)```/);
+  if (md?.[1]) { const c = md[1].trim(); try { JSON.parse(c); return c; } catch { /* continua */ } }
+  const obj = raw.match(/(\{[\s\S]*\})/);
+  if (obj?.[1]) { try { JSON.parse(obj[1]); return obj[1]; } catch { /* continua */ } }
+  return raw;
+}
+
 async function callOpenRouter(systemPrompt: string, userPrompt: string, config?: AIRequestConfig): Promise<AICallResult> {
-  const apiKey = Deno.env.get('OPENROUTER_API_KEY');
-  if (!apiKey) throw new Error('OPENROUTER_API_KEY not configured');
-  const model = config?.model ?? DEFAULT_MODEL;
+  const apiKey = Deno.env.get('ANTHROPIC_API_KEY');
+  if (!apiKey) throw new Error('ANTHROPIC_API_KEY not configured');
+  const model = resolveModel(config?.model);
   const startTime = Date.now();
-  const messages = [{ role: 'system', content: systemPrompt }, { role: 'user', content: userPrompt }];
   const fetchIt = async (m: string) => {
     const ctrl = new AbortController();
     const tid = setTimeout(() => ctrl.abort(), config?.timeout_ms ?? 30000);
     try {
-      const supportsJson = SUPPORTS_JSON_FORMAT.has(m) && !m.endsWith(':free') && !config?.text_mode;
-      const bodyPayload: Record<string, unknown> = { model: m, messages, temperature: config?.temperature ?? 0.3, max_tokens: config?.max_tokens ?? 2000 };
-      if (supportsJson) bodyPayload.response_format = { type: 'json_object' };
-      const resp = await fetch(OPENROUTER_URL, {
+      const resp = await fetch(ANTHROPIC_URL, {
         method: 'POST',
-        headers: { 'Authorization': `Bearer ${apiKey}`, 'Content-Type': 'application/json', 'HTTP-Referer': 'https://crm-croma.vercel.app', 'X-Title': 'Croma AI Engine' },
-        body: JSON.stringify(bodyPayload),
+        headers: { 'x-api-key': apiKey, 'anthropic-version': '2023-06-01', 'content-type': 'application/json' },
+        body: JSON.stringify({ model: m, max_tokens: config?.max_tokens ?? 2000, temperature: config?.temperature ?? 0.3, system: systemPrompt, messages: [{ role: 'user', content: userPrompt }] }),
         signal: ctrl.signal,
       });
-      if (!resp.ok) throw new Error(`OpenRouter ${resp.status}: ${await resp.text()}`);
+      if (!resp.ok) throw new Error(`Anthropic ${resp.status}: ${await resp.text()}`);
       return await resp.json();
     } finally { clearTimeout(tid); }
   };
+  // Resiliência: se o modelo primário falhar (erro transitório), tenta o fallback (Haiku) uma vez.
   let response: any; let used = model;
   try { response = await fetchIt(model); }
   catch (e) {
@@ -119,18 +142,11 @@ async function callOpenRouter(systemPrompt: string, userPrompt: string, config?:
     if (model === fb) throw e;
     response = await fetchIt(fb); used = fb;
   }
-  const usage = response.usage;
-  const costs = MODEL_COSTS[used] ?? MODEL_COSTS['openai/gpt-4.1-mini'];
-  const costUsd = (usage.prompt_tokens * costs.input + usage.completion_tokens * costs.output) / 1_000_000;
-  const rawContent = response.choices[0]?.message?.content ?? '';
-  // extract JSON if needed
-  let content = rawContent;
-  try { JSON.parse(rawContent); } catch {
-    const md = rawContent.match(/```(?:json)?\s*([\s\S]*?)```/);
-    if (md?.[1]) { try { JSON.parse(md[1].trim()); content = md[1].trim(); } catch {} }
-    else { const obj = rawContent.match(/(\{[\s\S]*\})/); if (obj?.[1]) { try { JSON.parse(obj[1]); content = obj[1]; } catch {} } }
-  }
-  return { content, model_used: used, tokens_input: usage.prompt_tokens, tokens_output: usage.completion_tokens, cost_usd: costUsd, duration_ms: Date.now() - startTime };
+  const usage = response.usage ?? { input_tokens: 0, output_tokens: 0 };
+  const costs = MODEL_COSTS[used] ?? MODEL_COSTS['claude-haiku-4-5-20251001'];
+  const costUsd = (usage.input_tokens * costs.input + usage.output_tokens * costs.output) / 1_000_000;
+  const rawContent = response.content?.[0]?.text ?? '';
+  return { content: extractJSON(rawContent), model_used: used, tokens_input: usage.input_tokens, tokens_output: usage.output_tokens, cost_usd: costUsd, duration_ms: Date.now() - startTime };
 }
 
 // ═══════════════════════════════════════════════════════════════════════
@@ -147,8 +163,8 @@ async function getTelegramToken(supabase: any): Promise<string> {
   }
   return _telegramToken;
 }
-const CLAUDE_MODEL = 'anthropic/claude-sonnet-4';
-const FALLBACK_MODEL = 'openai/gpt-4.1-mini';
+const CLAUDE_MODEL = 'claude-sonnet-4-20250514';      // Anthropic API direto (era 'anthropic/claude-sonnet-4' via OpenRouter)
+const FALLBACK_MODEL = 'claude-haiku-4-5-20251001';   // fallback resiliente (era 'openai/gpt-4.1-mini')
 const ESCALATION_KEYWORDS = /\b(cancelar|cancelamento|reclamação|reclamar|insatisfeito|problema grave|advogado|procon|processo|jurídico|péssimo|horrível|nunca mais|devolver|reembolso)\b/i;
 
 const BOT_PATTERNS: { regex: RegExp; tipo: string }[] = [
@@ -172,10 +188,10 @@ const BOT_PATTERNS: { regex: RegExp; tipo: string }[] = [
   { regex: /central\s+24h/i, tipo: 'horario_automatico' },
 ];
 
-const BOT_INVISIBLE_PREFIX = /^[‎‏‪-‮⁦-⁩]/;
+const BOT_INVISIBLE_PREFIX = /^[\u200E\u200F\u202A-\u202E\u2066-\u2069]/;
 
 function normalizarTexto(s: string): string {
-  return (s ?? '').toLowerCase().normalize('NFD').replace(/[̀-ͯ]/g, '').replace(/[^a-z0-9 ]/g, ' ').replace(/\s+/g, ' ').trim();
+  return (s ?? '').toLowerCase().normalize('NFD').replace(/[\u0300-\u036F]/g, '').replace(/[^a-z0-9 ]/g, ' ').replace(/\s+/g, ' ').trim();
 }
 
 function similaridade(a: string, b: string): number {
@@ -391,12 +407,8 @@ interface ClaudeStructuredResponse { text: string; intent: string; dados: DadosE
 
 async function generateClaudeResponse(supabase: any, lead: Record<string, unknown>, conversation: Record<string, unknown>, incomingMessage: string, contactName: string): Promise<ClaudeStructuredResponse | null> {
   try {
-    let apiKey = Deno.env.get('OPENROUTER_API_KEY');
-    if (!apiKey) {
-      const { data: keyConfig } = await supabase.from('admin_config').select('valor').eq('chave', 'OPENROUTER_API_KEY').single();
-      if (!keyConfig?.valor) return null;
-      Deno.env.set('OPENROUTER_API_KEY', keyConfig.valor as string);
-    }
+    const apiKey = Deno.env.get('ANTHROPIC_API_KEY');
+    if (!apiKey) { console.error('whatsapp-webhook: ANTHROPIC_API_KEY not configured — cannot generate response'); return null; }
     setFallbackModel(FALLBACK_MODEL);
     const { catalogo, licoes } = await loadCatalogoELicoes(supabase);
     const memoria = await lerMemoriaLead(supabase, lead.id as string);
@@ -416,7 +428,12 @@ async function generateClaudeResponse(supabase: any, lead: Record<string, unknow
     const memoriaBloco = memoria ? [`## MEMÓRIA`, memoria.resumo ? `Resumo: ${memoria.resumo}` : '', memoria.produto_interesse ? `Produto: ${memoria.produto_interesse}` : '', memoria.necessidade ? `Necessidade: ${memoria.necessidade}` : '', memoria.urgencia ? `Urgência: ${memoria.urgencia}` : '', memoria.proximos_passos ? `Próximos: ${memoria.proximos_passos}` : '', `Mensagens processadas: ${memoria.mensagens_processadas ?? 0}`].filter(Boolean).join('\n') : '## MEMÓRIA\n(primeiro contato)';
     const userPrompt = [`## DADOS DO LEAD`, `Nome: ${contactName || fullLead?.contato_nome || 'Não informado'}`, `Email: ${fullLead?.contato_email || 'Não informado'}`, `Empresa: ${fullLead?.empresa || 'Não informada'}`, `Segmento: ${fullLead?.segmento || 'Não identificado'}`, `Temperatura: ${fullLead?.temperatura || 'morno'}`, `Status: ${fullLead?.status || 'novo'}`, fullLead?.observacoes ? `Observações: ${fullLead.observacoes}` : '', dadosFaltantes.length > 0 ? `\n⚠️ DADOS FALTANTES: ${dadosFaltantes.join(', ')}` : '\n✅ Todos os dados coletados', ``, memoriaBloco, ``, pedidos && pedidos.length > 0 ? `## PEDIDOS\n${pedidos.map((p: any) => `- #${p.numero}: ${p.status} (R$ ${p.valor_total})`).join('\n')}` : '## PEDIDOS\nNenhum', ``, `## HISTÓRICO`, historico || '(primeira mensagem)', ``, `## MENSAGEM ATUAL`, incomingMessage, ``, `Retorne SOMENTE o JSON estruturado.`].filter(Boolean).join('\n');
     const aiResult = await callOpenRouter(buildCromaSystemPrompt(dadosFaltantes, catalogo, licoes), userPrompt, { model: CLAUDE_MODEL, temperature: 0.7, max_tokens: 1200, text_mode: false });
-    await supabase.from('ai_logs').insert({ function_name: 'auto-resposta-whatsapp', entity_type: 'geral', entity_id: lead.id as string, model_used: aiResult.model_used, tokens_input: aiResult.tokens_input, tokens_output: aiResult.tokens_output, cost_usd: aiResult.cost_usd, duration_ms: aiResult.duration_ms, status: 'success' });
+    // 2026-05-21 hardening (achado #1): user_id explícito null (coluna agora nullable) + defensivo.
+    // Antes: insert silenciava erro de NOT NULL → ai_logs ficava vazio (telemetria/custo invisível).
+    try {
+      const { error: logErr } = await supabase.from('ai_logs').insert({ user_id: null, function_name: 'auto-resposta-whatsapp', entity_type: 'geral', entity_id: lead.id as string, model_used: aiResult.model_used, tokens_input: aiResult.tokens_input, tokens_output: aiResult.tokens_output, cost_usd: aiResult.cost_usd, duration_ms: aiResult.duration_ms, status: 'success' });
+      if (logErr) console.error('whatsapp-webhook: ai_logs insert falhou:', logErr.message);
+    } catch (logEx) { console.error('whatsapp-webhook: ai_logs insert exception:', logEx); }
     let parsed: Record<string, unknown> = {};
     try { parsed = JSON.parse(aiResult.content); } catch { return { text: String(aiResult.content || '').trim() || 'Recebi sua mensagem! Em instantes te respondo melhor.', intent: 'conversa', dados: {}, confianca: {}, memoria: {} }; }
     const text = String(parsed.resposta_texto ?? '').trim();
@@ -605,7 +622,16 @@ serve(async (req: Request) => {
     }
     const claudeResult = await generateClaudeResponse(supabase, lead, conversation, textBody, contactName);
     if (!claudeResult) {
-      await notifyTelegram(supabase, `📱 *WhatsApp — ${isNewLead ? '🆕 NOVO LEAD' : '💬 MENSAGEM'}*\n\n👤 *${contactName || 'Sem nome'}*\n📞 +${normalizedPhone}\n\n💬 ${textBody.substring(0, 300)}\n\n⚠️ _Não consegui gerar resposta automática. Responda manualmente._`);
+      // 2026-05-21 hardening (achado #2): registrar visibilidade do erro — antes SÓ notificava Telegram (no-reply invisível).
+      try {
+        await supabase.from('agent_messages').insert({
+          conversation_id: conversation.id, direcao: 'enviada', canal: 'whatsapp',
+          conteudo: '[IA não gerou resposta — nada enviado ao cliente]', status: 'erro',
+          erro_codigo: 'IA_NULL', erro_mensagem: 'IA não gerou resposta (provider returned null)',
+          metadata: { auto_generated: false, lead_id: lead.id, modelo_ia: CLAUDE_MODEL, sent_success: false },
+        }).select('id').single();
+      } catch (errIns) { console.error('whatsapp-webhook: falha ao registrar agent_messages IA_NULL:', errIns); }
+      await notifyTelegram(supabase,`📱 *WhatsApp — ${isNewLead ? '🆕 NOVO LEAD' : '💬 MENSAGEM'}*\n\n👤 *${contactName || 'Sem nome'}*\n📞 +${normalizedPhone}\n\n💬 ${textBody.substring(0, 300)}\n\n⚠️ _Não consegui gerar resposta automática. Responda manualmente._`);
       return new Response('OK', { status: 200 });
     }
     let resposta = claudeResult.text;
@@ -629,7 +655,7 @@ serve(async (req: Request) => {
       }
     }
     const sent = await sendWhatsApp(supabase, normalizedPhone, resposta);
-    await supabase.from('agent_messages').insert({ conversation_id: conversation.id, direcao: 'enviada', canal: 'whatsapp', conteudo: resposta, status: sent ? 'enviada' : 'erro', metadata: { auto_generated: true, sent_by: 'claude-whatsapp-v18', modelo_ia: CLAUDE_MODEL, sent_success: sent, intent_detected: intent, orcamento_gerado: orcamentoGerado } });
+    await supabase.from('agent_messages').insert({ conversation_id: conversation.id, direcao: 'enviada', canal: 'whatsapp', conteudo: resposta, status: sent ? 'enviada' : 'erro', modelo_ia: CLAUDE_MODEL, erro_codigo: sent ? null : 'SEND_FAIL', erro_mensagem: sent ? null : 'Falha ao enviar via WhatsApp Cloud API', metadata: { auto_generated: true, sent_by: 'claude-whatsapp-anthropic', modelo_ia: CLAUDE_MODEL, sent_success: sent, intent_detected: intent, orcamento_gerado: orcamentoGerado } });
     await supabase.rpc('incrementar_contador_conversa', { p_id: conversation.id, p_enviadas: 1, p_recebidas: 0, p_score: 0 });
     const se = sent ? '✅' : '❌';
     const il = orcamentoGerado ? '📋 ORÇAMENTO GERADO' : `🏷️ ${intent}`;

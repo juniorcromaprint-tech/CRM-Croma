@@ -1,0 +1,61 @@
+{
+  "migration": "eliminar-openrouter-onda1",
+  "captured_at": "2026-05-21T12:03:44Z",
+  "test_phone": "5511999990010",
+  "webhook_version_deployed": 36,
+  "ai_gerar_orcamento_version_deployed": 12,
+  "lead": {
+    "id": "f64d9bc9-b072-4fe5-bb3b-862734d96e7f",
+    "empresa": "Teste Migracao Anthropic",
+    "contato_nome": "Teste Migracao Anthropic",
+    "contato_telefone": "5511999990010",
+    "status": "novo"
+  },
+  "agent_messages": [
+    {
+      "id": "345bfa8b-205e-4ea4-9f54-9c58e37a26d1",
+      "direcao": "recebida",
+      "status": "respondida",
+      "modelo_ia": null,
+      "conteudo_preview": "Oi, gostaria de saber sobre comunicacao visual para minha loja",
+      "created_at": "2026-05-21T11:54:20.181083+00:00"
+    },
+    {
+      "id": "e5b8fa38-4363-4caf-813b-27712ef290a7",
+      "direcao": "enviada",
+      "status": "enviada",
+      "modelo_ia": "claude-sonnet-4-20250514",
+      "erro_codigo": null,
+      "conteudo_preview": "Olá! Que bom falar com você! 😊\n\nA *Croma Print* é especialista em comunicação visual para lojas e redes. Trabalhamos com fachadas, placas, adesivos, banners, material de PDV, sinalização interna e ext...",
+      "metadata": {
+        "sent_by": "claude-whatsapp-anthropic",
+        "modelo_ia": "claude-sonnet-4-20250514",
+        "sent_success": true,
+        "auto_generated": true,
+        "intent_detected": "conversa",
+        "orcamento_gerado": false
+      },
+      "created_at": "2026-05-21T11:54:32.605521+00:00"
+    }
+  ],
+  "ai_log": {
+    "function_name": "auto-resposta-whatsapp",
+    "model_used": "claude-sonnet-4-20250514",
+    "tokens_input": 2123,
+    "tokens_output": 470,
+    "cost_usd": 0.013419,
+    "status": "success",
+    "created_at": "2026-05-21T11:54:29.72077+00:00"
+  },
+  "criterios_pass": {
+    "2_linhas_recebida_enviada": true,
+    "enviada_status_enviada": true,
+    "enviada_erro_codigo_null": true,
+    "modelo_ia_comeca_com_claude": true,
+    "modelo_ia_nao_e_anthropic_slash_nem_openai_slash": true,
+    "conteudo_nao_vazio": true,
+    "ai_logs_capturou_chamada": true,
+    "nenhuma_chamada_openrouter": true
+  },
+  "nota_ai_gerar_orcamento": "v12 deploy OK; boota e responde (404 'Lead nao encontrado' no teste leve = lookup pre-existente, anterior a qualquer chamada de IA, identico a v11 — nao e regressao do swap de provider). Caminho de IA usa o mesmo anthropic-provider.ts comprovado pelo E2E do webhook."
+}

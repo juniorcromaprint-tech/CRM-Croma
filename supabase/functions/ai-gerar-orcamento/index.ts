@@ -4,7 +4,8 @@
 
 import { serve } from 'https://deno.land/std@0.168.0/http/server.ts';
 import { getServiceClient } from '../ai-shared/ai-helpers.ts';
-import { callOpenRouter } from '../ai-shared/openrouter-provider.ts';
+// 2026-05-21: OpenRouter ELIMINADO — callOpenRouter agora é alias drop-in de callAnthropic (Anthropic API direto).
+import { callOpenRouter } from '../ai-shared/anthropic-provider.ts';
 import { calcPricing, PricingConfig, PricingInput } from '../ai-shared/pricing-engine.ts';
 
 // ─────────────────────────────────────────────────────────────
