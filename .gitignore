@@ -82,3 +82,26 @@ leads-base/
 
 # Supabase CLI local state
 supabase/.temp/
+
+# Sessoes Cowork — outputs locais
+outputs/
+
+# Dump JARVIS vazado 2026-05-12
+_legacy-imports/
+
+# Codex local config
+.codex/
+
+# Backups de migracoes / padronizacao
+*.PRE-*.bak.md
+*.PRE-PADRONIZACAO-*
+*.bak_dedup_*
+*.bak_*
+
+# Backups in-repo de Edge Functions
+supabase/functions/**/index.v*-prod.ts
+supabase/functions/**/index.v*-rollback.ts
+
+# MCP server payloads de teste
+mcp-server/args_*.json
+mcp-server/temp_*.json
