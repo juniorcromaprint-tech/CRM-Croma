@@ -1,5 +1,6 @@
 import { useState } from 'react'
 import { Copy, CheckCircle2, Zap, QrCode } from 'lucide-react'
+import { QRCodeSVG } from 'qrcode.react'
 import { Button } from '@/components/ui/button'
 
 interface PortalPixInfoProps {
@@ -94,10 +95,30 @@ export default function PortalPixInfo({ chavePix, valor, beneficiario = 'CROMA P
         </div>
       </div>
 
-      {/* Chave PIX */}
-      <div className="bg-white border border-emerald-200 rounded-xl p-3 mb-3">
-        <p className="text-xs text-slate-500 mb-1">Chave PIX</p>
-        <p className="text-sm font-mono font-medium text-slate-800 break-all">{chavePix}</p>
+      {/* QR Code + Chave PIX */}
+      <div className="flex flex-col sm:flex-row gap-3 mb-3">
+        {valor > 0 && (
+          <div className="bg-white border border-emerald-200 rounded-xl p-3 flex flex-col items-center justify-center self-center sm:self-stretch">
+            <QRCodeSVG
+              value={payload}
+              size={140}
+              level="M"
+              aria-label="QR Code para pagamento PIX"
+            />
+            <p className="text-[10px] text-emerald-700 mt-1.5 text-center">
+              Aponte a câmera do app do banco
+            </p>
+          </div>
+        )}
+        <div className="bg-white border border-emerald-200 rounded-xl p-3 flex-1 flex flex-col justify-center">
+          <p className="text-xs text-slate-500 mb-1">Chave PIX</p>
+          <p className="text-sm font-mono font-medium text-slate-800 break-all">{chavePix}</p>
+          {valor > 0 && (
+            <p className="text-xs text-slate-500 mt-2">
+              Valor: <span className="font-semibold text-slate-800">R$ {valor.toFixed(2).replace('.', ',')}</span>
+            </p>
+          )}
+        </div>
       </div>
 
       {/* Botões */}

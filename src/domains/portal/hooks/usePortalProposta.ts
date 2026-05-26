@@ -17,8 +17,17 @@ export function useAprovarProposta() {
   const queryClient = useQueryClient();
 
   return useMutation({
-    mutationFn: ({ token, comentario }: { token: string; comentario?: string }) =>
-      aprovarProposta(token, comentario),
+    // FASE 2-F: assinaturaBase64 opcional (data URL PNG). Quando presente, o service
+    // faz upload via Edge `portal-upload-assinatura` antes de chamar a RPC.
+    mutationFn: ({
+      token,
+      comentario,
+      assinaturaBase64,
+    }: {
+      token: string;
+      comentario?: string;
+      assinaturaBase64?: string | null;
+    }) => aprovarProposta(token, comentario, assinaturaBase64),
     onSuccess: (_, { token }) => {
       queryClient.invalidateQueries({ queryKey: ['portal-proposta', token] });
       showSuccess('Orçamento aprovado com sucesso!');

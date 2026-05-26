@@ -1,6 +1,7 @@
 // src/domains/portal/pages/PortalOrcamentoPage.tsx
 import { useParams } from 'react-router-dom';
 import { useCallback, useState } from 'react';
+import { useQueryClient } from '@tanstack/react-query';
 import { supabase } from '@/integrations/supabase/client';
 import { Loader2, AlertTriangle, CalendarClock, TrendingDown, Receipt } from 'lucide-react';
 import { brl } from '@/shared/utils/format';
@@ -8,11 +9,16 @@ import { usePortalProposta, useAprovarProposta } from '../hooks/usePortalPropost
 import { usePortalTracking } from '../hooks/usePortalTracking';
 import { useAdminConfig } from '../hooks/useAdminConfig';
 import { PortalHeader } from '../components/PortalHeader';
+import { PortalLojaInfo } from '../components/PortalLojaInfo';
+import { PortalInfoOrcamento } from '../components/PortalInfoOrcamento';
+import { PortalTimelinePedido } from '../components/PortalTimelinePedido';
 import { PortalItemList } from '../components/PortalItemList';
 import { PortalApproval } from '../components/PortalApproval';
 import { PortalFileUpload } from '../components/PortalFileUpload';
 import { PortalConfirmation } from '../components/PortalConfirmation';
 import { PortalFooter } from '../components/PortalFooter';
+import { PortalEditarDadosDialog } from '../components/PortalEditarDadosDialog';
+import { PortalWhatsAppButton } from '../components/PortalWhatsAppButton';
 import { CondicoesPagamentoView } from '@/domains/comercial/components/CondicoesPagamentoView';
 import PortalPixInfo from '../components/PortalPixInfo';
 import PortalChat from '../components/PortalChat';
@@ -24,6 +30,8 @@ export default function PortalOrcamentoPage() {
   const { trackClick } = usePortalTracking(token || '');
   const { data: chavePix } = useAdminConfig('chave_pix');
   const [generatingPdf, setGeneratingPdf] = useState(false);
+  const [editarDadosOpen, setEditarDadosOpen] = useState(false);
+  const queryClient = useQueryClient();
 
   // Gera PDF via Edge Function no servidor — zero alerta de antivírus
   const handleDownloadPdf = useCallback(async () => {
@@ -125,6 +133,7 @@ export default function PortalOrcamentoPage() {
           cliente={proposta.cliente}
           onDownloadPdf={handleDownloadPdf}
           generatingPdf={generatingPdf}
+          onEditarDados={() => setEditarDadosOpen(true)}
         />
 
         <main className="flex-1 max-w-4xl mx-auto w-full px-4 sm:px-6 py-8 space-y-8">
@@ -146,8 +155,34 @@ export default function PortalOrcamentoPage() {
             </div>
           )}
 
-          {/* Items */}
-          <PortalItemList itens={proposta.itens} onItemClick={trackClick} />
+          {/* Loja de destino (Beira Rio: code + brand/name + endereco) */}
+          <PortalLojaInfo store={proposta.store} />
+
+          {/* Informacoes do orcamento: referencia, prazo, logistica (FASE 1) */}
+          <PortalInfoOrcamento
+            referencia={proposta.referencia}
+            prazoEntregaDias={proposta.prazo_entrega_dias}
+            logistica={proposta.logistica}
+          />
+
+          {/* Timeline do pedido (FASE 2-D) */}
+          <PortalTimelinePedido
+            proposta={{
+              status: proposta.status,
+              aprovado_pelo_cliente: proposta.aprovado_pelo_cliente,
+              created_at: proposta.created_at,
+            }}
+            pedido={null}
+          />
+
+          {/* Items — modo aprovacao parcial ativado via prop token */}
+          <PortalItemList
+            itens={proposta.itens}
+            onItemClick={trackClick}
+            token={token}
+            readOnly={proposta.status === 'convertida' || proposta.status === 'aprovada'}
+            onStatusChange={() => queryClient.invalidateQueries({ queryKey: ['portal-proposta', token] })}
+          />
 
           {/* Summary card: total + payment */}
           <div className="bg-white rounded-2xl border border-slate-200 overflow-hidden">
@@ -207,9 +242,11 @@ export default function PortalOrcamentoPage() {
           clientName={clienteNome}
         />
 
-        {/* Approval */}
+        {/* Approval — agora aceita assinatura digital opcional (FASE 2-F) */}
         <PortalApproval
-          onApprove={(comentario) => aprovar.mutate({ token: token || '', comentario })}
+          onApprove={(comentario, assinaturaBase64) =>
+            aprovar.mutate({ token: token || '', comentario, assinaturaBase64 })
+          }
           isLoading={aprovar.isPending}
           disabled={expirada}
         />
@@ -217,8 +254,25 @@ export default function PortalOrcamentoPage() {
 
       <PortalFooter />
 
-      {/* Chat IA flutuante */}
+      {/* Chat IA flutuante (persistido via portal_mensagens — FASE 2-E) */}
       {token && <PortalChat shareToken={token} />}
+
+      {/* WhatsApp do vendedor (FASE 2-D) — botao flutuante bottom-right */}
+      <PortalWhatsAppButton
+        telefone={proposta.vendedor?.telefone}
+        nomeVendedor={proposta.vendedor?.nome}
+        propostaNumero={proposta.numero}
+        variant="floating"
+      />
+
+      {/* Modal: cliente edita seus proprios dados (FASE 2-C) */}
+      <PortalEditarDadosDialog
+        open={editarDadosOpen}
+        onOpenChange={setEditarDadosOpen}
+        token={token || ''}
+        cliente={proposta.cliente}
+        onSuccess={() => queryClient.invalidateQueries({ queryKey: ['portal-proposta', token] })}
+      />
     </div>
   );
 }

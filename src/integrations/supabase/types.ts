@@ -9619,7 +9619,7 @@ export type Database = {
         Returns: string
       }
       portal_aprovar_proposta: {
-        Args: { p_comentario?: string; p_token: string }
+        Args: { p_assinatura_url?: string; p_comentario?: string; p_token: string }
         Returns: Json
       }
       portal_get_proposta: { Args: { p_token: string }; Returns: Json }

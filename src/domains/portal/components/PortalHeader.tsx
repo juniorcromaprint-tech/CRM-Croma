@@ -1,5 +1,5 @@
 // src/domains/portal/components/PortalHeader.tsx
-import { FileText, Building2, Phone, Mail, MapPin, Download } from 'lucide-react';
+import { FileText, Building2, Phone, Mail, MapPin, Download, Pencil } from 'lucide-react';
 import type { PortalEmpresa, PortalCliente } from '../services/portal.service';
 
 function formatCnpj(cnpj: string): string {
@@ -28,9 +28,11 @@ interface Props {
   cliente?: PortalCliente;
   onDownloadPdf?: () => void;
   generatingPdf?: boolean;
+  /** FASE 2-C — quando definido, exibe botao "Alterar dados" no card do cliente. */
+  onEditarDados?: () => void;
 }
 
-export function PortalHeader({ numero, clienteNome, empresa, cliente, onDownloadPdf, generatingPdf }: Props) {
+export function PortalHeader({ numero, clienteNome, empresa, cliente, onDownloadPdf, generatingPdf, onEditarDados }: Props) {
   const nomeEmpresa = empresa?.nome_fantasia || empresa?.razao_social || 'Croma Print';
   const enderecoEmpresa = empresa
     ? [empresa.logradouro, empresa.numero_endereco].filter(Boolean).join(', ')
@@ -128,9 +130,22 @@ export function PortalHeader({ numero, clienteNome, empresa, cliente, onDownload
         {/* Client info card */}
         {cliente && (cliente.cnpj || cliente.telefone || cliente.email) && (
           <div className="mt-5 bg-white/5 backdrop-blur-sm rounded-xl border border-white/10 p-4">
-            <div className="flex items-center gap-2 mb-2">
-              <Building2 size={14} className="text-blue-300" />
-              <span className="text-xs font-semibold text-blue-200 uppercase tracking-wide">Dados do Cliente</span>
+            <div className="flex items-center justify-between gap-2 mb-2">
+              <div className="flex items-center gap-2">
+                <Building2 size={14} className="text-blue-300" />
+                <span className="text-xs font-semibold text-blue-200 uppercase tracking-wide">Dados do Cliente</span>
+              </div>
+              {onEditarDados && (
+                <button
+                  type="button"
+                  onClick={onEditarDados}
+                  className="flex items-center gap-1.5 text-xs font-medium text-blue-200 hover:text-white transition-colors underline decoration-blue-400/40 hover:decoration-white underline-offset-2"
+                  title="Alterar dados de contato e endereco"
+                >
+                  <Pencil size={11} />
+                  Alterar dados
+                </button>
+              )}
             </div>
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 text-xs text-blue-100/80">
               <div>
