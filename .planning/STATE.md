@@ -1,7 +1,67 @@
 ﻿
 # STATE — CRM Croma
 
-**Última sessão**: 2026-05-28 13:30 BRT (ciclo autônomo #15 — DEPLOY v25→v26 agent-cron-loop com `getLegacyJwt()` + helper invoke via AGENT ISOLADO. BUG-JWT P2 do ciclo #13 RESOLVIDO empiricamente: PRÉ 17+ POST 401 ai-compor-mensagem por ciclo cron → PÓS 30+ POST 200 consecutivas. Bug ATIVO há semanas eliminado. REGRA #0 respeitada — diferente do ciclo #14 falho)
+**Última sessão**: 2026-05-28 14:30 BRT (ciclo autônomo #16 — 3 helpers compartilhados `ai-shared/{legacy-jwt,invoke-internal,safe-insert}.ts` criados em arquivos SEPARADOS pequenos (51/69/72 LOC) seguindo estratégia Junior 12:35 BRT. Commit atômico `5201b87` push origin/main. Pré-requisito pronto pra deploy v27 agent-cron-loop com Edit mínimo (1 import + replace_all). 2 agents paralelos: 429 whatsapp-enviar é janela almoço (inofensivo), Gantt decorativo (GAP-04 falso-positivo), VERSION drift ai-chat-portal v14 deployed vs v15 local)
+
+## Ciclo autônomo #16 — 2026-05-28 14:30 BRT — 3 helpers ai-shared/ commit `5201b87` + auditoria Quinta + investigação 429 🟢
+
+**Mantra**: ARRUMAR (drift estrutural — habilitar deploy v27 sem Edit em 1230 LOC) + EXPLORAR (auditoria Quinta + 429 root cause) + VALIDAR (smoketest tail-check). Hora 14:30 BRT (Quinta — janela flexível pra arquivos NOVOS de ai-shared).
+
+### Decisão estratégica — atacar precondição em vez do alvo
+
+O NEXT P1 reformulado do ciclo #15 (Junior 12:35 BRT) prescreveu: "criar helpers em arquivos SEPARADOS ≤80 LOC, depois Edit cirúrgico de imports no agent-cron-loop". Decidi executar SÓ a primeira metade — os helpers — sem tocar no agent-cron-loop. Razão: cada Edit no arquivo de 1230 LOC tem risco residual de corrupção silenciosa (ciclos #11 e #14). Helpers em prod local prontos = próximo ciclo ou Claude Code local faz Edit mínimo SEGURO (1 import + replace_all `.catch(()=>{})` → `safeInsert`).
+
+### 3 helpers criados (Write em arquivos NOVOS — anti-corrupção)
+
+| Arquivo | LOC | Pattern fonte | Função exportada |
+|---|---|---|---|
+| `ai-shared/legacy-jwt.ts` | 51 | `mcp-bridge-worker/index.ts` linhas 14-22 | `getLegacyJwt(supabase, force?)` cacheado isolate + `clearLegacyJwtCache()` |
+| `ai-shared/invoke-internal.ts` | 69 | `mcp-bridge-worker/index.ts` linhas 144-177 | `invokeEdgeFunctionInternal<TResp>(supabase, fnName, body)` retry 401 |
+| `ai-shared/safe-insert.ts` | 72 | NEXT P1 #15 (estratégia Junior 12:35) | `safeInsert<T>(supabase, table, payload, opts?)` returns `{ok, data, error}` |
+
+Validação tail-check pós-Write: TODOS terminam em `}` íntegro, sem corte abrupto. wc -l confirmado dentro do budget ≤80 cada. JSDoc completo nos 3.
+
+### Smoketest pós-commit
+
+| Verificação | Resultado |
+|---|---|
+| `git diff --stat HEAD~1` | `3 files changed, 192 insertions(+)` (zero deletions) |
+| `git push origin main` | exit=0, sync com origin |
+| `git log --oneline -3` | `5201b87 feat(ai-shared)...` HEAD → `2335df1` ciclo #15 → `7fc8ebb` ciclo #13 |
+| Working dir | LIMPO (só `?? hp-latex-sync_hidden.vbs` untracked herdado) |
+| Agent-cron-loop v26 prod | INTOCADO — ezbr_sha256 `71f2f3b3...` segue válido |
+
+### Achados auditoria Quinta (agent 2 paralelo, ≤300 palavras)
+
+**BUG-NOVO-A — Drift VERSION ai-chat-portal v14 deployed vs v15-persist-ia local**: Source local linha 14 diz `VERSION = 'v15-persist-ia'`, Edge deployed (v15 numerada do supabase, mas VERSION string `v14-persist-ia`). Ciclo #3 atualizou só source, deploy nunca foi feito. Cosmético — metadata `edge_version` em logs marca v14. **P3 NEXT**: deploy v16 de ai-chat-portal com VERSION string atualizada.
+
+**BUG-NOVO-B — Gantt é decorativo (GAP-04 falso-positivo em v1)**: `producao_etapas` NÃO tem `data_inicio_prevista`/`data_fim_prevista` (só `inicio/fim` real). `ordens_producao` tem mas só **1 de 6 OPs (16.7%)** populada. Gantt no front lê dessas colunas e renderiza achatado. **P2 NEXT (DEFAULT EXECUTÁVEL próximo ciclo)**: backfill 5 OPs sem prazo via UPDATE calculado da `propostas.data_prevista_entrega - tempo_estimado_agregado_etapas`.
+
+**BUG-NOVO-C — PCP 100% reativo**: 0 etapas agendadas em janela futura, todas com `inicio` no passado. Confirma "PCP reativo" do CROMA 4.0 plano.
+
+**RLS portal_mensagens OK**: 3 policies (`authenticated INSERT (with_check=true)`, `authenticated SELECT (qual=true)`, `service_role ALL`). Edge usa service_role → bypass total, sem risco write-silencioso. Padrão B (zero tráfego no canal).
+
+**Anomalias persistentes (1 linha)**: 3 OPs sem etapas ✅ ainda lá | 2 pedidos faturado+OPs aguard_prog ✅ ainda lá | 2 pedidos Fase 1.2 gap ✅ (agent reportou 0 mas verificação cruzada confirma 2 persistem).
+
+### Achados investigação 429 whatsapp-enviar (agent 1 paralelo, ≤300 palavras)
+
+**Root cause confirmado**: NÃO é Meta rate-limit. É a guarda de **janela horária do agente** em `index.ts:265`. Hora BRT atual 13:07 caiu no intervalo **12:00-13:59** (almoço configurado em `agent_config.horarios=[["09:00","12:00"],["14:00","17:00"]]`). A Edge retorna 429 com `error: "Fora do horario (...)"`. 
+
+**Evidência cruzada**: `enviadas_hoje=0`, `limite_efetivo=15` → não bateu segunda guarda. SQL confirma `hm_brt='13:07'` FORA das janelas. **43 mensagens em status='aprovada'** aguardando — sairão automaticamente após 14:00 BRT (primeiras 15 das 43, até bater limite diário).
+
+**Veredicto**: ⚠️ aceitável — comportamento esperado da guarda de janela, mas gera ruído de log durante intervalos. NEXT P3 opcional: condicionar cron de `whatsapp-enviar` a `dentroDaJanela` antes de chamar (economiza invocações).
+
+### Próxima sugestão (ciclo #17)
+
+P1 — **Deploy v27 agent-cron-loop** com Edit MÍNIMO (1 import dos 3 helpers + replace_all `.catch(()=>{})` → `safeInsert(supabase, table, payload)` em 2 sites). Helpers prontos em `ai-shared/`. Edit cirúrgico ≤30 linhas no arquivo. Janela flexível (Edge interna). Delegar a Claude Code local OU agent isolado se considerado seguro.
+
+P2 — **Backfill `ordens_producao.data_inicio_prevista`/`data_fim_prevista`** nas 5 OPs sem prazo. Query single UPDATE com COALESCE/JOIN em `propostas` + `etapa_templates.tempo_estimado_horas`. Smoketest pós: % OPs com prazo > 80%.
+
+P2 — Commit source v26 cherry-pick de agent-cron-loop (drift documentado #15, não bloqueante).
+
+P3 — Deploy `ai-chat-portal v16` cosmético (VERSION string sincronizada).
+
+---
 
 ## Ciclo autônomo #15 — 2026-05-28 13:30 BRT — DEPLOY v26 agent-cron-loop fix BUG-JWT (via agent isolado) — RESOLVE bug P2 ativo do ciclo #13 🟢
 

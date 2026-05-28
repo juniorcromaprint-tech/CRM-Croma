@@ -4,6 +4,63 @@
 > Junior lê pra auditar progresso quando volta.
 > Formato definido em `autonomous-rules.md` seção "FORMATO DO LOG".
 
+## 2026-05-28 14:30 (ciclo #16)
+
+**Status**: 🟢 VERDE
+**Tipo**: arrumar + explorar + validar (3 tarefas paralelas)
+**Auto-diálogo**:
+1. 3 ciclos anteriores: #13 fix v24 placeholder → #14 ABORT silencioso corrupção Edit → #15 deploy v26 BUG-JWT P2 RESOLVIDO via agent isolado
+2. Dia/módulo rotação: Quinta = Produção + ai-chat-portal v15 (já auditado #2-12, pivot pra ângulos novos)
+3. Gap mais útil AGORA: (a) eliminar precondição do bug `.catch` em agent-cron-loop via helpers em arquivos SEPARADOS (estratégia Junior 12:35 BRT); (b) investigar 429 whatsapp-enviar pré-existente (P2 #15); (c) auditoria Quinta — ai-chat-portal RLS + drift schema
+4. Conflito IN-PROGRESS/BLOCKED: nenhum
+5. STATE/Obsidian novo: BUG-JWT eliminado empiricamente (ai-compor-mensagem 200 em todas ~80min)
+6. MODO PASSIVO: NÃO — Health VERDE, último ciclo >1h atrás, branch=main limpo
+7. Critério mensurável: 2-3 arquivos novos ai-shared/ ≤80 LOC cada + 2 agents reportam ≤300 palavras com achados acionáveis
+
+**Health check**: Vercel 200 | API logs ~80min zero 5xx; ai-compor-mensagem TODAS 200 (BUG-JWT eliminado empíricamente confirmado); 429 whatsapp-enviar contínuo (PRÉ-EXISTENTE) | mcp-bridge-worker v8 rodando ~1/min consistente | 76 Edges ACTIVE | branch=main HEAD `2335df1` em sync | working dir LIMPO (só `?? hp-latex-sync_hidden.vbs` herdado)
+
+**Agents disparados**: 2 paralelos (read-only ≤300 palavras cada)
+1. Investigação root cause 429 whatsapp-enviar (general-purpose, 7 tool uses, 45s, ~45k tokens) — janela horária 12:00-13:59 BRT (intervalo almoço configurado em agent_config.horarios). 43 mensagens aprovadas aguardando 14:00 BRT. **Inofensivo by-design**. ⚠️ aceitável.
+2. Auditoria Quinta Produção + ai-chat-portal v15 (general-purpose, 12 tool uses, 84s, ~49k tokens) — read-only, 3 ângulos novos.
+
+**Ações executadas**:
+1. Read paralelo (5 planning + STATE 500 linhas + REQUIREMENTS + log) + Obsidian via PowerShell + 2x get_logs + web_fetch Vercel + git status + list_edge_functions — turno único
+2. Auto-diálogo das 7 perguntas registrado
+3. 2 agents adversariais paralelos disparados + leitura do pattern mcp-bridge-worker (linhas 1-200) no mesmo turno
+4. **3 helpers novos criados via Write (arquivos pequenos)** em `supabase/functions/ai-shared/`:
+   - `legacy-jwt.ts` (51 LOC): `getLegacyJwt(supabase, force?)` cacheado no isolate + RPC `get_service_role_legacy_jwt` + clear cache helper. JSDoc completo.
+   - `invoke-internal.ts` (69 LOC): `invokeEdgeFunctionInternal<TResp>(supabase, fnName, body)` com Bearer legacy JWT + `X-Internal-Call` + retry 401 forçando refresh. Generic typed.
+   - `safe-insert.ts` (72 LOC): `safeInsert<T>(supabase, table, payload, opts?)` com `.select().single()` + retorno estruturado `{ok, data, error}` + console.warn estruturado. Substitui pattern bugado `.insert(...).catch(()=>{})`.
+5. Validação tail-check: 51/69/72 LOC todos OK, tail em `}` em todos
+6. Commit atômico `5201b87` push origin/main, +192 insertions, 0 deletions
+7. Edits paralelos STATE + ledger + log + Obsidian + Telegram
+
+**Decisão tomada**:
+- 3 helpers em arquivos NOVOS pequenos (estratégia Junior 12:35 BRT) — evita Edit em arquivo > 500 LOC. Próximo ciclo (#17+) OU Claude Code local pode fazer Edit cirúrgico de UMA linha de import + replace_all `.catch(()=>{})` → `safeInsert` no agent-cron-loop.
+- NÃO atacar agent-cron-loop direto (1230 LOC, REGRA #0)
+- NÃO commitar source v26 cherry-pick (drift documentado, não bloqueante — Edge funcionando)
+- NÃO investigar 429 whatsapp-enviar a fundo — agent confirmou inofensivo by-design (janela almoço)
+- Agent paralelo Quinta descobriu BUG-NOVO-A: VERSION string drift `v14` deployed vs `v15-persist-ia` local. Ciclo #3 atualizou source mas deploy não foi feito. Cosmético — registrar como NEXT P3.
+- Agent paralelo Quinta descobriu BUG-NOVO-B: Gantt decorativo (GAP-04 falso-positivo) — só 1/6 OPs com `data_inicio_prevista`/`data_fim_prevista`. Reabrir como NEXT P2.
+
+**Resultado**: 🟢 VERDE — 1 commit atômico com 3 helpers reutilizáveis, 2 achados acionáveis novos (Gantt P2 + drift VERSION P3), 1 root cause confirmado inofensivo (429 = janela almoço). Próximo ciclo tem caminho desimpedido pra deploy v27 de agent-cron-loop OU adoção dos helpers em outras Edges.
+
+**Ledger update**:
+- DONE: "Ciclo #16 — 3 helpers ai-shared/ commit `5201b87`" adicionado
+- NEXT P1 mantido (#15): deploy v27 agent-cron-loop substituindo `.catch(()=>{})` por `safeInsert` + adoção `getLegacyJwt`/`invokeEdgeFunctionInternal` (agora HELPERS PRONTOS — Edit é mínimo: 1 import + replace_all)
+- NEXT P2 novo: backfill `ordens_producao.data_inicio_prevista`/`data_fim_prevista` nas 5 OPs sem prazo (Gantt decorativo, reabre GAP-04)
+- NEXT P3 novo: deploy `ai-chat-portal v16` pra sincronizar VERSION header `v14`→`v15-persist-ia` (cosmético)
+- NEXT P2 mantido (#15): commit source v26 cherry-pick (não bloqueante)
+- NEXT P2 mantido (#15): 429 whatsapp-enviar — RESOLVIDO/INOFENSIVO (janela almoço)
+
+**Commits**: 1 (`5201b87` feat(ai-shared)) push main confirmado
+**Deploys**: 0
+**Migrations**: 0
+**Token usage**: ~280k (~95k inline + 45k agent 1 + 49k agent 2 + paralelos overhead)
+**Telegram**: a enviar 🟢
+
+---
+
 ## 2026-05-28 13:30 (ciclo #15)
 
 **Status**: 🟢 VERDE
