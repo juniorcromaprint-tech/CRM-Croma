@@ -18,7 +18,7 @@ export interface PricingConfig {
   faturamentoMedio: number;
   custoOperacional: number;
   custoProdutivo: number;
-  folhaProdutiva?: number; // alias de custoProdutivo (compatibilidade)
+  folhaProdutiva?: number;
   qtdFuncionarios: number;
   horasMes: number;
   percentualComissao: number;
@@ -50,7 +50,6 @@ export interface PricingInput {
   processos: ProcessoInput[];
   maquinas: MaquinaInput[];
   markupPercentual: number;
-  /** Aproveitamento do material (0.75 a 0.95) — perdas de corte/impressão */
   aproveitamento: number;
 }
 
@@ -71,10 +70,6 @@ export interface PricingResult {
   lucroEstimado: number;
 }
 
-// ---------------------------------------------------------------------------
-// PASSO 3: Percentual de Custos Fixos
-// P = ((C - CP) × 100) / F
-// ---------------------------------------------------------------------------
 export function calcPercentualFixo(config: PricingConfig): number {
   const { custoOperacional, custoProdutivo, faturamentoMedio } = config;
   if (faturamentoMedio === 0) return 0;
@@ -82,10 +77,6 @@ export function calcPercentualFixo(config: PricingConfig): number {
   return (custosFixos * 100) / faturamentoMedio;
 }
 
-// ---------------------------------------------------------------------------
-// PASSO 4: Custo por Minuto
-// Cm = ((Fp / Qf) / horasMes) / 60
-// ---------------------------------------------------------------------------
 export function calcCustoPorMinuto(config: PricingConfig): number {
   const { custoProdutivo, qtdFuncionarios, horasMes, percentualEncargos } = config;
   if (qtdFuncionarios === 0 || horasMes === 0) return 0;
@@ -95,62 +86,55 @@ export function calcCustoPorMinuto(config: PricingConfig): number {
   return custoPorHora / 60;
 }
 
-// ---------------------------------------------------------------------------
-// PASSO 5: Percentual de Vendas
-// Pv = (comissao + impostos + juros) / 100
-// ---------------------------------------------------------------------------
 export function calcPercentualVendas(config: PricingConfig): number {
   const { percentualComissao, percentualImpostos, percentualJuros } = config;
   return (percentualComissao + percentualImpostos + percentualJuros) / 100;
 }
 
-// ---------------------------------------------------------------------------
-// CÁLCULO COMPLETO (9 PASSOS)
-// ---------------------------------------------------------------------------
 export function calcPricing(input: PricingInput, config: PricingConfig): PricingResult {
-
   // PASSO 1: Matéria Prima — dividida pelo aproveitamento
-  const aproveitamento = input.aproveitamento > 0 ? input.aproveitamento : 1;
+  // v29 (2026-05-25): auto-normalize — regras_precificacao.aproveitamento_padrao está em
+  // formato percentual (75-90), motor esperava decimal (0.75-0.90). Sem isso, custoMP saía 100x menor.
+  let aproveitamento = input.aproveitamento > 0 ? input.aproveitamento : 1;
+  if (aproveitamento > 1) aproveitamento = aproveitamento / 100;
   const custoMP = input.materiais.reduce(
     (total, mat) => total + mat.quantidade * mat.precoUnitario,
     0,
   ) / aproveitamento;
 
-  // PASSO 2: Tempo Produtivo
+  // PASSO 2
   const tempoTotal = input.processos.reduce(
     (total, proc) => total + proc.tempoMinutos,
     0,
   );
 
-  // PASSO 3: Percentual de Custos Fixos
+  // PASSO 3
   const percentualFixo = calcPercentualFixo(config);
 
-  // PASSO 4: Custo por Minuto + Mão de Obra
+  // PASSO 4
   const custoPorMinuto = calcCustoPorMinuto(config);
   const custoMO = tempoTotal * custoPorMinuto;
 
-  // PASSO 5: Percentual de Vendas
+  // PASSO 5
   const percentualVendas = calcPercentualVendas(config);
 
-  // PASSO 5.5: Custo de Máquinas
+  // PASSO 5.5
   const custoMaquinas = input.maquinas.reduce(
     (total, maq) => total + (maq.custoHora * maq.tempoMinutos) / 60,
     0,
   );
 
-  // PASSO 6: Custo Base
-  // Vb = (Vmp + MO + Máquinas) × (1 + P/100)
+  // PASSO 6
   const custoBase = (custoMP + custoMO + custoMaquinas) * (1 + percentualFixo / 100);
 
-  // PASSO 7: Valor Antes do Markup
-  // Vam = Vb / (1 - Pv)
+  // PASSO 7
   const denominadorVendas = 1 - percentualVendas;
   const valorAntesMarkup = denominadorVendas > 0 ? custoBase / denominadorVendas : custoBase;
 
-  // PASSO 8: Markup
+  // PASSO 8
   const valorMarkup = valorAntesMarkup * (input.markupPercentual / 100);
 
-  // PASSO 9: Preço Final
+  // PASSO 9
   const precoVenda = valorAntesMarkup + valorMarkup;
 
   // Métricas derivadas

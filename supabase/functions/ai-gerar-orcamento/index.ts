@@ -1,6 +1,22 @@
 // supabase/functions/ai-gerar-orcamento/index.ts
 // Gera orçamentos automaticamente via IA quando o agente detecta intenção de compra.
 // Fluxo: Extração (IA) → Match de modelos + Cálculo (determinístico) → Persistência + Mensagem
+//
+// v26 (2026-05-25): suporte a `modelo_materiais.tipo='perimetro'` — materiais marcados
+// como perímetro são multiplicados por 2*(largura+altura) em metros em vez de area_m2.
+// Necessário pra fita dupla face e similares cujo consumo escala com o contorno da peça.
+// Backward compat: tipo='material' (default em 380 linhas existentes) usa area_m2 como antes.
+//
+// v27 (2026-05-25): FIX BUG — lê config de `config_precificacao` (tabela dedicada, snake_case)
+// em vez de `admin_config.config_precificacao` (chave inexistente). O motor v25/v26 sempre
+// caía no fallback hardcoded com valores ANTIGOS (R$ 30k/mês). Agora lê valores reais
+// (R$ 110k/mês, 2 sócios, custo produtivo R$ 12k). Mapeia snake_case → camelCase.
+//
+// v28 (2026-05-25): FIX pricing-engine.ts — restaurado return correto de calcPricing.
+//
+// v29 (2026-05-25): FIX bug crônico de `regras_precificacao.aproveitamento_padrao`.
+// Banco guarda 75-90 (percentual), motor esperava 0.75-0.90 (decimal) → custoMP saía
+// 100x menor. Fix em pricing-engine.ts: auto-normalize `if (aproveitamento > 1) /= 100`.
 
 import { serve } from 'https://deno.land/std@0.168.0/http/server.ts';
 import { getServiceClient } from '../ai-shared/ai-helpers.ts';
@@ -78,6 +94,10 @@ interface ModeloMatch {
     preco_medio: number;
     quantidade: number;
     unidade: string;
+    // 2026-05-25: tipo='perimetro' multiplica pelo perímetro 2*(L+A) em metros,
+    // em vez de pela área m². Usado pra fita dupla face em placas.
+    // Backward compat: default 'material' = comportamento antigo (× area_m2).
+    tipo: 'material' | 'perimetro';
   }>;
   processos: Array<{ etapa: string; tempo_minutos: number; ordem: number }>;
   markup_sugerido: number;
@@ -94,6 +114,8 @@ function buildMatchResult(modelo: Record<string, unknown>, confianca: number, ma
       preco_medio: (mm.materiais as Record<string, unknown>)?.preco_medio as number || 0,
       quantidade: mm.quantidade_por_unidade as number || 1,
       unidade: (mm.materiais as Record<string, unknown>)?.unidade as string || 'm²',
+      // 2026-05-25: propaga `tipo` (material|perimetro). Default 'material' garante backward compat.
+      tipo: (mm.tipo as string) === 'perimetro' ? 'perimetro' : 'material',
     })),
     processos: ((modelo.modelo_processos as unknown[]) || []).map((mp: Record<string, unknown>) => ({
       etapa: mp.etapa as string,
@@ -113,7 +135,7 @@ async function matchModelo(
   // tempo_minutos→tempo_por_unidade_min. O embed quebrado fazia toda query do matchModelo falhar.
   const MODEL_SELECT = `
     id, nome, markup_padrao,
-    modelo_materiais(material_id, quantidade_por_unidade, materiais(id, nome, preco_medio, unidade)),
+    modelo_materiais(material_id, quantidade_por_unidade, tipo, materiais(id, nome, preco_medio, unidade)),
     modelo_processos(etapa, tempo_por_unidade_min, ordem)
   `;
 
@@ -287,21 +309,37 @@ serve(async (req: Request) => {
     // ── FASE 2: Match de modelos + Cálculo de preços ─────────
 
     // Carregar config de precificação
+    // v27 (2026-05-25): lê de `config_precificacao` (tabela dedicada, snake_case) — antes lia
+    // de `admin_config.config_precificacao` (chave inexistente, sempre caía no fallback).
+    // Pega a linha ativa mais recente. Mapeia snake_case (banco) → camelCase (PricingConfig).
     const { data: configRow } = await supabase
-      .from('admin_config')
-      .select('valor')
-      .eq('chave', 'config_precificacao')
-      .single();
+      .from('config_precificacao')
+      .select('faturamento_medio, custo_operacional, custo_produtivo, qtd_funcionarios, horas_mes, percentual_comissao, percentual_impostos, percentual_juros, percentual_encargos')
+      .eq('ativo', true)
+      .order('vigencia_inicio', { ascending: false })
+      .limit(1)
+      .maybeSingle();
 
-    const pricingConfig: PricingConfig = (configRow?.valor as PricingConfig) || {
-      faturamentoMedio: 30000,
-      custoOperacional: 24850,
-      custoProdutivo: 16400,
-      qtdFuncionarios: 3,
-      horasMes: 176,
-      percentualComissao: 5,
+    const pricingConfig: PricingConfig = configRow ? {
+      faturamentoMedio:   Number(configRow.faturamento_medio),
+      custoOperacional:   Number(configRow.custo_operacional),
+      custoProdutivo:     Number(configRow.custo_produtivo),
+      qtdFuncionarios:    Number(configRow.qtd_funcionarios),
+      horasMes:           Number(configRow.horas_mes),
+      percentualComissao: Number(configRow.percentual_comissao),
+      percentualImpostos: Number(configRow.percentual_impostos),
+      percentualJuros:    Number(configRow.percentual_juros),
+      percentualEncargos: Number(configRow.percentual_encargos ?? 0),
+    } : {
+      // Fallback: valores reais Croma 2026-05-25 (Junior + Viviane, 2 sócios, R$ 12k/mês pró-labore)
+      faturamentoMedio:   110000,
+      custoOperacional:   36800,
+      custoProdutivo:     12000,
+      qtdFuncionarios:    2,
+      horasMes:           176,
+      percentualComissao: 3,
       percentualImpostos: 12,
-      percentualJuros: 2,
+      percentualJuros:    2,
       percentualEncargos: 0,
     };
 
@@ -327,6 +365,7 @@ serve(async (req: Request) => {
       match: ModeloMatch;
       pricing: ReturnType<typeof calcPricing>;
       areaM2: number;
+      perimetroM: number; // 2026-05-25: reusado na fase 3d (persistência proposta_item_materiais)
       aproveitamento: number;
     }> = [];
     const itensSemMatch: Array<{ item: ItemExtraido }> = [];
@@ -347,14 +386,20 @@ serve(async (req: Request) => {
       const regraCategoria = regrasMap[item.categoria_inferida] || regrasMap['geral'];
       const aproveitamento = regraCategoria?.aproveitamento_padrao || 0.85;
       const areaM2 = (item.largura_cm * item.altura_cm) / 10000;
+      // 2026-05-25: perímetro em metros — usado por materiais com tipo='perimetro' (fita dupla face etc).
+      const perimetroM = ((item.largura_cm + item.altura_cm) * 2) / 100;
 
       const pricingInput: PricingInput = {
-        materiais: match.materiais.map((m) => ({
-          nome: m.nome,
-          precoUnitario: m.preco_medio,
-          quantidade: m.quantidade * areaM2 * item.quantidade,
-          unidade: m.unidade,
-        })),
+        materiais: match.materiais.map((m) => {
+          // 2026-05-25: fator varia conforme tipo do material no modelo
+          const fator = m.tipo === 'perimetro' ? perimetroM : areaM2;
+          return {
+            nome: m.nome,
+            precoUnitario: m.preco_medio,
+            quantidade: m.quantidade * fator * item.quantidade,
+            unidade: m.unidade,
+          };
+        }),
         processos: match.processos.map((p) => ({
           etapa: p.etapa,
           tempoMinutos: p.tempo_minutos * item.quantidade,
@@ -369,7 +414,7 @@ serve(async (req: Request) => {
       };
 
       const pricing = calcPricing(pricingInput, pricingConfig);
-      itensCalculados.push({ item, match, pricing, areaM2, aproveitamento });
+      itensCalculados.push({ item, match, pricing, areaM2, perimetroM, aproveitamento });
     }
 
     // Se nenhum item calculável, pedir clarificação
@@ -503,15 +548,19 @@ serve(async (req: Request) => {
       // Materiais do item
       if (ic.match.materiais.length > 0) {
         await supabase.from('proposta_item_materiais').insert(
-          ic.match.materiais.map((m) => ({
-            proposta_item_id: itemCriado.id,
-            material_id: m.material_id,
-            descricao: m.nome,
-            quantidade: m.quantidade * ic.areaM2 * ic.item.quantidade,
-            unidade: m.unidade,
-            custo_unitario: m.preco_medio,
-            custo_total: (m.preco_medio * m.quantidade * ic.areaM2 * ic.item.quantidade) / ic.aproveitamento,
-          })),
+          ic.match.materiais.map((m) => {
+            // 2026-05-25: mesmo fator condicional usado no pricingInput acima.
+            const fator = m.tipo === 'perimetro' ? ic.perimetroM : ic.areaM2;
+            return {
+              proposta_item_id: itemCriado.id,
+              material_id: m.material_id,
+              descricao: m.nome,
+              quantidade: m.quantidade * fator * ic.item.quantidade,
+              unidade: m.unidade,
+              custo_unitario: m.preco_medio,
+              custo_total: (m.preco_medio * m.quantidade * fator * ic.item.quantidade) / ic.aproveitamento,
+            };
+          }),
         );
       }
 
