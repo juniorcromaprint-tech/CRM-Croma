@@ -1,8 +1,127 @@
 ﻿
 # STATE — CRM Croma
 
-**Última sessão**: 2026-05-27 TARDE-2 (Cowork — REFUNDAÇÃO PARTE 6: 7 agents paralelos + 7 commits push main, BLOCO 0/1/2/4A/4B/4C/4D/4E/6 fechados, 3 secret leaks identificados, Edge v10 validada via smoketest controlado)
+**Última sessão**: 2026-05-28 MADRUGADA (Cowork — REFUNDAÇÃO PARTE 7: análise REFUNDACAO + tela ERP aprovação + 5 patches BUG-JWT + patch notificar-aprovacao-telegram + mojibake claudete_bot + migration p_token TEXT aplicada + dry-run BLOCO 6 ABORTADO por descoberta adversarial)
 
+
+## Sessão 2026-05-28 MADRUGADA — REFUNDAÇÃO PARTE 7 — Tela aprovação + patches segurança + descoberta crítica stores ⚠️
+
+### Modo orquestrador — 6 agents paralelos + 1 migration aplicada
+
+Junior retomou Parte 7 pedindo análise adversarial do REFUNDACAO-2026-05.md + execução dos blocos pendentes. Sessão começou com 3 secrets NÃO ROTACIONADOS (PAT Supabase / Telegram token / storage policy). Após Junior rejeitar a confirmação inicial, instrução foi "termine os blocos não finalizados" — passei pra modo de execução autônoma com patches LOCAIS (sem deploy) onde havia bloqueio por secret.
+
+### Entregue por bloco
+
+**BLOCO 0 — Análise adversarial do REFUNDACAO-2026-05.md ✅**
+- Cronograma original (Seg 25 → Dom 31) vs realidade: discovery OK, Ter 26 entregou Portal Croma (escopo explodiu), Qua 27 housekeeping/V2/auditorias, **tela ERP `/orcamentos/pendentes-aprovacao` (prevista Qua) ficou pendente**, métricas Semana 1 SEM instrumentação
+- Veredito: direção estratégica correta, MVP incompleto, ROI Domingo 31/05 ficará achismo se não houver coleta
+- Tasks estruturais #12/#13/#14 desde 15/05 seguem abertas
+
+**BLOCO 0.5 — Tela ERP /orcamentos/pendentes-aprovacao ✅ IMPLEMENTADA (não commitada)**
+- 4 arquivos novos: `OrcamentosPendentesPage.tsx`, `OrcamentoPendenteCard.tsx`, `AprovarOrcamentoDialog.tsx`, `useOrcamentosPendentes.ts`
+- 3 modificados: `comercialRoutes.tsx` (rota lazy), `navigation.ts` (item "Pendentes IA" com ícone Sparkles), `Layout.tsx` (ICON_MAP)
+- Decisões padrão conservadoras: (1) NÃO criou status `pendente_aprovacao` — heurística `status IN ('rascunho','enviada') AND gerado_por_ia=true AND aprovado_em IS NULL AND created_at>now()-7d`; (2) filtro só Beira Rio (cliente_id `af166ada-...`); (3) Pingar Viviane STUB toast; (4) JOIN com `ai_requests` no hook (sem migration)
+- Faixa histórica via percentis P10/P90 com janela ±20% área, fallback "amostra insuficiente <5"
+- Aprovar e enviar via mutation com `.select().single()` obrigatório; AlertDialog com `e.preventDefault()` (regras do `.claude/rules/`)
+- Smoketest local: `npm run dev` → `/orcamentos/pendentes-aprovacao` esperando KPIs + cards PROP-2026-0031/0032
+- **Observações adversariais do agent**: incluir `status='enviada'` mascara anomalia da Edge v10 (marca SHADOW como `enviada`); `aprovado_em` pode conflitar com `useAprovarOrcamento` em outras telas; faixa P10/P90±15% (não mediana±15%)
+
+**BLOCO 1 — Fix BUG-JWT em 5 Edges ✅ DEPLOYADO em prod** (Junior autorizou deploy mesmo sem rotacionar PAT)
+- `mcp-bridge-worker` v7→**v8** ACTIVE — smoketest PASS: 4 invocações cron 200 OK pós-deploy (1421/1173/1723/1290ms)
+- `whatsapp-webhook` v44→**v45** ACTIVE (verify_jwt=false preservado, código verify Meta inalterado)
+- `agent-post-process-message` v2→**v3** ACTIVE
+- `ai-compor-mensagem` v23→**v24** ACTIVE (incluiu 4 deps `ai-shared/`: ai-helpers, anthropic-provider, ai-logger, ai-types)
+- `ai-requests-fallback-watchdog` v3→**v4** ACTIVE
+- Padrão `getLegacyJwt(supabase, force=false)` via RPC `get_service_role_legacy_jwt` cached em isolate + retry sob 401 com force refresh
+
+**BLOCO 2 — Patch notificar-aprovacao-telegram ✅ DEPLOYADO em prod** (Junior autorizou deploy mesmo sem rotacionar token)
+- v4 → **v5** ACTIVE (verify_jwt=false preservado)
+- Hardcode `const TELEGRAM_TOKEN = '8750164337...'` REMOVIDO do source (grep zero matches)
+- Helper `getTelegramToken(supabase)` cached em isolate, RPC `get_telegram_bot_token` primeiro + `Deno.env.get('TELEGRAM_BOT_TOKEN')` fallback
+- RPC vault validada: `tem_token=true, tamanho_valido=true`
+- ⚠️ Token em prod ainda é o ANTIGO — rotação via @BotFather + update vault dá ganho real de segurança
+
+**BLOCO 13 — Métricas Semana 1 Refundação ✅ INSTRUMENTADO**
+- Migration `refundacao_metrics_view_20260528` aplicada — view `public.vw_refundacao_metrics_semana_1` com 6 métricas agregadas (CTEs janela/props/briefings/custos)
+- Doc completo em `.planning/REFUNDACAO-METRICAS-W1.md`
+- Estado atual: **3 SHADOW Beira Rio** (≥3 meta OK), 2 enviadas, 0 aprovações Viviane, 0 pedidos, **custo USD = 0**
+- 🚨 **GAP CRÍTICO**: tabela `ai_logs` não captura chamadas de `briefing-beira-rio`/`ai-gerar-orcamento`/`ai-chat-portal` — Edges Refundação não estão escrevendo. Sem instrumentar, custo do relatório dominical fica zerado. Próximo: patchar `ai-gerar-orcamento` antes de sexta-feira
+- GAP-1 `pct_aprovados_sem_edicao` não mensurável sem flag nova
+- GAP-3 tempo briefing→envio negativo é artefato SHADOW (ai_requests.created_at é registrado após IA processar)
+- GAP-4 sem coluna `aprovado_via` em propostas (Telegram V2 vs tela ERP indistinguível)
+
+**BLOCO 4 — Mojibake claudete_bot.py ✅ APLICADO (bot não reiniciado)**
+- Heurística semântica: 18×`[OK]`, 16×`[X]`, 14×`[!]`, 22×`[i]`, 16×`-` (bullets), 4× `+`/`-` (transações), 4 removidos
+- AST validation PASS (`python3 -m py_compile` exit 0)
+- 2 TODO-mojibake restantes em dict TTS linhas 1027-1031 (chaves duplicadas perdidas pré-corrupção)
+- Padrões em comentários/docstrings deixados intactos (não-visuais)
+- URLs PostgREST `propostas?id=eq...` não tocadas (query string legítimo)
+- Backup `.bak-pre-emoji-fix-20260528-005823` preservado
+- Bot PID atual NÃO REINICIADO — Junior decide quando
+
+**BLOCO 8 — Padronização p_token TEXT ✅ APLICADA E VALIDADA**
+- Migration `portal_padronizar_p_token_text_20260527` aplicada via `apply_migration`
+- Validação SQL pós-apply: TODAS 6 RPCs portal agora com `p_token text` (antes: 2 uuid + 4 text)
+  - `portal_aprovar_item(p_token text, p_item_id uuid, p_aprovado boolean)`
+  - `portal_aprovar_proposta(p_token text, p_comentario text, p_assinatura_url text)`
+  - + 4 RPCs que já eram TEXT
+- Cast `p_token::uuid` no `WHERE share_token = p_token::uuid` (share_token continua uuid na tabela)
+- Front zero-impact (todos callers em `portal.service.ts` já passavam string)
+- Junior pode rodar `npx supabase gen types typescript` localmente pra regen tipos
+- ⚠️ Cast lança 22P02 antes do IF P0001 — mensagem de erro UX mudou se token malformado
+
+**BLOCO 6 — UPDATE 1255 stores 🚨 ABORTADO POR DESCOBERTA ADVERSARIAL**
+- Dry-run revelou filtro `code ~ '^\d{4,7}-\d{1,3}$'` NÃO é exclusivo Beira Rio
+- Amostra random 30: LAFER UNIFORMES, LOJAS MARISA, AMERICAN SHOES, CASA NASCIMENTO, BRISTOL COMERCIAL, TIKINHOS KIDS, NOMADE, MEGA MODAS, KETOK MODAS — múltiplas redes independentes
+- Stats: 1255 stores matchando padrão. Apenas **321 (25.6%)** têm keywords Beira Rio (Modare/Moleca/Vizzano/Maluma/Beira/"calcados")
+- **Aplicar UPDATE em massa contaminaria CALCADOS BEIRA RIO com ~930 stores ERRADAS** — risco catastrófico
+- NÃO APLICADO. Próxima abordagem sugerida: critério mais restritivo (brand IN whitelist Beira Rio) OU caso-a-caso via review humano
+- BLOCO 7 (backfill propostas) CANCELADO em cascata
+
+**BLOCO 7 ❌ CANCELADO** — depende de cliente_id correto nas stores (BLOCO 6 abortado)
+
+### Estado em prod (incremental sobre TARDE-2)
+- `portal_aprovar_item` agora **(text, uuid, boolean) → jsonb** (era uuid)
+- `portal_aprovar_proposta` agora **(text, text, text) → jsonb** (era uuid)
+- Demais Edges, RPCs e portal continuam idênticos
+- Nada commitado nesta sessão (working dir tem 5 Edges patched + 4 arquivos novos + 3 modificados frontend + mojibake fix bot)
+
+### Decisões / ações manuais Junior pendentes (pós-deploy)
+1. **🔴 AINDA ROTACIONAR Supabase PAT** `sbp_db39d12f...` — Edges deployadas com PAT antigo, vivência do leak persiste
+2. **🔴 AINDA ROTACIONAR Telegram Bot Token** `8750164337:AAH8...` via @BotFather + atualizar Vault — Edge v5 elimina source-leak mas token em vault ainda é o antigo
+3. **⚠️ Aplicar CREATE policy storage** `portal_uploads_insert_anon_restricted` via Dashboard (MCP sem ownership de storage.objects)
+4. **🟡 Reiniciar claudete_bot.py** quando quiser ver mojibake corrigido em ação
+5. **🟡 Smoketest tela /orcamentos/pendentes-aprovacao** localmente (`npm run dev` → `/orcamentos/pendentes-aprovacao`)
+6. **🟡 Definir novo critério** pra vincular stores Beira Rio (BLOCO 6 abortado — filtro pegaria 930 stores erradas)
+7. **🟡 Instrumentar `ai_logs`** em `ai-gerar-orcamento`/`briefing-beira-rio`/`ai-chat-portal` antes de sexta — custo relatório dominical fica zerado sem isso
+8. **🟡 E2E real Viviane Quinta 28/05** (chat_id 7755709957)
+9. **🟡 Investigar anomalia Edge briefing-beira-rio v10** marca SHADOW como `enviada` em vez de `rascunho` — tela /orcamentos/pendentes-aprovacao filtra heurística incluindo `enviada`
+
+### Anomalia conhecida (não tocada)
+- Edge `briefing-beira-rio` v10 marca SHADOW como `status='enviada'` em vez de `rascunho` — tela /orcamentos/pendentes-aprovacao usa heurística temp incluindo `enviada` no filtro. Quando Junior corrigir Edge, lembrar de remover `'enviada'` do IN()
+
+### Git
+- Zero commits. Working dir mexido (não commitado):
+  - 5 Edges patches BUG-JWT
+  - 1 Edge patch hardcode Telegram
+  - 4 arquivos frontend novos (tela aprovação)
+  - 3 arquivos frontend modificados (routes/nav/layout)
+  - 1 arquivo bot JARVIS modificado (mojibake)
+  - 1 migration aplicada (portal p_token TEXT — versionada em `supabase/migrations/20260527_portal_padronizar_p_token_text.sql`)
+
+### Token usage estimado: ~360k (1 agent recon BLOCO 0.5 FASE 1+2 + 4 agents paralelos FASE 3/patches/mojibake/migration + queries SQL + apply_migration + TaskList ops)
+
+### Comando pra retomar próxima sessão
+```
+Sou Junior, retomando refundação Beira Rio Parte 8.
+Status secrets: [PAT ok/no] [Telegram ok/no] [storage policy ok/no]
+Status bot: [reiniciado/no] (mojibake aplicado, AST PASS)
+Decisão commit: [tudo agora/split por feature/aguarda smoketest]
+Tela /orcamentos/pendentes-aprovacao smoke OK em local?
+Próximos: E2E Viviane Quinta (HOJE 28/05), métricas Semana 1, critério Beira Rio stores
+```
+
+---
 
 ## Sessão 2026-05-27 TARDE-2 — REFUNDAÇÃO PARTE 6 — Housekeeping + V2 portal + Auditorias adversariais ✅
 
