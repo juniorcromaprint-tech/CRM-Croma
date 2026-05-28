@@ -2,6 +2,8 @@
 // - ATOMIC claim: UPDATE status='processing' WHERE status='pending' RETURNING (via RPC)
 // - Fallback: SELECT FOR UPDATE SKIP LOCKED então UPDATE (se RPC não existir)
 // - Usa header X-Internal-Call quando chama outras Edge Functions IA (fix S2.6)
+// - v6 (2026-05-22 Etapa 2.2 ponte Cowork): release tipo 'whatsapp-resposta' à fila
+//   pra consumer Cowork (scheduled task croma-whatsapp-responder) pegar.
 
 import { createClient, SupabaseClient } from 'https://esm.sh/@supabase/supabase-js@2';
 
@@ -52,6 +54,13 @@ Deno.serve(async (req) => {
           response = await handleResumoClienteLocal(supabase, r);
         } else if (TIPO_TO_EDGE[r.tipo]) {
           response = await invokeEdgeFunctionInternal(TIPO_TO_EDGE[r.tipo], r);
+        } else if (r.tipo === 'whatsapp-resposta') {
+          // 2026-05-22 (Etapa 2.2 ponte Cowork): tipo dedicado ao consumer
+          // Cowork (scheduled task croma-whatsapp-responder). Devolve a fila
+          // pra que o consumer Cowork pegue no proximo ciclo dele.
+          await supabase.from('ai_requests').update({ status: 'pending' }).eq('id', r.id);
+          results.push({ id: r.id, tipo: r.tipo, status: 'released_to_cowork' });
+          continue;
         } else {
           throw new Error(`Tipo desconhecido: ${r.tipo}`);
         }

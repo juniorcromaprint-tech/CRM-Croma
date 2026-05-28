@@ -86,6 +86,17 @@ Deno.serve(async (req) => {
       if (resendKey && email) {
         const npsUrl = `https://crm-croma.vercel.app/nps/${token}`;
 
+        // 2026-05-08: reply_to lido de admin_config.agent_config p/ não perder
+        // respostas dos clientes em caixa inexistente (nps@ não tem mailbox).
+        const { data: cfgRow } = await supabase
+          .from('admin_config').select('valor').eq('chave', 'agent_config').single();
+        const cfg = (cfgRow?.valor && typeof cfgRow.valor === 'object'
+          ? cfgRow.valor
+          : typeof cfgRow?.valor === 'string'
+            ? JSON.parse(cfgRow.valor)
+            : {}) as Record<string, string>;
+        const replyToNps = cfg?.email_remetente || 'junior@cromaprint.com.br';
+
         try {
           const emailRes = await fetch('https://api.resend.com/emails', {
             method: 'POST',
@@ -96,6 +107,7 @@ Deno.serve(async (req) => {
             body: JSON.stringify({
               from: 'Croma Print <nps@cromaprint.com.br>',
               to: email,
+              reply_to: replyToNps,
               subject: `Como foi sua experiência? — Pedido #${pedido.numero}`,
               html: `
                 <div style="font-family: Arial, sans-serif; max-width: 500px; margin: 0 auto; padding: 20px;">

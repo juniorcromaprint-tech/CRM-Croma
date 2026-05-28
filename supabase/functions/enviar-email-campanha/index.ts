@@ -110,7 +110,22 @@ serve(async (req) => {
       .limit(1)
       .single();
     const nomeEmpresa = empresa?.nome_fantasia || empresa?.razao_social || 'Croma Print';
-    const emailFrom = Deno.env.get('EMAIL_FROM') || `${nomeEmpresa} <noreply@cromaprint.com.br>`;
+
+    // 2026-05-08: ler email_remetente/nome_remetente de admin_config.agent_config
+    // para manter consistência com o fluxo da /leads (agent-enviar-email).
+    // Antes usava 'noreply@cromaprint.com.br' que é caixa inexistente → respostas
+    // de cliente bouncavam silenciosamente.
+    const { data: cfgRow } = await supabase
+      .from('admin_config').select('valor').eq('chave', 'agent_config').single();
+    const cfg = (cfgRow?.valor && typeof cfgRow.valor === 'object'
+      ? cfgRow.valor
+      : typeof cfgRow?.valor === 'string'
+        ? JSON.parse(cfgRow.valor)
+        : {}) as Record<string, string>;
+    const emailRemetente = cfg?.email_remetente || 'junior@cromaprint.com.br';
+    const nomeRemetente  = cfg?.nome_remetente  || nomeEmpresa;
+    const emailFrom      = Deno.env.get('EMAIL_FROM') || `${nomeRemetente} <${emailRemetente}>`;
+    const replyTo        = Deno.env.get('EMAIL_REPLY_TO') || emailRemetente;
 
     const RESEND_API_KEY = Deno.env.get('RESEND_API_KEY');
     if (!RESEND_API_KEY) {
@@ -143,6 +158,7 @@ serve(async (req) => {
             to: [dest.email],
             subject: campanha.assunto_email,
             html: (campanha.corpo_email as string).replace(/\{\{nome\}\}/g, dest.nome),
+            reply_to: replyTo,
           }),
         });
 

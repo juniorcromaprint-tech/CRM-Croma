@@ -528,7 +528,7 @@ async function executeRuleAction(supabase: SupabaseClient, rule: AgentRule, matc
       break;
 
     case 'alerta_telegram':
-      await sendTelegramAlert(rule, match);
+      await sendTelegramAlert(supabase, rule, match);
       break;
 
     case 'alerta_sistema':
@@ -548,12 +548,12 @@ async function executeRuleAction(supabase: SupabaseClient, rule: AgentRule, matc
       break;
 
     case 'notificar_campo':
-      await sendTelegramAlert(rule, match);
+      await sendTelegramAlert(supabase, rule, match);
       break;
 
     case 'sugerir_compra':
       await createSystemAlert(supabase, rule, match);
-      await sendTelegramAlert(rule, match);
+      await sendTelegramAlert(supabase, rule, match);
       break;
 
     case 'recalcular_scores':
@@ -742,7 +742,23 @@ async function sendTelegram(message: string): Promise<void> {
   }
 }
 
-async function sendTelegramAlert(rule: AgentRule, match: any): Promise<void> {
+async function sendTelegramAlert(supabase: SupabaseClient, rule: AgentRule, match: any): Promise<void> {
+  // DEDUP: 1 alerta por (regra, entidade, dia). PK garante unicidade.
+  // FIX 2026-05-24: antes a regra disparava a cada 30min sem dedup → spam.
+  const today = new Date().toISOString().slice(0, 10); // YYYY-MM-DD
+  const { error: dedupErr } = await supabase
+    .from('alertas_telegram_dedup')
+    .insert({ rule_id: rule.id, entity_id: match.id, alert_date: today });
+
+  if (dedupErr) {
+    if (dedupErr.code === '23505') {
+      // unique_violation → ja enviou hoje, skip silencioso
+      console.log(`[dedup] skip ${rule.nome} entity=${match.id} (ja enviou hoje)`);
+      return;
+    }
+    console.error('[dedup] erro inesperado, enviando assim mesmo:', dedupErr.message);
+  }
+
   const templateData: Record<string, string> = {
     cliente: match.cliente_nome ?? match.contato_nome ?? match.nome ?? 'N/A',
     valor: formatBRL(match.saldo ?? match.valor_original ?? match.valor_total ?? 0),
