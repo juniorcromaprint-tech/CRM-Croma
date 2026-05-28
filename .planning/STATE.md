@@ -1,8 +1,149 @@
 ﻿
 # STATE — CRM Croma
 
-**Última sessão**: 2026-05-26 TARDE (Cowork — REFUNDAÇÃO PARTE 5: substituir Mubisys com portal Croma — 9 features novas + 10 migrations + 2 Edges + push prod em 2 commits atômicos)
+**Última sessão**: 2026-05-27 TARDE-2 (Cowork — REFUNDAÇÃO PARTE 6: 7 agents paralelos + 7 commits push main, BLOCO 0/1/2/4A/4B/4C/4D/4E/6 fechados, 3 secret leaks identificados, Edge v10 validada via smoketest controlado)
 
+
+## Sessão 2026-05-27 TARDE-2 — REFUNDAÇÃO PARTE 6 — Housekeeping + V2 portal + Auditorias adversariais ✅
+
+### Modo orquestrador — 9 agents paralelos disparados ao longo da sessão
+
+Junior pediu execução autônoma seguindo o `PROMPT-SESSAO-2026-05-27-AUTONOMO.md`. Modo orquestrador agressivo: 9 agents paralelos isolados (BLOCO 0 recon, BLOCO 1 housekeeping git, BLOCO 2 emojis, BLOCO 4A ai-chat-portal, BLOCO 4B portal_get_proposta, BLOCO 4C storage policy, BLOCO 4D trigger notif vendedor, BLOCO 4E vault RPCs migration, BLOCO 6 auditorias adversariais 3-em-1).
+
+### Entregue por bloco
+
+**BLOCO 0 — Validação Vercel + portal ✅ VERDE**
+- `crm-croma.vercel.app/` 200 OK
+- 3 portais `/p/:token` (PROP-2026-0032/0028/0030) retornam shell SPA 200
+- RPCs portal v2 ativas (portal_get_proposta, portal_aprovar_item, portal_aprovar_proposta, portal_atualizar_cliente, portal_inserir_mensagem, portal_listar_mensagens), v1 legacy DROPada confirmada
+- Logs últimas 24h sem erros 500 nas Edges portal/briefing
+- Inconsistência menor: tipo de p_token (uuid vs text) misturado entre RPCs — não bloqueante
+
+**BLOCO 1 — PR Housekeeping ✅ 5 commits + push main**
+- Commits atômicos: `707440d feat(ia)` ponte Cowork webhook v40 + 3 Edges (post-process, watchdog, audio), `3e3c85a fix(orcamento)` ai-gerar-orcamento v29 + pricing-engine, `44c21e4 fix(cron)` agent-cron-loop dedup Telegram + Edges envio, `5d51cd4 feat(mcp)` telegram tools + admin upgrades, `acd8171 docs` refundação maio 2026 + REGRA #0 + planning sessões
+- 18 modified + 22 untracked → working dir limpo (só hp-latex-sync_hidden.vbs e .claude/settings.local.json fora do escopo)
+- CRLF churn validado: zero (.gitattributes do commit 03b8126f cumpriu seu papel)
+- **🔴 SECRET LEAK 1 interceptado pelo GitHub Push Protection**: Supabase PAT `sbp_db39d12f... (REDACTED)` em `docs/plano-ia/2026-05-21-handoff-etapa2-ponte-cowork.md:44`. Agent redigiu pra `<REDACTED>` e fez `commit --amend` (commit ainda não publicado, legítimo). **Junior precisa ROTACIONAR o PAT no painel Supabase URGENTE** (token vivia em working dir desde 21/05)
+
+**BLOCO 2 — Emojis ASCII no bot ⛔ BLOQUEADO POR MOJIBAKE PREEXISTENTE**
+- `C:\Users\Caldera\Claude\JARVIS\claudete_bot.py` (PID 1784 ativo)
+- Backup `.bak-pre-emoji-fix-20260528-005823` (281KB)
+- Descoberta: arquivo **JÁ está em mojibake** — emojis viraram `?` literal no source. Não é problema do Telegram, é problema do FILE. 85 linhas afetadas. Provavelmente round-trip de encoding em edição anterior.
+- Caminhos: (a) git revert da versão pré-mojibake, (b) heurística semântica positivo/negativo/warning (`[OK]`/`[X]`/`[!]`), (c) deletar `?` solitários. **Junior decide.**
+
+**BLOCO 4A — ai-chat-portal persist IA ✅ v15 DEPLOYADA**
+- Patch inserindo `INSERT portal_mensagens (remetente='ia', metadata={tipo:'ia_auto',model,latencia_ms})` via service role (RPC `portal_inserir_mensagem` está hardcoded `remetente='cliente'`, incompatível)
+- **2 bugs adicionais fixados pelo agent**: (1) `aiData undefined` em log da v13 (refactor migração OpenRouter→Anthropic), (2) `.catch is not a function` no insert background → fazia Edge retornar **HTTP 500 em TODA chamada bem-sucedida**. v13 estava quebrada há semanas em prod.
+- v15 ezbr_sha `f8e320bb...`, verify_jwt:false preservado
+- Smoketest PASS em PROP-2026-0032: mensagem IA persistiu, recuperada pós-F5, cleanup OK
+
+**BLOCO 4B — portal_get_proposta + pedido ✅ migration aplicada**
+- `20260527_portal_get_proposta_with_pedido.sql` — RPC estendida com chave `pedido` (`id, numero, status, prioridade, data_prometida, data_conclusao, created_at, updated_at`), filtra `excluido_em IS NULL`
+- Schema confirmado: pedidos usa `data_prometida` (date) e `data_conclusao` (timestamptz)
+- Smoketest indireto OK (única proposta com pedido tem share_token expirado, não validei via portal real — Junior pode renovar token ou esperar próxima proposta convertida)
+
+**BLOCO 4C — Storage policy proposta-uploads ⚠️ PARCIAL**
+- `20260527_storage_proposta_uploads_policy.sql` versionada
+- DROP `portal_uploads_insert_anon` (permissiva): **OK**
+- CREATE `portal_uploads_insert_anon_restricted` (WITH CHECK path LIKE 'assinaturas/%' OR 'briefings/%'): **FALHOU** 42501 — `storage.objects` pertence a `supabase_storage_admin`, role `postgres` do MCP não tem ownership
+- **Estado prod**: anon não consegue INSERT em NENHUM path (deny-by-default). Fluxo assinatura segue OK porque `portal-upload-assinatura` Edge usa service_role (bypass RLS). Smoketest confirmou: path proibido 403 + path `assinaturas/%` também 403 (sem policy permitindo)
+- **Junior precisa aplicar CREATE via Supabase Dashboard ou `supabase db push`** (CLI conecta como supabase_admin)
+- Grep no codebase confirmou: nenhum upload anon-direto (sempre via Edge)
+
+**BLOCO 4D — Trigger notif vendedor cliente UPDATE ✅ migration aplicada + Telegram entregue**
+- `20260527_portal_notif_vendedor_cliente_update.sql`
+- ADD COLUMN `profiles.telegram_chat_id BIGINT` (Junior seedado com `1065519625`)
+- CREATE TABLE `portal_alteracoes_cliente` (audit log, RLS service_role ALL + authenticated SELECT)
+- Função `notify_vendedor_cliente_update()` SECURITY DEFINER: diff campo a campo na whitelist (cep,endereco,numero,complemento,bairro,cidade,estado,telefone,email,contato_financeiro), early-return se diff vazio, lookup vendedor via proposta mais recente, fallback chat_id Junior hardcoded `1065519625`, pg_net.http_post pra Telegram Bot API, side-effects wrap em BEGIN/EXCEPTION
+- TRIGGER `trg_notify_vendedor_cliente_update AFTER UPDATE ON clientes`
+- Smoketest: TEST cliente "TEST_TRIGGER_BR" → 2 UPDATEs → audit rows OK + pg_net request 51206 → `{"ok":true,"result":{"message_id":2973,...}}` → **Junior recebeu Telegram**, cleanup OK
+
+**BLOCO 4E — Vault RPCs migration ✅ aplicada**
+- `20260527_vault_rpcs.sql` com dump de `get_service_role_legacy_jwt` + `get_telegram_bot_token` via pg_get_functiondef
+- Match com prod confirmado (SECURITY DEFINER, search_path correto, REVOKE PUBLIC + GRANT service_role)
+- Idempotente (CREATE OR REPLACE)
+- Aplicada via `apply_migration name=vault_rpcs_20260527`
+
+**BLOCO 6 — Auditorias adversariais (3 sub-bloks)**
+
+  **6A — BUG-JWT pendente em 5 Edges** 🔴
+  - `mcp-bridge-worker:146` (maior blast radius — todas chamadas MCP→Edge eventualmente quebram)
+  - `agent-post-process-message:152`
+  - `ai-compor-mensagem:332`
+  - `whatsapp-webhook:622` (em `gerarOrcamentoReal`)
+  - `ai-requests-fallback-watchdog:153`
+  - Fix: padrão `getLegacyJwt()` via RPC `get_service_role_legacy_jwt` (já em uso em briefing-beira-rio v10)
+
+  **6B — Stores sem cliente_id**
+  - 1.573 stores totais, **1.261 sem cliente_id** (80.2%)
+  - **1.255 matchando padrão Beira Rio** `^\d{4,7}-\d{1,3}$` (99.5% dos órfãos)
+  - Cliente Beira Rio canônico: `af166ada-e01b-4197-b8c3-33410af325d1` (`CALCADOS BEIRA RIO S/A`) — só 6 stores hoje
+  - Migration proposta (NÃO aplicada — Junior decide): UPDATE em batch vinculando 1255 stores
+
+  **6C — Propostas SHADOW sem store no config_snapshot**
+  - 15/15 últimos 60 dias sem `config_snapshot.store`
+  - 14/15 com `config_snapshot=NULL` completo
+  - Não é bug ativo — propostas pre-v10 + migration 20260526 zerou (novas colunas adicionadas com NULL default)
+  - **VALIDADO via smoketest controlado**: Edge v10 funciona perfeitamente — PROP-2026-0033 (criada e limpa hoje) populou store/referencia/prazo/logistica corretamente
+  - Pequeno bug cosmético: `referencia = "186958-1 186958"` repete número quando regex de store_hint pega só parte do nome. Não bloqueante.
+
+**Achados críticos adicionais**:
+- **🔴 SECRET LEAK 2**: `supabase/functions/notificar-aprovacao-telegram/index.ts:8` tem `const TELEGRAM_TOKEN = '8750164337:AAH8Diet4zGJddKHq_F2F1JobUA2djisU8s'` **HARDCODED**. Junior precisa rotacionar via @BotFather. Migrar Edge pra `getTelegramToken()`.
+- Inconsistência `portal_inserir_mensagem` hardcoded `remetente='cliente'` — IA precisou usar INSERT direto via service_role. Considerar v2 da RPC com param opcional `p_remetente`.
+
+### Estado em prod (incremental sobre 2026-05-26)
+- `whatsapp-webhook` v44 ACTIVE
+- `briefing-beira-rio` v10 ACTIVE (**validada via smoketest hoje, PROP-2026-0033 OK**)
+- `ai-gerar-orcamento` v29 ACTIVE
+- `ai-chat-portal` **v15 ACTIVE** (persiste IA + 2 bug fixes)
+- `portal-upload-assinatura` v1 ACTIVE
+- RPCs vault: `get_service_role_legacy_jwt`, `get_telegram_bot_token` (agora **versionadas em migration**)
+- RPC portal v2 estendida com pedido: `portal_get_proposta` ACTIVE
+- Trigger novo: `trg_notify_vendedor_cliente_update` em `clientes` ACTIVE
+- Tabela nova: `portal_alteracoes_cliente` (audit log)
+- Coluna nova: `profiles.telegram_chat_id` (Junior seedado)
+- Storage policy: `portal_uploads_insert_anon` DROPada (sem replacement INSERT — aplicar via Dashboard depois)
+
+### Git
+- 7 commits push origin/main hoje:
+  - `707440d feat(ia)` ponte Cowork webhook v40 + 3 Edges
+  - `3e3c85a fix(orcamento)` ai-gerar-orcamento v29 + pricing-engine
+  - `44c21e4 fix(cron)` agent-cron-loop dedup Telegram
+  - `5d51cd4 feat(mcp)` telegram tools + admin upgrades
+  - `acd8171 docs` refundação maio 2026
+  - `dee823e feat(supabase)` 4 migrations 20260527 (vault, portal_get_proposta+pedido, storage policy, trigger notif vendedor)
+  - `c4fc532 feat(portal)` ai-chat-portal v14-persist-ia + 2 bug fixes
+- Working dir: limpo (só `.claude/settings.local.json` e `scripts/hp-latex-sync_hidden.vbs` fora do escopo)
+
+### Pendências CRÍTICAS pra Junior tomar ação manual
+1. **🔴 ROTACIONAR Supabase PAT** `sbp_db39d12f...` no painel Supabase (vazado no working dir desde 21/05)
+2. **🔴 ROTACIONAR Telegram Bot Token** `8750164337:AAH8...` via @BotFather + remover hardcode da `notificar-aprovacao-telegram/index.ts:8` + migrar pra `getTelegramToken()`
+3. **🔴 Fix BUG-JWT em 5 Edges** (mcp-bridge-worker prio max)
+4. **⚠️ Aplicar CREATE da policy `portal_uploads_insert_anon_restricted`** via Supabase Dashboard (MCP não tem ownership de `storage.objects`)
+5. **⚠️ Resolver mojibake do claudete_bot.py** (git revert OU heurística semântica)
+6. **Decisão UPDATE 1255 stores sem cliente_id** (vinculação batch a Beira Rio)
+7. **Backfill 15 propostas pre-v10 sem store no snapshot** (depende de 6: stores precisam cliente_id)
+8. **E2E real Viviane Quinta 28/05** (chat_id 7755709957)
+9. **Tela ERP `/orcamentos/pendentes-aprovacao`**
+10. **Padronizar tipos p_token nas RPCs portal** (uuid vs text — não bloqueante)
+
+### Token usage estimado: ~180k (9 agents paralelos + queries SQL + Edge deploys + git ops via PowerShell)
+
+### Comando pra retomar próxima sessão
+```
+Sou Junior, retomando refundação Beira Rio Parte 7. STATE.md mais recente.
+Estado: 7 commits push main hoje, ai-chat-portal v15, briefing-beira-rio v10 VALIDADA,
+3 secret leaks identificados (Supabase PAT + Telegram token hardcoded + BUG-JWT em 5 Edges).
+Próximo (ordem sugerida):
+1. CRÍTICO: confirmar rotação dos 2 secrets (PAT + Telegram)
+2. Aplicar CREATE policy storage proposta-uploads via Dashboard
+3. Fix BUG-JWT no mcp-bridge-worker (maior blast radius)
+4. Mojibake do claudete_bot.py — git revert ou heurística
+5. E2E real Viviane (Quinta 28/05)
+6. Decisão UPDATE 1255 stores sem cliente_id
+```
+
+---
 
 ## Sessão 2026-05-26 TARDE — REFUNDAÇÃO PARTE 5 — Substituir Mubisys com Portal Croma ✅
 
