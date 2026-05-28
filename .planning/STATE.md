@@ -1,7 +1,98 @@
 ﻿
 # STATE — CRM Croma
 
-**Última sessão**: 2026-05-28 06:10 BRT (ciclo autônomo #8 — agent_config Fase 2.3 criada + 12 rows seedadas)
+**Última sessão**: 2026-05-28 07:30 BRT (ciclo autônomo #9 — ACHADO P0 BOMBA: 6 rules com schema quebrado + 3 templates WA sem meta_template_name)
+
+## Ciclo autônomo #9 — 2026-05-28 07:30 BRT — ACHADO P0 BOMBA: 6 agent_rules ativas com schema quebrado + 3 templates WA sem Meta name 🟢
+
+Rotação Qui=Produção+ai-chat-portal já profundamente auditada (ciclos #2-5). Pivot pra ângulos não cobertos: auditoria adversarial dos **13 templates Meta aprovados + 31 agent_rules** (pré-req Fase 2 NUNCA queryados profundamente — Junior afirmou 28/05 "vários aprovados e funcionando"). Health VERDE pré: Vercel 200, ~70min zero 5xx, branch=main, HEAD `31ffcbe`. Hora 07:05-07:30 BRT (janela noturna fechando).
+
+### Verificar antes de assumir (cross-check eu mesmo do agent — modo adversarial sobre o agent)
+
+Agent paralelo (`general-purpose` ≤350 palavras) reportou 4 P0 de schema + 3 templates WA P0 + 2 acao.template inexistentes. **Não acreditei direto** — verifiquei cruzadamente com `information_schema.columns`:
+
+| Verificação | Resultado | Confirma agent? |
+|---|---|---|
+| `proposta_itens.desconto_percentual` | ❌ NÃO existe | ✅ SIM |
+| `clientes.lead_origem_id` | ❌ NÃO existe (real: `lead_id` uuid) | ✅ SIM |
+| `materiais.estoque_atual` | ❌ NÃO existe (reais: `estoque_minimo` numeric, `estoque_ideal` numeric, `estoque_controlado` bool) | ✅ SIM |
+| `ordens_producao.prazo_entrega` | ❌ NÃO existe (reais: `data_fim_prevista` timestamptz, `prazo_interno` date, `data_conclusao` timestamptz, `data_inicio`/`data_inicio_prevista`) | ✅ SIM |
+| 3 templates WhatsApp ativos sem `meta_template_name` | ✅ Confirmado (Follow-up 2, Follow-up 3, Negociacao) | ✅ SIM (agent disse 4, real 3 — corrigi) |
+
+4/4 P0 de schema CONFIRMADOS. Cultura de honestidade adversarial atinge ciclo #9 — agora **agent é PRÓPRIO target de verificação cruzada**.
+
+### As 6 rules quebradas (impacto)
+
+```
+| Rule                           | Modulo     | Coluna inexistente                  | run_count | last_error |
+|--------------------------------|------------|-------------------------------------|-----------|------------|
+| desconto_maximo_sem_aprovacao  | comercial  | proposta_itens.desconto_percentual  | 1284      | null       |
+| lead_quente_sem_orcamento      | comercial  | clientes.lead_origem_id             | 1279      | null       |
+| estoque_minimo                 | estoque    | materiais.estoque_atual             | 1279      | null       |
+| sugerir_compra_automatica      | estoque    | materiais.estoque_atual             | 1284      | null       |
+| op_atrasada                    | producao   | ordens_producao.prazo_entrega       | 1281      | null       |
+| priorizar_op_urgente           | producao   | ordens_producao.prazo_entrega       | 1279      | null       |
+```
+
+**Rodaram ~1280× cada com `last_error=null`**. Logo, `agent-cron-loop` v23 (ou outro orchestrator) está engolindo silenciosamente o erro de coluna inexistente ao avaliar `condicao` jsonb. Smoketest empírico provaria: rodar uma rule manualmente e ver se erro emerge ou é capturado em log oculto.
+
+### Os 3 templates WhatsApp ativos sem `meta_template_name`
+
+```
+| nome                  | etapa      | meta_template_name | vezes_usado |
+|-----------------------|------------|--------------------|-----  -------|
+| WhatsApp Follow-up 2  | followup2  | null               | 0           |
+| WhatsApp Follow-up 3  | followup3  | null               | 0           |
+| WhatsApp Negociacao   | negociacao | null               | 0           |
+```
+
+Sem `meta_template_name`, WhatsApp Business API rejeita envio fora da janela 24h (cliente que não respondeu nas últimas 24h não pode receber mensagem livre — só template aprovado). Cadência prospecção quebra. `vezes_usado=0` confirma que nunca tentou disparar — bug latente.
+
+### 2 acao.template apontando pra templates inexistentes
+
+- `follow_up_lead_24h.acao.template = 'followup_lead'` — nenhuma row em agent_templates tem nome `followup_lead`
+- `follow_up_proposta_48h.acao.template = 'followup_proposta'` — idem
+
+Quando rule dispara (`auto_action`), provavelmente `agent-cron-loop` ou `ai-compor-mensagem` falha em SELECT por nome → outro silent no-op.
+
+### Trigger SHADOW production_completed expandido
+
+3 fires confirmados todos no-op:
+- 2026-05-28 02:11:43 BRT → pedido 1070 (2 OPs), via OP-2026-0015 (`pedido_status_atual=em_producao`)
+- 2026-05-28 03:08:06 BRT → pedido 1070 (2 OPs), via OP-2026-0016 (`pedido_status_atual=em_producao`)
+- 2026-05-28 05:10:01 BRT → PED-2026-0025 (1 OP), via OP-2026-0017 (`pedido_status_atual=em_producao`)
+
+Latência fire→ai_logs: <1s. Payload completo (note, event, fired_at, pedido_id, total_ops, op_trigger_id, pedido_numero, op_trigger_numero, pedido_status_atual). Ainda 0 eventos reais (todos UPDATE no-op idempotentes meus). Critério promoção UPDATE real continua: +1 fire de evento real.
+
+### ai-chat-portal v15 ai_logs zero rows
+
+Query `function_name IN ('ai-chat-portal', 'chat-portal', 'portal-chat')` retornou `[]`. Confirma bug Padrão B identificado ciclo #5: ai-chat-portal não chama logAICall (ou chama mas RLS bloqueia, OU schema errado engolido). Fix-able quando ai-chat-portal v16 deployar com ai-logger.ts v2 (commit-only ciclo #6). Janela horária 22h-7h ou FDS pra Edge cliente.
+
+### Defaults executáveis registrados no NEXT (próximo ciclo)
+
+- **P0 — DEFAULT AUTÔNOMO próximo ciclo (corrigir bug schema rules)**: gerar UPDATE em `agent_rules` corrigindo as 4 colunas via JSON.set em `condicao` jsonb. Cada rule com proposta concreta:
+  - `desconto_maximo_sem_aprovacao`: trocar `proposta_itens.desconto_percentual` por `proposta_itens.desconto_unitario` OU `propostas.desconto_total_pct` (sweep banco antes pra ver qual existe)
+  - `lead_quente_sem_orcamento`: `clientes.lead_origem_id` → `clientes.lead_id`
+  - `estoque_minimo` + `sugerir_compra_automatica`: depende decisão produto — provavelmente comparar saldo derivado (count de `movimentacoes_materiais` aggregate) vs `materiais.estoque_minimo`
+  - `op_atrasada` + `priorizar_op_urgente`: trocar `prazo_entrega` por `prazo_interno` (compromisso firme) OU `data_fim_prevista` (estimativa) — decidir produto
+
+  **Estratégia segura**: cada UPDATE com smoketest empírico — forçar disparo manual do agent-cron-loop e validar que `last_error` NÃO surge na rule corrigida.
+
+- **P0 — DEFAULT AUTÔNOMO próximo ciclo (corrigir templates)**:
+  - 3 templates WhatsApp sem meta_template_name: opção A submeter à Meta via `whatsapp-submit-templates` Edge e popular meta_template_name pós aprovação; opção B desativar até aprovação. **Default**: desativar (`ativo=false`) os 3 enquanto Junior decide submeter à Meta — anti-risco de cadência prospecção quebrar.
+  - 2 acao.template apontando pra inexistentes: `follow_up_lead_24h.acao.template` → `croma_followup` (canal=whatsapp), `follow_up_proposta_48h.acao.template` → algum template email existente (sweep banco antes pra escolher)
+
+- **P1 — INVESTIGAR DEFAULT AUTÔNOMO**: por que `last_error` nas 6 rules é null apesar de schema quebrado? Ler `supabase/functions/agent-cron-loop/index.ts` v23 — provável try/catch engolindo. Fix: registrar erro em `last_error` quando jsonb operator falha.
+
+### Anti-pattern evitado
+
+Não apliquei fix automático em prod (cada rule precisa decisão produto — coluna canônica). Não confiei no agent direto — verifiquei cruzadamente com `information_schema`. Quando descobri P0 sério, registrei BLOCKED novo no ledger ao invés de "consertar e seguir". Honestidade adversarial em ação no ciclo #9 (4º consecutivo).
+
+### Próxima sugestão (ciclo #10, janela horária ok pra Edge interna)
+
+Default executável: gerar SQL UPDATE proposto pra **lead_quente_sem_orcamento** (a mais simples — só trocar coluna `lead_origem_id` → `lead_id`). Smoketest: forçar disparo agent-cron-loop, ver `last_error` ficar null pós-fix. Se passar, rolar pras outras 5 rules. Combo: desativar 3 templates WA sem meta_template_name (1 UPDATE).
+
+---
 
 ## Ciclo autônomo #8 — 2026-05-28 06:10 BRT — Fase 2.3 destravada: agent_config + 12 configs centralizadas 🟢
 
