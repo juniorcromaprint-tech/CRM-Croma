@@ -219,21 +219,37 @@ Args:
     "croma_criar_modelo_produto",
     {
       title: "Criar Modelo de Produto",
-      description: `Cria um novo modelo/variação de produto (ex: "Banner Lona 440g com Ilhós").
+      description: `Cria um novo modelo/variação de produto (ex: "Banner Lona 440g com Ilhós", "Poste Quadrado 10x10cm 3m").
 
 ATENÇÃO: Ação que modifica dados. Confirme com o usuário antes de executar.
 
 Args:
   - produto_id (string, obrigatório): UUID do produto pai
   - nome (string, obrigatório): Nome do modelo
-  - codigo (string, opcional): Código do modelo
-  - markup_padrao (number, opcional): Markup padrão em % (ex: 250 = 250%)
+  - markup_padrao (number, opcional): Markup padrão em % (ex: 60 = 60%). Default 40.
+  - preco_fixo (number, opcional): Preço de venda fixo em R$. Quando preenchido, sobrepoe o cálculo material+markup. Use para revenda ou produtos com preço fechado.
+  - observacoes_modelo (string, opcional): Especificações livres (espessura, fornecedor, diferenciais, etc.)
+  - largura_cm (number, opcional): Largura em cm
+  - altura_cm (number, opcional): Altura em cm
+  - unidade_venda (string, opcional): Unidade de venda ('m2', 'un', 'metro', 'par', etc.). Default 'm2'.
+  - descritivo_tecnico (string, opcional): Descrição técnica longa (aparece em propostas/orçamentos)
+  - descritivo_nf (string, opcional): Descrição curta para Nota Fiscal
+  - garantia_meses (number, opcional): Garantia em meses (default 6)
+  - linha_qualidade (string, opcional): 'primeira', 'segunda', 'premium' (default 'segunda')
   - materiais (array, opcional): Materiais vinculados com quantidade_por_unidade`,
       inputSchema: z.object({
         produto_id: z.string().uuid().describe("UUID do produto pai"),
         nome: z.string().min(3).max(200).describe("Nome do modelo"),
-        codigo: z.string().max(50).optional(),
-        markup_padrao: z.coerce.number().positive().optional().describe("Markup em % (ex: 250)"),
+        markup_padrao: z.coerce.number().positive().optional().describe("Markup em % (ex: 60)"),
+        preco_fixo: z.coerce.number().positive().optional().describe("Preço de venda fixo em R$"),
+        observacoes_modelo: z.string().max(2000).optional(),
+        largura_cm: z.coerce.number().positive().optional(),
+        altura_cm: z.coerce.number().positive().optional(),
+        unidade_venda: z.string().max(20).optional(),
+        descritivo_tecnico: z.string().max(2000).optional(),
+        descritivo_nf: z.string().max(500).optional(),
+        garantia_meses: z.coerce.number().int().nonnegative().optional(),
+        linha_qualidade: z.enum(["primeira", "segunda", "premium"]).optional(),
         materiais: z.array(z.object({
           material_id: z.string().uuid(),
           quantidade_por_unidade: z.coerce.number().positive().describe("Consumo por unidade/m²"),
@@ -276,11 +292,23 @@ Args:
           }
         }
 
+        const linhas = [
+          `✅ Modelo criado!`,
+          ``,
+          `- **ID**: \`${modelo.id}\``,
+          `- **Nome**: ${modelo.nome}`,
+          `- **Produto ID**: ${modelo.produto_id}`,
+        ];
+        if (modelo.preco_fixo) linhas.push(`- **Preço fixo**: ${formatBRL(modelo.preco_fixo)}`);
+        if (modelo.markup_padrao) linhas.push(`- **Markup**: ${modelo.markup_padrao}%`);
+        if (modelo.unidade_venda) linhas.push(`- **Unidade**: ${modelo.unidade_venda}`);
+        if (modelo.largura_cm || modelo.altura_cm) {
+          linhas.push(`- **Dimensões**: ${modelo.largura_cm ?? "?"}x${modelo.altura_cm ?? "?"} cm`);
+        }
+        if (matLog) linhas.push(matLog.trimStart());
+
         return {
-          content: [{
-            type: "text" as const,
-            text: `✅ Modelo criado!\n\n- **ID**: \`${modelo.id}\`\n- **Nome**: ${modelo.nome}\n- **Produto ID**: ${modelo.produto_id}${modelo.markup_padrao ? `\n- **Markup**: ${modelo.markup_padrao}%` : ""}${matLog}`,
-          }],
+          content: [{ type: "text" as const, text: linhas.join("\n") }],
           structuredContent: modelo,
         };
       } catch (error) {
@@ -304,11 +332,27 @@ Args:
   - modelo_id (string, obrigatório): UUID do modelo
   - nome (string, opcional): Novo nome
   - markup_padrao (number, opcional): Novo markup em %
+  - preco_fixo (number, opcional): Preço de venda fixo em R$ (sobrepoe engine de markup)
+  - observacoes_modelo (string, opcional): Especificações livres
+  - largura_cm / altura_cm (number, opcional)
+  - unidade_venda (string, opcional)
+  - descritivo_tecnico / descritivo_nf (string, opcional)
+  - garantia_meses (number, opcional)
+  - linha_qualidade ('primeira'|'segunda'|'premium', opcional)
   - ativo (boolean, opcional): Ativar/desativar modelo`,
       inputSchema: z.object({
         modelo_id: z.string().uuid().describe("UUID do modelo"),
         nome: z.string().max(200).optional(),
         markup_padrao: z.coerce.number().positive().optional(),
+        preco_fixo: z.coerce.number().positive().nullable().optional().describe("R$ fixo, null para limpar"),
+        observacoes_modelo: z.string().max(2000).nullable().optional(),
+        largura_cm: z.coerce.number().positive().nullable().optional(),
+        altura_cm: z.coerce.number().positive().nullable().optional(),
+        unidade_venda: z.string().max(20).optional(),
+        descritivo_tecnico: z.string().max(2000).nullable().optional(),
+        descritivo_nf: z.string().max(500).nullable().optional(),
+        garantia_meses: z.coerce.number().int().nonnegative().optional(),
+        linha_qualidade: z.enum(["primeira", "segunda", "premium"]).optional(),
         ativo: z.boolean().optional(),
       }).strict(),
       annotations: {
@@ -339,7 +383,7 @@ Args:
         return {
           content: [{
             type: "text" as const,
-            text: `✅ Modelo atualizado!\n\n- **${data.nome}** (\`${data.id}\`)\n- Campos atualizados: ${Object.keys(updates).join(", ")}`,
+            text: `✅ Modelo atualizado!\n\n- **${data.nome}** (\`${data.id}\`)\n- Campos atualizados: ${Object.keys(updates).join(", ")}${data.preco_fixo ? `\n- **Preço fixo atual**: ${formatBRL(data.preco_fixo)}` : ""}`,
           }],
           structuredContent: data,
         };

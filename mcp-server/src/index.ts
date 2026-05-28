@@ -36,6 +36,7 @@ import { registerComprasTools } from "./tools/compras.js";
 import { registerPropostasAnexosTools } from "./tools/propostas-anexos.js";
 import { registerStoresTools } from "./tools/stores.js";
 import { registerEspelhamentoTools } from "./tools/espelhamento.js";
+import { registerTelegramTools } from "./tools/telegram.js";
 
 // ─── Inicialização do servidor ──────────────────────────────────────────────
 
@@ -63,8 +64,9 @@ registerComprasTools(server);      // 5 ferramentas: listar, detalhe, criar, atu
 registerPropostasAnexosTools(server); // 3 ferramentas: listar_anexos, anexar_arquivo_url, remover_anexo (Claudete via MCP)
 registerStoresTools(server);          // 3 ferramentas: listar_stores, criar_store, atualizar_store (lojas/pontos de instalação)
 registerEspelhamentoTools(server);    // 1 ferramenta: croma_espelhar_os_mubisys (migração Mubisys → CRM)
+registerTelegramTools(server);        // 3 ferramentas: autorizar/listar/pedidos_pendentes (bot Claudete)
 
-// Total: 100 ferramentas
+// Total: 103 ferramentas
 
 // ─── Validação de credenciais ───────────────────────────────────────────────
 
@@ -103,7 +105,7 @@ async function main(): Promise<void> {
   const transport = new StdioServerTransport();
   await server.connect(transport);
 
-  process.stderr.write(`[croma-mcp] 🚀 Servidor Croma MCP iniciado (100 ferramentas)\n`);
+  process.stderr.write(`[croma-mcp] 🚀 Servidor Croma MCP iniciado (103 ferramentas)\n`);
 }
 
 main().catch((err) => {
