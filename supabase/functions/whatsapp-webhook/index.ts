@@ -1,11 +1,17 @@
-// whatsapp-webhook v41 (2026-05-27 BUG-JWT) — gerarOrcamentoReal usa legacy JWT + retry 401
+// whatsapp-webhook v46 (2026-05-28 ciclo autonomo #6) — ai_logs insert agora encadeia
+// .select().single() (regra dura .claude/rules/supabase-mutations.md) + VERSION header
+// rastreavel + console.warn semantica. auto-resposta-whatsapp ja gravava (7 rows historico),
+// patch e' defensivo/observabilidade — forca PostgREST a confirmar row criada.
+// - v45 (2026-05-27): BUG-JWT fix — getLegacyJwt cacheado + retry 401 force refresh
+// - v44 (anterior): guard INTERNAL_PHONES + route to briefing-beira-rio
+// - v41 (2026-05-27 BUG-JWT) — gerarOrcamentoReal usa legacy JWT + retry 401
 // - v40 (2026-05-22 — Etapa 2.3 ponte Cowork):
 //   PRIMARY: enfileira em ai_requests (tipo='whatsapp-resposta') → SKILL Cowork processa.
 //   FALLBACK: se INSERT em ai_requests falhar, segue caminho v39 (generateClaudeResponse inline).
-// - v41 (2026-05-27): troca Bearer SERVICE_ROLE_KEY pelo legacy JWT via getLegacyJwt
-//   cacheado em isolate; retry com refresh sob 401.
 import { serve } from 'https://deno.land/std@0.168.0/http/server.ts';
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2';
+
+const VERSION = 'v46-ailogs-select-single';
 
 // Cache do legacy JWT no escopo do isolate (BUG-JWT fix)
 let _cachedLegacyJwt: string | null = null;
@@ -734,7 +740,7 @@ async function generateClaudeResponse(supabase, lead, conversation, incomingMess
       text_mode: false
     });
     try {
-      const { error: logErr } = await supabase.from('ai_logs').insert({
+      const { data: logRow, error: logErr } = await supabase.from('ai_logs').insert({
         user_id: null,
         function_name: 'auto-resposta-whatsapp',
         entity_type: 'geral',
@@ -745,10 +751,11 @@ async function generateClaudeResponse(supabase, lead, conversation, incomingMess
         cost_usd: aiResult.cost_usd,
         duration_ms: aiResult.duration_ms,
         status: 'success'
-      });
-      if (logErr) console.error('whatsapp-webhook: ai_logs insert falhou:', logErr.message);
+      }).select().single();
+      if (logErr) console.warn(`[${VERSION}] ai_logs insert falhou:`, logErr.message);
+      else if (!logRow) console.warn(`[${VERSION}] ai_logs insert retornou row vazia (possivel RLS block)`);
     } catch (logEx) {
-      console.error('whatsapp-webhook: ai_logs insert exception:', logEx);
+      console.warn(`[${VERSION}] ai_logs insert exception:`, logEx);
     }
     let parsed = {};
     try {
