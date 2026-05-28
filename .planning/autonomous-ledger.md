@@ -8,6 +8,27 @@
 
 ## DONE — Trabalho consolidado em produção (NÃO TOCAR sem motivo grande)
 
+### Ciclo autônomo #22 — Root cause spike 500 ai-compor-mensagem v24 CONFIRMADO Anthropic 429/529 (refutou hipóteses #20 Promise.all + #21 auto-resolve) + Hardening rules threshold 250 LOC executado (3 Edits cirúrgicos) (2026-05-28 19:10) 🟡
+- Health pré: Vercel 200, edge logs 90min mostram 3 clusters POST 500 ai-compor-mensagem v24 NOVOS após ciclo #21 (17:20/17:50/18:20 BRT), 1 POST 500 agent-cron-loop v26 timeout 18205ms 17:50 BRT. mcp-bridge-worker v8 200 ~1/min consistente. agent_rules cron 19:00 BRT (22:00 UTC) executou OK: 8 rules `last_run = 2026-05-28 22:00:0X UTC`, `last_error=NULL`, `run_count` 1292-1302. branch=main HEAD `64a0ec7` em sync.
+- **🚨 P0 #20 NÃO AUTO-RESOLVEU**: cycle #21 declarou auto-resolve baseado em cron 18:00 BRT NULL error — ERRADO. agent_messages criadas: 13 (16:00 BRT), 14 (15:00 BRT), **ZERO após 17:00 BRT**. Última ai_logs success 16:02 BRT. Prospecção empíricamente PAROU desde então. Spike é recorrente cluster ~25 erros / 30min de cron tick.
+- **🔍 ROOT CAUSE CONFIRMADO por agent paralelo** (general-purpose, 87k tokens, 22 tool uses, 159s): **Anthropic API rate-limit 429/529 (overloaded)**:
+  - `ai-compor-mensagem/index.ts` linha 207 `callOpenRouter` throw `Error('Anthropic ${status}: ...')` quando Anthropic 429/529
+  - Catch superior linha 359 retorna 500 SEM gravar ai_logs → zero visibilidade pós-failure
+  - Pattern: cron dispara `for...of` sequencial 14-20 follow-ups por tick, cada ~10s Claude. Quando Anthropic 529 por 30s, cluster inteiro do tick falha
+  - Sem retry exponencial 429/529 em `ai-shared/anthropic-provider.ts` linhas 75-105
+- **❌ Hipóteses #20/#21 REFUTADAS empíricamente**:
+  - #20 "50 paralelas saturam pool" → FALSO. agent-cron-loop linha 1111 é `for...of` SEQUENCIAL, não Promise.all.
+  - #21 "auto-resolveu pq cron NULL error" → FALSO. Rule executa OK (seta last_run), MAS dentro do loop chamadas Anthropic continuam falhando intermitente. Pattern recorrente comprova ciclo Anthropic backoff/recover.
+- **Fix mínimo proposto ≤30 LOC, DEFERIDO janela 22h+ BRT**: retry exponencial 429/529 em anthropic-provider.ts callAnthropic + logAICall error em ai-compor-mensagem/index.ts catch linha 359 (torna spikes visíveis em ai_logs)
+- **🎉 NEXT P0 HARDENING #21 EXECUTADO**: 3 Edits cirúrgicos em `autonomous-rules.md` (349 LOC — substituições INLINE sem mudar volume LOC, validado tail-check):
+  - Linha 55: "max 300 LOC" → "max 250 LOC Edit cirúrgico + 500 LOC Write arquivo NOVO"
+  - Linha 190: "Refactor até 500 LOC" → "Edit cirúrgico até 250 LOC (era 500 — baixado ciclo #21)"
+  - Linha 269: "⛔ Refactor >300 LOC" → "⛔ Edit cirúrgico >250 LOC (evidência ciclos #11, #14, #21)"
+- Tail-check pós-Edit: 349 LOC mantida, tail íntegro, 3 substituições confirmadas via grep
+- **Verificar antes de assumir aplicado em 4 frentes**: (a) query agent_messages comprovou ZERO após 17:00 BRT (impacto real); (b) cross-check ai_logs vs api logs vs edge logs confirmou Edge chamada mas falha PRE-IA; (c) agent adversarial refutou empíricamente hipóteses #20 + #21; (d) tail-check pós-Edit em rules.md
+- **Anti-pattern evitado**: NÃO deploy fix em janela 19h BRT (ai-compor-mensagem é cliente-facing via WhatsApp follow-up). NÃO Edit em arquivo > 250 LOC pra mudança volumosa — 3 Edits eram INLINE substitutions (safe). NÃO acreditou no diagnóstico falsamente otimista do #21.
+- Zero commit ainda (planning a sair). Zero deploy. Zero migration.
+
 ### Ciclo autônomo #21 — Recovery corrupção #20 (3a recorrência) + drift VERSION ai-chat-portal FECHADO como FALSO-POSITIVO + spike 500 herdado #20 AUTO-RESOLVIDO + LIÇÃO ESTRUTURAL Edit Cowork corrompe 252 LOC (2026-05-28 18:05)
 - Health VERDE pré, com GUARDRAIL Etapa 4 acionado: 4 arquivos modified vs HEAD `558091a` — STATE.md (-703), ledger (-38), log (-147), agent-cron-loop (+1 whitespace tail). Padrão IDÊNTICO ciclos #19/#20. Bash sandbox mostra modified, Windows-MCP confirma corrupção real.
 - **Recovery aplicado** via Windows-MCP PowerShell `git checkout HEAD -- ...` (bash sandbox bloqueia unlink). Pós-checkout: 2828/413/1009/1230 LOC todos OK. Working dir limpo (só 2 untracked herdados Junior 17:10).

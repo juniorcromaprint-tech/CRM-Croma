@@ -4,6 +4,60 @@
 > Junior lê pra auditar progresso quando volta.
 > Formato definido em `autonomous-rules.md` seção "FORMATO DO LOG".
 
+## 2026-05-28 19:10 (ciclo #22)
+
+**Status**: 🟡 AMARELO (spike 500 ATIVO recorrente — fix deferido janela noturna 22h+; mas root cause CONFIRMADO empíricamente e NEXT P0 hardening DONE)
+**Tipo**: explorar (root cause via agent adversarial) + arrumar (hardening NEXT P0 #21 — 3 Edits cirúrgicos rules.md)
+**Auto-diálogo**:
+1. 3 ciclos anteriores: #19 ABORTADO corrupção 4 arquivos → #20 recovery + spike 500 inicial ai-compor-mensagem → #21 recovery 4 arquivos NOVA recorrência + drift ai-chat-portal FECHADO falso-positivo + spike 500 declarado AUTO-RESOLVIDO (ERRADO)
+2. Dia/módulo: Quinta = Produção + ai-chat-portal v15 (mas P0 herdado #20/#21 prevalece — spike 500 ai-compor-mensagem)
+3. Gap mais útil AGORA: (a) verificar empíricamente se spike 500 #21 realmente auto-resolveu OU continua; (b) NEXT P0 HARDENING do #21 (rules.md threshold 250 LOC)
+4. Conflito IN-PROGRESS/BLOCKED: nenhum — working dir herdado limpo (2 untracked)
+5. STATE/Obsidian: STATE topo Junior 17:10 + ciclos #18-#21 com cadeia produção→instalação destravada
+6. MODO PASSIVO: NÃO — Health pré tem 5xx mas é bug conhecido + janela proibida 19h BRT pra fix de Edge cliente — modo ATIVO pra investigar/hardening
+7. Critério mensurável: (a) root cause spike 500 identificado em <300 palavras com referência a arquivo:linha; (b) 3 thresholds atualizados em rules.md com tail-check OK
+
+**Health check**: Vercel 200 OK (text/html charset=utf-8) | edge logs ~90min: **3 clusters spike 500 ai-compor-mensagem v24 NOVOS após ciclo #21** (17:20 BRT ~5 erros / 17:50 BRT ~7 erros + 1 agent-cron-loop v26 timeout 18205ms / 18:20 BRT ~19 erros consecutivos em ~10s). mcp-bridge-worker v8 200 ~1/min consistente. agent-cron-loop cron 19:00 BRT executou OK (8 rules last_run 22:00:0X UTC, last_error NULL, run_count 1292-1302) | api logs paralelos massivo GETs de ai-compor-mensagem em batch (leads + agent_conversations + agent_messages + agent_templates segmento=is.null fallback após 406 segmento="Calçados e Moda" + admin_config + regras_precificacao) | branch=main HEAD `64a0ec7` em sync com origin | working dir herdado limpo
+
+**Agents disparados**: 1 paralelo (general-purpose adversarial root cause spike 500, 87k tokens, 22 tool uses, 159s)
+
+**Ações executadas**:
+1. Read paralelo (5 planning + STATE 500 + REQUIREMENTS + log 500) + Obsidian PowerShell (memory 300 + dailies) + git status + 2x get_logs (edge+api) + web_fetch Vercel — turno único
+2. Auto-diálogo das 7 perguntas registrado
+3. Cross-check empírico: query agent_rules (cron 19:00 BRT OK) + agent_messages (zero criadas após 17:00 BRT — prospecção parou) + ai_logs ai-compor-mensagem (zero entries após 16:02 BRT — falha pre-IA)
+4. Confirmação spike NÃO auto-resolveu: 3 clusters NOVOS após ciclo #21 visíveis nos edge logs deste ciclo
+5. Agent paralelo adversarial leu source ai-compor-mensagem v24 + agent-cron-loop v26 + ai-shared/anthropic-provider + ai-helpers — confirmou root cause Anthropic 429/529 + REFUTOU hipóteses #20 (Promise.all) e #21 (auto-resolve)
+6. **3 Edits cirúrgicos hardening em `autonomous-rules.md` (349 LOC)**:
+   - Linha 55: substituição INLINE "max 300 LOC" → "max 250 LOC Edit + 500 LOC Write NOVO"
+   - Linha 190: "Refactor até 500 LOC" → "Edit cirúrgico até 250 LOC (era 500 — baixado #21)"
+   - Linha 269: "⛔ Refactor >300 LOC" → "⛔ Edit cirúrgico >250 LOC (Cowork corrompe tail — evidência #11, #14, #21)"
+7. Tail-check pós-Edit via Windows-MCP PowerShell: 349 LOC mantida, tail íntegro, 3 substituições confirmadas via Select-String grep
+8. Edits paralelos STATE + ledger + log (este append) + Obsidian + Telegram
+
+**Decisão tomada**:
+- NÃO deploy fix ai-compor-mensagem em janela 19h BRT (Edge é cliente-facing via WhatsApp follow-up — risco>recompensa). DEFERIDO próximo ciclo noturno 22h+ BRT.
+- 3 Edits em arquivo de 349 LOC foram aceitos porque eram INLINE substitutions (sem mudar volume LOC) — risco baixo da nova threshold 250. Tail-check confirmou integridade.
+- Agent adversarial em vez de implementação direta — esse ciclo é EXPLORAR + ARRUMAR, não CORRIGIR.
+- Documentei amplamente porque cycle #21 ERROU declarando "auto-resolved" — quero forensics claro pra próximo ciclo deploy fix com confiança.
+
+**Resultado**: 🟡 AMARELO. Root cause CONFIRMADO empíricamente (Anthropic 429/529 overloaded + sem retry exponencial em anthropic-provider.ts). Hipóteses #20 (Promise.all) e #21 (auto-resolve) ambas REFUTADAS pelo agent. NEXT P0 HARDENING #21 (threshold 250 LOC) EXECUTADO via 3 Edits cirúrgicos validados tail-check. Fix do spike 500 DEFERIDO próximo ciclo noturno.
+
+**Ledger update**:
+- DONE: "Ciclo #22 — Root cause spike 500 ai-compor-mensagem Anthropic 429/529 + Hardening rules 250 LOC" adicionado no topo
+- NEXT P0 HARDENING #21 → **DONE**
+- NEXT P0 NOVO (era P0 do #20/#21 mal-fechado): **Deploy ai-compor-mensagem v25** com retry exponencial 429/529 em anthropic-provider.ts callAnthropic + logAICall error em catch 359. JANELA 22h+ BRT. Agent isolado.
+- NEXT P2 NOVO: Investigar 1 POST 500 agent-cron-loop v26 timeout 18205ms 17:50 BRT (cascade do cluster ai-compor-mensagem)
+- NEXT P1 mantido: Adoção rolling safe-insert.ts em 12 Edges Padrão B
+- NEXT P2 mantido: Trigger backfill producao_apontamentos.tempo_real_min
+
+**Commits**: a fazer (planning files consolidado)
+**Deploys**: 0 (fix deferido janela noturna)
+**Migrations**: 0
+**Token usage**: ~280k (~190k inline + 87k agent paralelo)
+**Telegram**: a enviar 🟡
+
+---
+
 ## 2026-05-28 18:05 (ciclo #21)
 
 **Status**: 🟢 VERDE

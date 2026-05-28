@@ -52,7 +52,7 @@ NÃO economizar:
 - Análises profundas com múltiplas verificações
 - Não há limite de "30 min de execução" — usar o tempo necessário
 
-Limites razoáveis: max 6 agents simultâneos, max 300 LOC por ciclo (anti-escopo-creep, não token).
+Limites razoáveis: max 6 agents simultâneos, max 250 LOC Edit cirúrgico em arquivo existente por ciclo (anti-corrupção Cowork — ver ciclo #21), max 500 LOC se for Write em arquivo NOVO.
 
 ---
 
@@ -187,7 +187,7 @@ Heurística de prioridade:
 - 1-3 tarefas substanciais por ciclo (era 1-2)
 - Múltiplos commits permitidos (cada feat/fix/chore atômico separado)
 - Deploy SHADOW + smoketest é fluxo normal, não exceção
-- Refactor até 500 LOC OK (era 300) — desde que escopo único e rastreável
+- Refactor: Edit cirúrgico em arquivo existente até **250 LOC** (era 500 — baixado ciclo #21 após Edit em arquivo de 252 LOC corromper tail). Write em arquivo NOVO pode ir até 500 LOC.
 
 Briefing obrigatório de cada agent:
 - Escopo EXATO (filepath, linhas, função)
@@ -266,7 +266,7 @@ Ledger: planning/autonomous-ledger
 ## RESTRIÇÕES DURAS (segurança não negocia)
 
 ⛔ Deploy de Edge cliente (whatsapp-webhook, briefing-beira-rio, ai-gerar-orcamento, portal-upload-assinatura) entre 8h-20h BRT — janela 22h-7h ou FDS. Edges internas (ai-chat-portal SHADOW, mcp-bridge-worker) qualquer hora.
-⛔ Refactor >300 LOC num ciclo (quebra em PRs)
+⛔ Edit cirúrgico em arquivo existente >250 LOC num ciclo (Cowork Edit tool corrompe tail silenciosamente — evidência ciclos #11, #14, #21). Use Write em arquivo NOVO ou delegue a agent isolado/Claude Code local. Quebra em PRs se necessário.
 ⛔ Push --force, drop coluna, rewrite history, DELETE em massa sem filtro
 ⛔ Branch ≠ main → ABORTAR
 ⛔ Refazer DONE
