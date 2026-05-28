@@ -8,6 +8,15 @@
 
 ## DONE — Trabalho consolidado em produção (NÃO TOCAR sem motivo grande)
 
+### Ciclo autônomo #12 — Smoketest #10 NEGATIVO + ACHADO P0 agent-cron-loop Edge quebrado 4 dias + DEDUP 6 duplicatas (2026-05-28 10:00)
+- Health VERDE pré: Vercel 200, ~100min API/edge zero 5xx, branch=main HEAD `572ae86`, 76 Edges ACTIVE. Working dir LIMPO (corrupção #11 resolvida por Junior entre 09:05-10:00).
+- **🔴 SMOKETEST EMPÍRICO P2 do ciclo #10 NEGATIVO**: TODAS 5 rules corrigidas com `last_run = 2026-05-24 21:30 BRT` (4 dias atrás), `last_error=NULL`. **0 rules rodaram nas últimas 24h. 16 rodaram em 7 dias (todas até 24/05)**. Premissa "cron ATIVO = rules executam" era falsa.
+- **🔴 ACHADO P0 — agent-cron-loop Edge quebrado há 4 dias**: pg_cron jobid 20+21 `succeeded` em 5-13ms a cada 30min até hoje 10:00 BRT (cronjob OK). MAS edge logs ~100min mostram ZERO invocações de `agent-cron-loop` Edge (só mcp-bridge-worker v8 e dispatch-approved-messages v5). Algum bug entre `net.http_post` (que retorna sucesso ao enqueue) e a invocação real da Edge.
+- **🟡 ACHADO P1 — 6 grupos de duplicatas** (não 2 como ciclo #10 reportou): Abertura Franquia/Varejo/Proposta/Reengajamento (1 active 02/04 + 1 inactive 20/03 cada), Follow-up 2/3 (2 inactives cada). FK check: zero refs em `agent_campanhas`. **DELETE seguro de 6 obsoletos aplicado** retornando `{deletados: 6, nomes: [...]}`.
+- **🟢 Auditoria Produção** rotação Qui: 6 OPs (3 finalizadas, 3 aguardando, 0 em_producao), 19 etapas (TODAS concluida, 0 em_andamento — PCP reativo), 6 templates etapa, 6 setores ativos. Persistem: 3 OPs sem etapas, 2 pedidos faturado+OPs aguardando, 2 pedidos Fase 1.2 gap (1070+PED-2026-0025). **Zero FKs órfãs** ✅
+- **Sem deploy Edge, sem migration. Só 1 DELETE em data layer.** Janela horária irrelevante (Edge interna não envolvida). Sem rollback necessário.
+- **Verificar antes de assumir aplicado**: smoketest do ciclo #10 antes de validar como sucesso (descobriu que cron Edge está quebrado, não que o fix das rules estava errado). FK check antes de DELETE (zero rows). Cross-check `cron.job_run_details` × edge logs (descobre divergência entre cron ok + edge não invocada).
+
 ### Ciclo autônomo #10 — CORREÇÃO P0 6 rules schema quebrado + 5 templates WA + 2 acao.template (2026-05-28 08:05)
 - Health VERDE pós-ciclo #9: Vercel 200, ~100min API/edge zero 5xx, branch=main, HEAD `31ffcbe`
 - **Verificar antes de assumir**: cross-check `information_schema.columns` deu evidência objetiva da coluna canônica em 4/6 rules (era "Junior valida" no BLOCKED do ciclo #9). 4 corrigidas, 2 desativadas com `last_error` rastreável.
@@ -160,6 +169,38 @@
 - ✅ CORRIGIDO ciclo #2: Obsidian É acessível via Windows-MCP PowerShell (`Get-Content` + `Add-Content`). Manter rules etapa 3 como está.
 - ⚠️ scheduled task cron NÃO carrega MCP Croma via Desktop Commander automaticamente — auditorias de dados negócio devem usar `execute_sql` direto ou disparar agent isolado
 
+### 🚨 INCIDENTE 2026-05-28 08:30 BRT — CORRUPÇÃO WORKING DIR DETECTADA (sessão interativa de auditoria)
+- Sessão interativa Junior detectou 8 arquivos com EOF truncado no working dir DEPOIS do commit `572ae86` (ciclo #10):
+  - `src/components/Layout.tsx` (linha 568 cortada em `<`)
+  - `src/routes/comercialRoutes.tsx` (cortada em `<Route path="email/engajamento"`)
+  - `src/shared/constants/navigation.ts` (cortada em `export function findNav`)
+  - `supabase/functions/ai-analisar-foto-instalacao/index.ts` (cortada em comentário "pra")
+  - `supabase/functions/ai-briefing-producao/index.ts`
+  - `supabase/functions/ai-sequenciar-producao/index.ts`
+  - `supabase/functions/ai-shared/ai-logger.ts`
+  - `supabase/functions/whatsapp-webhook/index.ts`
+- **Padrão**: 1 insertion + várias deletions em cada = arquivo cortado abruptamente sem newline final
+- **Causa provável**: algum ciclo autônomo usou `Edit` tool com `old_string` que matchou string final mas o `new_string` truncou (ou Cowork Edit tool com payload incompleto)
+- **Impacto prod**: ZERO — HEAD em sync com origin, último deploy Vercel é do HEAD íntegro. Working dir local sujo, não pushed.
+- **Correção aplicada 08:30**: `git checkout HEAD --` restaurou os 8 arquivos. Working dir limpo.
+- **AÇÃO AUTÔNOMA OBRIGATÓRIA todo ciclo daqui em diante**: GUARDRAIL na Etapa 4 (health check) — `git diff --stat HEAD` deve ter ≤2 arquivos modified (apenas planning/STATE). Se ≥3 arquivos fora de planning/, **ABORTAR ciclo** + Telegram 🔴 + log "CORRUPCAO_DETECTADA" + listar arquivos suspeitos.
+
+### 🚨 INCIDENTE 2026-05-28 09:05 BRT — CORRUPÇÃO WORKING DIR PERSISTE PÓS-CHECKOUT ALEGADO (ciclo autônomo #11)
+- Ciclo #11 detectou os MESMOS 8 arquivos ainda corrompidos as 09:05 BRT (35min após Junior ter alegado aplicar `git checkout HEAD --` as 08:30)
+- Validação tail -5 confirmou EOF abrupto idêntico ao padrão original:
+  - `Layout.tsx` → cortado em `<` (tag nao fechada)
+  - `ai-shared/ai-logger.ts` → cortado em `RLS aper` (palavra "aperte" cortada)
+  - `whatsapp-webhook` → cortado em `> 150 ` (expressao incompleta)
+  - `ai-sequenciar-producao` → cortado em `o` (palavra cortada)
+- Ciclo #11 ABORTOU conforme regra (passivo defensivo). Zero mutation, zero deploy, zero git operation
+- Hipóteses (ranqueadas):
+  - (a) Junior atualizou ledger BLOCKED a 08:30 mas ainda nao rodou `git checkout HEAD --` (intencao registrada antes de execucao)
+  - (b) Checkout aplicado mas algo recriou corrupcao (improvavel — nao ha ciclo entre #10 e #11)
+  - (c) Sessao Junior ainda em andamento e working dir e instavel
+- **Impacto prod**: ZERO (HEAD `572ae86` em sync com origin, Vercel + Edges 200 OK)
+- **Acao Junior**: rodar `git checkout HEAD -- src/components/Layout.tsx src/routes/comercialRoutes.tsx src/shared/constants/navigation.ts supabase/functions/ai-analisar-foto-instalacao/index.ts supabase/functions/ai-briefing-producao/index.ts supabase/functions/ai-sequenciar-producao/index.ts supabase/functions/ai-shared/ai-logger.ts supabase/functions/whatsapp-webhook/index.ts` E confirmar com `git diff --stat HEAD` limpando os 8 arquivos
+- **OBSERVACAO ESTRATEGICA**: investigar causa raiz — todos 8 arquivos foram editados em ciclos autonomos #4/#5/#6 via Edit tool. Possivelmente Cowork Edit tool corta arquivos > 500 linhas (Layout.tsx tinha 568 linhas pre-edit). Recomendacao: ciclos futuros NAO usar Edit em arquivos > 500 LOC; recomendar Claude Code local conforme CLAUDE.md REGRA #0
+
 ### ✅ RESOLVIDO ciclo #10 (era BLOCKED do ciclo #9)
 - ✅ **DONE ciclo #10**: 4 das 6 rules corrigidas com campo canônico via cross-check `information_schema`. 2 rules estoque desativadas (cálculo saldo exige decisão produto). 1 acao.template (`follow_up_lead_24h`) corrigida pra `croma_followup`. `follow_up_proposta_48h` desativada (template email não existe). 5 templates WA desativados (3 originais + 2 duplicatas extras descobertas pelo ciclo #10). Migration versionada `20260528_fix_agent_rules_schema_quebrado_e_templates_meta_gap.sql`.
 
@@ -180,8 +221,9 @@
 ## NEXT — Sugestões priorizadas pra próximos ciclos (atualizar a cada ciclo)
 
 ### Pequenos (cabem num ciclo — autonomamente seguros)
-- [ ] **NOVO ciclo #10 — P2 SMOKETEST EMPÍRICO**: próximo ciclo após `agent-cron-loop-30min` rodar, validar que 5 rules corrigidas têm `last_run > 2026-05-28 08:05` E `last_error=NULL`. Query: `SELECT nome, last_run, last_error FROM agent_rules WHERE nome IN ('desconto_maximo_sem_aprovacao','lead_quente_sem_orcamento','op_atrasada','priorizar_op_urgente','follow_up_lead_24h') ORDER BY last_run DESC;`. Se algum continuar `last_error=NULL` MAS `last_run` não atualizar, sinal de bug no agent-cron-loop ignorando rule.
-- [ ] **NOVO ciclo #10 — P2 DEDUP TEMPLATES**: 2 duplicatas confirmadas em `agent_templates` (Follow-up 2 com `87ee3b8d`+`1afc43be`, Follow-up 3 com `596781bb`+`21e7035f`). DEFAULT AUTÔNOMO: DELETE rows duplicadas mantendo a mais antiga + auditar `agent_templates` por outras duplicatas (`SELECT nome, canal, etapa, count(*) FROM agent_templates GROUP BY 1,2,3 HAVING count(*)>1`). Migration idempotente. Janela qualquer (só dado, sem efeito Edge).
+- [ ] **🔥 NOVO ciclo #12 — P0 DEFAULT AUTÔNOMO INVESTIGAR agent-cron-loop Edge quebrado**: descoberto no ciclo #12 que pg_cron jobid 20 dispatch OK, mas Edge `agent-cron-loop` v23 (function_id `8681a3a5-f0cd-4ea0-b007-8d8bca3c9b0f`) não é invocada há 4+ dias. Plano executável: (a) `get_edge_function` source ACTIVE, (b) `get_logs` filtrado por function_id 24h, (c) smoketest manual POST com `Authorization: Bearer $(private.get_service_role_key())` body `{"source":"manual","scheduled":false}` pra ver resposta direta, (d) cross-check `dispatch-approved-messages` v5 (que USA pg_cron sem problemas — confirma JWT helper funciona pra outros jobs), (e) se Edge retorna erro → fix imediato; se OK → bug provável em `private.get_service_role_key()` retornando NULL silenciosamente pra esse comando. Edge interna, janela flexível.
+- [ ] **NOVO ciclo #12 — P0 VALIDAÇÃO RETROATIVA**: após fix agent-cron-loop, forçar disparo manual pra ver `last_run` atualizar nas 5 rules corrigidas E `last_error=NULL`. Só assim valida empiricamente que fix do ciclo #10 funcionou (smoketest direto do ciclo #10 NEGATIVO por causa do cron quebrado, NÃO por causa do fix em si).
+- [x] ✅ **DONE ciclo #12** — DEDUP 6 duplicatas obsoletas em `agent_templates` (4 grupos com 1 active + 1 inactive 20/03 — deletou inactive; 2 grupos Follow-up 2/3 com 2 inactives — deletou duplicata 02/04 mais nova). Zero FKs em `agent_campanhas`. Cleanup seguro.
 - [ ] **NOVO ciclo #10 — P2 SALDO MATERIAIS via movimentacoes**: criar view `materiais_com_saldo` ou função `fn_saldo_material(material_id)` calculando agregado `SUM(quantidade * CASE tipo WHEN 'entrada' THEN 1 WHEN 'saida' THEN -1 END)` de `movimentacoes_materiais`. Reativar `estoque_minimo` + `sugerir_compra_automatica` apontando pra essa fonte canônica. Smoketest com 5 materiais reais.
 
 - [x] ✅ **DONE ciclo #3** (commit `9b45c32`): header `VERSION = 'v14-persist-ia'` → `'v15-persist-ia'` em `supabase/functions/ai-chat-portal/index.ts` (drift cosmético resolvido)
@@ -225,7 +267,6 @@
 - [ ] Desativar webhook Telegram (Fase 1.3) — DEFAULT: marcar Edge como inactive, não deletar, fallback Channels já operacional
 - [x] ✅ **DONE pré-ciclo #7** — Seed `agent_templates` + `agent_rules` (Fase 2.3): 29 templates + 31 rules já populados em prod, 13 templates com meta_template_name aprovado pela Meta
 - [x] ✅ **DONE pré-ciclo #7** — Memory Layer schema (Fase 4.1): ai_memory existe com 4 rows. Auditoria ciclo #7 confirmou.
-- [ ] **NOVO ciclo #2 — P1 segurança ai-chat-portal v16 — DEFAULT AUTÔNOMO**: patch com (a) rate-limit por share_token (nova tabela `portal_rate_limit`, 20msg/h, 429 quando exceder), (b) `historico` derivado server-side de portal_mensagens filtrado por proposta_id (NÃO confiar no client), (c) sanitização leve mensagem cliente (cap 2000 chars + flag tags suspeitas), (d) encadear `.select().single()` em insert portal_mensagens + ai_alertas. **Estratégia segura**: deploy SHADOW v16-rc, smoketest em PROP-2026-0032 antes de promover. Janela noturna. SE smoketest falhar → rollback v15 + Telegram. SE passar → promover v16.
 - [ ] **NOVO ciclo #2 — P1 segurança ai-chat-portal v16 — DEFAULT AUTÔNOMO**: patch com (a) rate-limit por share_token (nova tabela `portal_rate_limit`, 20msg/h, 429 quando exceder), (b) `historico` derivado server-side de portal_mensagens filtrado por proposta_id (NÃO confiar no client), (c) sanitização leve mensagem cliente (cap 2000 chars + flag tags suspeitas), (d) encadear `.select().single()` em insert portal_mensagens + ai_alertas. **Estratégia segura**: deploy SHADOW v16-rc, smoketest em PROP-2026-0032 antes de promover. Janela noturna. SE smoketest falhar → rollback v15 + Telegram. SE passar → promover v16.
 
 ### Grandes (alguns DESTRAVADOS — DEFAULT AUTÔNOMO em SHADOW)

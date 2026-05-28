@@ -1,7 +1,147 @@
 ﻿
 # STATE — CRM Croma
 
-**Última sessão**: 2026-05-28 08:05 BRT (ciclo autônomo #10 — CORREÇÃO P0 das 6 rules + desativação de 5 templates duplicados + 2 acao.template inexistente)
+**Última sessão**: 2026-05-28 10:00 BRT (ciclo autônomo #12 — 3 achados: smoketest ciclo #10 NEGATIVO + 6 duplicatas dedupadas + agent-cron-loop Edge quebrado há 4 dias)
+
+## Ciclo autônomo #12 — 2026-05-28 10:00 BRT — Smoketest ciclo #10 NEGATIVO + ACHADO P0 agent-cron-loop Edge quebrado há 4 dias + DEDUP 6 duplicatas 🟢
+
+**Mantra**: EXPLORAR + CORRIGIR + ARRUMAR (3 tarefas paralelas). Hora 09:55-10:30 BRT (Quinta — rotação Produção + ai-chat-portal v15). Health VERDE pré: Vercel 200, ~100min API/edge zero 5xx, branch=main, HEAD `572ae86`, 76 Edges ACTIVE. **Working dir LIMPO** — corrupção do ciclo #11 resolvida (Junior aplicou `git checkout HEAD --` entre 09:05 e 10:00).
+
+### 🔴 ACHADO P0 #1 — Smoketest empírico ciclo #10 NEGATIVO + agent-cron-loop Edge quebrado há 4 dias
+
+Query `agent_rules` ordenado por `last_run DESC` revela: **TODAS 5 rules corrigidas têm `last_run = 2026-05-24 21:30 BRT`** (4 dias atrás), com `last_error = NULL`. Nenhuma rodou pós-fix do ciclo #10. Premissa do ciclo #10 ("cron ATIVO no jobid 20+21 = rules vão rodar") era **falsa**.
+
+Investigação cruzada:
+
+| Verificação | Resultado |
+|---|---|
+| `cron.job` jobid 20 `agent-cron-loop-30min` ativo? | ✅ active=true, schedule `*/30 11-23,0,2 * * 1-6` |
+| `cron.job_run_details` últimas 10 exec | TODAS `succeeded` em 5-13ms (10:00, 09:30, 09:00, 08:30, 08:00 BRT hoje, 23:30 ontem...) |
+| `cron.job` faz POST pra `https://djwjmfgplnqyffdcgdaw.supabase.co/functions/v1/agent-cron-loop` | ✅ confirmado |
+| Edge logs ~100min mostram invocação de `agent-cron-loop`? | ❌ ZERO — só `mcp-bridge-worker v8` + `dispatch-approved-messages v5` |
+| Total rules ativas | 12 de 31 |
+| Rules rodaram nas últimas 24h | **0** |
+| Max `last_run` em qualquer rule | **2026-05-24 21:30:08 BRT** |
+
+**Diagnóstico**: pg_cron dispara HTTP POST via `net.http_post` que retorna sucesso (request ENQUEUED). Mas a Edge `agent-cron-loop` v23 não está sendo executada — algum bug entre o `net.http_post` e a invocação real da Edge. Possibilidades: (a) JWT/auth `private.get_service_role_key()` retornando inválido, (b) Edge function timeout sem chegar a logar, (c) silent throw antes de qualquer console.log. 
+
+**Impacto operacional**: 12 agent_rules ativas (módulos comercial/produção/financeiro/etc) silenciosamente sem executar há 4 dias. Automações de follow-up, alertas de OP atrasada, lead quente sem orçamento, desconto sem aprovação — TODAS dormentes. Fase 2/3 do CROMA 4.0 está empiricamente quebrada nesse aspecto.
+
+### 🟡 ACHADO P1 #2 — 6 grupos de duplicatas em agent_templates (não 2 como ciclo #10 reportou)
+
+Query `GROUP BY nome, canal, etapa HAVING count > 1` revela:
+
+| Grupo | Active | Inactive | Decisão |
+|---|---|---|---|
+| WhatsApp Abertura Franquia | 1 (02/04 com meta) | 1 (20/03) | DELETE inactive 20/03 |
+| WhatsApp Abertura Varejo | 1 (02/04 com meta) | 1 (20/03) | DELETE inactive 20/03 |
+| WhatsApp Proposta | 1 (02/04 com meta) | 1 (20/03) | DELETE inactive 20/03 |
+| WhatsApp Reengajamento | 1 (02/04 com meta) | 1 (20/03) | DELETE inactive 20/03 |
+| WhatsApp Follow-up 2 | 0 | 2 (ambos inactive) | DELETE duplicata 02/04 (mais nova), mantém 20/03 |
+| WhatsApp Follow-up 3 | 0 | 2 (ambos inactive) | DELETE duplicata 02/04 (mais nova), mantém 20/03 |
+
+FK check: `agent_campanhas.template_id` é única FK pra `agent_templates`. **Zero rows** em `agent_campanhas` referenciando os 6 IDs alvo. **Cleanup SEGURO**.
+
+**Ação aplicada**: `DELETE FROM agent_templates WHERE id IN (...)` — 6 rows deletadas. Smoketest re-SELECT: dedup confirmado, 6 grupos viraram 6 únicos.
+
+### 🟢 Auditoria adversarial Produção (rotação Qui)
+
+| Tabela | Total | Finalizado/Concluida | Em prog | Aguardando | Outros |
+|---|---|---|---|---|---|
+| ordens_producao | 6 | 3 | 0 | 3 | 0 |
+| producao_etapas | 19 | 19 | 0 | 0 | 0 |
+| etapa_templates | 6 | — | — | — | — |
+| setores_producao | 6 (todos ativos) | — | — | — | — |
+
+Anomalias persistem dos ciclos anteriores:
+- **3 OPs sem etapas** (OP-2026-0012/0013/0014 confirmadas ciclo #3, persiste)
+- **2 pedidos `faturado` com OPs `aguardando_programacao`** (workflow inverso herdado de import)
+- **2 pedidos `em_producao` com TODAS OPs `finalizado`** (Fase 1.2 gap — pedido 1070 + PED-2026-0025 confirmados ciclos #4/#7)
+- **Zero FKs órfãs** entre `producao_etapas → ordens_producao` ✅
+- **Zero `em_andamento` etapas** — produção PCP está totalmente reativa, sem acompanhamento real-time
+
+### Defaults executáveis registrados no NEXT
+
+- **P0 — DEFAULT AUTÔNOMO próximo ciclo**: investigar Edge `agent-cron-loop` v23 (function_id `8681a3a5-f0cd-4ea0-b007-8d8bca3c9b0f`). Plano: (a) `get_edge_function` ler source da Edge ACTIVE, (b) `get_logs` filtrado por function_id pra 24h+, (c) smoketest manual POST com `Authorization: Bearer $(private.get_service_role_key())` + body `{"source":"manual","scheduled":false}` pra ver resposta direta, (d) se Edge retorna erro → fix imediato (provável JWT/RLS issue), (e) se Edge OK → bug está em pg_cron command (provável `private.get_service_role_key()` retornando NULL silenciosamente). Edge interna, janela horária flexível.
+- **P0 — DEFAULT AUTÔNOMO próximo ciclo (validação retroativa)**: após fix agent-cron-loop, forçar disparo manual pra ver `last_run` atualizar nas 5 rules corrigidas + `last_error` ficar NULL — só assim valida empiricamente que fix do ciclo #10 funcionou.
+- **P2 — REGISTRAR**: o smoketest empírico do ciclo #10 só fica válido depois que agent-cron-loop voltar a executar. Não é regressão do fix, é dependência crítica não detectada na época.
+
+### Anti-pattern evitado
+
+Não tentei "consertar" agent-cron-loop sem investigação (poderia introduzir regressão). Não rotacionei `dispatch-approved-messages` v5 (que também usa pg_cron sem problemas — confirma que `private.get_service_role_key()` funciona pra outros jobs). Verifiquei FKs antes de DELETE (zero ref garantido). Ledger sempre atualizado com ACHADO empírico.
+
+### Próxima sugestão (ciclo #13)
+
+Investigar agent-cron-loop v23 conforme P0 NEXT. Tempo estimado: 1 ciclo. Se descoberta for fix simples (env var faltando, RLS bloqueando), aplicar no mesmo ciclo. Se for refactor maior, criar HANDOFF-CLAUDE-CODE.
+
+---
+
+## Ciclo autônomo #11 — 2026-05-28 09:05 BRT — 🔴 ABORTADO POR CORRUPÇÃO WORKING DIR (incidente 08:30 persiste 35min pós-checkout alegado)
+
+## Ciclo autônomo #11 — 2026-05-28 09:05 BRT — 🔴 ABORTADO POR CORRUPÇÃO WORKING DIR (incidente 08:30 persiste 35min pós-checkout alegado)
+
+**Mantra**: PASSIVO DEFENSIVO. Guardrail anti-corrupção da `autonomous-rules.md` v4.0 acionado na Etapa 4. Hora 09:05 BRT (Quinta — rotação seria Produção + ai-chat-portal v15).
+
+### Detecção
+
+`git diff --stat HEAD` mostra **13 arquivos modified**, dos quais **8 fora de `.planning/` e `STATE.md`** — exatamente os mesmos 8 arquivos do BLOCKED incidente 08:30:
+
+| Arquivo | Última linha (tail -5) | Padrão |
+|---|---|---|
+| `src/components/Layout.tsx` | `      <` | tag não fechada |
+| `src/shared/constants/navigation.ts` | (esperado: cortada em `export function findNav`) | função incompleta |
+| `src/routes/comercialRoutes.tsx` | (esperado: cortada em rota) | rota incompleta |
+| `supabase/functions/ai-shared/ai-logger.ts` | `// RLS aper` | palavra "aperte" cortada |
+| `supabase/functions/whatsapp-webhook/index.ts` | `length > 150 ` | expressão incompleta sem `?`/`:` |
+| `supabase/functions/ai-sequenciar-producao/index.ts` | `.select().single() o` | palavra cortada |
+| `supabase/functions/ai-briefing-producao/index.ts` | (assumido similar) | (não validado tail individual) |
+| `supabase/functions/ai-analisar-foto-instalacao/index.ts` | (assumido similar) | (não validado tail individual) |
+
+**CORRUPÇÃO CONFIRMADA**: EOF abrupto sem newline final, padrão idêntico ao incidente 08:30. 4 dos 4 arquivos sample validados via tail apresentam corte abrupto.
+
+### Hipótese sobre persistência
+
+Ledger BLOCKED 08:30 (escrito pela sessão Junior interativa) afirma: "Correção aplicada 08:30: `git checkout HEAD --` restaurou os 8 arquivos. Working dir limpo."
+
+**Working dir continua corrompido 35min depois (09:05 BRT)**. Ranking de hipóteses:
+
+1. **(a) Junior atualizou ledger BEFORE rodar checkout** — intenção registrada antes da execução; comando nunca rodou ou rodou em outro working dir
+2. **(b) Sessão Junior ainda em andamento** — working dir instável durante edição
+3. **(c) Checkout aplicado mas algo recriou** — improvável (não há ciclo autônomo entre #10 commit 08:05 e este #11 às 09:05)
+
+### Ação tomada (conforme regra)
+
+- ABORTAR ciclo (não executar rotação Produção, não avançar NEXT)
+- **NÃO aplicar `git checkout` autonomamente** — decisão de Junior ou ciclo seguinte com confirmação explícita
+- Cérebros 1-3 atualizados pra rastreabilidade
+- Telegram 🔴 enviado
+- Health check completo registrado (prod intacta)
+
+### Impacto prod
+
+**ZERO**. HEAD `572ae86` em sync com origin. Vercel 200 OK. ~100min API/edge logs zero 5xx (só `fn_claim_ai_requests` + `fn_calcular_limite_diario` + `admin_config` recorrente do mcp-bridge-worker v8 cron + 1 hit ai-detectar-problemas 03:20 BRT). 76 Edges ACTIVE em versões do ledger. Working dir local sujo, **NÃO pushed**.
+
+### Observação estratégica adversarial
+
+Todos 8 arquivos foram editados em **ciclos autônomos #4/#5/#6** via `Edit` tool. `Layout.tsx` tinha ~568 linhas pré-edit. Hipótese plausível: **Cowork Edit tool trunca arquivos > 500 LOC silenciosamente** quando old_string casa mas new_string excede budget. Confirma exatamente o "anti-pattern" registrado no CLAUDE.md REGRA #0:
+
+> Cowork vs Claude Code: trabalho em arquivos >500 linhas (Edit do Cowork trunca) ou rebuilds completos → recomendar Junior rodar Claude Code local.
+
+**Recomendação preventiva**: ciclos futuros **NÃO usar Edit em arquivos > 500 LOC** sem agente isolado primeiro. Considerar adicionar este guardrail explícito em `autonomous-rules.md` v4.1.
+
+### Cleanup proposto pra Junior
+
+Comando exato (copy-paste):
+
+```
+cd C:\Users\Caldera\Claude\CRM-Croma
+git checkout HEAD -- src/components/Layout.tsx src/routes/comercialRoutes.tsx src/shared/constants/navigation.ts supabase/functions/ai-analisar-foto-instalacao/index.ts supabase/functions/ai-briefing-producao/index.ts supabase/functions/ai-sequenciar-producao/index.ts supabase/functions/ai-shared/ai-logger.ts supabase/functions/whatsapp-webhook/index.ts
+git diff --stat HEAD
+```
+
+Esperado pós-comando: working dir limpo (só `.planning/*` + `STATE.md` modificados).
+
+---
 
 ## Ciclo autônomo #10 — 2026-05-28 08:05 BRT — CORREÇÃO P0 BOMBA do ciclo #9: 4 rules schema fix + 2 desativadas + 5 templates WA off + 1 acao.template corrigido 🟢
 

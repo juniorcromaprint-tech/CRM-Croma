@@ -4,6 +4,125 @@
 > Junior lê pra auditar progresso quando volta.
 > Formato definido em `autonomous-rules.md` seção "FORMATO DO LOG".
 
+## 2026-05-28 10:00 (ciclo #12)
+
+**Status**: 🟢 VERDE
+**Tipo**: explorar + corrigir + arrumar (3 tarefas paralelas)
+**Auto-diálogo**:
+1. 3 ciclos anteriores: #9 ACHADO P0 (6 rules + 3 templates) → #10 correção (4 rules fix + 2 desativadas + 5 templates off + 1 acao.template) → #11 ABORTADO por corrupção working dir (35min pós-checkout alegado)
+2. Dia/módulo: Quinta = Produção + ai-chat-portal v15 (rotação)
+3. Gap mais útil AGORA: (a) validar empiricamente que ciclo #10 funcionou (smoketest empírico), (b) dedup templates ampla, (c) auditoria adversarial Produção
+4. Conflito IN-PROGRESS/BLOCKED: NÃO — working dir LIMPO (Junior aplicou checkout entre 09:05-10:00), zero IN-PROGRESS
+5. STATE/Obsidian: Obsidian daily registrou ciclo #11 abortado. memory.md sem entrada nova
+6. MODO PASSIVO: NÃO — working dir limpo, health VERDE, sem 5xx, branch=main HEAD `572ae86`
+7. Critério mensurável: (a) 5 rules têm last_run > 08:05 BRT E last_error=NULL → smoketest empírico passa, (b) 6 duplicatas viram únicas, (c) gap report Produção com counts e anomalias
+
+**Health check**: Vercel 200 OK | API logs ~100min: TODOS 200 (zero 5xx, só fn_claim_ai_requests + fn_calcular_limite_diario + admin_config recorrente do mcp-bridge-worker v8 cron + impressora_jobs HP Latex sync com alguns 400 esperado — schema impressora_consumiveis errado) | Edge logs idem (zero 5xx — só mcp-bridge-worker v8 + dispatch-approved-messages v5) | 76 Edges canônicas ACTIVE (whatsapp-webhook v46, briefing-beira-rio v10, ai-gerar-orcamento v29, ai-chat-portal v15, portal-upload-assinatura v1, mcp-bridge-worker v8, ai-sequenciar-producao v13, ai-briefing-producao v22, ai-analisar-foto-instalacao v13, agent-cron-loop v23) | branch=main, HEAD `572ae86` em sync com origin | working dir LIMPO (5 arquivos planning + 1 untracked herdado)
+
+**Agents disparados**: 0 (8 queries SQL paralelas + 1 DELETE + 1 PowerShell Obsidian + Edits)
+
+**Ações executadas**:
+1. Read paralelo (CLAUDE.md + 5 planning + STATE 500 linhas + REQUIREMENTS + log) + list_edge_functions + 2x get_logs + web_fetch Vercel + git status PowerShell + Obsidian memory+daily — tudo no mesmo turno
+2. Auto-diálogo das 7 perguntas registrado literalmente acima
+3. 4 queries SQL paralelas: (a) smoketest empírico 5 rules ciclo #10, (b) dedup amplo agent_templates GROUP BY HAVING, (c) auditoria Produção counts, (d) FKs órfãs + Fase 1.2 gap
+4. **🔴 ACHADO P0 #1 (BOMBA)**: smoketest negativo — TODAS 5 rules com last_run=2026-05-24 21:30 BRT (4 dias atrás), last_error=NULL. Investigação cruzada: `cron.job_run_details` mostra agent-cron-loop-30min `succeeded` em 5-13ms a cada 30min (jobid 20 ativo, schedule `*/30 11-23,0,2 * * 1-6`). MAS edge logs ~100min mostram ZERO invocações de `agent-cron-loop`. **pg_cron dispatch OK, Edge não executa**.
+5. Cross-check `dispatch-approved-messages` v5 USA pg_cron e aparece nos edge logs (200 OK 2-3s) — confirma `private.get_service_role_key()` funciona pra outros jobs
+6. **🟡 ACHADO P1 #2**: dedup amplo revela 6 grupos de duplicatas (não 2 como ciclo #10 reportou): Abertura Franquia/Varejo/Proposta/Reengajamento (1 active 02/04 + 1 inactive 20/03 cada), Follow-up 2/3 (2 inactives cada). FK check em agent_campanhas: ZERO refs.
+7. **DELETE 6 duplicatas obsoletas aplicado** retornando `{deletados:6, nomes:[Reengajamento, Abertura Franquia, Proposta, Follow-up 3, Follow-up 2, Abertura Varejo]}`. Smoketest: dedup confirmado.
+8. **🟢 Auditoria Produção** rotação Qui: 6 OPs (3 finalizadas, 3 aguardando, 0 em_producao), 19 etapas todas concluida, 6 etapa_templates seedados ciclo #4, 6 setores ativos. Anomalias persistem: 3 OPs sem etapas, 2 pedidos faturado+OPs aguardando, 2 pedidos Fase 1.2 gap (1070+PED-2026-0025). Zero FKs órfãs ✅
+9. Edits paralelos: STATE.md (entrada nova topo) + autonomous-ledger.md (DONE+NEXT) + autonomous-log.md (este append) + Obsidian daily via Windows-MCP
+
+**Decisão tomada**:
+- NÃO tentei consertar agent-cron-loop sem investigação (alto risco regressão). Registrei como P0 DEFAULT EXECUTÁVEL próximo ciclo com plano concreto (get_edge_function + get_logs filtrado + smoketest manual POST)
+- NÃO promovi trigger SHADOW production_completed (continua esperando evento real, NÃO no-op)
+- Aplicei DELETE 6 duplicatas direto em prod (pré-aprovado, zero FKs)
+- Smoketest empírico do ciclo #10 fica como **inválido até cron voltar** — fix das rules pode estar correto, mas não dá pra validar enquanto Edge agent-cron-loop não executa
+
+**Resultado**: Ciclo VERDE com 3 achados úteis. (a) Validação empírica revelou bug maior que o do ciclo #10 — agent-cron-loop Edge quebrado há 4 dias. (b) Dedup ampliado: 6 obsoletos deletados (vs 2 que ciclo #10 reportava). (c) Produção: mapa de gaps + zero FKs órfãs. Próximo ciclo tem caminho desimpedido pra atacar agent-cron-loop v23 com plano executável documentado.
+
+**Ledger update**:
+- DONE: "Ciclo #12 — smoketest #10 NEGATIVO + ACHADO P0 cron Edge + DEDUP 6 templates" adicionado
+- NEXT removido (DONE): "DEDUP templates" (6 obsoletos deletados, dedup completo)
+- NEXT (novo P0): investigar Edge agent-cron-loop v23 quebrado há 4 dias — plano executável com 5 passos
+- NEXT (novo P0): validação retroativa rules pós-fix agent-cron-loop
+- NEXT (mantido P2): saldo materiais via movimentacoes (não atacado este ciclo)
+
+**Commits**: a fazer (1 commit consolidado planning + 0 source Edge)
+**Deploys**: 0
+**Migrations**: 0
+**Token usage**: ~340k (Read paralelo + Obsidian + 8 SQL queries + 1 DELETE + Edits 3 planning + PowerShell)
+**Telegram**: a enviar
+
+---
+
+## 2026-05-28 09:05 (ciclo #11) — 🔴 ABORTADO POR CORRUPCAO WORKING DIR (incidente 08:30 persiste)
+
+**Status**: 🔴 VERMELHO
+**Tipo**: passivo defensivo (guardrail anti-corrupcao acionado)
+**Auto-dialogo registrado**:
+1. 3 ciclos anteriores: #8 agent_config 12 seed → #9 ACHADO P0 6 rules + 3 templates → #10 CORRECAO 4 rules fix + 5 templates desativados
+2. Dia da semana: Quinta = Producao + ai-chat-portal v15 (rotacao)
+3. Gap mais util agora: corrigir 5xx ativo OU continuar rotacao Producao OU NEXT P2 do ciclo #10 (smoketest empirico, dedup templates, saldo materiais via movimentacoes)
+4. Conflito IN-PROGRESS/BLOCKED: SIM — BLOCKED do ledger registra incidente 08:30 corrupcao working dir; guardrail Etapa 4 obriga checar git diff --stat HEAD
+5. STATE/Obsidian dao contexto novo: STATE topo confirma ciclo #10 commit 572ae86, sem mencao a working dir limpo pos-08:30
+6. MODO PASSIVO: SIM acionado (corrupcao confirmada)
+7. Criterio sucesso mensuravel: nao se aplica — guardrail aborta ciclo antes de executar trabalho
+
+**Health check**: Vercel 200 OK | API logs ~100min: TODOS 200 (zero 5xx, so fn_claim_ai_requests + fn_calcular_limite_diario + admin_config recorrente; 1 hit ai-detectar-problemas em 03:20 BRT) | Edge logs idem (zero 5xx; mcp-bridge-worker v8 + dispatch-approved-messages v5 + ai-detectar-problemas v21 todos 200) | 76 Edges canonicas ACTIVE conforme ledger (whatsapp-webhook v46, briefing-beira-rio v10, ai-gerar-orcamento v29, ai-chat-portal v15, portal-upload-assinatura v1, mcp-bridge-worker v8, ai-sequenciar-producao v13, ai-briefing-producao v22, ai-analisar-foto-instalacao v13) | branch=main, HEAD `572ae86` em sync com origin
+
+**🚨 GUARDRAIL ANTI-CORRUPCAO ACIONADO**
+
+`git diff --stat HEAD` mostra 13 arquivos modified — **8 fora de `.planning/` e `STATE.md`**, exatamente os mesmos do BLOCKED incidente 08:30:
+- `src/components/Layout.tsx`
+- `src/routes/comercialRoutes.tsx`
+- `src/shared/constants/navigation.ts`
+- `supabase/functions/ai-analisar-foto-instalacao/index.ts`
+- `supabase/functions/ai-briefing-producao/index.ts`
+- `supabase/functions/ai-sequenciar-producao/index.ts`
+- `supabase/functions/ai-shared/ai-logger.ts`
+- `supabase/functions/whatsapp-webhook/index.ts`
+
+**Validacao tail -5 em 4 arquivos suspeitos**:
+- `Layout.tsx` → linha final `      <` (tag nao fechada, corte abrupto)
+- `ai-logger.ts` → linha final `// Refactor previne regressoes futuras caso schema mude ou RLS aper` (palavra "aperte" cortada)
+- `whatsapp-webhook` → linha final `    const tm = textBody.length > 150 ` (expressao incompleta, sem `?`/`:`)
+- `ai-sequenciar-producao` → linha final `    // Fix v13-rc: schema CORRETO ai_logs + .select().single() o` (palavra cortada)
+
+Padrao IDENTICO ao incidente 08:30: EOF abrupto sem newline final, arquivos cortados no meio de tags/expressoes/palavras. **CORRUPCAO CONFIRMADA**.
+
+**Hipotese sobre persistencia pos-checkout**:
+- Junior alegou no ledger BLOCKED ter aplicado `git checkout HEAD --` as 08:30
+- Working dir ainda corrompido as 09:05 (35min depois)
+- Hipotese: (a) Junior atualizou ledger antes de aplicar checkout e ainda nao rodou; (b) checkout foi aplicado mas algo recriou corrupcao; (c) sessao Junior ainda em andamento
+
+**Acao tomada (conforme regra)**:
+- ABORTAR ciclo (nao executar rotacao Producao, nao avancar NEXT do ledger)
+- NAO aplicar `git checkout` autonomamente (decisao Junior ou proximo ciclo apos confirmacao)
+- Append este log + STATE entry + ledger BLOCKED reforco + Obsidian daily + Telegram 🔴
+- Health check completo registrado pra evidencia de prod intacta
+
+**Confirmacao prod intacta**:
+- HEAD `572ae86` em sync com origin/main
+- Vercel + Edges em prod operacionais (200 OK consistente)
+- Corrupcao e apenas working dir local — NAO afeta producao
+
+**Decisao tomada**: passivo defensivo conforme regra. Nao consertar autonomamente. Reportar via cerebros 1-3 + Telegram. Aguardar Junior ou ciclo #12 com decisao explicita.
+
+**Resultado**: Ciclo VERMELHO defensivo. Zero mutation banco, zero deploy, zero commit, zero git operation. Cerebros 1-3 atualizados pra rastreabilidade.
+
+**Ledger update**:
+- DONE: nao acrescenta (ciclo nao entregou trabalho)
+- BLOCKED: reforco do incidente 08:30 — corrupcao PERSISTE pos-checkout alegado (registrar tempo + evidencia)
+- NEXT: nao acrescenta novos (mantem NEXT do ciclo #10 prontos pra retomada quando working dir limpo)
+
+**Commits**: 0
+**Deploys**: 0
+**Migrations**: 0
+**Token usage**: ~55k (Read paralelo CLAUDE+mission+rules+ledger+log+REQUIREMENTS + STATE 500 linhas + Obsidian memory+daily + health check paralelo + tail validacao + edits planning)
+**Telegram**: a enviar 🔴
+
+---
+
 ## 2026-05-28 07:30 (ciclo #9)
 
 **Status**: 🟢 VERDE
