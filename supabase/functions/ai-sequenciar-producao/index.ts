@@ -5,6 +5,14 @@
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2';
 import { getCorsHeaders, handleCorsOptions, authenticateAndAuthorize, jsonResponse } from '../ai-shared/ai-helpers.ts';
 
+// v13-rc (ciclo autonomo #4 2026-05-28):
+//  - Adicionado VERSION pra rastreabilidade
+//  - Fix .select().single() em ai_logs.insert (era .catch(()=>{}) violando regra dura)
+//  - Schema fix ai_logs: function_name/model_used/tokens_input/output/cost_usd (schema real)
+//    Antes: funcao/tokens_usados/custo/metadata — colunas que NAO EXISTEM. Insert sempre falhou silenciosamente.
+//  - NOTA: deployed em prod é STANDALONE (sem ai-shared), source local usa ai-shared como design futuro DI.
+const VERSION = 'v13-rc';
+
 const SUPABASE_URL = Deno.env.get('SUPABASE_URL')!;
 const SERVICE_ROLE_KEY = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!;
 
@@ -100,13 +108,21 @@ Deno.serve(async (req) => {
     const atrasados = sequencia.filter(s => s.status_prazo === 'atrasado').length;
     const urgentes = sequencia.filter(s => s.status_prazo === 'urgente').length;
 
-    await supabase.from('ai_logs').insert({
-      funcao: 'sequenciar-producao',
+    // Fix v13-rc: schema CORRETO ai_logs + .select().single() obrigatorio
+    const { data: logData, error: logError } = await supabase.from('ai_logs').insert({
+      function_name: 'sequenciar-producao',
+      model_used: 'system/heuristic',
       user_id: authResult.userId,
-      tokens_usados: 0,
-      custo: 0,
-      metadata: { total_ops: sequencia.length, atrasados, urgentes },
-    }).catch(() => {});
+      entity_type: 'sequencia',
+      tokens_input: 0,
+      tokens_output: 0,
+      cost_usd: 0,
+      status: 'success',
+      error_message: JSON.stringify({ total_ops: sequencia.length, atrasados, urgentes, version: VERSION }),
+    }).select().single();
+    if (logError || !logData) {
+      console.warn('[ai-sequenciar-producao v13-rc] ai_logs insert falhou:', logError?.message ?? 'no data');
+    }
 
     return jsonResponse({
       sequencia,
@@ -116,6 +132,7 @@ Deno.serve(async (req) => {
         urgentes,
         no_prazo: sequencia.length - atrasados - urgentes,
       },
+      version: VERSION,
     }, 200, corsHeaders);
 
   } catch (err) {
