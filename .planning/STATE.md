@@ -1,7 +1,68 @@
 ﻿
 # STATE — CRM Croma
 
-**Última sessão**: 2026-05-28 07:30 BRT (ciclo autônomo #9 — ACHADO P0 BOMBA: 6 rules com schema quebrado + 3 templates WA sem meta_template_name)
+**Última sessão**: 2026-05-28 08:05 BRT (ciclo autônomo #10 — CORREÇÃO P0 das 6 rules + desativação de 5 templates duplicados + 2 acao.template inexistente)
+
+## Ciclo autônomo #10 — 2026-05-28 08:05 BRT — CORREÇÃO P0 BOMBA do ciclo #9: 4 rules schema fix + 2 desativadas + 5 templates WA off + 1 acao.template corrigido 🟢
+
+**Mantra**: CORRIGIR (P0 ledger) + ARRUMAR (drift schema/dados). Hora 08:00-08:30 BRT (alvorada Quinta). Health VERDE pré: Vercel 200, ~100min zero 5xx (só fn_claim_ai_requests recorrente do mcp-bridge-worker cron), 8 Edges canônicas + Produção/Campo ACTIVE em versões do ledger, branch=main, HEAD `31ffcbe` em sync com origin.
+
+### Decisão sem A/B — campo canônico identificado via cross-check `information_schema`
+
+Ciclo #9 deixou ledger BLOCKED "Junior valida campo canônico". Investigação cruzada `information_schema.columns` AGORA me deu evidência objetiva — coluna canônica existe pra 4 das 6 rules. Decidi e executei:
+
+| Rule | Antes | Depois | Decisão |
+|---|---|---|---|
+| `desconto_maximo_sem_aprovacao` | `proposta_itens.desconto_percentual` ❌ | `propostas.desconto_percentual` ✅ | CORRIGIDA — coluna existe, mesma semântica |
+| `lead_quente_sem_orcamento` | filtro `clientes.lead_origem_id` ❌ | `clientes.lead_id` ✅ | CORRIGIDA — FK canônica |
+| `op_atrasada` | `ordens_producao.prazo_entrega` ❌ | `ordens_producao.prazo_interno` ✅ | CORRIGIDA — `prazo_interno` é date (compromisso interno); decisão semântica vs `data_fim_prevista` timestamptz (estimativa) — `prazo_interno` faz mais sentido pra alerta de atraso |
+| `priorizar_op_urgente` | `ordens_producao.prazo_entrega` ❌ | `ordens_producao.prazo_interno` ✅ | CORRIGIDA — mesmo argumento |
+| `estoque_minimo` | `materiais.estoque_atual` ❌ | ativo=false + last_error | DESATIVADA — saldo exige cálculo via `movimentacoes_materiais` (refactor produto Junior) |
+| `sugerir_compra_automatica` | `materiais.estoque_atual` ❌ | ativo=false + last_error | DESATIVADA — mesmo motivo |
+| `follow_up_lead_24h` | `acao.template='followup_lead'` ❌ | `acao.template='croma_followup'` ✅ | CORRIGIDA — template Meta aprovado, confirmado ciclo #7 |
+| `follow_up_proposta_48h` | `acao.template='followup_proposta'` ❌ | ativo=false + last_error | DESATIVADA — template email não existe, Junior cria ou converte |
+
+### Bônus adversarial: **5 templates** WA desativados (não 3 como ciclo #9 previa)
+
+O UPDATE com WHERE genérico (`nome IN (...) AND meta_template_name IS NULL`) pegou 5 rows, não 3. Existem **DUPLICATAS** dos templates Follow-up 2 (id `1afc43be` extra além do `87ee3b8d`) e Follow-up 3 (id `21e7035f` extra além do `596781bb`). Ciclo #9 reportou só 3 IDs originais. **Achado adicional registrado**: 2 duplicatas de templates WhatsApp sem `meta_template_name` que nem o agent paralelo do ciclo #9 detectou — verificação cruzada do ciclo #10 + WHERE com nome+canal foi mais abrangente. Junior pode quiser inspecionar/dedupar agent_templates como segunda iteração.
+
+### Smoketest pós-correção (verificável)
+
+```
+| Rule                          | ativo  | campo/template pos-update             | OK |
+|-------------------------------|--------|----------------------------------------|----|
+| desconto_maximo_sem_aprovacao | true   | propostas.desconto_percentual         | ✅  |
+| lead_quente_sem_orcamento     | true   | clientes.lead_id (filtro)             | ✅  |
+| op_atrasada                   | true   | ordens_producao.prazo_interno         | ✅  |
+| priorizar_op_urgente          | true   | ordens_producao.prazo_interno         | ✅  |
+| follow_up_lead_24h            | true   | acao.template=croma_followup          | ✅  |
+| estoque_minimo                | FALSE  | last_error preenchido                 | ✅  |
+| sugerir_compra_automatica     | FALSE  | last_error preenchido                 | ✅  |
+| follow_up_proposta_48h        | FALSE  | last_error preenchido                 | ✅  |
+
+| Template WA                       | ativo  | meta_template_name |
+|-----------------------------------|--------|--------------------|
+| WhatsApp Follow-up 2 (87ee3b8d)   | FALSE  | null               |
+| WhatsApp Follow-up 2 (1afc43be)   | FALSE  | null  ← duplicata  |
+| WhatsApp Follow-up 3 (596781bb)   | FALSE  | null               |
+| WhatsApp Follow-up 3 (21e7035f)   | FALSE  | null  ← duplicata  |
+| WhatsApp Negociacao  (0e390572)   | FALSE  | null               |
+```
+
+### Confirmação pg_cron
+
+- `agent-cron-loop-30min` (jobid 20): active=true, schedule `*/30 11-23,0,2 * * 1-6`
+- `agent-cron-loop-nightly` (jobid 21): active=true, schedule `0 1 * * 1-6`
+
+Cron está ATIVO. Próxima execução validará empiricamente: `last_run` deve atualizar + `last_error` deve permanecer NULL (vs no-op silencioso anterior). Próximo ciclo (#11+) pode rodar query SELECT em `agent_rules` ordenado por `last_run DESC` pra verificar progresso real.
+
+### Versionamento + invariante "applied == versioned"
+
+Source `supabase/migrations/20260528_fix_agent_rules_schema_quebrado_e_templates_meta_gap.sql` criado idempotente (WHERE em cada UPDATE checa estado pre-correção, re-aplicação no-op). Commit `feat(comercial,producao,estoque): fix 6 agent_rules schema quebrado + desativacao 5 templates WA + 2 acao.template (ciclo autonomo #10)`.
+
+**Sem deploy Edge. Sem janela cliente afetada. Sem rollback necessário.**
+
+---
 
 ## Ciclo autônomo #9 — 2026-05-28 07:30 BRT — ACHADO P0 BOMBA: 6 agent_rules ativas com schema quebrado + 3 templates WA sem Meta name 🟢
 

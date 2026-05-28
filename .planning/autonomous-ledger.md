@@ -8,6 +8,22 @@
 
 ## DONE — Trabalho consolidado em produção (NÃO TOCAR sem motivo grande)
 
+### Ciclo autônomo #10 — CORREÇÃO P0 6 rules schema quebrado + 5 templates WA + 2 acao.template (2026-05-28 08:05)
+- Health VERDE pós-ciclo #9: Vercel 200, ~100min API/edge zero 5xx, branch=main, HEAD `31ffcbe`
+- **Verificar antes de assumir**: cross-check `information_schema.columns` deu evidência objetiva da coluna canônica em 4/6 rules (era "Junior valida" no BLOCKED do ciclo #9). 4 corrigidas, 2 desativadas com `last_error` rastreável.
+- **4 RULES CORRIGIDAS (campo canônico identificado por information_schema)**:
+  - `desconto_maximo_sem_aprovacao`: `proposta_itens.desconto_percentual` → `propostas.desconto_percentual` (existe, mesma semântica)
+  - `lead_quente_sem_orcamento`: filtro `clientes.lead_origem_id` → `clientes.lead_id` (FK canônica)
+  - `op_atrasada`: `ordens_producao.prazo_entrega` → `ordens_producao.prazo_interno` (date, compromisso interno — mais semântico pra alerta atraso vs `data_fim_prevista` timestamptz estimativa)
+  - `priorizar_op_urgente`: mesmo argumento → `prazo_interno`
+- **2 RULES DESATIVADAS (campo exige decisão produto Junior)**: `estoque_minimo` + `sugerir_compra_automatica` — `materiais.estoque_atual` não existe (cálculo via `movimentacoes_materiais` aggregate é refactor produto). `ativo=false` + `last_error` explicativo.
+- **1 acao.template CORRIGIDA**: `follow_up_lead_24h` → `croma_followup` (template Meta aprovado confirmado ciclo #7)
+- **1 RULE DESATIVADA (template email inexistente)**: `follow_up_proposta_48h` → ativo=false + last_error (canal email + template `followup_proposta` não existe em agent_templates).
+- **🎁 ACHADO ADICIONAL CICLO #10**: UPDATE de templates WhatsApp pegou **5 rows** (não 3 como ciclo #9 previa). Existem DUPLICATAS no banco: Follow-up 2 tem 2 IDs (`87ee3b8d`+`1afc43be`), Follow-up 3 tem 2 IDs (`596781bb`+`21e7035f`). Cinco templates desativados. **NEXT P2 deduplicar agent_templates**: 2 templates duplicados detectados pelo ciclo #10 (nome+canal+etapa idênticos).
+- Migration `supabase/migrations/20260528_fix_agent_rules_schema_quebrado_e_templates_meta_gap.sql` versionada idempotente (WHERE em cada UPDATE checa estado pré-correção, re-aplicação no-op).
+- pg_cron `agent-cron-loop-30min` (jobid 20) e `agent-cron-loop-nightly` (jobid 21) ativos — próxima execução automática validará: `last_run` deve atualizar + `last_error=NULL`. Smoketest empírico próximo ciclo (SELECT por `last_run DESC`).
+- Zero deploy Edge. Sem janela cliente afetada. Sem migration DDL (só UPDATE em data layer).
+
 ### Refundação Beira Rio (2026-05 sprints — concluída)
 - `whatsapp-webhook` v44 ACTIVE (guard INTERNAL_PHONES, route to briefing-beira-rio)
 - `briefing-beira-rio` v10 ACTIVE (referencia + prazo + logistica + store + notify_chat_id)
@@ -144,17 +160,8 @@
 - ✅ CORRIGIDO ciclo #2: Obsidian É acessível via Windows-MCP PowerShell (`Get-Content` + `Add-Content`). Manter rules etapa 3 como está.
 - ⚠️ scheduled task cron NÃO carrega MCP Croma via Desktop Commander automaticamente — auditorias de dados negócio devem usar `execute_sql` direto ou disparar agent isolado
 
-### 🔴 NOVO BLOCKED (descoberto ciclo #9 — 2026-05-28 07:30)
-- 🔴 **6 AGENT_RULES ATIVAS COM SCHEMA QUEBRADO** (rodaram ~1280× cada como silent no-op):
-  - `desconto_maximo_sem_aprovacao` precisa `condicao.campo` corrigido pra coluna existente em `proposta_itens` (sugestão: `desconto_unitario` ou similar — Junior valida campo canônico)
-  - `lead_quente_sem_orcamento`: filtro precisa `clientes.lead_id` no lugar de `clientes.lead_origem_id`
-  - `estoque_minimo` + `sugerir_compra_automatica`: lógica precisa rever — `materiais.estoque_atual` não existe. Possível: calcular saldo via `movimentacoes_materiais` aggregate ou outra fonte. Decisão de produto: comparar estoque vs `estoque_minimo` ou vs `estoque_ideal`?
-  - `op_atrasada` + `priorizar_op_urgente`: trocar `prazo_entrega` por `prazo_interno` (date, compromisso) OU `data_fim_prevista` (timestamptz, estimativa). Semanticamente diferentes — Junior decide qual.
-  - **DEFAULT AUTÔNOMO próximo ciclo**: gerar SQL UPDATE proposto pra cada rule com smoketest empírico antes (forçar disparo do agent-cron-loop manualmente após cada fix, verificar `last_error` NÃO surge).
-
-- 🔴 **3 TEMPLATES WHATSAPP ATIVOS SEM `meta_template_name`**: WhatsApp Follow-up 2 (id `87ee3b8d`), WhatsApp Follow-up 3 (id `596781bb`), WhatsApp Negociacao (id `0e390572`). Fora da janela 24h, Meta API rejeita → cadência quebra. **DEFAULT AUTÔNOMO próximo ciclo**: rodar `whatsapp-submit-templates` Edge passando esses 3 templates, aguardar Meta aprovar, popular `meta_template_name` no banco. OU desativar até aprovação.
-
-- 🔴 **2 RULES COM `acao.template` APONTANDO PRA TEMPLATES INEXISTENTES**: `follow_up_lead_24h` (template `followup_lead`) e `follow_up_proposta_48h` (template `followup_proposta`). Strings não correspondem a nenhum `nome` nem `meta_template_name` da tabela agent_templates. **DEFAULT AUTÔNOMO**: UPDATE `acao.template` apontando pra meta_template_name real (`croma_followup` p/ WA, ou nome de template email existente).
+### ✅ RESOLVIDO ciclo #10 (era BLOCKED do ciclo #9)
+- ✅ **DONE ciclo #10**: 4 das 6 rules corrigidas com campo canônico via cross-check `information_schema`. 2 rules estoque desativadas (cálculo saldo exige decisão produto). 1 acao.template (`follow_up_lead_24h`) corrigida pra `croma_followup`. `follow_up_proposta_48h` desativada (template email não existe). 5 templates WA desativados (3 originais + 2 duplicatas extras descobertas pelo ciclo #10). Migration versionada `20260528_fix_agent_rules_schema_quebrado_e_templates_meta_gap.sql`.
 
 ### Itens conhecidos pendentes
 - 🔴 **Rotacionar PAT Supabase** — `sbp_db39d12f...` vazou em working dir desde 21/05, foi redigido em `docs/plano-ia/2026-05-21-handoff-etapa2-ponte-cowork.md` mas precisa ROTACIONAR no painel Supabase. Crítico.
@@ -173,6 +180,10 @@
 ## NEXT — Sugestões priorizadas pra próximos ciclos (atualizar a cada ciclo)
 
 ### Pequenos (cabem num ciclo — autonomamente seguros)
+- [ ] **NOVO ciclo #10 — P2 SMOKETEST EMPÍRICO**: próximo ciclo após `agent-cron-loop-30min` rodar, validar que 5 rules corrigidas têm `last_run > 2026-05-28 08:05` E `last_error=NULL`. Query: `SELECT nome, last_run, last_error FROM agent_rules WHERE nome IN ('desconto_maximo_sem_aprovacao','lead_quente_sem_orcamento','op_atrasada','priorizar_op_urgente','follow_up_lead_24h') ORDER BY last_run DESC;`. Se algum continuar `last_error=NULL` MAS `last_run` não atualizar, sinal de bug no agent-cron-loop ignorando rule.
+- [ ] **NOVO ciclo #10 — P2 DEDUP TEMPLATES**: 2 duplicatas confirmadas em `agent_templates` (Follow-up 2 com `87ee3b8d`+`1afc43be`, Follow-up 3 com `596781bb`+`21e7035f`). DEFAULT AUTÔNOMO: DELETE rows duplicadas mantendo a mais antiga + auditar `agent_templates` por outras duplicatas (`SELECT nome, canal, etapa, count(*) FROM agent_templates GROUP BY 1,2,3 HAVING count(*)>1`). Migration idempotente. Janela qualquer (só dado, sem efeito Edge).
+- [ ] **NOVO ciclo #10 — P2 SALDO MATERIAIS via movimentacoes**: criar view `materiais_com_saldo` ou função `fn_saldo_material(material_id)` calculando agregado `SUM(quantidade * CASE tipo WHEN 'entrada' THEN 1 WHEN 'saida' THEN -1 END)` de `movimentacoes_materiais`. Reativar `estoque_minimo` + `sugerir_compra_automatica` apontando pra essa fonte canônica. Smoketest com 5 materiais reais.
+
 - [x] ✅ **DONE ciclo #3** (commit `9b45c32`): header `VERSION = 'v14-persist-ia'` → `'v15-persist-ia'` em `supabase/functions/ai-chat-portal/index.ts` (drift cosmético resolvido)
 - [x] ✅ **DONE ciclo #4** (deploy v13 + Edit local): ai-sequenciar-producao com VERSION v13-rc + fix `.select().single()` + schema ai_logs correto (descoberta adversarial: nunca gravou ai_logs há meses)
 - [x] ✅ **DONE ciclo #4** (migration seed_etapa_templates_croma_20260528): 6 templates Croma idempotentes

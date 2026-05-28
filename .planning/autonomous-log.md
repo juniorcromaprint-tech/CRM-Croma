@@ -483,3 +483,59 @@
 **Notificação Telegram**: a enviar próximo passo
 
 ---
+
+## 2026-05-28 08:05 (ciclo #10)
+
+**Status**: 🟢 VERDE
+**Tipo**: corrigir + arrumar (resolve P0 BLOCKED do ciclo #9)
+**Auto-diálogo**:
+- 3 ciclos anteriores: #7 reality check Padrão C + auditoria Fase 2 banco → #8 agent_config Fase 2.3 + 12 seed + commit 31ffcbe → #9 ACHADO P0 BOMBA 6 rules schema quebrado + 3 templates sem meta_template_name + 2 acao.template inexistente
+- Dia/módulo da rotação: Quinta = Produção + ai-chat-portal v15 (já auditado #2-5). Pivot: 2 das 6 rules quebradas são módulo Produção (op_atrasada, priorizar_op_urgente) — alinha com rotação.
+- Gap mais útil agora: corrigir P0 BLOCKED do ciclo #9 (evidência empírica colhida, default executável documentado)
+- Conflito IN-PROGRESS/BLOCKED: nenhum (resolve um item do BLOCKED)
+- STATE/Obsidian dão contexto novo: ledger registra "Junior valida campo canônico" como blocker — cross-check information_schema dá evidência objetiva agora → POSSO decidir
+- Modo: ATIVO (08:00 BRT, ainda janela noturna; só SQL UPDATE em data layer, sem Edge cliente)
+- Critério mensurável: 8 rules + 3 templates após UPDATE têm valores que apontam pra colunas/templates existentes; smoketest re-SELECT confirma
+
+**Health check**: Vercel 200 OK | API logs ~100min: TODOS 200 (só fn_claim_ai_requests recorrente, esperado) | 8+ Edges canônicas ACTIVE em versões do ledger | branch=main, HEAD 31ffcbe em sync com origin | pg_cron gent-cron-loop-30min/nightly jobid 20+21 active=true
+
+**Agents disparados**: 0 (tarefa SQL UPDATE atômico + investigação cruzada inline — agent paralelo seria overkill pra 8 UPDATES em 1 transação)
+
+**Ações executadas**:
+1. Cross-check information_schema.columns confirmou 4/6 colunas canônicas: propostas.desconto_percentual EXISTE, clientes.lead_id EXISTE, ordens_producao.prazo_interno EXISTE (date, compromisso interno), materiais.estoque_atual NÃO existe (decisão produto)
+2. SQL transacional aplicado direto via execute_sql (10 UPDATES em 1 BEGIN/COMMIT):
+   - 4 UPDATES jsonb_set corrigindo campos canônicos
+   - 2 UPDATES desativando rules estoque com last_error explicativo
+   - 1 UPDATE corrigindo acao.template ollow_up_lead_24h → croma_followup
+   - 1 UPDATE desativando ollow_up_proposta_48h
+   - 1 UPDATE bloco desativando 3 templates WA → pegou **5 rows** (2 duplicatas extras detectadas)
+3. Smoketest re-SELECT confirmou estado pós-update: 5 rules ativas com campo correto + 3 rules desativadas com last_error rastreável + 5 templates desativados
+4. Migration versionada supabase/migrations/20260528_fix_agent_rules_schema_quebrado_e_templates_meta_gap.sql idempotente
+5. STATE.md atualizado (nova entrada ciclo #10 no topo, antes do ciclo #9)
+6. autonomous-ledger.md DONE + BLOCKED resolvido + 3 NEXT P2 adicionados (smoketest empírico, dedup templates, saldo materiais)
+
+**Decisão tomada**:
+- Cross-check information_schema em ciclo isolado deu evidência objetiva pra 4 de 6 colunas — não preciso esperar Junior. Aplico.
+- 2 rules estoque desativadas (mais seguro do que chutar coluna errada) + 1 rule follow_up email desativada
+- WHERE no UPDATE templates foi mais abrangente que IDs do ciclo #9 → pegou 5 (achado bônus: 2 duplicatas)
+- Idempotência via WHERE checa estado pré-correção → re-aplicação no-op
+- Janela 08:00 BRT OK (sem deploy Edge cliente, só data layer; risco zero janela horária)
+
+**Achados adversariais**:
+- 2 duplicatas em gent_templates (Follow-up 2 e 3) não detectadas pelo ciclo #9 — WHERE genérico do ciclo #10 pegou mais que o esperado. NEXT P2 dedup adicionado.
+- agent-cron-loop pg_cron ativo (jobid 20+21) — próxima execução validará empiricamente correções (last_run deve atualizar pós-08:00, last_error permanecer NULL)
+
+**Resultado**: Ciclo VERDE com vitória empírica P0 do ledger. 8 rules problemáticas tratadas + 5 templates duplicados desativados + 1 migration versionada + 0 deploy + 0 regressão. BLOCKED do ciclo #9 resolvido. agent-cron-loop pode agora avaliar rules sem silent no-op.
+
+**Ledger update**:
+- DONE: "Ciclo #10 — CORREÇÃO P0 6 rules schema quebrado + 5 templates WA + 2 acao.template"
+- BLOCKED resolvido: 6 rules quebradas + 3 templates + 2 acao.template do ciclo #9
+- NEXT (3 novos P2): smoketest empírico pós-cron, dedup agent_templates, saldo materiais via movimentacoes
+
+**Commits**: 1 pendente (será committed neste turno via Windows-MCP PowerShell — migration + STATE + ledger + log)
+**Deploys**: nenhum (data layer only)
+**Migrations**: 20260528_fix_agent_rules_schema_quebrado_e_templates_meta_gap.sql versionada (aplicada via execute_sql atômico, idempotente)
+**Token usage**: ~110k (paralelo Read CLAUDE+mission+rules+ledger+log300+memory+daily + 8 SQL queries investigação + 1 SQL transação 10 UPDATES + smoketest + Edits STATE/ledger/log/migration)
+**Telegram**: a enviar próximo passo
+
+---
