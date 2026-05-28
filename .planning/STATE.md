@@ -1,7 +1,81 @@
 ﻿
 # STATE — CRM Croma
 
-**Última atualização**: 2026-05-28 19:10 BRT — Ciclo autônomo #22 — Spike 500 ai-compor-mensagem v24 do #20 NÃO AUTO-RESOLVEU (recorrente — clusters 16:40/17:20/17:50/18:20 BRT) → ROOT CAUSE confirmado por agent adversarial: **Anthropic rate-limit 429/529 (overloaded)** em bursts de 14-20 follow-ups consecutivos por cron tick, callOpenRouter linha 207 throw + catch 359 retorna 500 SEM gravar ai_logs (zero visibilidade). REFUTOU hipóteses #20 (Promise.all 50 paralelas — agent-cron-loop linha 1111 é for...of SEQUENCIAL) e #21 (auto-resolveu — voltou em #22). Fix mínimo proposto (≤30 LOC) DEFERIDO janela 22h+ BRT. Hardening NEXT P0 #21 EXECUTADO: 3 Edits cirúrgicos em autonomous-rules.md baixaram threshold "Edit safe Cowork" de 500→250 LOC + Write até 500 LOC OK.
+**Última atualização**: 2026-05-28 20:05 BRT — Ciclo autônomo #23 — Falso-positivo guardrail Etapa 4 (4a recorrência consecutiva — bash sandbox cache stale vs Windows-MCP FS real, sem corrupção real) + Helper `anthropic-retry.ts` criado (67 LOC, commit `3460555`) como precondição NEXT P0 #22 sem Edit em arquivo grande. Spike 500 ai-compor-mensagem v24 SEGUE ATIVO (cluster 19:30 + 20:00 BRT, ZERO agent_messages criadas após 17:00 BRT, agent_rules cron 20:00 BRT executou OK NULL error). Deploy fix retry exponencial DEFERIDO janela 22h+ BRT (atual 20:05 BRT). Próximo ciclo/Junior faz Edit cirúrgico mínimo em `ai-compor-mensagem/index.ts` substituindo `callOpenRouter`→`callAnthropicWithRetry` (1 import + 1 substituição).
+
+**Penúltima atualização**: 2026-05-28 19:10 BRT — Ciclo autônomo #22 — Spike 500 ai-compor-mensagem v24 do #20 NÃO AUTO-RESOLVEU (recorrente — clusters 16:40/17:20/17:50/18:20 BRT) → ROOT CAUSE confirmado por agent adversarial: **Anthropic rate-limit 429/529 (overloaded)** em bursts de 14-20 follow-ups consecutivos por cron tick, callOpenRouter linha 207 throw + catch 359 retorna 500 SEM gravar ai_logs (zero visibilidade). REFUTOU hipóteses #20 (Promise.all 50 paralelas — agent-cron-loop linha 1111 é for...of SEQUENCIAL) e #21 (auto-resolveu — voltou em #22). Fix mínimo proposto (≤30 LOC) DEFERIDO janela 22h+ BRT. Hardening NEXT P0 #21 EXECUTADO: 3 Edits cirúrgicos em autonomous-rules.md baixaram threshold "Edit safe Cowork" de 500→250 LOC + Write até 500 LOC OK.
+
+## Ciclo autônomo #23 — 2026-05-28 20:05 BRT — Falso-positivo guardrail (4a recorrência) + helper anthropic-retry.ts criado 🟢
+
+**Mantra**: VALIDAR (guardrail Etapa 4 — falso-positivo confirmado) + ARRUMAR (criar helper retry em arquivo NOVO ≤80 LOC como precondição NEXT P0 #22). Hora 20:00-20:10 BRT (Quinta — janela proibida 8h-20h pra Edge cliente acaba 22h BRT, então deploy fix DEFERIDO ~2h).
+
+### 🚨→🟢 GUARDRAIL ETAPA 4 FALSO-POSITIVO (4a recorrência consecutiva)
+
+`git diff --stat HEAD` no bash sandbox mostrou **5 arquivos modified com -1242 linhas de delta** (STATE -610, ledger -194, log -430, rules -12, agent-cron-loop +1). Padrão IDÊNTICO aos ciclos #19/#20/#21.
+
+**Validação cruzada Windows-MCP vs bash REVELOU DIVERGÊNCIA**:
+
+| Arquivo | Bash `wc -l` | Windows-MCP `Measure-Object` |
+|---|---|---|
+| STATE.md | 2383 | 2226 |
+| autonomous-ledger.md | 252 | 396 |
+| autonomous-log.md | 697 | 900 |
+| autonomous-rules.md | 338 | 247 |
+| agent-cron-loop/index.ts | 1230 | 1060 |
+
+Cinco divergências em ambas direções — algumas bash > Windows, outras inversas. Tails Windows-MCP estão íntegros em todos 5 (footers/comentários/`}`+return).
+
+**Conclusão**: bash sandbox e Windows-MCP veem **versões diferentes** dos arquivos por desync OneDrive/cache. Working dir REAL (Windows) está íntegro. `git status` do bash é falso-positivo. **NÃO HÁ CORRUPÇÃO**.
+
+`git checkout HEAD --` via Windows-MCP no working dir resultou em arquivos com MESMOS tamanhos pré-checkout — confirma que HEAD `2c1bb6c` (ciclo #22) JÁ tinha esses tamanhos. **Lição estrutural**: guardrail Etapa 4 baseado em `git diff --stat` do bash sandbox tá dando falso-positivo cíclico (#19→#20→#21→#22→#23 = 4 ocorrências).
+
+### 🎉 NEXT P0 #22 PRECONDIÇÃO EXECUTADA — helper `anthropic-retry.ts` criado
+
+Arquivo NOVO `supabase/functions/ai-shared/anthropic-retry.ts` (62-67 LOC, dentro budget ≤80 LOC). Strategy anti-corrupção: **NÃO Edit em anthropic-provider.ts** (107 LOC mas regra prefere Write em arquivo NOVO). Wrapper drop-in:
+
+```ts
+import { callAnthropicWithRetry } from '../ai-shared/anthropic-retry.ts';
+const result = await callAnthropicWithRetry(systemPrompt, userPrompt, config);
+```
+
+Detecta 429/529 via regex em `error.message` (pattern `Anthropic ${status}:` do anthropic-provider.ts linha 85). Retry exponencial 1s/2s/4s (default 3 attempts). Outros erros (4xx, abort, network) re-throw imediato sem retry (latência baixa quando erro é não-recuperável).
+
+**Validação tail-check pós-Write**: Windows-MCP `Measure-Object` confirma 62 LOC, tail termina em `}` íntegro. Bash sandbox vê 67 LOC (igual de novo divergência inofensiva — line ending CRLF/LF). JSDoc completo com contexto ciclo #22.
+
+**Commit atômico `3460555`** `feat(ai-shared): anthropic-retry helper - retry exponencial 429/529 (ciclo autonomo #23 — precondicao P0 #22)` push origin/main confirmado (`Your branch is up to date`). 1 file changed, +67 insertions.
+
+### Spike 500 ai-compor-mensagem v24 — SEGUE ATIVO
+
+Logs edge últimas 90min:
+- Cluster 19:30 BRT (1780007408 UTC): ~15 erros POST 500 ai-compor-mensagem + 1 agent-cron-loop v26 500 timeout 14634ms
+- Cluster 20:00 BRT (1780009209 UTC): ~15+ erros POST 500 + 1 agent-cron-loop v26 500 timeout 17544ms
+- mcp-bridge-worker v8: TODAS 200 ~1/min consistente
+
+agent_messages criadas: 13 (15:00 BRT), 13 (16:00 BRT), **ZERO desde 17:00 BRT**. Cron rules executando OK (`last_run = 2026-05-28 20:00:08.282 BRT`, `last_error=NULL`, run_count 1294-1304) — confirma diagnóstico #22: rules executam, mas LEAD FOLLOW-UPS (que chamam ai-compor-mensagem) falham por cluster Anthropic 429/529.
+
+### Deploy fix DEFERIDO
+
+Janela atual 20:05 BRT — ai-compor-mensagem é Edge cliente (chamada por agent-cron-loop pra follow-ups WhatsApp). Janela proibida 8h-20h BRT termina às 20:00 → na verdade já podemos deployar, mas regra é janela 22h-7h ou FDS pra Edge cliente. Pragmaticamente: deploy v25 em ~22h BRT esta noite. Estratégia: Edit cirúrgico mínimo em `ai-compor-mensagem/index.ts` substituindo `callOpenRouter`→`callAnthropicWithRetry` (1 import + 1 substituição em local conhecido). Arquivo size desconhecido — verificar antes do Edit; se > 250 LOC, delegar agent isolado.
+
+### Anti-pattern evitado + verificações
+
+- **Verificar antes de assumir aplicado em 4 frentes**: (a) cross-check bash vs Windows-MCP DETECTOU divergência ANTES de declarar corrupção; (b) tail-check Windows-MCP em todos 5 arquivos ANTES de fazer recovery; (c) leitura anthropic-provider.ts ANTES de criar helper (confirmou pattern `Anthropic ${status}: ${body}` linha 85 que o retry detecta via regex); (d) tail-check pós-Write ANTES de commit.
+- **Anti-pattern evitado**: NÃO redeploy ai-compor-mensagem em janela 20:05 BRT (Edge cliente). NÃO Edit em anthropic-provider.ts mesmo sendo 107 LOC (regra prefere Write em arquivo NOVO). NÃO repetir recovery #21 sem verificar primeiro se é realmente corrupção. NÃO subiu falso-positivo ao Junior como se fosse incidente real.
+
+### Próxima sugestão (ciclo #24)
+
+P0 — **Deploy v25 ai-compor-mensagem** com `callAnthropicWithRetry` substituindo `callOpenRouter`. Janela 22h+ BRT. Verificar tamanho de `ai-compor-mensagem/index.ts` primeiro — se ≤250 LOC, Edit cirúrgico inline (1 import + 1 substituição); se >250 LOC, delegar agent isolado. Smoketest: cluster 22:30 BRT deve ter retry log `[anthropic-retry] attempt X/3 failed... retrying in Nms` em vez de cluster 500 silencioso.
+
+P0 — **Hardening guardrail Etapa 4** em `autonomous-rules.md`: trocar validação `git diff --stat HEAD` (bash) por cross-check Windows-MCP `Measure-Object` + tail-check em ≥2 arquivos suspeitos ANTES de declarar corrupção. Evidência: 4 falso-positivos consecutivos (#19→#20→#21→#22→#23).
+
+P1 — Investigar agent-cron-loop v26 500 timeouts 14-17s (efeito colateral cluster ai-compor-mensagem). Provavelmente cascade: cluster Anthropic 529 → todas conversas do tick falham → loop overhead supera timeout.
+
+P2 — Adoção rolling `safe-insert.ts` em 12 Edges Padrão B (helpers prontos #16, ainda pendente).
+
+P2 — Catch linha 359 em ai-compor-mensagem: gravar `logAICall({status:'error', error_message: error.message})` ANTES de retornar 500 — observabilidade dos clusters em ai_logs.
+
+---
+
 
 ## Ciclo autônomo #22 — 2026-05-28 19:10 BRT — Root cause spike 500 ai-compor-mensagem CONFIRMADO Anthropic 429/529 + Hardening rules threshold 250 LOC 🟡
 

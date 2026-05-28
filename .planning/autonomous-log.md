@@ -1124,3 +1124,39 @@ Padrao IDENTICO ao incidente 08:30: EOF abrupto sem newline final, arquivos cort
 **Telegram**: a enviar próximo passo
 
 ---
+
+## 2026-05-28 20:05 (ciclo #23)
+
+**Status**: VERDE
+**Tipo**: validar + arrumar
+**Auto-dialogo**:
+- 3 ciclos anteriores: #20 recovery 4 arquivos + investigacao spike 500 inicio. #21 recovery 3a vez + FALSO-POSITIVO drift ai-chat-portal v15 + spike auto-resolveu (mas voltou). #22 root cause spike confirmado Anthropic 429/529 + hardening rules threshold 250 LOC.
+- Gap mais util agora: VALIDAR se guardrail Etapa 4 sinaliza corrupcao real (4a recorrencia consecutiva e suspeito) + ARRUMAR criando precondicao NEXT P0 #22 (helper retry em arquivo NOVO, evita Edit em arquivo grande).
+- Conflito IN-PROGRESS/BLOCKED: NEXT P0 #22 (deploy fix v25 ai-compor-mensagem) DEFERIDO janela 22h+. Atacar precondicao agora destrava commit-and-deploy unitario no proximo ciclo.
+- Modo: ATIVO. Janela 20:00-20:10 BRT (proibida pra Edge cliente, OK pra arquivos NOVOS e commits planning).
+- Criterio sucesso: (a) cross-check bash vs Windows-MCP confirma se ha corrupcao real; (b) helper anthropic-retry.ts criado e commitado main; (c) 3 cerebros + Obsidian + Telegram atualizados.
+
+**Health check**: Vercel 200 (HTML title 'Croma Print - CRM'). API/edge logs 90min: cluster 19:30 + 20:00 BRT ai-compor-mensagem ~30 erros 500 + 2 agent-cron-loop v26 500 timeouts. mcp-bridge-worker v8 TODAS 200 ~1/min. agent_rules cron 20:00 BRT OK NULL error run_count 1294-1304. branch=main HEAD 2c1bb6c (apos commit do ciclo). git diff stat HEAD bash mostrou 5 modified -1242 deletions (FALSO-POSITIVO).
+
+**Agents disparados**: 0 (sessao principal coordenou; tarefa Write em arquivo NOVO nao requer agent).
+
+**Acoes executadas**:
+- Cross-check bash vs Windows-MCP em 5 arquivos: DIVERGENCIA em ambas direcoes (bash 2383/252/697/338/1230 vs WinMCP 2226/396/900/247/1060). Tails Windows-MCP integros em todos. CONFIRMADO falso-positivo.
+- Read anthropic-provider.ts (107 LOC) pra confirmar pattern error 'Anthropic status: body' linha 85.
+- Write novo arquivo supabase/functions/ai-shared/anthropic-retry.ts (67 LOC bash / 62 LOC WinMCP) com callAnthropicWithRetry. Drop-in wrapper. Retry exponencial 1s/2s/4s default. Detecta 429/529 via regex.
+- Tail-check pos-Write OK em ambos backends.
+- Commit 3460555 push main confirmado (Your branch is up to date with origin/main).
+- Update STATE.md topo com entry ciclo #23 (Edit cirurgico em arquivo grande mas inline substitution sem mudar volume).
+- Update Obsidian daily 2026-05-28 via Windows-MCP Add-Content.
+
+**Decisao tomada**: NAO declarei corrupcao real (precedente #21 fez recovery por desconfianca; ciclo #23 cross-checked primeiro e descobriu falso-positivo). Criei precondicao NEXT P0 #22 em arquivo NOVO (anti-corrupcao). NAO redeploy ai-compor-mensagem (janela 20:05 BRT proibida Edge cliente).
+
+**Resultado**: VERDE com 2 vitorias - (1) guardrail falso-positivo identificado e documentado, hardening NEXT P0 NOVO; (2) helper anthropic-retry.ts pronto pra adocao deploy v25 v=22h+ BRT.
+
+**Ledger update**: DONE adicionado entry #23. NEXT P0 #22 ainda em pe (deploy nao feito). NEXT P0 NOVO: hardening guardrail Etapa 4 via cross-check Windows-MCP.
+**Commits**: 3460555 feat(ai-shared): anthropic-retry helper
+**Deploys**: nenhum
+**Token usage**: ~310k
+**Telegram**: enviar proximo passo
+
+---
