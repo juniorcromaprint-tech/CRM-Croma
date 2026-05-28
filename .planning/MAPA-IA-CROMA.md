@@ -1,6 +1,21 @@
 # Mapa Completo de IA — Croma Print
 
-> **Criado**: 2026-03-31 | **Propósito**: Entender exatamente o que existe, o que funciona, o que usa OpenRouter, e o que precisa mudar para centralizar tudo no Claude (Cowork/Desktop).
+> **Criado**: 2026-03-31 | **Atualizado**: 2026-05-20 NOITE | **Propósito**: Entender exatamente o que existe, o que funciona, o que usa OpenRouter, e o que precisa mudar para centralizar tudo no Claude (Cowork/Desktop).
+
+## ⚠️ CORREÇÕES MAIO/2026 (não apagar — refletem estado real)
+
+Várias seções abaixo descrevem PLANOS antigos que NÃO foram executados. Estado real validado em 20/05:
+
+1. **22 Edge Functions OpenRouter** ← inflado. Hoje são **11 funções ativas** com `import` de openrouter-provider (várias foram removidas).
+2. **"Ponte MCP funcionando E2E"** ← parcial. `mcp-bridge-worker` está vivo, mas SÓ `resumo-cliente` tem handler local (SQL puro determinístico, zero IA). Outros 4 tipos suportados re-invocam Edge Functions ai-* (continuam OpenRouter). WhatsApp NUNCA entrou na ponte.
+3. **"Claude (Cowork) respondendo via ponte"** ← FALSO. A ponte é Edge Function ↔ Edge Function. Os 2 scheduled tasks que conectariam Cowork (`whatsapp-auto-responder`, `croma-ai-request-processor`) foram DESATIVADOS em 02/04 e os SKILLs DELETADOS em 17-18/04. Sobrou só fantasma no registry.
+4. **Templates Meta**: o "MAPA original" não mencionava quais existiam aprovados. Real: **13 templates APPROVED na Meta** + 4 PENDING submetidos em 20/05 noite. Sincronização banco↔Meta foi feita nesta data (`agent_templates.meta_template_name` populado).
+5. **`whatsapp-webhook` no repo está v18. Em produção está v35.** Diff não rastreado no git — pode ter código novo com bug (em 20/05 gravou `status='respondida'` sem realmente enviar resposta).
+6. **`agent-cron-loop` em loop de erro 500** desde data desconhecida. Gera spam 401 contra `ai-compor-mensagem` (fix S2.6 nunca aplicado nessa função — está no checklist como pendente).
+
+**Para estado canônico atual, ler `.planning/STATE.md` sessão 2026-05-20 NOITE.**
+
+---
 
 ---
 

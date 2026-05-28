@@ -1,0 +1,201 @@
+{
+  "_status_2026_05_20_NOITE": "EXECUTADO PARCIALMENTE. 4 templates novos submetidos via Graph API (croma_abertura_varejo, croma_abertura_calcados, croma_abertura_industria, croma_abertura_franquia) e estão PENDING na Meta. Os outros 6 templates do banco JÁ EXISTIAM aprovados na Meta (descoberta após query no Graph API) — só faltava sincronizar agent_templates.meta_template_name, que foi feito nesta sessão. Este JSON fica como REFERÊNCIA do payload Meta — não re-submeter os 4 PENDING. Status real em .planning/STATE.md sessão 2026-05-20 NOITE.",
+  "_meta": {
+    "criado": "2026-05-20",
+    "objetivo": "Submeter 10 templates de WhatsApp à Meta Business para aprovação. Necessário pois sem template aprovado a Meta bloqueia mensagens fora da janela de 24h (erro 131047).",
+    "endpoint": "POST https://graph.facebook.com/v22.0/{WHATSAPP_WABA_ID}/message_templates",
+    "headers": "Authorization: Bearer {WHATSAPP_ACCESS_TOKEN_COM_PERMISSAO_management}, Content-Type: application/json",
+    "permissao_necessaria": "whatsapp_business_management (NÃO basta o whatsapp_business_messaging atual; pode precisar criar System User com escopo correto no Business Manager)",
+    "waba_id_atual": "1262844242060742",
+    "como_submeter_manualmente": [
+      "1) Acessar https://business.facebook.com/wa/manage/message-templates/?waba_id=1262844242060742",
+      "2) Botão 'Criar modelo' (Create template)",
+      "3) Categoria: ver campo 'category' de cada payload abaixo",
+      "4) Nome: ver campo 'name' (snake_case obrigatório)",
+      "5) Idioma: pt_BR",
+      "6) Corpo: copiar do campo 'components[0].text' substituindo {{1}}, {{2}}, {{3}} no editor visual",
+      "7) Exemplos: o Business Manager pede valores de exemplo para as variáveis — usar os valores do campo 'components[0].example.body_text[0]'"
+    ],
+    "como_submeter_via_api": "curl -X POST 'https://graph.facebook.com/v22.0/1262844242060742/message_templates' -H 'Authorization: Bearer SEU_TOKEN_COM_management' -H 'Content-Type: application/json' -d @payload.json",
+    "aprovacao_meta": "Templates novos levam de 1 minuto a 24h pra serem aprovados. Status visível no Business Manager.",
+    "boas_praticas_aprovacao": [
+      "Não usar promoções agressivas ('CLIQUE AGORA', 'IMPERDÍVEL')",
+      "Não pedir info sensível (CPF, senha)",
+      "Variáveis devem fazer sentido no contexto (nome real, empresa real)",
+      "Marketing precisa de opt-out explícito ou seguir LGPD",
+      "Categoria MARKETING tem mais restrições; UTILITY (transacional, ex: status de pedido) aprova mais fácil"
+    ]
+  },
+  "templates": [
+    {
+      "name": "croma_abertura_geral",
+      "language": "pt_BR",
+      "category": "MARKETING",
+      "components": [
+        {
+          "type": "BODY",
+          "text": "Oi {{1}}! Sou {{2}} da *Croma Print*. A *{{3}}* tem alguma demanda de comunicação visual prevista?",
+          "example": {
+            "body_text": [["Marcos", "Junior", "SI Câmeras"]]
+          }
+        }
+      ],
+      "_origem_banco": "WhatsApp Abertura Geral",
+      "_variaveis_template_banco": "{{contato_nome}}, {{nome_remetente}}, {{empresa}}",
+      "_uso_atual": 50
+    },
+    {
+      "name": "croma_abertura_varejo",
+      "language": "pt_BR",
+      "category": "MARKETING",
+      "components": [
+        {
+          "type": "BODY",
+          "text": "Oi {{1}}, tudo bem? Sou {{2}} da *Croma Print*. Fazemos comunicação visual de redes de lojas. A *{{3}}* tem alguma campanha prevista?",
+          "example": {
+            "body_text": [["Marcos", "Junior", "Renner"]]
+          }
+        }
+      ],
+      "_origem_banco": "WhatsApp Abertura Varejo",
+      "_segmento": "varejo (322 leads novos, 168 prontos WhatsApp)"
+    },
+    {
+      "name": "croma_abertura_franquia",
+      "language": "pt_BR",
+      "category": "MARKETING",
+      "components": [
+        {
+          "type": "BODY",
+          "text": "Oi {{1}}! Sou {{2}} da *Croma Print*. Cuido de redes com muitas unidades. A *{{3}}* tem fornecedor homologado pra comunicação visual?",
+          "example": {
+            "body_text": [["Marcos", "Junior", "Cacau Show"]]
+          }
+        }
+      ],
+      "_origem_banco": "WhatsApp Abertura Franquia",
+      "_segmento": "franquia"
+    },
+    {
+      "name": "croma_abertura_industria",
+      "language": "pt_BR",
+      "category": "MARKETING",
+      "components": [
+        {
+          "type": "BODY",
+          "text": "Oi {{1}}! Sou {{2}} da *Croma Print*. Fazemos PDV e comunicação visual pra indústria. A *{{3}}* distribui materiais pros lojistas?",
+          "example": {
+            "body_text": [["Marcos", "Junior", "Ambev"]]
+          }
+        }
+      ],
+      "_origem_banco": "WhatsApp Abertura Industria",
+      "_segmento": "industria (20 leads novos, 13 prontos WhatsApp)"
+    },
+    {
+      "name": "croma_abertura_calcados",
+      "language": "pt_BR",
+      "category": "MARKETING",
+      "components": [
+        {
+          "type": "BODY",
+          "text": "Oi {{1}}, tudo bem? Sou {{2}} da *Croma Print*. Fazemos comunicação visual e vitrinismo pra redes de calçados e moda. A *{{3}}* tem campanhas sazonais ou trocas de coleção?",
+          "example": {
+            "body_text": [["Marcos", "Junior", "Arezzo"]]
+          }
+        }
+      ],
+      "_origem_banco": "NOVO — criado especificamente para os 779 leads de Calçados e Moda (407 prontos WhatsApp). Sem template existente no banco.",
+      "_segmento": "calcados"
+    },
+    {
+      "name": "croma_followup_1",
+      "language": "pt_BR",
+      "category": "MARKETING",
+      "components": [
+        {
+          "type": "BODY",
+          "text": "Oi {{1}}! Uma ideia: começar com *projeto piloto pra 1 loja* pra testar sem compromisso. Faz sentido pra *{{2}}*?",
+          "example": {
+            "body_text": [["Marcos", "SI Câmeras"]]
+          }
+        }
+      ],
+      "_origem_banco": "WhatsApp Follow-up 1"
+    },
+    {
+      "name": "croma_followup_2",
+      "language": "pt_BR",
+      "category": "MARKETING",
+      "components": [
+        {
+          "type": "BODY",
+          "text": "Oi {{1}}! Ajudamos uma rede de *40 lojas* a trocar vitrine em menos de 2 semanas. Quando surgir demanda na *{{2}}*, me chama!",
+          "example": {
+            "body_text": [["Marcos", "Renner"]]
+          }
+        }
+      ],
+      "_origem_banco": "WhatsApp Follow-up 2"
+    },
+    {
+      "name": "croma_followup_3",
+      "language": "pt_BR",
+      "category": "MARKETING",
+      "components": [
+        {
+          "type": "BODY",
+          "text": "{{1}}, última mensagem por agora! Quando surgir comunicação visual, me chama. Boa sorte com os projetos da *{{2}}*!",
+          "example": {
+            "body_text": [["Marcos", "SI Câmeras"]]
+          }
+        }
+      ],
+      "_origem_banco": "WhatsApp Follow-up 3"
+    },
+    {
+      "name": "croma_reengajamento",
+      "language": "pt_BR",
+      "category": "MARKETING",
+      "components": [
+        {
+          "type": "BODY",
+          "text": "Oi {{1}}! A *{{2}}* tem alguma novidade em comunicação visual? Estamos com condições especiais esse mês.",
+          "example": {
+            "body_text": [["Marcos", "SI Câmeras"]]
+          }
+        }
+      ],
+      "_origem_banco": "WhatsApp Reengajamento",
+      "_uso": "Clientes antigos sem contato recente (>30d). Equivalente ao croma_reativacao_v3 mencionado em decisões antigas."
+    },
+    {
+      "name": "croma_proposta_enviada",
+      "language": "pt_BR",
+      "category": "UTILITY",
+      "components": [
+        {
+          "type": "BODY",
+          "text": "{{1}}, preparei uma *proposta personalizada* pra *{{2}}*! Posso enviar por aqui ou prefere email?",
+          "example": {
+            "body_text": [["Marcos", "SI Câmeras"]]
+          }
+        }
+      ],
+      "_origem_banco": "WhatsApp Proposta",
+      "_categoria_meta": "UTILITY pois é transacional (cliente já está em negociação ativa)"
+    }
+  ],
+  "_resumo_categoria": {
+    "MARKETING": 9,
+    "UTILITY": 1,
+    "total": 10
+  },
+  "_observacoes_estrategia": [
+    "Os templates de poste/segurança (croma_poste_seg_abertura_v2 e croma_poste_seg_followup_v2) JÁ EXISTEM aprovados na Meta — não submeter novamente.",
+    "O template antigo 'croma_abertura' que deu erro 132000 em 15/05 não está na lista de approved templates do banco. Pode ter sido deletado da Meta ou nunca aprovado. Será substituído por 'croma_abertura_geral' acima.",
+    "Os templates de cobrança/proposta/reativação documentados em admin_config (WHATSAPP_TEMPLATE_COBRANCA, WHATSAPP_TEMPLATE_PROPOSTA, WHATSAPP_TEMPLATE_REATIVACAO) precisam ser verificados separadamente no Business Manager — eles podem ou não estar aprovados.",
+    "Categoria MARKETING tem aprovação mais lenta e exige opt-in claro. Se for rejeitado, replicar como categoria UTILITY com texto mais neutro/transacional.",
+    "Templates rejeitados podem ser editados e ressubmetidos sem novo nome."
+  ]
+}

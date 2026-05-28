@@ -71,6 +71,29 @@
 - [x] **WA-02**: Templates Meta Business — Edge Function whatsapp-submit-templates criada (3 templates: abertura, followup, proposta)
 - [x] **CRON-01**: pg_cron configurado (migration 107) — 4 jobs: agent-loop 30min, overdue daily, expire requests 2h, resumo 22h
 
+## v4 Requirements (Marketing & Campanhas)
+
+### Integração Leads ↔ Campanhas
+
+- [ ] **MKT-02**: Vincular disparos da aba Leads a `agent_campanhas` como mestre — sub-itens:
+  - [ ] **MKT-02.1** Migration 140: estender `agent_campanhas` (canal, assunto_email, corpo_email, imagem_url, data_inicio, data_fim, total_alvo); adicionar `agent_conversations.campanha_id`; alterar `fn_disparar_abertura_em_massa` para aceitar `p_campanha_id UUID DEFAULT NULL`
+  - [ ] **MKT-02.2** Componente `CampanhaSelector` no passo 3 (Cadência) do `DispararAberturaModal` + `QuickCriarCampanhaDialog`
+  - [ ] **MKT-02.3** Hook `useCampanhasAtivas` filtrando por canal+segmento; default sugere campanha ativa compatível, sempre trocável, sempre com opção "Sem campanha"
+  - [ ] **MKT-02.4** `CampanhaBanner` em `/leads` lendo `agent_campanhas` real com fallback para agregado por segmento quando não há campanha ativa
+  - [ ] **MKT-02.5** Feature flag `feature_campanhas_link_disparo` em `admin_config` (default false) para rollback instantâneo
+  - [ ] **MKT-02.6** Smoke tests: disparo sem campanha mantém comportamento atual; disparo com campanha grava `campanha_id` em messages e conversations
+- [ ] **MKT-03**: CampanhasPage v2 — listar `agent_campanhas` reais com métricas (leads vinculados, enviados, respondidos, falhas, propostas, pedidos, faturamento; SEM ROI nesta versão); cards com badge de status (rascunho/ativa/pausada/concluída) e canal (whatsapp/email/misto)
+- [ ] **MKT-04**: Ações na CampanhasPage v2:
+  - "Ver leads da campanha" → `/leads?campanha_id=X` filtrado
+  - "Adicionar leads" → `/leads?campanha_alvo=X` com pré-seleção e filtros normais
+  - "Pausar" com diálogo que tem checkbox opcional "Cancelar mensagens pendentes desta campanha?" (desmarcado por padrão)
+  - "Encerrar" (congela métricas) e "Duplicar" (cria rascunho sem leads)
+  - **Sem botão principal de disparo** — disparo é só na aba Leads
+- [ ] **MKT-05**: Métricas comerciais por campanha — view `vw_metricas_campanha` cruzando `agent_messages.campanha_id` + `leads` + `propostas` + `pedidos` + `faturamento`. Aba "Resultados" no detalhe da campanha.
+
+**Restrição de produto (não-negociável):**
+A integração Campanhas ↔ Leads deve **somar** ao fluxo atual. Nada que hoje funciona na aba Leads (filtros, cesta lateral, seleção individual ou em lote, escolha de templates, envio WhatsApp e e-mail, imagem no e-mail, rampa ou imediato) pode ser reduzido, escondido ou substituído. Se a integração deixar a aba Leads mais difícil de usar, está errado.
+
 ## Out of Scope
 
 | Feature | Reason |

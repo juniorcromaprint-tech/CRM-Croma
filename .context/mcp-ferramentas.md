@@ -1,4 +1,4 @@
-# MCP Server Croma — 100 Ferramentas
+﻿# MCP Server Croma — 108 Ferramentas
 
 > Arquivo de referência — carregado sob demanda quando precisar saber que ferramenta usar
 
@@ -31,3 +31,4 @@
 | **Sistema** | `croma_executar_sql` (SELECT only), `croma_health_check` |
 | **Stores** | `croma_listar_stores`, `croma_criar_store`, `croma_atualizar_store` |
 | **Espelhamento** | `croma_espelhar_os_mubisys` — importa OS Mubisys completa (cliente→store→pedido→itens→OI→job). Suporta dry_run=true |
+| **Telegram (Claudete)** | `croma_telegram_autorizar` (chat_id, acao: autorizar/remover, nome?), `croma_telegram_listar_autorizados`, `croma_telegram_pedidos_pendentes` — gerencia acesso ao bot @Claudete_Juca_bot. Atualiza `JARVIS/.env` (AUTHORIZED_CHAT_IDS) + `claudete_bot_config.json`. Bot detecta mudança via mtime e recarrega em ≤5s sem restart. |

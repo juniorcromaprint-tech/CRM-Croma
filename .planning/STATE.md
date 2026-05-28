@@ -1,7 +1,502 @@
-
+﻿
 # STATE — CRM Croma
 
-**Última sessão**: 2026-05-21 TARDE/NOITE (Cowork — OpenRouter 100% ELIMINADO das 18 funções; atendimento ao cliente em OPUS; ORÇAMENTO consertado e saindo de ponta a ponta; 401 dos follow-ups resolvido; 500 do cron instrumentado aguardando 1 ciclo.)
+**Última sessão**: 2026-05-26 TARDE (Cowork — REFUNDAÇÃO PARTE 5: substituir Mubisys com portal Croma — 9 features novas + 10 migrations + 2 Edges + push prod em 2 commits atômicos)
+
+
+## Sessão 2026-05-26 TARDE — REFUNDAÇÃO PARTE 5 — Substituir Mubisys com Portal Croma ✅
+
+### Contexto do problema
+Junior reportou: link público do orçamento (mubisys.com SaaS PHP externo) está "vago" — descrição do item é genérica, cliente Beira Rio recebe 50 orçamentos/mês e não distingue qual loja é qual. Mubisys é benchmark (melhor SaaS pra gráfica hoje), Croma quer **substituir** com portal próprio `/p/:token`. Decisão tomada com agent recon adversarial: TODOS os orçamentos (não só Beira Rio), bloco "Loja+endereço" no topo + outras features pra superar Mubisys.
+
+### Entregue — sub-bloco LOJA + 9 features novas
+Modo orquestrador com **9 agents paralelos** (FASE 1 schema solo + 5 FASE 2 paralelos + 1 auditoria git + FASE 3 integração+push). Token usage ~250k. Zero conflito de merge entre agents (cada um escopo isolado).
+
+**FASE 1 — Schema + Edge v10** (1 agent solo):
+- 10 migrations idempotentes dumpadas em `supabase/migrations/20260526_*.sql`:
+  - `propostas_add_referencia_prazo_logistica`
+  - `proposta_itens_add_imagem_url` (+ coluna `aprovado BOOLEAN` tri-state)
+  - `propostas_assinatura_cliente` (`assinatura_cliente_url`, `assinatura_cliente_at`)
+  - `create_portal_mensagens` (tabela + RLS)
+  - `portal_mensagens_rpcs` (`portal_listar_mensagens`, `portal_inserir_mensagem`)
+  - `propostas_aprovacao_parcial` (CHECK constraint amplo)
+  - `portal_get_proposta_with_store` (RPC v2 retornando store/vendedor/referencia/prazo/logistica/itens-imagem-aprovado/assinatura)
+  - `portal_aprovar_item_rpc` (recálculo status agregado)
+  - `portal_atualizar_cliente_rpc` (whitelist editável)
+  - `portal_aprovar_proposta_v2_assinatura` (+ DROP da v1 legacy executado pós-FASE 3)
+- Edge `briefing-beira-rio` v10 ACTIVE (sha `5407bfc28bbd...`, popula referencia/prazo/logistica)
+- Edge `portal-upload-assinatura` v1 ACTIVE (sha `347a75016433...`, proxy seguro pro Storage com signed URLs 1 ano)
+
+**FASE 2 — Componentes (5 agents em paralelo, ~30 min total)**:
+- Agent B (itens): `PortalItemImagem.tsx` + lightbox shadcn + aprovação parcial tri-state + RPC `portal_aprovar_item` + hook `useAprovacaoParcial`
+- Agent C (header/editar/info): `PortalEditarDadosDialog.tsx` (CEP via ViaCEP, máscaras, validações) + `PortalInfoOrcamento.tsx` (cards Referência+Prazo+Logística com ícones lucide) + botão "Alterar dados" no PortalHeader
+- Agent D (PIX QR + WA + Timeline): QR SVG via `qrcode.react` (já no projeto) + `PortalWhatsAppButton.tsx` flutuante + `PortalTimelinePedido.tsx` (5 estágios baseado em pedidos.status)
+- Agent E (chat persistido): `usePortalChat.ts` hook React Query polling 10s + `PortalChat.tsx` reescrito + diferenciação visual cliente/vendedor/IA (Edge `ai-chat-portal` continua stateless — TODO V2)
+- Agent F (assinatura touch): `react-signature-canvas` adicionado, canvas no PortalApproval, `aprovarProposta(token, comentario?, assinaturaBase64?)`, Edge proxy faz upload com service_role pro bucket `proposta-uploads`
+
+**Auditoria git paralela**: identificou 45 arquivos CRLF churn (revertidos), `.gitattributes eol=lf` criado, `.gitignore` estendido (outputs/, _legacy-imports/, .codex/, *.bak_*), plano de 4 commits atômicos, 7 arquivos lixo deletados.
+
+**FASE 3 — Integração + Git + Push**:
+- `PortalOrcamentoPage.tsx`: +64 LOC integrando 5 novos componentes na ordem visual correta (Header → LojaInfo → InfoOrcamento → TimelinePedido → ItemList c/ token → resumo+PIX → observações → upload → Approval c/ assinatura → footer → chat → WhatsApp flutuante → EditarDadosDialog modal)
+- `pnpm install --lockfile-only` ok (`react-signature-canvas@1.0.7` adicionado, `pnpm-lock.yaml` atualizado)
+- **Commit 1** (`03b8126f`): `chore(repo)` — .gitattributes + .gitignore + cleanup __pycache__
+- **Commit 2** (`63bee93c`): `feat(portal)` — 32 arquivos, +3226/-150
+- **Push main**: `f194fad..63bee93 main -> main` OK (autenticação git OK)
+- Vercel HEAD `https://crm-croma.vercel.app/` retornou 200 (deploy build em curso)
+
+### Bugs/observações pegas (modo adversarial)
+- **v1 legacy `portal_aprovar_proposta(uuid, text, text, text)` persistiu** após migration — agent prometeu DROP mas não executou. **Resolvido inline pós-FASE 3** com `DROP FUNCTION IF EXISTS portal_aprovar_proposta(uuid,text,text,text)`. Apenas v2 ativa agora.
+- **Vercel pode usar npm em vez de pnpm** — conflito `next-themes` vs `react@19` no npm; pnpm funciona. **Junior precisa validar Vercel build logs**. Se quebrar, configurar `installCommand: pnpm install` no `vercel.json` ou painel.
+- **`portal.pedido` sempre null no RPC v2** — TimelinePedido sempre mostra "Aguardando pedido". TODO V2: estender `portal_get_proposta` retornando o pedido convertido quando existe.
+- **Edge `ai-chat-portal` stateless** — respostas IA persistem em state local mas somem no F5. TODO V2: patchar Edge pra fazer `portal_inserir_mensagem(remetente='ia')`.
+- **Policy storage `portal_uploads_insert_anon` permissiva** (pré-existente, não criada agora) — TODO V2 restringir path `assinaturas/%`.
+- **Aprovação parcial UX risk**: clientes pequenos podem se confundir. Pode-se ativar/desativar via prop `readOnly`.
+
+### Pendências (não tocadas — PR separado depois)
+Working dir tem 18 arquivos modified + 60+ untracked de OUTRAS sessões (sessões 21-25/05). Plano: PR separado quando Junior decidir:
+- whatsapp-webhook v40 (ponte Cowork, 1374 LOC mudadas)
+- agent-post-process-message + ai-requests-fallback-watchdog + whatsapp-enviar-audio (Edges novas)
+- ai-gerar-orcamento v29 + pricing-engine fix
+- agent-cron-loop dedup Telegram
+- MCP server `tools/telegram.ts` + admin upgrades
+- Refundação CLAUDE.md + docs planning + REGRA #0 orquestrador
+
+### Estado em prod
+- `briefing-beira-rio` v10 ACTIVE
+- `portal-upload-assinatura` v1 ACTIVE
+- `portal_get_proposta` v2 com store/vendedor/referencia/prazo/logistica
+- `portal_aprovar_item` ACTIVE
+- `portal_aprovar_proposta` v2 (v1 legacy DROPPED) ACTIVE
+- `portal_atualizar_cliente` ACTIVE
+- `portal_inserir_mensagem` + `portal_listar_mensagens` ACTIVE
+- Frontend deployado via Vercel auto-deploy (commit `63bee93c`)
+- claudete_bot.py com Telegram-entry handler (sessão MADRUGADA-2, PID dinâmico, sem mudança hoje)
+
+### Token usage estimado: ~250k (1 recon Mubisys + 6 agents paralelos FASE 2 + 1 auditoria git + 1 FASE 3 + queries SQL + Edge deploys)
+
+### Comando pra retomar próxima sessão
+```
+Sou Junior, retomando refundação Beira Rio Parte 6. STATE.md mais recente.
+Estado: portal Croma /p/:token com 9 features novas + 10 migrations versionadas + 2 Edges novas em prod.
+Substituição Mubisys started — falta: validar Vercel build, popular stores.brand/imagens itens caso a caso,
+patchar ai-chat-portal pra persistir resposta IA, refinar Timeline com pedido real.
+Próximo (ordem sugerida):
+1. Validar visual de uma proposta real (gerar briefing pelo Telegram → abrir portal)
+2. PR separado pras 18 sessões pendentes (webhook v40, ai-gerar-orcamento, MCP telegram)
+3. Trocar emojis ✅❌✏️ por ASCII no claudete_bot.py
+4. E2E Viviane Quinta 28/05 (chat_id 7755709957)
+```
+
+---
+
+## Sessão 2026-05-26 MADRUGADA-2 — REFUNDAÇÃO PARTE 4 — TELEGRAM-ENTRY pro briefing-beira-rio ✅
+
+### Entregue (4 blocos com agentes em paralelo)
+
+1. **BLOCO 1 — Recon adversarial** (1 agent inline). Mapeou estrutura `claudete_bot.py` (6380 linhas) — handler `tratar_brio_callback` em 5571-5912, loop principal em 6125-6300. Identificou pontos exatos pra inserir interceptor pré-Anthropic. Descobriu `VIVIANE_CHAT_ID = JUNIOR_CHAT_ID` alias hardcode no v7 (linha 23) — todos os cards iam pro Junior, independente da origem. Plano final: ~110 LOC totais, retrocompat zero-quebra via param opcional `notify_chat_id`.
+
+2. **BLOCO 2 — Implementação** (2 agents em PARALELO, ganho de tempo ~2x):
+   - **Agent A — `claudete_bot.py`** 6380 → 6498 (+118 LOC). Backup `bak-pre-tg-entry-20260525-234909` (277KB). 4 patches:
+     - linha 140-151: constantes `CHAT_ID_VIVIANE=7755709957`, dict `TELEGRAM_INTERNAL_PHONES`, regex `\b\d{4,7}-\d{1,3}\b`, prefixo `/brio`
+     - linha 5680: helper `_brio_detectar_e_despachar(bot, chat_id, msg, texto) -> bool`
+     - linha 6402: chamada no loop principal logo após `MUBISYS.handle_confirm`, ANTES do dispatch Anthropic
+     - linha 5866-5879: `_brio_pickstore` propaga `notify_chat_id` via `cq.from.id` → fallback `chat_origem` → `CHAT_ID_JUNIOR`
+     - AST OK, encoding UTF-8 sem BOM preservado
+   - **Agent B — `briefing-beira-rio` v7 → v8** (ACTIVE, sha `af68db6b...`, version 8). 5 sites patched: declaração `notify_chat_id`, empty_briefing, ambiguous card, SHADOW card final, catch global. VERSION bump pra `v8-notify-chat-id`. **Versionada agora em `supabase/functions/briefing-beira-rio/index.ts`** (pasta nova criada — resolveu gap "Edge não versionada localmente"). Smoketest pg_net 200 com PROP-2026-0032 de teste (limpa depois). Param ausente = fallback pro hardcode original (zero quebra do webhook v44).
+
+3. **BLOCO 3 — E2E real Junior** validado pelo Telegram Claudete. Junior mandou `"Orçamento para Beira Rio, uma placa de PS 1mm 50x70 para a loja 186958-1 Giseli"`:
+   - 00:06:47 — `[TG-BRIEFING] intent=detected chat_id=1065519625 wamid=tg_1065519625_2942 has_code=True`
+   - 00:07:04 — Edge v8 dispatch: `status=200` em 17s, `lookup_tier=code_exact`, `proposta_id=50e20d3a-...`, `proposta_numero=PROP-2026-0032`, `total=253.56`
+   - Card SHADOW Telegram chegou (message_id=2944) no MESMO chat do Junior (notify_chat_id funcionou)
+   - 00:07:38 — Junior clicou Aprovar → handler V2 atualizou banco: `status=enviada`, `shadow_awaiting_approval=false`, `shadow_approved_at=2026-05-26T03:07:38`
+   - Link ERP correto: `https://crm-croma.vercel.app/orcamentos/<id>`
+   - Telefone cliente puxado da loja: `+55 (51) 3584-2200`
+
+4. **BLOCO 4 — STATE.md atualizado + Telegram notificado** (esta entrada — request_id pg_net 48375)
+
+### Estado em prod
+- `claudete_bot.py` com Telegram-entry handler ACTIVE (PID 26836, restartado 23:59:00)
+- `briefing-beira-rio` v8 ACTIVE (notify_chat_id retrocompat)
+- `supabase/functions/briefing-beira-rio/index.ts` versionada local (sem commit/push)
+- whatsapp-webhook v44, ai-gerar-orcamento v29, RPCs vault — intocados
+
+### Bugs/observações pegas (modo adversarial)
+- **EMOJI quebrado** no card APROVAR — `✅ APROVADA` vira `? APROVADA` no cliente Telegram do Junior. Visto AGORA no E2E real. Pendência #5 (trocar emojis por ASCII) **PRIORIZADA** pra próxima sessão.
+- **Número re-usado**: agent v8 criou+limpou PROP-2026-0032 no smoketest → próxima proposta real (Junior) pegou 0032 também. Mecânica = `COUNT/MAX + 1`. Sem gaps atuais (0018→0032 contínuo, 15 distinct). Risco residual: limpeza de smoketest APÓS proposta real cria gap real. **Documentar: nunca limpar dados de teste sem checar se já há propostas reais com número superior.**
+- **VIVIANE_CHAT_ID = JUNIOR_CHAT_ID** alias no v7/v8 (linha 23). Não é bug — Viviane ainda não tem chat_id próprio cadastrado. Com `notify_chat_id`, dá pra rotear dinâmico sem mexer no hardcode. Quando Viviane testar pelo Telegram dela (7755709957), o card chegará nela direto.
+- **`logAiRequest` registra `solicitante_id=JUNIOR_PROFILE_ID`** mesmo quando o briefing vem de outro chat. Inconsistência de log se Vivi disparar — todos viram "Junior" no histórico. V2: mapear notify_chat_id → profile_id.
+- **`responder_claude` perde contexto** se Junior está no meio de uma conversa e manda código. Interceptor consome, Claudete não "lembra". Aceitável V1.
+
+### Pendências (não tocadas nesta sessão)
+1. Disparo WhatsApp automático pós-Aprovar (Meta janela 24h + template aprovado)
+2. Auditar 1258 stores sem cliente_id (cosmético, lookup v7 já funciona)
+3. Persistir RPCs vault em migration versionada (`20260526_create_vault_rpcs.sql`)
+4. Auditar outras Edge Functions usando SERVICE_ROLE_KEY ou TELEGRAM_BOT_TOKEN com mesmo padrão BUG-JWT
+5. **Trocar emojis (✅❌✏️) por ASCII no bot — PRIORIDADE (visto no E2E real)**
+6. Tela ERP `/orcamentos/pendentes-aprovacao`
+7. E2E real Viviane Quinta 28/05
+8. Bug Claudete-cliente-fantasma (antigo)
+9. agent-cron-loop 500 (ler `admin_config.debug_cron_last_error`)
+10. Commit `supabase/functions/briefing-beira-rio/index.ts` no git (versão local apenas)
+11. V2: solicitante_id dinâmico no logAiRequest baseado em notify_chat_id
+
+### Token usage estimado: ~85k (1 recon agent BLOCO 1 + 2 agents paralelos BLOCO 2 + queries SQL inline + Telegram + STATE.md)
+
+### Comando pra retomar próxima sessão
+```
+Sou Junior, retomando refundação Beira Rio Parte 5. STATE.md mais recente.
+Estado: webhook v44 + briefing-beira-rio v8 + ai-gerar-orcamento v29 ACTIVE.
+claudete_bot.py com Telegram-entry handler (helper _brio_detectar_e_despachar L5680).
+E2E real Junior validado PROP-2026-0032 via Claudete.
+Próximo (ordem sugerida):
+1. Trocar emojis ✅❌✏️ por ASCII no bot (E2E mostrou que quebra)
+2. Tela ERP /orcamentos/pendentes-aprovacao
+3. E2E real Viviane Quinta 28/05 (testar do chat_id 7755709957)
+4. Persistir RPCs vault em migration versionada
+```
+
+---
+
+## Sessão 2026-05-26 MADRUGADA — REFUNDAÇÃO PARTE 3 — BUG-JWT + BUG-TG-CARD + BUG-CALLBACK fechados, E2E validado ✅
+
+### Entregue (4 blocos)
+1. **BLOCO 1 — BUG-JWT resolvido**. Causa-raiz: Supabase migrou `SUPABASE_SERVICE_ROLE_KEY` pro novo formato `sb_secret_*` (não-JWT, 41 chars). Vault preserva paralelo `service_role_key_legacy_jwt` (HS256, 219 chars). Fix: criada RPC `public.get_service_role_legacy_jwt()` SECURITY DEFINER (GRANT só service_role). `briefing-beira-rio v4` ACTIVE com helper `getLegacyJwt()` cached em isolate + retry sob 401. ai-gerar-orcamento NÃO foi tocado (preserva compat com outros callers).
+2. **BLOCO 2 — Webhook v44 ACTIVE** (verify_jwt=false preservado). Guard early na linha 706 (antes de criar lead/conversation cliente). `routeToBriefingBeiraRio()` chama briefing-beira-rio com header `X-Internal-Call: true` (sem Bearer — briefing-beira-rio v4 está com verify_jwt=false, aceita). Smoketest interno: 200 OK em 1146ms, 0 leads/conversations cliente criados.
+3. **BLOCO 3 — E2E REAL validado**. Junior enviou WhatsApp real do +5511981549118 pro WhatsApp Croma (113947-1862): "Orçamento pra Beira Rio placa de PS 1mm tamanho 100x60cm, pra loja 186958-1 Giseli". Sistema:
+   - Webhook v44 detectou INTERNAL_PHONES ✅
+   - briefing-beira-rio v4 processou (8.8s) ✅
+   - ai-gerar-orcamento v29 (5.9s) ✅
+   - Lead `[BRIEFING-INT] Beira Rio - 186958-1 Giseli` criado (id `80ff231f`) ✅
+   - PROP-2026-0030 criada (cliente operacional af166ada, total R$ 261,41, shadow_awaiting_approval=true) ✅
+   - ai_requests `1ea847c4` completed, wamid real Meta ✅
+   - Telegram card ❌ NÃO disparou — descoberto BUG-TG-CARD
+4. **BLOCO 4 — BUG-TG-CARD resolvido**. Causa-raiz: `Deno.env.get('TELEGRAM_BOT_TOKEN')` retornava undefined no Edge Runtime. Token existe em `vault.decrypted_secrets` (`8750164337:AAH8...`) MAS Supabase não injeta vault em Edge Functions automaticamente — precisa `supabase secrets set` (env vars são sistema separado do vault). `if (!token) return null;` silenciava o erro. Fix: criada RPC `public.get_telegram_bot_token()` SECURITY DEFINER. `briefing-beira-rio v6` ACTIVE com helper `getTelegramToken()` (env primeiro, fallback RPC, cached) + logs `[TELEGRAM] status=... resp=...` + retry sem Markdown se 400. Smoketest pós-fix: message_id 2931 entregue, card SHADOW com inline_keyboard Aprovar/Editar/Cancelar funcionou. Card real da PROP-2026-0030 re-enviado manualmente via pg_net.
+5. **BLOCO 5 — BUG-CALLBACK Telegram resolvido**. Junior recebeu o card SHADOW da PROP-2026-0030 mas botões Aprovar/Editar/Cancelar NÃO faziam nada. Causa: bot `claudete_bot.py` tinha handler `tratar_callback_query` (linha 5567) mas só processava prefix `auth:*`. Callbacks `brio:*` (formato do v6) caíam no else "Botao desconhecido" e eram descartados silenciosamente. **Bot é Python puro com polling manual (`requests.post`/`getUpdates`), NÃO usa `python-telegram-bot`.** Fix: patch `claudete_bot.py` (5350 → 5606 linhas, +256 LOC) — backup em `claudete_bot.py.bak-pre-brio-handler-20260525-221852`. Adicionado: 5 helpers Supabase (`_brio_supabase_request`, `_brio_get_proposta`, `_brio_update_proposta`, `_brio_get_cliente_telefone`, `_brio_link_proposta`), handler `tratar_brio_callback`, dispatch novo em `tratar_callback_query` ANTES do branch auth. Comportamento V1:
+   - **Aprovar**: UPDATE propostas status='enviada' + `config_snapshot.shadow_awaiting_approval=false` + `shadow_approved_at`. Edita card pra "✅ APROVADA" com link ERP + telefone do cliente + lembrete PIX. **NÃO dispara WhatsApp automático** (TODO V2: regra Meta janela 24h exige template).
+   - **Editar**: edita card pra "✏️ EDITAR" com link `https://crm-croma.vercel.app/propostas/<id>` (rota assumida — Junior precisa confirmar se é `/propostas/` ou `/orcamentos/`).
+   - **Cancelar**: UPDATE propostas status='recusada' + tenta marcar lead status='descartado' best-effort (PROP-2026-0030 tem lead_id=null então pula). Edita card pra "❌ CANCELADA".
+   - Todos: `answer_callback_query` imediato pro Telegram não retry + `edit_message_text(reply_markup={})` remove botões.
+   - Mantém gate `from_id != CHAT_ID_JUNIOR` (segurança).
+   - **Junior precisa restartar o bot pra ativar handler** (instruções PowerShell entregues).
+
+### Estado em prod
+- whatsapp-webhook v44 ACTIVE (verify_jwt=false, guard INTERNAL_PHONES)
+- briefing-beira-rio v6 ACTIVE (verify_jwt=false, fix JWT + Telegram via RPCs vault)
+- ai-gerar-orcamento v29 ACTIVE intocado
+- RPCs novas: `get_service_role_legacy_jwt()`, `get_telegram_bot_token()` (ambas SECURITY DEFINER, só service_role)
+
+### Risco residual + próximos passos
+1. **Outras Edge Functions usando `Bearer SERVICE_ROLE_KEY`** podem ter mesmo bug — grep `Bearer.*SERVICE_ROLE_KEY` no repo, candidatos: agent-cron-loop, whatsapp-enviar, mcp-bridge-worker, ai-requests-fallback-watchdog. Auditoria pendente.
+2. **Outras Edge Functions usando `Deno.env.get('TELEGRAM_BOT_TOKEN')`** podem estar silenciosamente sem enviar. Auditar.
+3. **Recomendado configurar TELEGRAM_BOT_TOKEN como Edge Function secret** (Dashboard → Settings → Edge Functions → Secrets) pra eliminar dependência da RPC e ganhar ~50ms/chamada. Fix atual funciona sem isso.
+4. **Persistir RPC em migration versionada** (`supabase/migrations/20260526_create_vault_rpcs.sql`) — hoje só vive no banco, sem rastro no git.
+5. **Decisão Telegram-entry pendente** (Task #6): hoje só WhatsApp dispara briefing-beira-rio. Junior perguntou se via Telegram (bot Claudete) funciona pedir orçamento — NÃO funciona (Claudete é stack Python separada). Trivial adicionar (~30 LOC: detectar keyword/comando, chamar Edge Function). Decisão arquitetural pendente.
+6. **E2E real Viviane (Quinta 28/05)** preservada no cronograma.
+7. **Disparo WhatsApp pós-Aprovar = TODO V2**. Hoje botão Aprovar muda status no banco e apresenta dados pro Junior enviar manual. Implementar chamada `whatsapp-enviar` Edge Function quando padrão de templates Meta estiver validado.
+8. **Rota ERP no botão Editar** (`/propostas/<id>` vs `/orcamentos/<id>`) — Junior precisa confirmar e ajustar `_brio_link_proposta` em claudete_bot.py se diferente.
+9. **Mensagem órfã PROP-2026-0032** no Telegram do Junior: smoketest do agent BUG-TG enviou card pra proposta que foi limpa do banco. Foi enviado aviso explicativo (msg_id 2937). Sem ação adicional.
+
+### Bugs corrigidos
+- BUG-JWT (briefing-beira-rio chamava ai-gerar-orcamento com sb_secret_*) ✅
+- BUG-TG-CARD (Edge não enxerga TELEGRAM_BOT_TOKEN do vault) ✅
+- BUG-CALLBACK (botões Telegram não acionavam nada — handler brio: faltava no claudete_bot.py) ✅
+
+### Cleanup
+- 6 rows smoketest deletados (ai_requests, propostas, conversations, leads, atividades_comerciais, agent_messages) durante validação.
+- Dados REAIS do E2E do Junior preservados: PROP-2026-0030, lead 80ff231f, conv 3623e6d6.
+
+### Token usage estimado: ~150k (3 sub-agents BLOCO 1 + BLOCO 2 + BUG-TG + 1 inline resend + 1 doc agent + queries adversariais)
+
+### Comando pra retomar próxima sessão
+```
+Sou Junior, retomando refundação Beira Rio Parte 4. STATE.md mais recente.
+Estado: webhook v44 + briefing-beira-rio v6 + ai-gerar-orcamento v29 todos ACTIVE em prod.
+E2E real Junior validado (PROP-2026-0030 SHADOW + Telegram card OK).
+Próximo: tela ERP /orcamentos/pendentes-aprovacao + E2E real Viviane.
+Pendências: auditar outros callers SERVICE_ROLE_KEY e TELEGRAM_BOT_TOKEN, persistir RPCs em migration, decidir Telegram-entry.
+```
+
+---
+
+## Sessão 2026-05-25 NOITE — REFUNDAÇÃO PARTE 2 — Bloco 5+6 deployados, Bloco 7 pronto, BUG-JWT bloqueador 🟡
+
+### Entregue
+1. **BLOCO 5 — Webhook v43 ACTIVE** (sha `533d2b25`, 754 linhas): system prompt Croma SP (era Nova Hartz/RS), faixas validadas Mubisys (PS R$235/m², BLACKOUT R$211/m², Banner R$35/m²), removido ACM/fachadas, catálogo fallback atualizado, instalação Grande SP embutida + fora-SP frete documentado. Fluxo cliente normal intacto.
+2. **BLOCO 6 — Edge Function `briefing-beira-rio` v2 ACTIVE** (sha `6709dd8b`, 818 LOC): modo SHADOW completo — parser regex+IA Haiku fallback, fuzzy lookup stores Beira Rio (pg_trgm client-side), decisão instalação Grande SP vs frete, lead fantasma `[BRIEFING-INT]` + conversation + chamada interna `ai-gerar-orcamento`, persistência proposta com flag `shadow_awaiting_approval=true`, cancel silencioso de `agent_messages` pendente_aprovacao, Telegram card com inline keyboard `Aprovar/Editar/Cancelar`, log dual em `ai_requests` + `atividades_comerciais`, idempotência via `whatsapp_message_id`.
+3. **BLOCO 7 — Webhook v44 código PRONTO** (não deployado, em `outputs/webhook-v44.ts` sha `76aa2236`, 801 linhas): adiciona `INTERNAL_PHONES = {Junior 5511981549118, Viviane 5511967310547}` Set + helper `routeToBriefingBeiraRio()` + guard early no handler que intercepta mensagens internas e dispatcha pra `briefing-beira-rio` retornando 200 antes do fluxo cliente. **Decisão deliberada de NÃO deployar enquanto BUG-JWT está aberto** — evitar ativar rota quebrada em produção.
+4. **BLOCO 8 — Status report Telegram entregue** (chat_id Junior 1065519625, msg_id 2928). Markdown estourou no primeiro envio (caracter inválido), enviei sem parse_mode no segundo.
+
+### Bugs adversariais pegos no smoketest E2E
+1. ✅ `agent_conversations.etapa` CHECK rejeita 'orcamento' (válidos: abertura, followup1-3, reengajamento, **proposta**, negociacao) → fixed pra 'proposta' em v2
+2. ✅ `agent_conversations.status` CHECK rejeita 'ativo' (válidos: **ativa**, pausada, aguardando_aprovacao, convertida, encerrada, escalada) → fixed pra 'ativa' em v2
+3. ❌ **BUG-JWT BLOQUEADOR**: `ai-gerar-orcamento` retorna `401 UNAUTHORIZED_INVALID_JWT_FORMAT` quando `briefing-beira-rio` chama com `Bearer ${SUPABASE_SERVICE_ROLE_KEY}`. Mesmo padrão historicamente funcionou no webhook. v3 com `console.log` do prefix da key está pronto em `outputs/briefing-beira-rio-v3.ts` (não deployado ainda — token economy).
+
+### Hipóteses BUG-JWT (próxima sessão)
+- (A) Supabase migrou SERVICE_ROLE_KEY pra novo formato `sb_secret_*` (não-JWT) em projetos novos → solução: usar JWT_SECRET pra gerar JWT na hora OU deployar ai-gerar-orcamento com verify_jwt=false + auth interna shared secret
+- (B) Env var não propagou pra função nova (briefing-beira-rio criada hoje) → solução: redeploy + verificar `Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')?.length` no log
+- (C) Validator Edge Runtime mudou comportamento → solução: trocar pra `apikey: ANON_KEY` header
+
+### Validações SQL feitas
+- ✅ Status enum em `propostas`: rascunho/enviada/em_revisao/aprovada/aprovada_cliente/recusada/expirada/convertida (`pendente_aprovacao` NÃO existe → usei `rascunho` + flag config_snapshot)
+- ✅ Profiles confirmados: Junior `f91d20a9-9d75-4a2c-8a67-87abfd910cba` admin, Viviane `15ca4415-88fd-4dc5-8f60-4c705a9c3a24` instalador
+- ✅ pg_trgm disponível, 6 stores Beira Rio (4 sem code, 2 com code formato "186958-1 Giseli") → fuzzy é primary path
+
+### Cleanup feito
+- Lead fantasma + conversation + agent_messages do smoketest deletados
+- ai_requests com `whatsapp_message_id LIKE 'wamid.SMOKETEST_%'` deletados (2 linhas)
+
+### Estado em prod
+- `whatsapp-webhook` v43 ACTIVE (fluxo cliente normal funciona)
+- `briefing-beira-rio` v2 ACTIVE (mas E2E quebra no JWT) — sem caller real, então não impacta nada
+- `ai-gerar-orcamento` v29 ACTIVE intacto
+- Motor v29 calibrado (markup placa 310, config_precificacao b414b818)
+
+### Cronograma Semana 1 ajustado
+- **Hoje (terça 26/05)** EXECUTADO BLOCOS 5+6+7 (parcial)+8 ✅
+- **Quarta 27/05**: resolver BUG-JWT (#6) → deploy webhook v44 → smoketest E2E shadow → tela ERP `/orcamentos/pendentes-aprovacao`
+- **Quinta 28/05**: E2E real Viviane (encaminhar briefing real BR)
+- **Sex 29/05**: iteração baseado em casos reais
+- **Sáb-Dom 30-31/05**: coleta dados + relatório final ROI
+
+### Token usage estimado: ~180k (3 sub-agents Plan/Implement/Recon + multi-deploys + debugging E2E)
+
+### Comando pra retomar próxima sessão
+```
+Sou Junior, retomando refundação Beira Rio. Bug bloqueador BUG-JWT em briefing-beira-rio.
+Lê primeiro:
+- C:\Users\Caldera\Claude\CRM-Croma\.planning\STATE.md (sessão NOITE 25/05, entrada atual)
+- C:\Users\Caldera\AppData\Roaming\Claude\local-agent-mode-sessions\565da480-167b-4f2d-9c54-0d669597c884\local_8e22091f-556e-4b21-9c54-0d669597c884\outputs\briefing-beira-rio-v3.ts (debug version local)
+- C:\Users\Caldera\AppData\Roaming\Claude\local-agent-mode-sessions\565da480-167b-4f2d-9c54-0d669597c884\local_8e22091f-556e-4b21-9c54-0d669597c884\outputs\webhook-v44.ts (pronto, não deployado)
+Estado: webhook v43 ACTIVE OK + briefing-beira-rio v2 ACTIVE com bug 401 INVALID_JWT.
+Próximo: deployar v3 com debug log → confirmar formato SERVICE_ROLE_KEY → fix → deploy v44 → E2E.
+```
+
+---
+
+## Sessão 2026-05-25 — REFUNDAÇÃO PARTE 1 — Motor orçamento consertado + Mubisys recon ✅
+
+### Entregue (4 blocos do cronograma + 1 extra)
+1. **Bloco 1 — Limpeza Beira Rio**: cliente fake `40ac91c3` DELETE, store seed `5df8f4c9` DELETE, `5c015179` UPDATE → 'Beira Rio Sede RS' ativo=false. Cliente operacional `af166ada` (CALCADOS BEIRA RIO S/A 88.379.771/0001-82) intacto.
+2. **Bloco 2 — Modelo PS 1mm**: cadastrou material `MP-FITA-VHB-19` (R$ 2/m), removeu parafuso/bucha do modelo `7f4519ee`, adicionou fita com `tipo='perimetro'`. Motor v25→v26 ensinado a entender `tipo='perimetro'` (multiplica por 2*(L+A) em vez de area_m2).
+3. **Bloco 3 — config_precificacao**: UPDATE linha `b414b818` com valores reais Junior 2026-05: fat=110k, op=36800, prod=12000, qtd=2, comissao=3, impostos=12, juros=2, encargos=0. Motor v26→v27 lê de `config_precificacao` (não `admin_config.config_precificacao` que não existia).
+4. **Bloco 4 — Dry-run revelou 2 bugs crônicos**:
+   - Motor lia config de chave `admin_config.config_precificacao` inexistente → fallback hardcoded R$ 30k/mês (todas as propostas IA históricas usaram valor errado)
+   - `regras_precificacao.aproveitamento_padrao` está em formato percentual (75-90), motor esperava decimal (0.75-0.90) → custoMP saía 100x menor → preço gerado ridículo (R$ 42 pra placa que vale R$ 1.078)
+   - **v28 fix** pricing-engine return (typo "branco_brilho_promo" entrou no v27 por erro de cópia inline)
+   - **v29 fix** auto-normalize aproveitamento (`if (aproveitamento > 1) aproveitamento = aproveitamento / 100`)
+5. **Bloco 4b — Mubisys recon**: coletei 6 orçamentos Beira Rio (1553+1560+1559+1556+1555+1549) via Claude-in-Chrome. PS 1mm instalado SP = R$ 225-245/m² (média R$ 235). BLACKOUT = R$ 195-225/m² (média R$ 211). **Frete SEMPRE separado no Mubisys** (R$ 80-1200 conforme distância) — confirmado regra Junior: SP capital + Grande SP sem frete, fora-SP com frete. Markup placa atualizado 55%→310% (calibrado pra Beira Rio típico 2-5m², erro -4% em 4m²).
+
+### Estado atual ai-gerar-orcamento v29 ACTIVE
+- ezbr_sha256: `75b16f425b1af09fd7fd8a44ad095b2c76189e857600a07e0e8acf6c539f0783`
+- 380/380 linhas modelo_materiais com tipo='material' (compat preservada)
+- 1 linha tipo='perimetro' (modelo PS 1mm + fita VHB)
+- regras_precificacao.placa.markup_sugerido = 310
+
+### Pendências pra Bloco 5+ (próxima sessão)
+- **Bloco 5**: editar system prompt webhook v42 — Nova Hartz/RS → São Paulo-SP, atualizar faixas preço, remover ACM
+- **Bloco 6**: Edge Function `briefing-beira-rio` v1 SHADOW
+- **Bloco 7**: webhook v42 → v43 guard INTERNAL_PHONES (Junior + Viviane)
+- **Bloco 8**: status report Telegram
+- **Backlog**:
+  - Criar modelo BLACKOUT no banco (não existe — agente não consegue orçar BLACKOUT hoje)
+  - Validar markup adesivo (atual 580%, não testado contra Mubisys)
+  - Implementar frete como adicional pra fora-SP
+  - Refinamento futuro: custos com componente fixo+variável (markup % único não bate todos os tamanhos — peças <1,5m² ficam +30%, peças >5m² ficam -10%)
+
+### Bug observado de novo (alerta sessão futura)
+- **Edit do Cowork TRUNCA files grandes** (>500 linhas index.ts, >150 linhas pricing-engine.ts). Aconteceu 2x nesta sessão. Solução: regenerar via Python heredoc no bash, NÃO usar Edit em arquivos grandes.
+- **Cola inline gigante (>20KB) no tool call é risk de typo** (perdi 1 deploy com `branco_brilho_promo` no return). Solução: gerar conteúdo via Python e validar via diff antes de submeter.
+
+### Comando pra retomar próxima sessão
+```
+Sou Junior, retomando refundação motor orçamento Beira Rio. Lê primeiro
+- C:\Users\Caldera\Claude\CRM-Croma\.planning\STATE.md (sessão 2026-05-25, entrada mais recente)
+- C:\Users\Caldera\Claude\CRM-Croma\.planning\CONTINUACAO-2026-05-25.md
+Estado: motor v29 ACTIVE com aproveitamento normalized + config_precificacao lida da tabela
++ markup placa=310%. Próximo: Bloco 5 (system prompt webhook v43).
+Cuidado: Edit nativo trunca files >500 linhas — usar Python heredoc pra rebuilds.
+```
+
+---
+
+## Sessão 2026-05-22 NOITE — DECISÃO ESTRATÉGICA: WhatsApp só cliente + Claudete Telegram = Jarvis ✅ Fase 1.1
+
+### Contexto da decisão
+Junior questionou se WhatsApp+MODO DONO valia o custo (tokens janela Cowork, voz OUT em limbo, complexidade da ponte). Análise mostrou:
+- **Atendimento cliente WhatsApp**: VALE — é onde o dinheiro entra (3.456 leads, clientes só falam por WhatsApp), $0/msg via ponte Cowork, voz IN funciona (Groq Whisper).
+- **MODO DONO WhatsApp**: NÃO VALE — duplica o que Claudete Telegram já faz (multiusuário Junior+Vivi, log_acoes, hot-reload), enquanto carrega complexidade Meta (Quality Rating, Messaging Limits, voz OUT bloqueada).
+- **Por que Telegram não parou quando WhatsApp parou**: Claudete bot Python roda Anthropic API direto, NÃO usa ponte Cowork. Independente da janela.
+
+### Decisão (com OK do Junior)
+1. **WhatsApp = 100% atendimento cliente** (mantém ponte Cowork, $0/msg, voz IN OK).
+2. **MODO DONO WhatsApp removido** — Junior usa Telegram.
+3. **Voz OUT WhatsApp abandonada** — Telegram sendVoice é trivial e simples.
+4. **Foco migra pra Claudete Telegram via ponte Cowork** — Caminho B escolhido (vs Caminho A bot Python autônomo). Justificativa: só ponte Cowork entrega Windows-MCP + Chrome real + Skills + 104 MCPs.
+
+### ✅ REVERSÃO COMPLETA — Etapa 2 ponte Cowork DESLIGADA (2026-05-22 NOITE final)
+
+Após múltiplas iterações Junior alertou que CADA execução vazia de cron Cowork (a cada 1min) carregava prompt SKILL completo + catálogo de tools + cabeçalho de sessão → queimava janela inteira em pouco tempo. Decisão estratégica final: **voltar pra Anthropic API direto pra TUDO**.
+
+**Etapa 2 (ponte Cowork) revertida em 4 passos cirúrgicos**:
+1. **`whatsapp-webhook` v41 → v42** deployado: removido bloco de enfileiramento em `ai_requests` (linhas 1124-1151 do v41). Caminho síncrono `generateClaudeResponse` (que já era fallback no v40+) virou caminho ÚNICO. ai_requests fica como tabela apenas pra audit. (Tool deploy_edge_function MCP, version 42 ACTIVE, verify_jwt=false preservado)
+2. **pg_cron `ai-requests-fallback-watchdog-5min` (jobid=23) DESATIVADO** via `cron.alter_job(23, active:=false)`. Não precisa mais — webhook responde síncrono. Job preservado pra rollback fácil se necessário.
+3. **SKILLs Cowork DISABLED** (já feitas por Junior em sessão paralela): `croma-whatsapp-responder` v8 (early-exit guard) e `claudete-telegram-responder` v1 (criada nesta sessão) — ambas */5 disabled. Não consomem recorrente.
+4. **Bot Python Claudete (`claudete_bot.py`)** — NÃO MUDADO. Já usa Anthropic API direto, ~$0.03/msg. Sem patch necessário pra Fase 3.2 (DELETED do plano).
+
+**Modelo atual (pós-reversão)**:
+- **WhatsApp atendimento cliente**: webhook v42 → Anthropic API direto síncrono (5-15s latência). Sonnet 4 + Haiku 4.5 fallback. ~$0.03/msg × 800 msgs/mês = ~$24/mês.
+- **Claudete Telegram (Jr+Vivi)**: bot Python `claudete_bot.py` → Anthropic API direto (3-5s latência). ~$0.03/msg × ~50/dia = ~$45/mês.
+- **Total previsto: ~$70/mês de API**. Previsível, sem queimar janela Cowork, sem latência 5-10min do watchdog.
+- **Bug bug "Claudete mente"**: SupabaseDirectClient.insert() já corrigido na sessão MADRUGADA (Prefer: return=representation + check len(rows)). Auditoria das 104 tools MCP Croma fica como Fase B pendente (não-urgente).
+
+**Lições aprendidas**:
+- Karpathy: Think Before Coding falhou — eu não MEDI o custo real de uma SKILL Cowork vazia rodando cada minuto antes de propor a arquitetura. Junior teve que descobrir empiricamente.
+- A premissa "ponte Cowork = $0 API" estava ingênua: troca custo financeiro por custo de janela Cowork, e janela Cowork tem ciclo curto de exhaustion em horário de pico.
+- "Tabela como fila ativa" só vale se o consumer for ASSÍNCRONO de verdade (Edge Function, worker dedicado), não SKILL Cowork que consome janela ao executar.
+
+### Pendente pra retomar (não-urgente)
+1. **Teste E2E final**: Junior manda mensagem real WhatsApp → confirma resposta em 5-15s
+2. **Deletar SKILLs Cowork DISABLED** (`croma-whatsapp-responder`, `claudete-telegram-responder`) — opcional, atualmente só consomem 0 tokens disabled
+3. **Auditar pg_cron `expire-ai-requests` (jobid 4)** — segue ativo a cada 2h, OK pra limpeza histórica
+4. **Fase B do diagnóstico Claudete-mente**: auditar 104 tools MCP Croma pelo bug "RLS-silencioso" (não-urgente, anti-alucinação já protege)
+5. **dispatch-approved-messages**: investigar se o "dispatch via celular" que Junior mencionou se conecta com essa Edge Function (próxima sessão)
+
+### Estado real ao pausar (snapshot final)
+- SKILL `claudete-telegram-responder` rodando cada minuto, fila vazia (bot ainda não enfileira) → custo ~zero recorrente
+- Bot Python segue 100% no caminho rápido Anthropic-direto → nada quebrado
+- WhatsApp atendimento cliente v7 intocado
+- MODO DONO WhatsApp → redirect pro Telegram funcional desde já
+
+### Entregue nesta sessão (Fases 1.1, 1.2, 2, 3.1 ✅)
+1. **SKILL `croma-whatsapp-responder` v6 → v7** atualizada via `mcp__scheduled-tasks__update_scheduled_task`:
+   - Removida toda seção MODO DONO (~180 linhas, mantra D-0, 10 seções D, catálogo tools)
+   - Adicionado passo 2.0 intercept Junior (from_phone=5511981549118) com redirect fixo: "Oi Junior! Modo dono migrou pro Telegram (@Claudete_Juca_bot). Lá tu tem o Jarvis completo — Windows, Chrome real, Skills, tudo. Te encontro lá! 👋"
+   - Idempotência preservada (metadata->>'ai_request_id'), `manual:true` bypassa janela horária
+   - Atendimento cliente 2a-2f mantido INTACTO (zero regressão)
+   - Tamanho: ~110 linhas vs 328 de v6
+2. **STATE.md** atualizado com sessão NOITE.
+3. **Diagnóstico Claudete-mente** (sessão MADRUGADA) revalidado como ainda relevante pra Fase B de auditoria das 108 tools MCP Croma.
+
+### Adicional: decisão arquitetural ATUALIZADA
+Junior escolheu inicialmente Caminho B puro. Após mapear código, recomendei reabrir: **Híbrido** (5 linhas de roteamento por keyword: cotidiano via Anthropic-direto rápido, heavy via Cowork). Junior aprovou híbrido. SKILL Telegram já foi criada com instrução "mensagens leves seguem caminho rápido Anthropic-direto no bot — não passam aqui".
+
+### Pendente (Fases 3.2, 3.3, 3.4, 4)
+1. **Fase 3.2** (PAUSADA — fazer fora do Cowork): Patch `claudete_bot.py` com 3 funções novas (`precisa_cowork`, `enfileirar_e_processar_cowork`, `_thread_aguardar_cowork`) + modificar `processar_comando` linha 4794 pra rotear híbrido. Detalhes completos em `docs/plano-ia/2026-05-22-claudete-mapa-tools.md` seção "3.2 — Patch claudete_bot.py". Recomenda Claude Code local OU sessão Cowork dedicada.
+2. **Fase 3.3**: Patch `ai-requests-fallback-watchdog` v3 → v4 cobrir telegram-resposta + envio via Telegram Bot API direto (fallback)
+3. **Fase 3.4**: Teste E2E ("tira print do dashboard Croma" no Telegram → SKILL Cowork executa → bot envia foto)
+4. **Fase 4**: Validar capabilities equivalentes (Skills docx/pptx/xlsx, MCPs externos, Chrome real)
+
+### Como retomar (sugestão)
+- **Modo A (Claude Code local)**: rodar `claude` no terminal dentro de `C:\Users\Caldera\Claude\JARVIS`, mostrar este STATE + mapa + SKILL Telegram, pedir patch Fase 3.2. Edit grande em arquivo grande é caso típico Claude Code.
+- **Modo B (nova sessão Cowork dedicada)**: abrir sessão Cowork SÓ pra Fase 3.2 (sem reler tudo — só o mapa + linhas relevantes do bot). Custo estimado: 30-40k tokens.
+
+### Tradeoff aceito por Junior
+- Latência Telegram vai de ~3-5s (Anthropic direto) → ~15-60s (ponte Cowork) — preço por ter Windows-MCP/Chrome/Skills.
+- Quando janela Cowork estourar, Claudete também para por até 5min (watchdog Anthropic API fallback).
+
+### Bug interessante observado (segue válido)
+- Edit nativo do Claude Code Cowork TRUNCA files grandes (>5k linhas claudete_bot.py, 200+ linhas Edge Functions) — solução foi regenerar via Python + bash workspace. Vale alertar próxima sessão.
+
+### Pendentes herdados de sessões anteriores (não tocados)
+1. **Bug Claudete-cliente-fantasma**: rastrear quando Junior lembrar do CNPJ/empresa
+2. **agent-cron-loop 500**: ler `admin_config.debug_cron_last_error` no próximo ciclo
+3. **Watchdog Windows Task Scheduler** do bot Claudete (NextRunTime vazio — sem auto-restart confiável)
+4. **Fase B do diagnóstico Claudete-mente**: auditar 108 tools MCP Croma pelo bug "RLS-silencioso"
+
+---
+
+## Sessão 2026-05-22 MADRUGADA — PONTE COMPLETA + MODO DONO + DIAG VOZ OUT 🟡
+
+### Entregue
+1. **mcp-bridge-worker v6** — branch `whatsapp-resposta` libera à fila pra Cowork
+2. **Webhook whatsapp-webhook v40** — enfileira em `ai_requests` (em vez de chamar Anthropic síncrono). Fallback síncrono preservado se INSERT falhar
+3. **Edge Function agent-post-process-message v1** — encapsula gravarDadosExtraidos + atualizarMemoriaLead + gerarOrcamentoReal + incrementar_contador (paridade webhook v39)
+4. **Edge Function ai-requests-fallback-watchdog v3** + pg_cron `*/5min` — fallback Anthropic API se Cowork cair
+5. **SKILL `croma-whatsapp-responder` v6** — MODO DONO (telefone Junior) com Mantra D-0 "tão poderoso e autônomo quanto Claude no Cowork" + Goal-Driven Verification obrigatória pós-mutation + acesso completo (terminal, browser, web, MCPs, skills)
+6. **Edge Function whatsapp-enviar-audio v2** — ElevenLabs TTS (voice GDzHdQOi6jjf8zaXhCYD, eleven_multilingual_v2) em OGG/Opus + upload Meta Media + send type=audio
+7. **Karpathy guidelines mescladas no CLAUDE.md** do Croma (linhas 134-202)
+8. **Fix RLS-aware Claudete** — SupabaseDirectClient.insert() agora usa `Prefer: return=representation` + checa `len(rows) > 0` (anti-mentira)
+9. **Secret `ELEVENLABS_API_KEY` adicionado no Supabase** (copiado do .env local)
+10. **STATE.md + Karpathy guidelines + diagnóstico Claudete-mente** documentados
+
+### Teste E2E modo atendimento — PASS (Junior recebeu mensagem real)
+- POST webhook simulado → ai_request enfileirado → SKILL Cowork claimou → agent-post-process-message OK → INSERT agent_messages aprovada → whatsapp-enviar 200 → Junior recebeu no WhatsApp +5511981549118
+
+### Estado AÇO atual (ponte Cowork em produção)
+- mcp-bridge-worker: v7 ACTIVE | whatsapp-webhook: v41 ACTIVE | agent-post-process-message: v1 | ai-requests-fallback-watchdog: v3 | whatsapp-enviar-audio: v2
+- Custo API Anthropic no atendimento ao cliente: **$0** (a SKILL Cowork é Claude Max)
+- Watchdog cobre fallback se Cowork cair (5min trigger via pg_cron)
+
+### Diagnóstico voz OUT (PROBLEMA ABERTO)
+- Texto via whatsapp-enviar: ✅ chega + lida (callback Meta atualiza `status='lida'`)
+- Áudio v1 MP3, v2 OGG, v3 OGG c/ agent_message pre-criada: ❌ Meta aceita (wamid retornado) mas NUNCA envia callback delivered/failed — fica em limbo no banco como `status='enviada'` indefinidamente
+- 3 tentativas, 2 formatos diferentes — mesmo comportamento
+- **Hipótese principal**: limitação da conta WhatsApp Business da Croma — contas em "limited messaging" tier permitem só texto/template outbound, áudio é engolido silenciosamente
+- **Próximo passo**: navegar Meta Business Manager via Claude in Chrome (browser Caldera selecionado) → WhatsApp Manager → ver Quality Rating + Messaging Limits + restrições. Pausado por limite de tokens.
+
+### Bug interessante observado
+- Edit nativo do Claude Code Cowork TRUNCA files grandes (>5k linhas claudete_bot.py, 200+ linhas Edge Functions) — solução foi regenerar via Python + bash workspace. Vale alertar próxima sessão.
+
+### Pendências pra próxima sessão
+1. **Navegar Meta Business Manager** (Claude in Chrome browser Caldera) pra ver status conta WhatsApp Business e confirmar/refutar hipótese da limitação
+2. **Se conta limitada**: documentar restrições + sugerir caminho (verificação Meta, upgrade tier, etc)
+3. **Se conta NÃO limitada**: investigar formato áudio mais fundo (talvez precisar bitrate 16/24kHz mono em vez de 48kHz)
+4. **Etapa 2.5** — após 24h: validar `via_cowork / total > 95%` e remover `ANTHROPIC_API_KEY` dos secrets Supabase
+5. **Integração Voz OUT na SKILL** (depois de resolver entrega): patch v6→v7 detectando `media_type='audio'` na recebida e chamando `whatsapp-enviar-audio` automaticamente
+6. **Caso real teste modo dono**: Junior mandar "busca passagem ônibus SP-Paraguai essa semana" pelo WhatsApp Croma — valida raciocínio livre + Claude in Chrome + verificação cruzada
+7. **Bug Claudete-cliente-fantasma** (cadastrou cliente que não cadastrou): rastrear quando Junior lembrar do CNPJ/empresa
+8. **agent-cron-loop 500** (follow-ups parados): ler `admin_config.debug_cron_last_error` no próximo ciclo
+9. **Watchdog Windows Task Scheduler** do bot Claudete (NextRunTime vazio — sem auto-restart confiável)
+
+### Comando pra retomar na próxima sessão (cola no início)
+
+```
+Sou Junior, vou retomar investigação áudio WhatsApp + Etapa 2.5.
+Lê primeiro:
+- C:\Users\Caldera\Claude\CRM-Croma\.planning\STATE.md (sessão MADRUGADA 22/05)
+- SKILL v6 em C:\Users\Caldera\Claude\Scheduled\croma-whatsapp-responder\SKILL.md
+Próximo passo: Claude in Chrome (browser Caldera) → business.facebook.com → WhatsApp Manager → Quality Rating + Messaging Limits da conta Croma.
+Aplica princípios karpathy. Confirma antes de cada deploy.
+```
+
+---
+
+## Sessão 2026-05-21 NOITE 2 — ETAPA 2.2 PONTE COWORK ✅
+
+### Entregue
+1. **Scheduled task `croma-whatsapp-responder`** criada (cron `* * * * *`, path canônico `C:\Users\Caldera\Claude\Scheduled\croma-whatsapp-responder\SKILL.md`). Consumer da fila `ai_requests` tipo='whatsapp-resposta'. Fluxo: claim atômico (fn_claim_ai_requests) → contexto SQL → resposta natural pt-BR → INSERT agent_messages aprovada → POST whatsapp-enviar → tratamento 429 (devolve à fila) → UPDATE ai_requests completed.
+2. **mcp-bridge-worker v6** deployed (Edge Function): adicionado branch `else if (r.tipo === 'whatsapp-resposta')` que devolve à fila (status=pending) em vez de marcar erro. Resolve corrida com pg_cron — handoff de ontem dizia "podem coexistir" mas estava errado.
+3. **Karpathy guidelines mescladas no CLAUDE.md** (linhas 134-202, opção B do user). 4 princípios em PT-BR com atribuição ao repo `multica-ai/andrej-karpathy-skills`. Vale automaticamente em Cowork/Claude Code/Claudete.
+
+### Teste E2E (PASS no fluxo, 429 esperado no envio)
+- Injetado ai_request fake com lead do Junior (`e1296747...`, +5511981549118)
+- mcp-bridge-worker v6 release_to_cowork: ✅ status 200 nos logs
+- SKILL Cowork claimou ai_request: ✅ pending → processing
+- SKILL gerou resposta natural: ✅ "Oi Junior! Aqui é da Croma — mensagem recebida e processada pela ponte Cowork..."
+- SKILL inseriu agent_messages com modelo_ia='claude-via-cowork-mcp', status='aprovada': ✅
+- SKILL chamou whatsapp-enviar: ✅ POST visível nos logs (2.187s)
+- whatsapp-enviar retornou 429: ESPERADO — `agent_config.horarios=[["09:00","12:00"],["14:00","17:00"]]` e teste rodou 20:59 BRT (FORA janela)
+- SKILL devolveu ai_request pra pending: ✅
+- BUG observado: SKILL deletou agent_messages após 429 por iniciativa própria (não estava no prompt). Ver "Próximos passos".
+
+### Achados que invalidam o handoff de ontem
+- **Janela horária real**: `agent_config.horarios=[["09:00","12:00"],["14:00","17:00"]]` (com almoço). Função `dentroDaJanela` USA o array primeiro, ini/fim só fallback. Meu draft chutou "09-23".
+- **mcp-bridge-worker NÃO podia coexistir**: a RPC `fn_claim_ai_requests(5)` claim TODA a fila atomicamente sem filtrar por tipo. Quem ganha a corrida pega tudo. Fix v6 resolve.
+- **fn_claim move pra 'processing'** (não fica em pending). Watchdog Etapa 2.4 precisa filtrar `status IN ('pending','processing') AND created_at < now() - 5min` (não só pending).
+- **whatsapp-enviar é message_id-driven** (`{message_id: uuid}`), lê de agent_messages WHERE status='aprovada'. Tem guards de horário + limite diário.
+- **ai_responses schema**: `conteudo` jsonb (não `payload`), `actions`/`summary`/`model_used` (não `metadata`).
+
+### Limpeza
+- ai_requests teste (`fd4d5cf3...`, `96726609...`) marcados `status='expired'` com audit-trail
+- agent_conversation teste (`2cec4cab...`) deletada
+
+### Próximos passos (Etapa 2 continua)
+1. **Iterar SKILL `croma-whatsapp-responder`**: adicionar instrução explícita "NÃO DELETAR agent_messages após 429 — manter status='aprovada' pra próxima tentativa quando entrar na janela". Update via `mcp__scheduled-tasks__update_scheduled_task`.
+2. **Etapa 2.3 — Webhook v40**: substituir chamada síncrona à Anthropic API por INSERT em ai_requests tipo='whatsapp-resposta'. Snippet exato no handoff.
+3. **Etapa 2.4 — Watchdog**: novo scheduled task `ai-requests-fallback-watchdog` cron `*/5 * * * *`, pega ai_requests `status IN ('pending','processing')` mais velhos que 5min, chama Anthropic API direto + envia. Telegram alert.
+4. **Etapa 2.5 — Validação 24h + remover ANTHROPIC_API_KEY**.
+
+---
 
 ## Sessão 2026-05-21 TARDE/NOITE — OPENROUTER 100% ELIMINADO + ORÇAMENTO + 401/500 ✅
 

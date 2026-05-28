@@ -1,48 +1,59 @@
-# CROMA PRINT — CRM/ERP SISTEMA
+﻿# CROMA PRINT — CRM/ERP SISTEMA
 
-> **Versão**: 6.0 | **Atualizado**: 2026-04-24 | **Status**: Produção — MCP Server 93 ferramentas
+> v6.3 | 2026-05-25 | Produção — MCP Server **108 ferramentas** + REGRA MODO ORQUESTRADOR
+
+---
+
+## REGRA #0 — MODO ORQUESTRADOR (padrão em TODA sessão)
+
+A sessão principal **planeja, coordena e valida**. Trabalho pesado é delegado pra sub-agents (`Agent` tool). Isso resolve o problema de janela enchendo no fim da sessão — o que vai pro contexto principal é só o sumário, não o trabalho cru.
+
+**Quando disparar sub-agent (regra simples):**
+- Recon de código (ler Edge Function de 500+ linhas, schema de tabelas, logs)
+- Implementação (criar/editar arquivos com ≥100 linhas novas)
+- Deploy multi-step (build + deploy + smoketest + validação)
+- Debug de bug específico (investigar, reproduzir, propor fix)
+- Qualquer tarefa que sozinho consumiria >30k tokens inline
+
+**Quando fazer inline (sem agent):**
+- Tool call único (uma query SQL, um Edit pequeno, um deploy já preparado)
+- Decisão arquitetural que exige meu raciocínio com contexto da conversa
+- Validação rápida de output de agent
+
+**Paralelismo obrigatório:** se 2+ blocos são independentes, disparar agents em **paralelo** num único turno (múltiplos `Agent()` no mesmo message). Ex: recon webhook + design briefing-beira-rio simultâneos.
+
+**Budget mental:** assumir ~150k tokens disponíveis por sessão. Se passar de 100k, escalar uso de agents. Se passar de 150k, prep próxima sessão e parar (não esperar contexto saturar).
+
+**Cowork vs Claude Code:** trabalho em arquivos >500 linhas (Edit do Cowork trunca) ou rebuilds completos → recomendar Junior rodar Claude Code local. Cowork é melhor pra orquestração + deploys + queries.
+
+**Modo adversarial:** sempre em auditorias/validações. Sub-agents recebem instrução explícita "questione premissas, faça verificações cruzadas, modo adversarial".
+
+**Anti-pattern proibido:** "vou parar pra economizar tokens" sem ter tentado disparar agent. Se o trabalho é necessário e tem ≥30k de carga inline, a resposta NÃO é parar — é delegar pra agent isolado que retorna sumário ≤5k.
+
+**Não negociar:** Junior pode dizer "continua" pra forçar execução, ou "para aqui" pra forçar pausa. Sem isso, default é DELEGAR antes de parar.
 
 ---
 
 ## REGRA #1 — MCP SERVER CROMA É O SISTEMA
 
-O MCP Server Croma é a interface principal para TODA operação. Claude opera a Croma ATRAVÉS do MCP.
+MCP é a interface principal para TODA operação de dados de negócio.
 
 **Hierarquia (SEM EXCEÇÕES):**
+1. **MCP Server Croma** — OBRIGATÓRIO para tudo que envolve dados
+2. Consultas (leitura): executar direto, sem pedir permissão
+3. Alterações (escrita): confirmar com Junior antes
+4. Frontend/React: APENAS bugs de UI, features visuais
+5. Supabase/apply_migration: apenas infraestrutura (DDL, RLS, schema)
 
-1. **MCP Server Croma** — OBRIGATÓRIO para tudo que envolve dados do negócio
-2. **Consultas (leitura)**: executar direto, sem pedir permissão
-3. **Alterações (escrita)**: confirmar com Junior antes
-4. **Frontend/React**: APENAS para bugs de UI, features visuais
-5. **Supabase/apply_migration**: apenas infraestrutura técnica (DDL, RLS, schema)
+**PROIBIDO ❌** Inventar preços, dados de clientes, ou qualquer valor que existe no banco. Usar SQL direto quando existe ferramenta MCP.
 
-**PROIBIDO ❌**
-
-- Inventar preços — consultar `materiais` + `produto_modelos` + `regras_precificacao` via MCP
-- Inventar dados de clientes — buscar no banco via MCP
-- Usar SQL direto quando existe ferramenta MCP para a operação
-- Estimar/chutar qualquer valor que existe no banco
-
-**OBRIGATÓRIO ✅**
-
-- Consultar preço real antes de cotar qualquer produto
-- Criar propostas/orçamentos reais no sistema
-- Usar motor Mubisys (materiais + markup + regras) para precificação
-- Consultar `croma_custo_real_pedido` / `croma_resumo_impressora` antes de estimar margens
+**OBRIGATÓRIO ✅** Consultar preço real antes de cotar. Usar motor Mubisys (materiais + markup + regras). Consultar `croma_custo_real_pedido` / `croma_resumo_impressora` antes de estimar margens.
 
 ---
 
-## ACESSO À MCP CROMA — MEMORIZAR (não esquecer!)
+## ACESSO À MCP CROMA NO COWORK ⚠️
 
-A MCP Croma é acessada de forma DIFERENTE em cada surface do Claude:
-
-| Surface | Como invocar |
-|---|---|
-| **Telegram (Claudete)** | Bot Python conecta direto à MCP via stdio |
-| **Claude Code (CLI)** | Ferramentas `croma_*` aparecem nativas via stdio |
-| **Cowork (Desktop) ⚠️** | **VIA Desktop Commander** — não aparece em `list_connectors` |
-
-### Comando bridge no Cowork (sempre que operar Croma daqui):
+No Cowork a MCP Croma **não aparece** em `list_connectors` — invocar via Desktop Commander:
 
 ```
 mcp__Desktop_Commander__start_process
@@ -51,17 +62,12 @@ mcp__Desktop_Commander__start_process
   timeout_ms: 30000
 ```
 
-**Exemplos práticos:**
-
 - Health check: `croma.cmd croma_health_check`
 - JSON sem acentos: `croma.cmd croma_listar_clientes {"limit":5}`
-- JSON com acentos/espaços (use PowerShell, aspas simples preservam literal):
-  ```
-  $env:CROMA_ARGS='{"campo":"valor com espaço","outro":"acentuação"}';
-  & "C:\Users\Caldera\Claude\CRM-Croma\mcp-server\croma.cmd" <tool>
-  ```
+- JSON com acentos/espaços → PowerShell com aspas simples:
+  `$env:CROMA_ARGS='{"campo":"valor"}'; & "...\croma.cmd" <tool>`
 
-⚠️ **Antes de afirmar "MCP Croma offline"** → SEMPRE testar com `croma_health_check`. Em 99% dos casos ela está ativa no Cowork — só não aparece como "MCP deferred" porque é um binário bridge, não um servidor MCP nativo registrado.
+⚠️ Antes de afirmar "MCP offline" → testar `croma_health_check` primeiro.
 
 ---
 
@@ -70,58 +76,27 @@ mcp__Desktop_Commander__start_process
 - **Repo**: `C:\Users\Caldera\Claude\CRM-Croma` | GitHub: `juniorcromaprint-tech/CRM-Croma`
 - **Vercel ERP**: `crm-croma.vercel.app` | **Campo**: `campo-croma.vercel.app`
 - **Supabase**: `djwjmfgplnqyffdcgdaw`
-- **PIX**: CNPJ 18.923.994/0001-83 | **Email**: [junior@cromaprint.com.br](mailto:junior@cromaprint.com.br)
-- **Visão**: Primeira empresa de comunicação visual gerida por IA
-
----
-
-## PADRÕES DE CÓDIGO
-
-- **Código**: TypeScript/inglês | **UI**: pt-BR em TUDO que o usuário vê
-- **Cards**: `rounded-2xl` | **Inputs**: `rounded-xl`
-- **Cor primária**: `bg-blue-600 hover:bg-blue-700`
-- **Toasts**: `showSuccess()` / `showError()` de `@/utils/toast.ts`
-- **Formatação**: `brl()`, `formatDate()` de `@/shared/utils/format.ts`
-- **Supabase client**: `@/integrations/supabase/client.ts`
-- **Mutations**: TODO insert/update DEVE usar `.select().single()` (detectar RLS silencioso)
-- **AlertDialogAction async**: SEMPRE `e.preventDefault()` + fechar dialog manualmente via `onSettled`
-- **Auth**: `ProtectedRoute` obrigatório. Login em todas as rotas exceto `/p/:token` e `/nps/:token`
-
-### Estado Vazio Padrão
-
-```tsx
-<div className="bg-white rounded-2xl border border-slate-200 p-12 text-center">
-  <Icon size={40} className="mx-auto text-slate-300 mb-3" />
-  <h3 className="font-semibold text-slate-600">Título</h3>
-  <p className="text-sm text-slate-400 mt-1">Ação sugerida</p>
-</div>
-```
+- **PIX**: CNPJ 18.923.994/0001-83 | **Email**: junior@cromaprint.com.br
+- **Obsidian**: `C:\Users\Caldera\Obsidian\JARVIS`
 
 ---
 
 ## CONTEXTO SOB DEMANDA — LER QUANDO NECESSÁRIO
 
-Precisa de...Ler arquivoLista das 93 ferramentas MCP por módulo`.context/mcp-ferramentas.md`Dados da empresa, produtos, clientes referência`.context/empresa.md`Stack, arquitetura, módulos, dev server`.context/arquitetura.md`Migrations aplicadas, dados no banco`.context/migrations.md`HP Latex 365, custeio, consumíveis`.context/hp-latex.md`Sprints concluídos, bugs corrigidos, auditorias`.context/historico-sprints.md`Estado atual, última atividade, blockers`.planning/STATE.md`Papel do Claude, divisão responsabilidades`.planning/IDENTITY.md`Visão, requirements, constraints`.planning/PROJECT.md`Requirements checkáveis (BUG-01, GAP-01)`.planning/REQUIREMENTS.md`Histórico sessões cross-projeto`Obsidian → 99-Meta/memory.md`
+| Precisa de... | Ler arquivo |
+|---|---|
+| Ferramentas MCP (108) por módulo | `.context/mcp-ferramentas.md` |
+| Dados da empresa, produtos, clientes | `.context/empresa.md` |
+| Stack, arquitetura, módulos, dev server | `.context/arquitetura.md` |
+| Migrations aplicadas, dados no banco | `.context/migrations.md` |
+| HP Latex 365, custeio, consumíveis | `.context/hp-latex.md` |
+| Sprints, bugs corrigidos, auditorias | `.context/historico-sprints.md` |
+| Padrões de código React/TypeScript | `.context/codigo.md` |
+| Princípios Karpathy (dev) | `.context/karpathy.md` |
+| Estado atual, blockers | `.planning/STATE.md` |
+| Papel do Claude, divisão responsabilidades | `.planning/IDENTITY.md` |
+| Visão, requirements, constraints | `.planning/PROJECT.md` |
+| Requirements checkáveis (BUG-01, GAP-01) | `.planning/REQUIREMENTS.md` |
+| Histórico sessões cross-projeto | `Obsidian → 99-Meta/memory.md` |
 
 **Regra**: não carregar tudo sempre. Ler só o que a tarefa exige.
-
----
-
-## GSD — CONTEXTO ESTRUTURADO
-
-1. Ler [IDENTITY.md](http://IDENTITY.md) + [STATE.md](http://STATE.md) antes de tarefa não-trivial
-2. Atualizar [STATE.md](http://STATE.md) após work significativo
-3. Marcar requirements como \[x\] quando completados
-4. Logar decisões em [PROJECT.md](http://PROJECT.md)
-5. Atualizar Obsidian `memory.md` ao final de sessões produtivas
-
----
-
-## OBSIDIAN VAULT
-
-Memória persistente cross-projeto: `C:\Users\Caldera\Obsidian\JARVIS`
-
-- Decisões → `10-Projetos/Croma-Print/decisoes/`
-- Aprendizados → `10-Projetos/Croma-Print/aprendizados/`
-- Processos → `30-Conhecimento/Processos/`
-- Usar `[[wikilinks]]` para conectar notas
