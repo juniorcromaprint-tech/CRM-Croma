@@ -2,10 +2,16 @@
 // Auth via share_token (no login required)
 // Only answers about the specific proposal/order linked to the token
 // Cannot: modify orders, give discounts, reveal margins
+//
+// v14-persist-ia (2026-05-27): persiste resposta IA em portal_mensagens
+//   antes de retornar pro front (F5-safe). Also: corrige bug aiData.usage
+//   undefined (legacy do tempo do OpenRouter) que crashava no log.
 
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2';
 // 2026-05-21: OpenRouter ELIMINADO — Anthropic via provider compartilhado.
 import { callOpenRouter } from '../ai-shared/anthropic-provider.ts';
+
+const VERSION = 'v14-persist-ia';
 
 const SUPABASE_URL = Deno.env.get('SUPABASE_URL')!;
 const SERVICE_ROLE_KEY = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!;
@@ -146,7 +152,7 @@ Deno.serve(async (req) => {
 ITENS:
 ${itensStr || 'Nenhum item'}${pedidoInfo}`;
 
-    // ── 4. Call OpenRouter ────────────────────────────────────────────
+    // ── 4. Call Anthropic ─────────────────────────────────────────────
     const apiKey = Deno.env.get('ANTHROPIC_API_KEY');
     if (!apiKey) {
       return new Response(
@@ -162,12 +168,20 @@ ${itensStr || 'Nenhum item'}${pedidoInfo}`;
       .join('\n');
     const userPrompt = (histStr ? `Histórico da conversa:\n${histStr}\n\n` : '') + `Mensagem atual do cliente: ${mensagem}`;
 
+    const MODEL = 'claude-haiku-4-5-20251001';
     let resposta = 'Desculpe, não entendi. Pode reformular?';
+    let tokensInput = 0;
+    let tokensOutput = 0;
+    let latenciaMs = 0;
+    const t0 = Date.now();
     try {
-      const aiResult = await callOpenRouter(systemContent, userPrompt, { model: 'claude-haiku-4-5-20251001', max_tokens: 500 });
+      const aiResult = await callOpenRouter(systemContent, userPrompt, { model: MODEL, max_tokens: 500 });
       resposta = aiResult.content || resposta;
+      tokensInput = aiResult.tokens_input ?? 0;
+      tokensOutput = aiResult.tokens_output ?? 0;
+      latenciaMs = aiResult.duration_ms ?? (Date.now() - t0);
     } catch (e) {
-      console.error('ai-chat-portal IA error:', e);
+      console.error('[ai-chat-portal] IA error:', e);
       return new Response(
         JSON.stringify({ resposta: 'Desculpe, não consegui processar sua pergunta. Tente novamente.', tipo: 'info' }),
         { status: 200, headers: cors }
@@ -179,18 +193,49 @@ ${itensStr || 'Nenhum item'}${pedidoInfo}`;
       ? 'acao_necessaria'
       : 'info';
 
-    // ── 5. Log usage ─────────────────────────────────────────────────
+    // ── 5. Persist IA message in portal_mensagens (v14) ───────────────
+    // RPC portal_inserir_mensagem hardcoded a remetente='cliente', então
+    // inserimos direto via service role (bypassa RLS). Graceful: falha
+    // de persistência NÃO impede entrega da resposta ao front.
+    try {
+      const { error: errInsert } = await supabase
+        .from('portal_mensagens')
+        .insert({
+          proposta_id: proposta.id,
+          remetente: 'ia',
+          conteudo: resposta,
+          metadata: {
+            tipo: 'ia_auto',
+            model: MODEL,
+            latencia_ms: latenciaMs,
+            tokens_input: tokensInput,
+            tokens_output: tokensOutput,
+            edge_version: VERSION,
+          },
+        });
+      if (errInsert) {
+        console.error('[ai-chat-portal] persist IA falhou:', errInsert);
+      }
+    } catch (e) {
+      console.error('[ai-chat-portal] erro insert IA:', e);
+    }
+
+    // ── 6. Log usage ─────────────────────────────────────────────────
     // Portal chat usa share_token (sem user_id): loga em ai_alertas como evento informativo
     // A tabela ai_logs exige user_id NOT NULL, então usamos um canal de log alternativo
-    await supabase.from('ai_alertas').insert({
-      tipo: 'portal_chat',
-      severidade: tipo === 'acao_necessaria' ? 'media' : 'baixa',
-      titulo: 'Chat portal: mensagem processada',
-      descricao: `Token: ${share_token.slice(0, 8)}... | Tokens: ${aiData.usage?.total_tokens ?? 0} | Modelo: gpt-4.1-mini`,
-      entity_type: 'proposta',
-      entity_id: proposta.id,
-      resolvido: tipo !== 'acao_necessaria',
-    }).catch(() => {});
+    try {
+      await supabase.from('ai_alertas').insert({
+        tipo: 'portal_chat',
+        severidade: tipo === 'acao_necessaria' ? 'media' : 'baixa',
+        titulo: 'Chat portal: mensagem processada',
+        descricao: `Token: ${share_token.slice(0, 8)}... | Tokens in/out: ${tokensInput}/${tokensOutput} | Modelo: ${MODEL} | ${VERSION}`,
+        entity_type: 'proposta',
+        entity_id: proposta.id,
+        resolvido: tipo !== 'acao_necessaria',
+      });
+    } catch (e) {
+      console.error('[ai-chat-portal] log ai_alertas falhou:', e);
+    }
 
     return new Response(
       JSON.stringify({ resposta, tipo }),
