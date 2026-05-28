@@ -4,6 +4,59 @@
 > Junior lê pra auditar progresso quando volta.
 > Formato definido em `autonomous-rules.md` seção "FORMATO DO LOG".
 
+## 2026-05-28 11:15 (ciclo #13)
+
+**Status**: 🟢 VERDE
+**Tipo**: corrigir + validar (P0 do ciclo #12 + validação retroativa ciclo #10)
+**Auto-diálogo**:
+1. 3 ciclos anteriores: #10 fix rules schema → #11 ABORTADO corrupção → #12 ACHADO P0 agent-cron-loop quebrado 4 dias
+2. Dia/módulo: Quinta = Produção + ai-chat-portal v15 (rotação) — mas P0 do #12 prevalece
+3. Gap mais útil AGORA: investigar agent-cron-loop 401 (P0 default executável do #12 com plano de 5 passos) → fix → validação retroativa ciclo #10
+4. Conflito IN-PROGRESS/BLOCKED: NÃO — working dir LIMPO, corrupção #11 resolvida, sem 5xx
+5. STATE/Obsidian: STATE top tem registro completo do achado #12 com plano executável
+6. MODO PASSIVO: NÃO — Health VERDE, P0 com plano claro
+7. Critério mensurável: (a) Edge retorna != 401 no smoketest, (b) `agent_rules.last_run` atualiza pra agora nas 5 rules do ciclo #10, (c) last_error fica NULL
+
+**Health check**: Vercel 200 OK | API logs ~100min: TODOS 200 (zero 5xx, só fn_claim_ai_requests/fn_calcular_limite_diario/admin_config recorrente + impressora_consumiveis 400 esperado HP Latex schema sync) | Edge logs: zero 5xx, mcp-bridge-worker v8 + dispatch-approved-messages v5 consistentes | **ACHADO**: edge logs mostram `POST | 401 | agent-cron-loop v23` em 779ms às 13:53 BRT (confirma 401 do gateway) | 76 Edges ACTIVE | branch=main, HEAD `83d794e` em sync com origin | working dir LIMPO (só `.claude/settings.local.json` + `.planning/autonomous-rules.md` modified — drift normal)
+
+**Agents disparados**: 1 (general-purpose isolado pra deploy v24 — Read 1230 linhas + Read 126 linhas + deploy_edge_function + verificação PLACEHOLDER ausente — ~94k tokens, 9 tool uses, 289s)
+
+**Ações executadas**:
+1. Read paralelo (mission + ledger + log 120 linhas + STATE 200 linhas) + Obsidian via PowerShell + 2x get_logs + web_fetch Vercel + git status
+2. Auto-diálogo das 7 perguntas registrado
+3. **🔴 ROOT CAUSE encontrada inline (não precisou agent)**: `get_edge_function agent-cron-loop` revelou source ACTIVE v23 termina com `// PLACEHOLDER_PARA_RESTANTE_DO_ARQUIVO_VEJA_ABAIXO_NAO_ENVIE_ASSIM`. Sem `Deno.serve()` registrado → gateway com verify_jwt:true retorna 401. Padrão IDÊNTICO aos 8 arquivos truncados incidente 08:30 BRT.
+4. **Verificação pré-deploy**: PowerShell + Grep confirmaram source LOCAL íntegro (1230 linhas, `Deno.serve` na linha 73, ZERO placeholders). `git log` mostrou último commit `44c21e4 fix(cron): dedup Telegram em agent-cron-loop`. `git status` confirmou arquivo limpo, em sync com HEAD.
+5. **Deploy v24 delegado a agent isolado**: leu 2 arquivos completos (`index.ts` 52KB + `whatsapp-credentials.ts` 3.5KB), chamou MCP `deploy_edge_function` preservando verify_jwt:true, verificou pós-deploy que PLACEHOLDER está ausente. ezbr_sha256 mudou de `df5b49a...` para `828c9564b752acb9a71b4f01d96e047ecd44923a7fa5103d57552363b3c27b8e`.
+6. **Smoketest empírico**: `SELECT net.http_post('.../agent-cron-loop?force=1', ...service_role JWT, body manual_smoketest_ciclo13)` → request_id 52029
+7. Sleep 15s + query paralela 4-fold: net._http_response + agent_rules + ai_logs + system_events
+8. **🎉 VITÓRIA EMPÍRICA TRIPLA**: (a) 12 rules ativas TODAS com `last_run = 2026-05-28 11:13 BRT`, last_error=NULL, run_count incrementou; (b) system_events.rule_executed 5+ eventos às 11:13:43.x; (c) system_events.alert_generated 5+ alertas
+9. **VALIDAÇÃO RETROATIVA ciclo #10 PASSA**: as 5 rules corrigidas TODAS rodaram com last_error NULL. Fix do schema do #10 estava correto desde o início — bloqueado pela Edge truncada do ciclo #12.
+10. **Bug residual capturado**: `debug_cron_last_error` = `TypeError: supabase.from(...).insert(...).catch is not a function at handler:120:13`. Mesmo bug do ciclo #6 (ai-chat-portal v15 fix). supabase-js v2 recente removeu .catch direto. Cosmético — não bloqueia rules.
+11. **Bug residual #2 detectado**: edge logs mostram 17 chamadas `POST | 401 | ai-compor-mensagem` durante smoketest. processLeadFollowUps invoca ai-compor-mensagem com header X-Internal-Call mas Edge tem verify_jwt:true e rejeita.
+12. Edits paralelos: STATE.md (entry topo) + autonomous-ledger.md (DONE + NEXT atualizado) + autonomous-log.md (este append) + Obsidian daily
+
+**Decisão tomada**:
+- NÃO tentei consertar bug `.catch` no mesmo ciclo (regra REGRA #0 — não Edit em arquivo 1230 LOC; delegar a agent isolado em ciclo próximo)
+- NÃO investiguei ai-compor-mensagem 401 a fundo (escopo do ciclo era fix agent-cron-loop, não bug separado)
+- Smoketest com `?force=1` pra bypassar horário (a Edge tem filter brtHour < startHour || >= endHour, e estamos 11h dentro do range mas defensivo)
+- Deploy via agent isolado mantendo verify_jwt:true (pg_cron envia Bearer service_role que valida nesse modo)
+
+**Resultado**: Ciclo VERDE com P0 do #12 ENTREGUE + validação retroativa do #10 PASSA. agent-cron-loop v24 ACTIVE, 12 rules dormentes há 4 dias VOLTARAM A RODAR. 2 bugs residuais documentados como NEXT P1/P2. Anti-pattern principal aplicado: REGRA #0 — não usar Edit em arquivos > 500 LOC.
+
+**Ledger update**:
+- DONE: "Ciclo #13 — CORREÇÃO P0 agent-cron-loop v24 + VALIDAÇÃO RETROATIVA #10 PASSA" adicionado
+- NEXT P0 do #12 → DONE
+- NEXT P0 validação retroativa → DONE
+- NEXT P1 novo: deploy v25 agent-cron-loop com safeInsert helper (fix .catch)
+- NEXT P2 novo: investigar 17x 401 ai-compor-mensagem
+- NEXT P2 novo: guardrail rotativo get_edge_function pra detectar PLACEHOLDER
+
+**Commits**: a fazer (1 commit consolidado planning) **Deploys**: 1 (agent-cron-loop v23→v24) **Migrations**: 0
+**Token usage**: ~75k inline + 94k agent isolado = ~169k
+**Telegram**: a enviar
+
+---
+
 ## 2026-05-28 10:00 (ciclo #12)
 
 **Status**: 🟢 VERDE

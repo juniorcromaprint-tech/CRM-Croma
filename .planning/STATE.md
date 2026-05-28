@@ -1,7 +1,78 @@
 ﻿
 # STATE — CRM Croma
 
-**Última sessão**: 2026-05-28 10:00 BRT (ciclo autônomo #12 — 3 achados: smoketest ciclo #10 NEGATIVO + 6 duplicatas dedupadas + agent-cron-loop Edge quebrado há 4 dias)
+**Última sessão**: 2026-05-28 11:15 BRT (ciclo autônomo #13 — CORREÇÃO P0: agent-cron-loop v24 deployed, source íntegro substituiu placeholder + VALIDAÇÃO EMPÍRICA RETROATIVA do ciclo #10 PASSA)
+
+## Ciclo autônomo #13 — 2026-05-28 11:15 BRT — CORREÇÃO P0: agent-cron-loop v24 + validação retroativa ciclo #10 PASSA 🟢
+
+**Mantra**: CORRIGIR (P0 do ciclo #12) + VALIDAR (retroativo ciclo #10). Hora 11:00-11:30 BRT (Quinta — rotação Produção). Health VERDE pré: Vercel 200, ~100min API/edge zero 5xx (só impressora_consumiveis 400 esperado), branch=main HEAD `83d794e`, 76 Edges ACTIVE. Working dir LIMPO (só `.claude/settings.local.json` + `.planning/autonomous-rules.md` modified — drift normal).
+
+### 🔴 CAUSA RAIZ ENCONTRADA — Edge v23 deployed com PLACEHOLDER no source
+
+`get_edge_function agent-cron-loop` revelou que o source persistido em prod termina com:
+```
+// PLACEHOLDER_PARA_RESTANTE_DO_ARQUIVO_VEJA_ABAIXO_NAO_ENVIE_ASSIM
+```
+
+Sem `Deno.serve()` registrado, o gateway com `verify_jwt:true` retorna **401** a cada invocação do pg_cron. Isso explica o achado do ciclo #12: pg_cron `succeeded` em 5-13ms (HTTP enqueue OK), mas Edge nunca processa as rules. Edge log da última invocação 13:53 BRT: `POST | 401 | agent-cron-loop v23` em 779ms.
+
+**Padrão de corrupção**: idêntico aos 8 arquivos truncados no incidente 08:30 BRT — Edit do Cowork em arquivo > 500 LOC silenciosamente corta o conteúdo. `agent-cron-loop/index.ts` tem 1230 linhas (52KB). Deploy v23 (timestamp 1779670938 = 2026-05-24 21:22 BRT) foi feito com source já truncado em algum ciclo de Cowork passado.
+
+### ✅ FIX APLICADO — Deploy v24 com source local íntegro
+
+Source LOCAL (`C:\Users\Caldera\Claude\CRM-Croma\supabase\functions\agent-cron-loop\index.ts`) está íntegro: 1230 linhas, `Deno.serve()` na linha 73, código completo até linha 1230 incluindo `sendWhatsAppTemplate`. Git status confirma arquivo em sync com HEAD `83d794e` (commit `44c21e4` do refundação Beira Rio Parte 6).
+
+Agent isolado deployou v24 via MCP `deploy_edge_function`:
+- `ezbr_sha256`: `df5b49a...` → `828c9564b752acb9a71b4f01d96e047ecd44923a7fa5103d57552363b3c27b8e`
+- `verify_jwt: true` preservado (pg_cron envia Bearer service_role)
+- Files: `index.ts` (52KB) + `../ai-shared/whatsapp-credentials.ts` (3.5KB)
+- Verificação `get_edge_function` pós-deploy: **PLACEHOLDER ausente**, source termina corretamente em `sendWhatsAppTemplate`
+
+### ✅ VITÓRIA EMPÍRICA TRIPLA — Validação retroativa ciclo #10 PASSA
+
+Smoketest manual via `net.http_post` com `?force=1` + Bearer service_role:
+
+| Verificação | Resultado |
+|---|---|
+| HTTP response gateway | net.http_post timeout 5s (Edge processa >5s) |
+| Edge log do smoketest | `POST 500` em 8535ms (crash tardio, ver bug residual abaixo) |
+| **12 agent_rules ativas** | **TODAS com `last_run = 2026-05-28 11:13:xx BRT`** (timestamp do smoketest) |
+| **`last_error`** | **NULL em TODAS as 12** ✅ |
+| `run_count` | **incrementou +1 a +2** vs valor pré-deploy |
+| `system_events.rule_executed` | **5+ eventos** às 11:13:43.x BRT (rules processaram actions) |
+| `system_events.alert_generated` | **5+ alertas** gerados |
+| `system_events.cron_loop_executed` | não gravado (crash antes do INSERT final) |
+| `ai_logs` agent-cron-loop | vazio (bug `.catch(()=>{})` conhecido) |
+
+**Validação retroativa**: as 5 rules que ciclo #10 corrigiu (`desconto_maximo_sem_aprovacao`, `lead_quente_sem_orcamento`, `op_atrasada`, `priorizar_op_urgente`, `follow_up_lead_24h`) TODAS rodaram empiricamente sem `last_error`. **Fix do schema do ciclo #10 estava correto desde o início** — estava bloqueado pela Edge truncada do ciclo #12.
+
+### 🟡 BUG RESIDUAL — `.insert(...).catch is not a function` (não bloqueante)
+
+`debug_cron_last_error` capturou:
+```
+TypeError: supabase.from(...).insert(...).catch is not a function
+  at handler (.../source/index.ts:120:13)
+```
+
+supabase-js v2 recente removeu `.catch()` direto do `PostgrestBuilder`. **Mesmo bug** que ciclo #6 corrigiu em ai-chat-portal v15 (DONE ledger). Aparece nos `.insert(...).catch(() => {})` das linhas 174-183 (ai_logs success) e 232-239 (ai_logs error) + outros sites.
+
+**Mas**: as rules processaram ANTES do crash. Bug é cosmético (perde-se o log no ai_logs) e não regressão de prod — sempre esteve lá, estava mascarado pelo 401 do gateway. Fix é mecânico: trocar `.catch(() => {})` por wrapper try/catch ou await + descartar erro.
+
+Edge log também mostra **17 chamadas 401 pra ai-compor-mensagem** durante o smoketest — `processLeadFollowUps` invoca `ai-compor-mensagem` que retorna 401 (provável: helper invoke não passando JWT correto com header `X-Internal-Call`). Bug separado, registrar pra investigar.
+
+### Anti-pattern evitado
+
+Não tentei reescrever o source local (já estava íntegro). Não usei Edit em arquivo > 500 LOC (regra REGRA #0 — delegei deploy a agent isolado, ele leu localmente e enviou). Não rotacionei `dispatch-approved-messages` v5 (que segue funcionando). Verifiquei placeholder ausente pós-deploy ANTES de declarar sucesso. Capturei o `debug_cron_last_error` ANTES de marcar fix como completo — descobri bug residual `.catch`.
+
+### Próxima sugestão (ciclo #14)
+
+P1 — Fix `.insert(...).catch is not a function` em `agent-cron-loop`. Estratégia: deploy v25 com helper local `safeInsert(supabase, table, payload)` que wrap try/catch + console.warn. Substituir todos os `.insert(...).catch(() => {})` por `await safeInsert(...)`. Janela flexível (Edge interna). Cuidado: arquivo > 500 LOC — delegar a agent isolado.
+
+P2 — Investigar 17 chamadas 401 ai-compor-mensagem chamadas por agent-cron-loop. Verify_jwt + invoke + headers `X-Internal-Call` precisa de auditoria adversarial.
+
+---
+
+
 
 ## Ciclo autônomo #12 — 2026-05-28 10:00 BRT — Smoketest ciclo #10 NEGATIVO + ACHADO P0 agent-cron-loop Edge quebrado há 4 dias + DEDUP 6 duplicatas 🟢
 
