@@ -1,7 +1,162 @@
 ﻿
 # STATE — CRM Croma
 
-**Última sessão**: 2026-05-28 14:30 BRT (ciclo autônomo #16 — 3 helpers compartilhados `ai-shared/{legacy-jwt,invoke-internal,safe-insert}.ts` criados em arquivos SEPARADOS pequenos (51/69/72 LOC) seguindo estratégia Junior 12:35 BRT. Commit atômico `5201b87` push origin/main. Pré-requisito pronto pra deploy v27 agent-cron-loop com Edit mínimo (1 import + replace_all). 2 agents paralelos: 429 whatsapp-enviar é janela almoço (inofensivo), Gantt decorativo (GAP-04 falso-positivo), VERSION drift ai-chat-portal v14 deployed vs v15 local)
+**Última atualização**: 2026-05-28 17:30 BRT — Ciclo autônomo #18 corrigiu trigger production_completed estruturalmente quebrado + agent inverteu diagnóstico drift VERSION ai-chat-portal do #16.
+
+## Ciclo autônomo #18 — 2026-05-28 17:30 BRT — fix `fn_check_production_completed` (ec31d81) + agent INVERTE drift VERSION 🟢
+
+**Mantra**: CORRIGIR (P0 NOVO do #17) + EXPLORAR (agent adversarial Quinta deep dive ai-chat-portal v15) + VALIDAR (smoketest 6 verificações inspeção pós-apply). Hora 17:30 BRT (Quinta — janela flexível pra DDL, sem Edge cliente). Health VERDE pré: Vercel skip (logs cobrem), API/edge logs ~80min massivo 200/201 (ai-compor-mensagem TODAS 200 7-20s = Claude real, BUG-JWT do #15 segue eliminado empíricamente; agent-enviar-email 200; mcp-bridge-worker v8 ~1/min consistente; whatsapp-enviar/webhook TODAS 200 — prospecção saiu janela almoço, 43+ mensagens fluindo). 76 Edges ACTIVE. branch=main HEAD `3daf2b2`. Working dir LIMPO (3 planning modified + 2 untracked herdados sessão Junior 17:10).
+
+### 🎉 P0 do ciclo #17 RESOLVIDO — Cadeia Produção→Instalação destravada estruturalmente
+
+| Verificação pós-apply | Resultado |
+|---|---|
+| func aponta `FROM producao_etapas` | **TRUE** ✅ |
+| func ainda aponta `op_etapas` legado | FALSE ✅ |
+| func usa `'concluida'` (feminino) | **TRUE** ✅ |
+| func ainda usa `'concluido'` (masculino) | FALSE ✅ |
+| trigger WHEN usa `'concluida'` | **TRUE** ✅ |
+| trigger WHEN ainda usa `'concluido'` | FALSE ✅ |
+
+**6/6 PASS** — bug estrutural ATIVO desde sempre eliminado. 0 eventos `production_completed` no histórico lifetime do system_events confirmam que trigger NUNCA disparou. Próximo evento real de etapa transitando p/ `concluida` em OP `em_producao`/`aguardando_programacao` vai disparar naturalmente.
+
+### Migration `20260528_fix_fn_check_production_completed.sql` (58 LOC)
+
+`CREATE OR REPLACE FUNCTION` + `DROP TRIGGER IF EXISTS` + `CREATE TRIGGER` + `COMMENT ON FUNCTION` documentando origem do fix. Adicionado `NOT IN ('concluida', 'finalizado')` no UPDATE de `ordens_producao` pra idempotência (status atual das 3 OPs c/ etapas concluida é `finalizado`). WHEN clause usa `IS DISTINCT FROM 'concluida'` pra lidar com NULL gracefully. Commit atômico `ec31d81` `fix(producao)` push origin/main confirmado.
+
+### 🚨 Agent paralelo INVERTE diagnóstico drift VERSION do #16
+
+O ciclo #16 reportou "deploy remoto está em v14, source local em v15" — assumindo que source local era mais novo (deploy pendente cosmético P3). **O agent #18 leu source LOCAL E remote EZBR-resolved comparou linha 14**:
+
+| Fonte | VERSION |
+|---|---|
+| Source local `index.ts:14` | `'v15-persist-ia'` |
+| Edge remota v15 (sha `f8e320bb…`) | `'v14-persist-ia'` |
+
+Source LOCAL é o que tem novidade. Foi editado pós-deploy mas NUNCA foi pushed via `deploy_edge_function`. Reverter via diff comparar antes de decidir — pode haver código de persistência IA em local que se perdeu no caminho. **NEXT P0** (era P3 cosmético no #16, agora P0 estrutural).
+
+### 🟡 4 bugs latentes catalogados (Edge dormente, sem urgência operacional)
+
+| # | Sev | Tabela/Path | Bug |
+|---|---|---|---|
+| 1 | P0 | `ai-chat-portal/index.ts:14` | Drift VERSION local→remoto INVERTIDO #16 |
+| 2 | P1 | `pg_policy portal_mensagens authenticated read all` | qual=`true` → qualquer user autenticado lê TODAS mensagens (vaza no CRM logado, OK no portal anônimo) |
+| 3 | P1 | `ai-chat-portal/index.ts:~170` | `.insert(portal_mensagens)` sem `.select().single()` — viola regra dura projeto; mascarado pq usa service_role bypass RLS |
+| 4 | P2 | `ai-chat-portal` (sem table) | Edge loga só em `ai_alertas`, não `ai_logs` — observabilidade cega de uso/custo |
+
+### Edge ai-chat-portal DORMENTE confirmado
+
+| Sinal | Lifetime |
+|---|---|
+| portal_mensagens total | 0 |
+| portal_mensagens direcao=ia | 0 |
+| portal_mensagens direcao=cliente | 0 |
+| ai_logs function_name ILIKE %portal% | 0 |
+| ai_alertas tipo='portal_chat' | 1 (antigo) |
+
+Persist IA implementada (header `v15-persist-ia`) mas zero carga real. Bugs latentes só viram problema se Edge sair da dormência.
+
+### Anti-pattern evitado + verificações
+
+- **Verificar antes de assumir em 4 frentes**: (a) `pg_get_functiondef` ANTES de migration descobriu corpo EXATO com 2 bugs (referência tabela + status); (b) `pg_get_triggerdef` ANTES descobriu que WHEN clause TAMBÉM tinha `'concluido'` — não bastava CREATE OR REPLACE, precisava DROP+CREATE; (c) `to_regclass('op_etapas')` ANTES de afirmar tabela inexistente — confirmou NULL; (d) Smoketest 6 verificações inspeção pós-apply ANTES de declarar sucesso — todas TRUE.
+- **Anti-pattern evitado**: NÃO Edit em arquivo grande (REGRA #0 — toda mudança via apply_migration MCP); NÃO deploy de Edge cliente (17:30 BRT = janela proibida 8h-20h); NÃO atacou drift VERSION ai-chat-portal mesmo turno (Edge dormente, sem urgência); NÃO disparou smoketest empírico ATIVO em produção (poderia mover pedido_em_producao→pronto_instalacao sem coordenação com Junior — fica pra próximo evento real natural).
+
+### Próxima sugestão (ciclo #19)
+
+P0 — Investigar drift VERSION ai-chat-portal: diff source local vs remoto. Se persist IA está só local, push v16 (Edge interna, qualquer hora). Se remoto tem código que local não tem, revert source local pra alinhar.
+P1 — Restringir policy RLS `portal_mensagens authenticated read all` por proposta_id/cliente (não impacta portal anônimo).
+P1 — Adoção rolling `safe-insert.ts` em 12 Edges Padrão B (helpers prontos #16).
+P2 — Trigger backfill `producao_apontamentos.tempo_real_min` (quick-win #17).
+
+---
+
+## Ciclo autônomo #17 — 2026-05-28 15:30 BRT — VITÓRIA TRIPLA Gantt 100% + 3 achados NOVOS Quinta (1 CRITICAL) 🟢
+
+**Mantra**: CORRIGIR (P2 BACKFILL Gantt #16) + EXPLORAR (agent adversarial Quinta) + VALIDAR (smoketest cross 3-dim). Hora 14:30-15:30 BRT (Quinta — backfill em data layer, sem janela cliente). Health VERDE pré: Vercel 200, ~80min API/edge zero 5xx (ai-compor-mensagem TODAS 200 7-8s = Claude real, BUG-JWT do #15 segue eliminado empiricamente). whatsapp-enviar TODAS 200 (saiu da janela almoço, 43 mensagens aprovadas fluindo). 76 Edges ACTIVE. branch=main HEAD `d722d03`. Working dir LIMPO.
+
+### 🎉 VITÓRIA EMPÍRICA TRIPLA — GAP-04 ENCERRADO
+
+| Métrica | PRÉ ciclo #17 | PÓS ciclo #17 |
+|---|---|---|
+| producao_etapas.template_id | 0/19 (0%) | **19/19 (100%)** |
+| producao_etapas.tempo_estimado_min > 0 | ~4/19 (~21%) | **19/19 (100%)** |
+| ordens_producao.tempo_estimado_min > 0 | 0/6 (0%) | **6/6 (100%)** com 240-270min |
+| ordens_producao.data_inicio/fim_prevista | 1/6 (16.7%) | **6/6 (100%)** |
+
+Critério "% OPs com Gantt populado > 80%" **SUPEROU**. GAP-04 do REQUIREMENTS reaberto pelo agent #16 está **ENCERRADO** (não era falso-positivo, era subdiagnosticado).
+
+### 4 UPDATEs cascateados (idempotentes)
+
+1. **producao_etapas.template_id** via match nome normalizado (translate+ILIKE) — 19 rows linkadas em 6 templates. 0 falhas.
+2. **producao_etapas.tempo_estimado_min** sync via FK template — 15 sincronizadas (4 já tinham, OP-0015 duplicada).
+3. **ordens_producao.tempo_estimado_min** = SUM(DISTINCT ON template_id) com fallback 240min — 6 rows. DISTINCT dedup OP-0015 (9 etapas duplicadas lower/Capitalized).
+4. **ordens_producao.data_inicio_prevista** + **data_fim_prevista** cascade — 5 rows (1 já populada do #4).
+
+### Migration versionada
+
+`supabase/migrations/20260528_backfill_gantt_template_id_e_prazo.sql` (65 LOC) — 4 UPDATEs idempotentes com WHERE preservando populados. Commit atômico `3daf2b2` `feat(producao)` push origin/main confirmado.
+
+### 🚨 3 achados NOVOS do agent paralelo (Quinta — ângulos não cobertos #2-12)
+
+**🔴 CRITICAL — Trigger `fn_check_production_completed` QUEBRADO estruturalmente desde sempre**:
+- Função (AFTER UPDATE em `producao_etapas`) consulta `FROM op_etapas WHERE ordem_producao_id=v_op_id`. **Tabela `op_etapas` NÃO EXISTE** (`to_regclass('public.op_etapas')` = NULL). Real é `producao_etapas`.
+- Status comparado `'concluido'` — tabela real usa `'concluida'`.
+- **0 eventos `production_completed` no histórico inteiro do `system_events`**.
+- ⚠️ NÃO é o trigger SHADOW `production_completed_shadow` do ciclo #4 (que fires 3x consistentemente — esse é OUTRO trigger, em `ordens_producao` UPDATE, e funciona). Esse aqui é o trigger ORIGINAL em `producao_etapas`.
+- **Impacto**: cadeia Produção→Instalação travada estruturalmente. 19 etapas concluídas + 6 OPs registradas = pipeline silenciosamente quebrado. ai_briefing_producao + ai-sequenciar-producao operam sem feedback.
+- **NEXT P0**: migration `CREATE OR REPLACE FUNCTION fn_check_production_completed` trocando referência + status. Backfill UPDATE no-op em 1 etapa por OP pra disparar trigger corrigido.
+
+**🟡 HIGH — 12 Edges Padrão B**: ai-analisar-nps:135, ai-briefing-producao:21, ai-conciliar-bancario:222, ai-detectar-intencao-orcamento:123, ai-enviar-nps:141, ai-insights-diarios:134, ai-inteligencia-comercial:260, ai-preco-dinamico:127, ai-previsao-estoque:170, ai-sequenciar-producao:112, ai-sugerir-compra:102, ai-validar-nfe:222. Helpers `safe-insert.ts` do #16 prontos. NEXT P1 rolling.
+
+**🟡 MEDIUM — `producao_apontamentos` dead-code**: 0 rows, 19 etapas com `tempo_real_min=0`. Quick-win: trigger backfill `EXTRACT(EPOCH FROM fim-inicio)/60` quando status='concluida'. NEXT P2.
+
+### Anti-pattern evitado + verificações
+
+- **Verificar antes de assumir aplicado em 5 frentes**: (a) `information_schema.columns` antes UPDATE descobriu 3 nomes errados do agent #16 (numero_op→numero, tempo_estimado_horas→tempo_estimado_min, data_prevista_entrega NÃO existe); (b) match SQL preview confirmou 19/19; (c) verificação cruzada pós-UPDATE descobriu BEGIN/COMMIT em chamadas MCP separadas roda em transações isoladas (rollback silencioso) — refeito sem transação; (d) smoketest 3-dim antes de declarar sucesso; (e) agent paralelo verificou `to_regclass` ANTES de afirmar quebra do trigger.
+- **Anti-pattern evitado**: NÃO atacou NEXT P1 SAFE (deploy v27 agent-cron-loop) — 1230 LOC, REGRA #0. NÃO deletou OP-0015 duplicada (NEXT P3 separado).
+
+### Próxima sugestão (ciclo #18)
+
+P0 — Migration `fn_check_production_completed` fix referência (`op_etapas`→`producao_etapas`, `'concluido'`→`'concluida'`). Janela flexível DDL. Smoketest: UPDATE no-op em 1 etapa concluida deve disparar fire em system_events.
+P1 — Adoção rolling `safe-insert.ts` em 12 Edges Padrão B. Edit cirúrgico ≤30 linhas/arquivo.
+P2 — Trigger backfill `tempo_real_min` via EPOCH(fim-inicio)/60.
+P3 — DEDUP OP-2026-0015 etapas duplicadas (4 grupos lower vs Capitalized).
+
+---
+
+## Sessão Junior 2026-05-28 17:10 BRT — OS Mubisys #1557 espelhada + Protocolo consolidado ✅
+
+**Última sessão Junior original**: 2026-05-28 17:10 BRT — Espelhamento OS Mubisys #1557 (Beira Rio / RAVENA / SP capital) executado completo: cliente match, store nova, pedido R$ 1.085,73, OI agendada hoje, job campo + **2 anexos** (referência loja + arte na ordem) extraídos do PDF e subidos no bucket `job-attachments`. Protocolo consolidado em `docs/MUBISYS_MIRROR_PROTOCOL.md`.
+
+## Sessão 2026-05-28 17:10 BRT — OS Mubisys #1557 espelhada + Protocolo consolidado ✅
+
+### Entregue
+- **OS 1557** (CALCADOS BEIRA RIO / RAVENA — Av. Manuel Pimentel 255, SP capital) espelhada via `croma_espelhar_os_mubisys` Cowork:
+  - Cliente: `af166ada-e01b-4197-b8c3-33410af325d1`
+  - Store NOVA: `91cb9878-be26-40bf-83b4-d5d79ddffd59` ("134074/1 RAVENA")
+  - Pedido: `877aad11-ba0a-4714-8148-ab925a3af5cf` (R$ 1.085,73 · 3× Adesivo BLACKOUT 0,93×1,81m)
+  - OI: `90489096-fd15-41c3-a68a-d3d306a60434`
+  - Job: `a220b46d-bfd6-47a5-98e5-1c080c6864ad` (`os_number='1557'`, scheduled hoje)
+- **2 fotos extraídas do PDF** via pymupdf + upload bucket `job-attachments/mubisys/os1557/`:
+  - `referencia_local`: foto da loja com beira rio + molekinha instalados
+  - `arte_aprovada`: 3 artes na ordem (beira rio → VIZZANO → moleca)
+- **Protocolo consolidado** em `docs/MUBISYS_MIRROR_PROTOCOL.md` (v1.0):
+  - `numero_os` = número do orçamento (1557), NÃO o `cc=` da URL
+  - `skip_auto_op = skip_auto_cr = true` (Mubisys mantém produção + cobrança)
+  - Comissão Viviane 5% nas observações, sem lançamento
+  - Tipos válidos em `job_attachments.tipo`: `referencia_local`, `arte_aprovada`, `foto_impresso` (check constraint)
+  - Anti-patterns documentados
+
+### Descobertas / gotchas
+- `job_attachments.tipo` tem CHECK constraint estrita — usar `referencia` ou `arte` quebra com `23514`
+- Tool atual NÃO anexa fotos automaticamente — passo manual pós-espelhamento (candidato a melhoria futura: estender `croma_espelhar_os_mubisys` com `pdf_path` opcional → extração + upload + insert na mesma chamada)
+- Padrão `os_number` agora estável: número visível do orçamento Mubisys (1070 com prefixo INST- foi caso-zero abandonado)
+
+### Próximo (sugestões — sem urgência)
+- Estender tool com extração automática de fotos do PDF
+- Documentar lógica de filtro de imagens (logo/ícones/cartão vendedor vs fotos reais) num helper reutilizável
+
+---
 
 ## Ciclo autônomo #16 — 2026-05-28 14:30 BRT — 3 helpers ai-shared/ commit `5201b87` + auditoria Quinta + investigação 429 🟢
 

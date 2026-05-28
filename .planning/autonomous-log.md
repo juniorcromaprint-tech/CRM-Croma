@@ -4,6 +4,148 @@
 > Junior lê pra auditar progresso quando volta.
 > Formato definido em `autonomous-rules.md` seção "FORMATO DO LOG".
 
+## 2026-05-28 17:30 (ciclo #18)
+
+**Status**: 🟢 VERDE
+**Tipo**: corrigir + explorar + validar (P0 NOVO do #17 + agent adversarial Quinta)
+**Auto-diálogo**:
+1. 3 ciclos anteriores: #15 deploy v26 BUG-JWT → #16 3 helpers ai-shared/ → #17 BACKFILL Gantt 100% + agent descobriu 3 achados NOVOS
+2. Dia/módulo: Quinta = Produção + ai-chat-portal v15 (rotação semanal — pivot pra atacar achado P0 CRITICAL do #17)
+3. Gap mais útil AGORA: **NEXT P0 NOVO do #17** — migration `fn_check_production_completed` (referência `op_etapas`→`producao_etapas` + status `'concluido'`→`'concluida'`). Default executável, mensurável, escopo claro, DDL só (sem deploy Edge cliente)
+4. Conflito IN-PROGRESS/BLOCKED: nenhum — working dir LIMPO (3 planning modified + 2 untracked herdados), 2h gap desde último ciclo
+5. STATE/Obsidian: topo Junior 17:10 (Mubisys #1557) + ciclo #17 com 3 achados pendentes
+6. MODO PASSIVO: NÃO — Health VERDE total (API/edge logs zero 5xx, prospecção rodando intensa)
+7. Critério mensurável: (a) `func` aponta `producao_etapas` (não `op_etapas`); (b) trigger WHEN usa `'concluida'`; (c) commit push main
+
+**Health check**: Vercel skip (logs cobrem) | API logs ~80min: massivo 200/201 (ai-compor-mensagem TODAS 200 7-20s = Claude real, BUG-JWT do #15 segue eliminado; agent-enviar-email 200; mcp-bridge-worker ~1/min consistente); whatsapp-enviar/webhook TODAS 200 (prospecção saiu janela almoço) | 76 Edges ACTIVE | branch=main HEAD `3daf2b2` → após push `ec31d81` em sync com origin | working dir antes do ciclo LIMPO (só `.planning/*` modified + `docs/MUBISYS_MIRROR_PROTOCOL.md` e `scripts/hp-latex-sync_hidden.vbs` untracked herdados sessão Junior 17:10)
+
+**Agents disparados**: 1 paralelo (general-purpose, ≤350 palavras, 13 tool uses, 74s, ~45k tokens) — auditoria adversarial Quinta deep dive ai-chat-portal v15 com 3 frentes (drift VERSION + RLS portal_mensagens + tráfego 30d)
+
+**Ações executadas**:
+1. Read paralelo (mission + rules + ledger 278/393 + log 500 + STATE 500 + REQUIREMENTS) + Obsidian PowerShell + 2x get_logs + list_edge_functions + git status — turno único
+2. Auto-diálogo das 7 perguntas registrado
+3. 3 queries paralelas de recon: `pg_get_functiondef` da função, `pg_get_triggerdef` do trigger, verificação cruzada `to_regclass('op_etapas')` + counts etapas + counts events historicamente
+4. **CONFIRMAÇÃO empírica do agent #17**: `to_regclass('op_etapas')=NULL` (tabela NÃO existe), `producao_etapas` tem 19 etapas com `'concluida'` e 0 com `'concluido'`, `system_events.production_completed=0` lifetime
+5. Agent paralelo Quinta + apply_migration em paralelo no mesmo turno
+6. **Migration `fix_fn_check_production_completed_20260528`** aplicada via MCP:
+   - CREATE OR REPLACE FUNCTION com `FROM producao_etapas` + `status = 'concluida'`
+   - Adicionado `NOT IN ('concluida', 'finalizado')` no UPDATE de ordens_producao pra idempotência (status atual das 3 OPs c/ etapas é `finalizado`)
+   - DROP+CREATE TRIGGER (WHEN clause é compilado em PG)
+   - Comentário em pt-BR documentando origem do fix
+7. Smoketest 6 verificações inspeção pós-apply: func_aponta_producao_etapas TRUE, func_ainda_aponta_op_etapas_legado FALSE, func_usa_concluida_feminino TRUE, func_ainda_usa_concluido_masculino FALSE, trigger_when_usa_concluida TRUE, trigger_when_ainda_usa_concluido FALSE → **6/6 PASS** ✅
+8. Migration versionada em `supabase/migrations/20260528_fix_fn_check_production_completed.sql` (58 LOC)
+9. Commit atômico `ec31d81` `fix(producao)` push origin/main exit=0
+10. Edits paralelos STATE + ledger + log + Obsidian + Telegram
+
+**Decisão tomada**:
+- Migration única consolidada via apply_migration MCP (não broken em chamadas separadas)
+- Idempotência reforçada: WHERE `NOT IN ('concluida', 'finalizado')` no UPDATE de ordens_producao garante segurança em re-aplica
+- WHEN clause `IS DISTINCT FROM 'concluida'` em vez de `<> 'concluida'` lida com NULL gracefully
+- Smoketest empírico ATIVO NÃO disparado: 3 OPs com etapas estão `finalizado` (já satisfaz idempotência) → próximo evento real (etapa transitando p/ `concluida` em OP `em_producao` ou `aguardando_programacao`) vai disparar trigger naturalmente
+- NÃO atacou drift VERSION ai-chat-portal P3 (cosmético, Edge dormente — sem urgência)
+- NÃO atacou trigger backfill apontamentos P2 (NEXT mantido próximo ciclo)
+- Anti-pattern evitado: NÃO Edit em arquivo grande (REGRA #0), NÃO deploy de Edge cliente (janela horária)
+
+**Achados agent paralelo (ai-chat-portal v15 deep dive, ≤350 palavras)**:
+- **🚨 BUG-NOVO-A do #16 REFUTADO + INVERTIDO**: source LOCAL diz `VERSION = 'v15-persist-ia'`, edge REMOTA (Supabase versão 15 numerada, sha `f8e320bb…`) tem código com header `VERSION = 'v14-persist-ia'`. Ou seja, source local foi editado pós-deploy e NUNCA foi feito push. Drift é **local→remoto**, não logs. **P0 NEXT**: deploy v16 com VERSION sincronizada OU reverter source local pra alinhar.
+- **🟡 P1 RLS portal_mensagens — `authenticated read all` qual=`true`**: qualquer authenticated lê TODAS mensagens de TODAS propostas. Não afeta portal anônimo, mas vaza no CRM logado. Restringir por `proposta_id` linkado a vendedor/cliente.
+- **🟢 Tráfego 30d — EDGE DORMENTE confirmado**: 0 portal_mensagens lifetime, 0 ai_logs com function_name chat-portal, 1 ai_alertas tipo portal_chat (antigo). Edge tem código v15 com persistência IA mas zero carga.
+- **🟡 P1 INSERT portal_mensagens sem `.select().single()` (viola regra dura projeto)**: linha ~170. Mascarado hoje pq usa service_role bypass RLS, mas regressão silenciosa se policy mudar.
+- **🟡 P2 Observabilidade cega**: Edge loga em ai_alertas mas NÃO em ai_logs. Histograma uso/custo inexistente.
+
+**Verificar antes de assumir aplicado em 4 frentes**:
+(a) `pg_get_functiondef` ANTES de assumir bug — confirmou source EXATO da função real
+(b) `pg_get_triggerdef` ANTES de migration — confirmou WHEN clause também tinha `'concluido'` (não só body da função)
+(c) `to_regclass` ANTES de afirmar tabela inexistente — confirmou `op_etapas`=NULL, `producao_etapas`=existe
+(d) Smoketest 6 verificações pós-apply ANTES de declarar sucesso — todas TRUE
+
+**Resultado**: 🟢 VERDE — Trigger production_completed CORRIGIDO em prod (fix migration aplicada + commit `ec31d81` push main). Cadeia Produção→Instalação destravada estruturalmente após estar quebrada DESDE SEMPRE (0 eventos production_completed lifetime). Próximo evento real de etapa concluindo vai disparar trigger corretamente. Agent paralelo INVERTEU diagnóstico do #16 (drift é local→remoto, source nunca foi pushed). 4 bugs latentes novos catalogados pra próximos ciclos.
+
+**Ledger update**:
+- DONE: "Ciclo #18 — fix fn_check_production_completed migration + agent paralelo invertendo drift VERSION ai-chat-portal" adicionado
+- NEXT P0 do #17 (trigger fix) → **DONE**
+- NEXT P0 NOVO: deploy ai-chat-portal v16 OU reverter source local pra alinhar com Edge remota (BUG-NOVO-A INVERTIDO — source LOCAL tem código nunca pushed)
+- NEXT P1 NOVO: restringir policy RLS `portal_mensagens authenticated read all` por proposta_id/cliente
+- NEXT P1 NOVO: ai-chat-portal `.insert(portal_mensagens)` sem `.select().single()` (linha ~170)
+- NEXT P2 NOVO: ai-chat-portal adicionar logAICall pra observabilidade ai_logs (Edge usa só ai_alertas hoje)
+- NEXT P1 mantido (#17): Adoção rolling `safe-insert.ts` em 12 Edges Padrão B
+- NEXT P2 mantido (#17): Trigger backfill `producao_apontamentos.tempo_real_min`
+- NEXT P3 mantido (#17): DEDUP OP-2026-0015 etapas duplicadas
+- NEXT P1 mantido (#15/#16): Deploy v27 agent-cron-loop fix `.catch()`
+
+**Commits**: 1 (`ec31d81` fix(producao)) push origin/main confirmado
+**Deploys**: 0
+**Migrations**: 1 versionada (`20260528_fix_fn_check_production_completed.sql`)
+**Token usage**: ~280k (~235k inline + 45k agent paralelo)
+**Telegram**: a enviar 🟢
+
+---
+
+## 2026-05-28 15:30 (ciclo #17)
+
+**Status**: 🟢 VERDE
+**Tipo**: corrigir + explorar + validar (P2 do #16 + agent adversarial paralelo)
+**Auto-diálogo**:
+1. 3 ciclos anteriores: #14 ABORT corrupção → #15 deploy v26 BUG-JWT → #16 3 helpers ai-shared/
+2. Dia/módulo rotação: Quinta = Produção + ai-chat-portal v15 (rotação semanal)
+3. Gap mais útil AGORA: P2 BACKFILL Gantt do #16 (default executável, sem Edit em arquivo grande, mensurável) + auditoria adversarial Quinta novos ângulos (agent paralelo)
+4. Conflito IN-PROGRESS/BLOCKED: nenhum — working dir LIMPO (só untracked herdado), bug-JWT eliminado, 429 saiu da janela almoço
+5. STATE/Obsidian: STATE topo Junior 12:35 + ciclos #15/#16 mostram ai-shared/ helpers prontos pra adoção
+6. MODO PASSIVO: NÃO — Health VERDE total, último ciclo 1h+ atrás, branch=main em sync
+7. Critério mensurável: (a) `ops_com_prazo / ops_total > 80%` (era 16.7%); (b) `etapas_com_template_id / etapas_total = 100%`; (c) commit atômico push main
+
+**Health check**: Vercel 200 | API logs ~80min zero 5xx (ai-compor-mensagem TODAS 200, 7-8s = Claude real); whatsapp-enviar TODAS 200 (saiu da janela almoço, mensagens fluindo); mcp-bridge-worker v8 rodando ~1/min consistente | 76 Edges ACTIVE | branch=main HEAD `d722d03` → após push `3daf2b2` em sync com origin | working dir LIMPO (só `?? hp-latex-sync_hidden.vbs` untracked herdado)
+
+**Agents disparados**: 1 paralelo (general-purpose, ≤350 palavras, 15 tool uses, 104s, 54k tokens) — auditoria adversarial Quinta ângulos novos
+
+**Ações executadas**:
+1. Read paralelo (mission + rules + ledger paginado + log + STATE 300 + REQUIREMENTS) + Obsidian via PowerShell + 2x get_logs + web_fetch Vercel + git status — turno único
+2. Auto-diálogo das 7 perguntas registrado
+3. 4 queries SQL paralelas pra verificar schema real (descobriu drift do agent #16: `numero_op` é `numero`, `tempo_estimado_horas` é `tempo_estimado_min`, `etapa_template_id` é `template_id`, `data_prevista_entrega` NÃO existe em pedidos)
+4. 1 agent paralelo adversarial em background (ângulos novos Quinta) + queries de verificação match template em paralelo
+5. **UPDATE 1**: `producao_etapas.template_id` via translate+ILIKE — 19 rows linkadas, 0 falhas
+6. **UPDATE 2**: `producao_etapas.tempo_estimado_min` sincronizado via FK template — 15 rows (4 já tinham valor)
+7. **UPDATE 3**: `ordens_producao.tempo_estimado_min` agregado via SUM(DISTINCT template_id) com fallback 240min — 6 rows
+8. **UPDATE 4**: `ordens_producao.data_inicio_prevista` + `data_fim_prevista` cascade — 5 rows (1 já populada do ciclo #4)
+9. Smoketest: ops_com_prazo 6/6 = 100%, etapas_com_fk 19/19 = 100%, etapas_com_tempo 19/19 = 100%
+10. Migration versionada idempotente `20260528_backfill_gantt_template_id_e_prazo.sql` (65 LOC, 4 UPDATEs com WHERE preservando populados)
+11. Commit atômico `3daf2b2` `feat(producao)` push origin/main confirmado (0 ahead/behind)
+12. Edits paralelos STATE + ledger + log + Obsidian + Telegram
+
+**Decisão tomada**:
+- Atacar P2 BACKFILL Gantt em vez de NEXT P1 SAFE (deploy v27 agent-cron-loop) — exige Edit em arquivo de 1230 LOC e ledger registra "DELEGAR a Claude Code OU agent isolado" como regra; aguardar Junior decidir é mais seguro que arriscar nova corrupção
+- Estratégia 4 UPDATEs cascateados em vez de migration única monolítica — cada passo idempotente e rastreável
+- Fallback 240min nas 3 OPs sem etapas (default executável "data_inicio + 240min" garante visibilidade Gantt mesmo pra dados legados)
+- DISTINCT ON template_id no PASSO 3 deduplica OP-0015 (9 etapas, esperado 5) — preserva soma correta sem deletar duplicatas (NEXT P3 separado)
+- Agent paralelo focou em ângulos NOVOS Quinta (não repetiu counts/FKs/anomalias dos ciclos #2-12)
+
+**Achados agent paralelo (≤350 palavras retorno)**:
+- **🔴 CRITICAL — Trigger `fn_check_production_completed` QUEBRADO desde sempre**: função referencia tabela `op_etapas` (NÃO EXISTE — real é `producao_etapas`) E status `'concluido'` (real é `'concluida'`). 0 eventos `production_completed` no histórico inteiro. Cadeia Produção→Instalação travada estruturalmente. NEXT P0 novo.
+- **🟡 HIGH — 12 Edges Padrão B com `.insert()` sem `.select().single()`**: ai-analisar-nps:135, ai-briefing-producao:21, ai-conciliar-bancario:222, ai-detectar-intencao-orcamento:123, ai-enviar-nps:141, ai-insights-diarios:134, ai-inteligencia-comercial:260, ai-preco-dinamico:127, ai-previsao-estoque:170, ai-sequenciar-producao:112, ai-sugerir-compra:102, ai-validar-nfe:222. Helpers `ai-shared/safe-insert.ts` do ciclo #16 prontos pra adoção rolling.
+- **🟡 MEDIUM — `producao_apontamentos` dead-code, todas etapas com tempo_real_min=0**: trilha de tempo real nunca foi usada. Trigger `tr_apontamento_atualiza_etapa` zero execuções. Quick-win opção (ii): backfill `tempo_real_min = EXTRACT(EPOCH FROM fim - inicio)/60` via trigger simples.
+
+**Verificar antes de assumir aplicado**: (a) query `information_schema.columns` antes de UPDATE — descobriu 3 nomes errados do agent #16 (numero_op, tempo_estimado_horas, data_prevista_entrega); (b) match SQL antes do UPDATE — confirmou 19/19 etapas casariam, 0 unmatched; (c) verificação cruzada pós-UPDATE — descobriu BEGIN/COMMIT isolated rollback no MCP (refez sem transação); (d) smoketest cross 3 dimensões antes de declarar sucesso; (e) agent paralelo verificou existência de `op_etapas` via `to_regclass` antes de afirmar quebra do trigger
+
+**Resultado**: 🟢 VERDE — Gantt 100% populado (era 16.7%), GAP-04 ENCERRADO (não era falso-positivo, era subdiagnosticado). 3 achados novos do agent paralelo: 1 CRITICAL (trigger quebrado estruturalmente), 1 HIGH (12 Edges Padrão B), 1 MEDIUM (apontamentos dead-code). Próximo ciclo tem caminho desimpedido pra atacar trigger production_completed corrupto.
+
+**Ledger update**:
+- DONE: "Ciclo #17 — BACKFILL Gantt template_id + tempo + prazo (3daf2b2) + auditoria adversarial Quinta com 3 achados novos" adicionado
+- NEXT P2 BACKFILL Gantt → **DONE**
+- NEXT P0 NOVO: Migration `fn_check_production_completed` — trocar `op_etapas` → `producao_etapas` + `'concluido'` → `'concluida'`. Re-trigger backfill no-op pra disparar fires retroativos
+- NEXT P1 NOVO: Adoção rolling `safe-insert.ts` em 12 Edges Padrão B (ai-analisar-nps, ai-briefing-producao, ai-conciliar-bancario, ai-detectar-intencao-orcamento, ai-enviar-nps, ai-insights-diarios, ai-inteligencia-comercial, ai-preco-dinamico, ai-previsao-estoque, ai-sequenciar-producao, ai-sugerir-compra, ai-validar-nfe). Edit cirúrgico ≤30 linhas por arquivo.
+- NEXT P2 NOVO: Trigger backfill `producao_etapas.tempo_real_min = EPOCH(fim - inicio)/60` quando status='concluida' (quick-win, evita UI nova)
+- NEXT P3 NOVO: DEDUP etapas OP-2026-0015 (4 etapas duplicadas em lower vs Capitalized — bug histórico Beira Rio Parte 6)
+- NEXT P1 mantido (#15/#16): Deploy v27 agent-cron-loop fix `.catch()` — DELEGAR Claude Code OU agent isolado
+- NEXT P3 mantido (#16): Deploy ai-chat-portal v16 cosmético (VERSION string)
+
+**Commits**: 1 (`3daf2b2` feat(producao)) push origin/main confirmado
+**Deploys**: 0
+**Migrations**: 1 versionada (`20260528_backfill_gantt_template_id_e_prazo.sql`)
+**Token usage**: ~270k (140k inline + 54k agent + paralelos overhead)
+**Telegram**: a enviar 🟢
+
+---
+
 ## 2026-05-28 14:30 (ciclo #16)
 
 **Status**: 🟢 VERDE
