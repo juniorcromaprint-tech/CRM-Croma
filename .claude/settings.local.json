@@ -61,7 +61,10 @@
       "WebFetch(domain:connectpay.vc)",
       "WebFetch(domain:artta.com.br)",
       "mcp__plugin_context-mode_context-mode__ctx_execute_file",
-      "mcp__claude_ai_Supabase__get_project"
+      "mcp__claude_ai_Supabase__get_project",
+      "mcp__croma__croma_listar_propostas",
+      "mcp__croma__croma_listar_pedidos",
+      "mcp__croma__croma_listar_ordens_producao"
     ],
     "additionalDirectories": [
       "C:\\Users\\Caldera\\Claude\\AutoBid-Instagram"

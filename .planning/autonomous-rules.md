@@ -137,13 +137,20 @@ mcp__Windows-MCP__PowerShell
 
 Se algo falhar individualmente, seguir com o resto.
 
-### Etapa 4 — Health check paralelo
+### Etapa 4 — Health check paralelo (COM GUARDRAIL ANTI-CORRUPÇÃO)
 
-- Vercel `web_fetch` → 200
+- Vercel `web_fetch` → 200 (se timeout, fallback Windows-MCP `Invoke-WebRequest`)
 - Supabase `get_logs` 60min (api E edge) → 5xx count
 - `list_edge_functions` → ACTIVE conforme ledger
-- `git status` + `git branch --show-current` → main
+- `git status --short` + `git branch --show-current` + `git diff --stat HEAD`
 - Branch ≠ main → ABORTAR
+
+**🚨 GUARDRAIL ANTI-CORRUPÇÃO** (incidente 2026-05-28 08:30):
+- Se `git diff --stat HEAD` mostra **≥3 arquivos modified FORA de `.planning/` ou `STATE.md`** → CORRUPÇÃO PROVÁVEL
+- Validar com `tail -3` em 2-3 arquivos suspeitos: se `\ No newline at end of file` + corte abrupto (`<`, palavra incompleta, comentário cortado) → **CONFIRMADO CORRUPÇÃO**
+- **AÇÃO**: ABORTAR ciclo + Telegram 🔴 `CORRUPCAO_DETECTADA + N arquivos + listar suspeitos` + log VERMELHO + STATE append "ciclo abortado por corrupção working dir"
+- NÃO tentar consertar via `git checkout` autonomamente (próximo ciclo OU Junior decide)
+- Verificar `.git/index.lock` antes de qualquer comando git: se existe há >5min, remover; se recente, ABORTAR (outro ciclo rodando)
 
 ### Etapa 5 — Decidir e executar (VOCÊ ESCOLHE — pé no acelerador)
 
