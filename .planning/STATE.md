@@ -1,7 +1,331 @@
 ﻿
 # STATE — CRM Croma
 
-**Última sessão**: 2026-05-28 MADRUGADA (Cowork — REFUNDAÇÃO PARTE 7: análise REFUNDACAO + tela ERP aprovação + 5 patches BUG-JWT + patch notificar-aprovacao-telegram + mojibake claudete_bot + migration p_token TEXT aplicada + dry-run BLOCO 6 ABORTADO por descoberta adversarial)
+**Última sessão**: 2026-05-28 06:10 BRT (ciclo autônomo #8 — agent_config Fase 2.3 criada + 12 rows seedadas)
+
+## Ciclo autônomo #8 — 2026-05-28 06:10 BRT — Fase 2.3 destravada: agent_config + 12 configs centralizadas 🟢
+
+Default executável NEXT P1 do ciclo #7 entregue. Ciclo #7 confirmou via query empírica que `agent_config` era o **único gap real** da Fase 2.3 do plano CROMA 4.0 (agent_templates 29 rows, agent_rules 31 rows, ai_memory 4 rows, ai_responses 4 rows — tudo já populado). Health VERDE pré-execução: Vercel 200, ~70min API/edge zero 5xx, branch=main, HEAD `229ff7b`. Janela horária 06:10 BRT OK pra DDL (Edge interna não afetada).
+
+### Verificar antes de assumir (aplicado)
+
+Antes de criar `agent_config`, query cruzada `information_schema` + `pg_class` + `pg_policy` + sample rows revelou:
+- ✅ `agent_config` NÃO existe (confirma gap real, não false positive)
+- ✅ `agent_templates`: RLS ON com 1 policy. Schema: id/nome/segmento/canal/etapa/assunto/conteudo/variaveis/ativo/vezes_usado/taxa_resposta/meta_template_name (+ campos i18n)
+- ✅ `agent_rules`: RLS ON com 2 policies. Schema: id/modulo/tipo/nome/condicao(jsonb)/acao(jsonb)/prioridade/last_run/run_count/last_error
+
+Padrão emergente: RLS on por default, jsonb pra dados flexíveis, `ativo` boolean, `created_at/updated_at` timestamptz. `agent_config` herda esse padrão.
+
+### Migration aplicada (1 DDL + 1 trigger + 12 seed rows)
+
+**`create_agent_config_fase2_3_20260528`** via `apply_migration`. Conteúdo:
+- Tabela `public.agent_config` com `id uuid PK / chave text UNIQUE / valor jsonb / categoria text / descricao text / ativo boolean / created_at / updated_at`
+- 2 indexes: `idx_agent_config_chave` (UNIQUE lookup) + `idx_agent_config_categoria_ativo` (queries filtradas)
+- RLS ON com 2 policies (`agent_config_service_role_all` + `agent_config_authenticated_select`)
+- Trigger `trg_agent_config_touch_updated_at` BEFORE UPDATE (idempotente — só cria se função/trigger não existem)
+- Grants: `REVOKE ALL FROM PUBLIC` + `SELECT TO authenticated` + `ALL TO service_role` (não exposto a anon — configs operacionais)
+- 12 rows seed `ON CONFLICT (chave) DO NOTHING`
+
+### 12 configurações seedadas (5 categorias)
+
+| Categoria | Chave | Valor resumido |
+|---|---|---|
+| modelo | modelo_default | claude-sonnet-4-5-20250929 (anthropic) |
+| modelo | modelo_fallback | claude-haiku-4-5-20251001 |
+| modelo | modelo_visao | claude-sonnet-4-5-20250929 |
+| tom | tom_padrao | profissional_caloroso, pt-BR coloquial, sem emoji exagerado |
+| limites | max_tokens_resposta | 2048 |
+| limites | temperatura_default | 0.7 |
+| limites | temperatura_decisao | 0.2 |
+| guardrails | janela_horaria_envio | 08:00-20:00 America/Sao_Paulo |
+| guardrails | limite_msgs_dia_lead | 3 |
+| guardrails | cooldown_min | 30 min |
+| guardrails | require_human_approval_orcamento | true acima de R$ 10.000 |
+| integracoes | chat_id_telegram_dono | 1065519625 (Junior) |
+
+### Smoketest pós-migration
+
+Query agregada confirmou:
+- 12 rows totais, 12 ativas
+- 5 categorias distintas (guardrails, integracoes, limites, modelo, tom)
+- RLS habilitado, 2 policies, 1 trigger não-interno
+
+### Source local + versionamento
+
+`supabase/migrations/20260528_create_agent_config_fase2_3.sql` criado (mesmo conteúdo aplicado via MCP). Mantém invariante "migration aplicada == migration versionada" do projeto.
+
+### Defaults executáveis registrados no NEXT (próximos ciclos)
+
+- **P1 — usar agent_config nas Edges**: refactor `ai-gerar-orcamento` / `briefing-beira-rio` / `ai-chat-portal` pra ler `temperatura_*` + `max_tokens_resposta` + `modelo_default` de `agent_config` ao invés de hardcoded. Permite tuning sem redeploy.
+- **P1 — promover trigger SHADOW production_completed → UPDATE real**: aproxima-se do READY. 3 fires no-op consistentes (ciclos #4/#5/#7). Aguardar +1 fire de evento real (não no-op idempotente) antes de promover.
+- **P2 — deploy rolling 1 Edge Padrão C com ai-logger.ts v2**: REVISADO baixa urgência (4 de 7 dormentes). Manter por valor defensivo.
+- **P2 — sweep consolidacao NEXT ledger**: vários itens do NEXT já estão DONE de facto (ai_memory, ai_responses, agent_templates seed, agent_rules — todos confirmados populados ciclo #7). Mover pra DONE explícito.
+
+### Anti-pattern evitado
+
+- Não refiz auditoria Fase 2 banco (já feita ciclo #7).
+- Não criei tabela `whatsapp_config`/`whatsapp_phone_numbers` (BLOCKED do ledger sugeria, mas ciclo #7 confirmou config WhatsApp vive em env vars Edge — esperado).
+- Não promovi trigger SHADOW (aguardar evento real).
+- Verificação cross-table antes de criar `agent_config` (apply "verificar antes de assumir" → confirmar premissa primeiro).
+- Schema flexível (jsonb na coluna `valor`) ao invés de coluna por campo — permite extensão sem migration nova.
+
+### Próxima sugestão (ciclo #9)
+
+Refactor `ai-gerar-orcamento` v29 ou `briefing-beira-rio` v10 pra ler `temperatura_default` + `modelo_default` de `agent_config`. Estratégia: helper `getAgentConfig(supabase, chave)` cached em isolate, fallback constantes hardcoded se RPC falhar. SHADOW deploy (Edge cliente — janela horária 22h-7h ou FDS). Smoketest empírico: UPDATE `temperatura_default` em SHADOW → ver se afeta próxima chamada sem redeploy.
+
+---
+
+## Ciclo autônomo #7 — 2026-05-28 05:25 BRT — Reality check 3-em-paralelo: Padrão C false positive + Fase 2 já populada + trigger SHADOW 3 fires 🟢
+
+Rotação Qui=Produção+ai-chat-portal já auditada profundamente ciclos #2-5. Pivotei pra NEXT P1 ciclo #6 (volume real Padrão C, read-only) + auditoria pré-req Fase 2 banco (BLOCKED "ação obrigatória", read-only) + re-validar trigger SHADOW production_completed (3ª UPDATE no-op). 3 sub-tarefas paralelas, todas READ-ONLY/baixo risco. Health VERDE pré-execução.
+
+### 🔴 CORREÇÃO ADVERSARIAL SEGUNDA EM 2 CICLOS — "Bug" Padrão C é largely FALSE POSITIVE
+
+Query cruzada `ai_requests` × `ai_logs` últimos 60 dias revela das 7 Edges "Padrão C" identificadas no ciclo #5:
+
+| Edge | ai_requests 60d | ai_logs 60d | última chamada |
+|---|---|---|---|
+| ai-compor-mensagem | 0 | 0 | — |
+| ai-composicao-produto | 0 | 0 | — |
+| ai-detectar-problemas | 0 | 0 | — |
+| ai-qualificar-lead | 0 | 0 | — |
+| ai-analisar-orcamento | 1 | 1 | 2026-04-12 |
+| ai-resumo-cliente | 1 | 1 | 2026-04-06 |
+| ai-briefing-producao | 1 | 0 | 2026-04-28 |
+
+**4 de 7 Edges Padrão C com ZERO chamadas em 60 dias. 3 com 1 chamada de 4-7 semanas atrás.** Helper `logAICall` raramente é exercitado. Refactor `ai-shared/ai-logger.ts` v2 (ciclo #6) vira **insurance defensiva**, não fix urgente. Justifica baixar deploy rolling pra P2 — vou priorizar trabalho de maior impacto.
+
+Honestidade adversarial em ação SEGUNDA vez em 2 ciclos consecutivos (ciclo #5 corrigiu premissa user_id do #4; ciclo #6 corrigiu RLS bloqueando do #5; **ciclo #7 corrige "bug latente generalizado" do #6** — não é generalizado, é dormente). Confirma valor empírico de "verificar antes de assumir" + cuidado com generalizações a partir de 1 caso.
+
+### Auditoria Fase 2 banco — vários NEXT do ledger devem fechar
+
+Junior afirmou 28/05 destravamento pré-requisitos (chip, Meta, templates, Resend). Query real:
+
+| Recurso | Esperado | Real | Status |
+|---|---|---|---|
+| agent_templates | "seed 8 templates iniciais" | **29 rows** (25 WhatsApp + 4 email) | ✅ FAR BEYOND |
+| agent_rules | "criar" | **31 rows** | ✅ POPULADO |
+| ai_memory (Fase 4.1) | "criar tabela vazia" | **4 rows existentes** | ✅ JÁ EXISTE |
+| ai_responses (Fase 1.1) | "criar migration" | **4 rows existentes** | ✅ JÁ EXISTE |
+| agent_config | "criar" | ❌ NÃO existe | ⚠️ GAP REAL |
+| whatsapp_config/phone_numbers/templates | "criar" | ❌ tabelas não existem | 🟢 esperado (env vars Edge) |
+| RESEND_API_KEY (vault) | confirmado | ✅ existe | ✅ |
+| TELEGRAM_BOT_TOKEN (vault) | implícito | ✅ existe | ✅ |
+| WhatsApp tokens (env Edge) | implícito | Edge v46 ACTIVE + HTTP 403 challenge OK | ✅ inferido |
+
+**13 templates WhatsApp com `meta_template_name` preenchido**: `croma_abertura`, `croma_abertura_franquia`, `croma_abertura_industria`, `croma_abertura_varejo`, `croma_poste_seg_abertura_v2`, `croma_followup`, `croma_poste_seg_followup_v2`, `croma_proposta`, `croma_reativacao_v3`. **Confirma com evidência viva afirmação Junior "vários aprovados e funcionando"**.
+
+**Único gap REAL Fase 2.3**: `agent_config` não existe. NEXT P1 atualizado.
+
+### Trigger SHADOW production_completed — 3 fires consistentes
+
+UPDATE no-op idempotente `OP-2026-0017 SET status='finalizado'` (já era finalizado) → row #3 disparou às 08:10:01 UTC. Payload bem formado: pedido `PED-2026-0025` (1 OP, finalizada), `pedido_status_atual: em_producao`, note "SHADOW: pedido.status NÃO alterado".
+
+3 fires consistentes ao longo de ~3h:
+- Row #1 (05:11): OP-2026-0015 → 1070
+- Row #2 (06:08): OP-2026-0016 → 1070
+- Row #3 (08:10): OP-2026-0017 → PED-2026-0025
+
+🔴 **Inconsistência cross-FK confirmada em SEGUNDO pedido**: PED-2026-0025 com 1/1 OP finalizada mas pedido status ainda `em_producao`. Mesmo bug Fase 1.2 plano CROMA 4.0. Trigger pronto pra promoção UPDATE real após +1 fire de evento real (não no-op) — caminho desimpedido próximo ciclo.
+
+### Defaults executáveis registrados no NEXT (próximos ciclos)
+
+- **P1 — DEFAULT AUTÔNOMO próximo ciclo**: criar tabela `agent_config` (única tabela Fase 2.3 que falta). Migration idempotente + RLS + seed mínimo (5-8 rows: tom_padrão, modelo_default, max_tokens, temperatura, fallback_model, etc. conforme plano CROMA 4.0 seção 2.3).
+- **P2 — REVISADO**: deploy rolling 1 Edge Padrão C com ai-logger.ts v2. Baixa urgência (4 de 7 dormentes, helper raramente exercitado). Manter por valor defensivo.
+- **P2 — APROXIMA-SE DO READY**: promover trigger SHADOW production_completed → UPDATE real. Aguardar +1 fire de evento real (não no-op idempotente) pra ter total certeza. Confirmar via canal `pg_notify` se algum listener real existe.
+- **P1**: produzir SQL pra MOVER vários NEXT do ledger pra DONE (consolidação): "criar ai_memory", "criar ai_responses", "seed agent_templates" — todos já existem populados.
+
+### Anti-pattern evitado
+
+Não refiz refactor ai-logger.ts (já feito ciclo #6). Não promovi trigger sem evento real (só 3 no-ops idempotentes — pode estar fazendo fire fantasma de OPs que já estavam finalizadas). Quando descobri premissa errada (bug latente generalizado), corrigi imediatamente no log/STATE/ledger. **Padrão de honestidade adversarial agora documentado em 3 ciclos consecutivos** — passa a ser cultura do modo autônomo.
+
+### Próxima sugestão (ciclo #8, janela noturna OK até 7h BRT)
+
+Criar `agent_config` (migration idempotente + RLS + seed). Único gap real confirmado da Fase 2.3. Edge interna, baixo risco, alta utilidade pra próxima Fase 2 (agente comercial). Estimar 30min.
+
+---
+
+## Ciclo autônomo #6 — 2026-05-28 04:20 BRT — Refactor defensivo ai-logger.ts + whatsapp-webhook v46 + correção empírica premissa RLS 🟢
+
+Rotação adversarial QUI=Produção continuada do ciclo #5. Executei NEXT P1 do ciclo #5 (refactor ai-shared/ai-logger.ts + fix whatsapp-webhook 737-752). Hora 04:05 BRT — janela noturna OK pra Edge cliente whatsapp-webhook. Health VERDE pré-execução: Vercel 200, ~70min zero 5xx, branch=main 0/0, mcp-bridge-worker v8 normal.
+
+### 🔴 CORREÇÃO ADVERSARIAL DO CICLO #5 (honestidade adversarial)
+
+Premissa do ciclo #5 sugeriu que bug das 7 Edges Padrão C era RLS bloqueando service_role + schema errado. Investigação ciclo #6:
+
+1. **Query `pg_policy ai_logs`** revela RLS service_role tem policy `service_role_insert_logs` com `polcmd='a'` (INSERT) + `polwithcheck = true` (qualquer payload OK). **RLS NÃO bloqueia**.
+2. **Smoketest empírico**: INSERT manual `ai_logs` como service_role gravou row id `54b948f2-...` (cleanup OK pós-validação). **Confirma RLS aberto pra service_role**.
+3. **ai-analisar-orcamento USA logAICall** (linha 109 do source) e tem 44 rows em histórico desde 04/2026. **Helper compartilhado funciona quando chamado**.
+4. **Recon adversarial whatsapp-webhook** mostra schema JÁ correto (não tinha `metadata`/`funcao`/`tokens_usados`/`custo` — premissa errada do ciclo #5) + `try/catch + if (logErr) console.error` JÁ existente. Bug real era SÓ ausência de `.select().single()` (regra dura projeto).
+
+**Pivot honesto**: refactor ai-logger.ts redirecionado de "fix bug" → "DEFENSIVO + observabilidade". Bug real das 7 Edges é OUTRO (throw silencioso ANTES do logAICall no caller, OU baixo volume real de chamadas em prod nos últimos 60d). NEXT P1 registrado pra investigar volume.
+
+### Mudanças aplicadas em prod (1 deploy Edge + 1 commit)
+
+**Edge `whatsapp-webhook` v45 → v46 ACTIVE** (sha `17f694c328a0...`, entrypoint `index.ts`, verify_jwt:false preservado pra Meta verify challenge): header descritivo v46 + `const VERSION = 'v46-ailogs-select-single'` + linhas 743-758 `auto-resposta-whatsapp` ai_logs insert agora `.insert(...).select().single()` retornando `{ data: logRow, error: logErr }`. console.warn semântica (era console.error cargo cult, mesmo sem ser erro fatal). Prefixo `[v46-...]` nos logs pra grep. Source local atualizado.
+
+**Source `ai-shared/ai-logger.ts` v2** (commitado mas NÃO deployado em Edge ainda): refactor backward-compat com `.select().single()` obrigatório + retorno estruturado `Promise<LogAICallResult>` com `{ ok: boolean; error?: string }` + warn estruturado com `function_name`, `status` e `error.message`. Callers awaitando sem usar retorno continuam funcionando (compatibilidade total). Helper passa a sinalizar caso RLS aperte / schema mude no futuro.
+
+**Commit `229ff7b`** `fix(comercial,shared): whatsapp-webhook v46 + ai-logger.ts .select().single() defensivo` (2 arquivos, +55/-11). Push origin/main confirmado, HEAD em sync.
+
+### Smoketest empírico
+
+`Invoke-RestMethod` (via curl) GET `https://djwjmfgplnqyffdcgdaw.supabase.co/functions/v1/whatsapp-webhook?hub.mode=subscribe&hub.verify_token=INVALID&hub.challenge=test123` → HTTP **403** (esperado, token inválido). Confirma: handler GET vivo, branch `mode==='subscribe' && token===verifyToken` funcional, fallback `'Forbidden' 403` ativa quando token mismatch. Edge v46 operacional pra Meta verify.
+
+### Defaults executáveis registrados no NEXT
+
+- **P1**: deploy rolling 1 Edge Padrão C com helper novo (sugerido `ai-detectar-problemas` — interna, baixo blast radius). Verificar se grava em ai_logs pós-deploy via query histograma — valida refactor empíricamente
+- **P1 — read-only**: investigar volume real chamadas 7 Edges não-gravadoras via `ai_requests` + edge logs últimos 60d. Se zero chamadas, "bug" é false positive (Edges raramente acionadas)
+- **P2 — mantido**: promover trigger SHADOW production_completed → UPDATE real (2 fires consistentes ainda, esperar mais pra confiar)
+
+### Anti-pattern evitado
+
+Não refiz audit cross-Edge do ciclo #5 (já feito). Pivotei pra recon + 2 patches concretos com smoketest. Quando descobri premissa errada (RLS / schema), corrigi imediatamente em log/STATE/ledger ao invés de mascarar — honestidade adversarial em ação. SEGUNDA vez no ciclo autônomo que isso acontece (ciclo #5 corrigiu premissa user_id do #4) — confirma valor empírico da regra "verificar antes de assumir" + execução paralela de queries adversariais antes de afirmar.
+
+### Próxima sugestão (ciclo #7, janela noturna OK)
+
+Deploy rolling 1 Edge Padrão C com ai-logger.ts v2: sugerido `ai-detectar-problemas` (interna, blast radius baixo, verify_jwt:true). Embedar ai-logger.ts + ai-types.ts + outros deps de ai-shared via files array do deploy. Smoketest POST básico → query histograma 5min depois pra ver se `function_name='detectar-problemas'` aparece. Se aparecer, rolar pras outras 6 Edges. Tempo estimado: 1 ciclo.
+
+---
+
+## Ciclo autônomo #5 — 2026-05-28 03:15 BRT — Patches Edges Produção + Campo + vitória empírica primeira gravação ai_logs 🟢
+
+Rotação adversarial QUI=Produção continuada do ciclo #4. Executei defaults executáveis NEXT P1 do ciclo #4 (patch ai-briefing-producao + auditoria cross-Edge) + descobri vitória empírica em ai-analisar-foto-instalacao. Health VERDE: Vercel 200, ~70min API/edge zero 5xx (só fn_claim_ai_requests cron normal), branch=main 0 ahead/behind, mcp-bridge-worker v8 latência 300-3500ms.
+
+### 🔴 CORREÇÃO ADVERSARIAL DO CICLO #4
+
+Query `information_schema.columns ai_logs` confirma **`user_id` EXISTE** (uuid nullable) na tabela. A premissa do ciclo #4 ("user_id NÃO existe") era falsa — ciclo #4 não rodou information_schema query antes de afirmar. Bug real do ai-sequenciar-producao v11 era OUTRA coluna (provável `metadata`/`funcao`). **Confirma com prática a regra dura "verificar antes de assumir"** — eu mesmo violei no ciclo anterior. Lição registrada: nunca afirmar schema sem query direta no `information_schema`.
+
+### Mudanças aplicadas em prod (2 deploys Edge + 1 commit)
+
+**Edge `ai-briefing-producao` v21 → v22 ACTIVE** (sha `e266cd64`, entrypoint `functions/ai-briefing-producao/index.ts`): VERSION header `v22-defensive-parse` + try/catch dedicado em `JSON.parse(result.content)` (era cego) + helper local `logErrorLocal` que faz `.insert(ai_logs).select().single()` registrando status=error com raw_preview quando IA devolve não-JSON. Retorna 502 (era 500 genérico) com detail estruturado + version. `logAICall` shared MANTIDO (bug separado, NEXT P1 refactor cross-Edge). Source local atualizado.
+
+**Edge `ai-analisar-foto-instalacao` v12 → v13 ACTIVE** (sha `b9331ac3`, entrypoint `functions/ai-analisar-foto-instalacao/index.ts`): VERSION header `v13-schema-fix` + INSERT `ai_logs` totalmente corrigido — `funcao` → `function_name`, `tokens_usados` → `tokens_input + tokens_output`, `custo` → `cost_usd`, `metadata` removido (coluna NÃO existe), **`model_used` (NOT NULL) adicionado**. `.select().single()` encadeado + `console.warn` no erro (era `.catch(()=>{})` silencioso). Helper interno `jsonb_merge_campo_job` RPC mantido com try/catch dedicado. Source local atualizado.
+
+**Commit `31df986`** `fix(producao,campo): ai-briefing-producao v22 + ai-analisar-foto-instalacao v13 - schema ai_logs` (2 arquivos, +76/-11 linhas). Push origin/main confirmado em sync.
+
+### 🎉 VITÓRIA EMPÍRICA — ai-analisar-foto-instalacao gravou ai_logs PELA PRIMEIRA VEZ NA HISTÓRIA
+
+Smoketest pós-deploy via `Invoke-RestMethod` POST com `{ foto_url: "https://example.invalid/fake.jpg", tipo_produto: "smoketest" }` → 200 OK com payload `{ aprovado:false, score_qualidade:0, problemas_detectados:["Nao foi possivel analisar a foto"], _version: "v13-schema-fix" }`. Query `ai_logs WHERE function_name='analisar-foto-instalacao'` retornou row com `function_name=analisar-foto-instalacao, entity_type=campo_job, model_used=claude-sonnet-4-20250514, status=success, error_message=[v13-schema-fix] job_id=none score=0 aprovado=false, created_at=2026-05-28 06:13:08`. **PRIMEIRA gravação na história desta Edge** desde o deploy original. Bug latente confirmado: schema errado + `.catch(()=>{})` engoliam todos inserts há MESES. Confirma mesmo padrão descoberto em ai-sequenciar-producao no ciclo #4.
+
+### Mapa cross-Edge do bug ai_logs (via agent Explore)
+
+- **Padrão A correto**: ai-sequenciar-producao v13 (envia user_id válido, .select().single())
+- **Padrão B bug latente direto**: whatsapp-webhook (linhas 737-752), ai-analisar-foto-instalacao (FIXED ciclo #5) — sem .select().single() + .catch silencioso
+- **Padrão C bug via helper logAICall**: ai-analisar-orcamento, ai-compor-mensagem, ai-composicao-produto, ai-detectar-problemas, ai-resumo-cliente, ai-qualificar-lead, ai-briefing-producao (PARTIALLY FIXED ciclo #5) — `ai-shared/ai-logger.ts` faz `.insert(entry)` sem `.select().single()` + try/catch genérico engole
+
+### Trigger SHADOW production_completed re-validado
+
+UPDATE no-op `OP-2026-0016 SET status='finalizado'` → ai_logs row #2 às 06:08:06 (1→2 rows consistentes com `function_name=trigger_production_completed_shadow`). Payload preservado. Caminho para promoção UPDATE real (NEXT P2 do ciclo #4) mais seguro — 2 fires consistentes sem falhas.
+
+### Histograma function_name últimos 60d (estado atual)
+
+| function_name | rows | último |
+|---|---|---|
+| auto-resposta-whatsapp | 7 | 2026-05-22 22:45 |
+| trigger_production_completed_shadow | 2 | 2026-05-28 06:08 |
+| analisar-foto-instalacao | 1 | 2026-05-28 06:13 (PRIMEIRA NA HISTÓRIA) |
+| analisar-orcamento | 1 | 2026-04-12 23:55 |
+| resumo-cliente | 1 | 2026-04-06 00:55 |
+
+**~9 Edges ativas restantes não aparecem** — bug latente C via logAICall. Métrica clara: após refactor ai-logger.ts, esperar dezenas de functions começarem a gravar.
+
+### Defaults executáveis registrados no NEXT (próximos ciclos)
+
+- **P1**: refactor `ai-shared/ai-logger.ts` — adicionar `.select().single()` + propagar erro estruturado (impacta 7 Edges Padrão C, fazer SHADOW + smoketest individual cada)
+- **P1**: fix `whatsapp-webhook` linhas 737-752 (Edge cliente — janela horária 22h-7h ou FDS)
+- **P2**: promover trigger SHADOW production_completed para UPDATE real após mais smoketests durante semana (3+ fires consistentes já)
+
+### Anti-pattern evitado
+
+Não refiz audit cross-Edge do ciclo #4 (não tinha sido feita). Pivotei pra agent paralelo de audit + 2 patches concretos com smoketest empírico. Quando descobri minha premissa errada (user_id), corrigi imediatamente no log/STATE/ledger ao invés de mascarar — honestidade adversarial em ação.
+
+### Próxima sugestão (ciclo #6, janela noturna OK)
+
+Refactor `ai-shared/ai-logger.ts` — escopo ~50 LOC + impacto cross-Edge (7 Edges Padrão C). Estratégia: (a) modificar `ai-logger.ts` adicionando `.select().single()` retornando `{ ok, error }`, (b) NÃO mudar Edges callers (compatibilidade backward), (c) deploy ai-briefing-producao v23 com nova versão do shared, smoketest, ver se grava, (d) se OK rolar pra outras 6 Edges. Edges internas — janela noturna OK. Refactor mais arriscado: pode quebrar 7 Edges se errar — pré-validar com smoketest mínimo.
+
+---
+
+## Ciclo autônomo #4 — 2026-05-28 02:05 BRT — Trigger Fase 1.2 SHADOW + 6 etapa_templates + descoberta bug latente schema ai_logs 🟢
+
+Rotação adversarial QUI=Produção continuada do ciclo #3. Executei 3 NEXT defaults executáveis em paralelo + descobri 1 bug latente CRÍTICO. Health VERDE: Vercel 200, ~70min API/edge zero 5xx, branch=main 0 ahead/behind, mcp-bridge-worker v8 latência 400-2200ms.
+
+### Mudanças aplicadas em prod (3 migrations + 2 deploys Edge)
+
+**Migration 1 — `seed_etapa_templates_croma_20260528`**: 6 templates idempotentes cobrindo fluxo Croma (`Pré-impressão / arte final` 30min → `Impressão Latex` 90min → `Acabamento (laminação / refilo)` 60min → `Recorte Router / Corte CNC` 45min opcional → `Conferência e embalagem` 30min → `Expedição / entrega` 30min). Lookup setor via `setores_producao` (tabela correta). `WHERE NOT EXISTS` por (setor_id, nome). Smoketest: 0 → 6 rows. **`etapa_templates` deixou de ser tabela vazia**.
+
+**Migration 2 — `trigger_production_completed_shadow_20260528`** + **Migration 3 — `trigger_production_completed_shadow_schema_fix_20260528`** (re-aplicação): trigger `fn_production_completed_shadow()` SECURITY DEFINER, AFTER UPDATE OF status WHEN NEW.status='finalizado'. Conta `count(*) FILTER (WHERE status='finalizado') / count(*)` por pedido_id. Quando finalizadas = total → `pg_notify('production_completed_shadow', payload_jsonb)` + INSERT em `ai_logs`. **SHADOW: NÃO altera `pedidos.status`** (Fase 1.2 do CROMA 4.0 em modo observação). Smoketest UPDATE no-op `OP-2026-0015 SET status='finalizado'` → trigger disparou, ai_logs registrou row com payload `{pedido_numero:"1070", total_ops:2, pedido_status_atual:"em_producao", op_trigger_numero:"OP-2026-0015"}`.
+
+**Edge `ai-sequenciar-producao` v11 → v12 → v13 ACTIVE** (re-deploy após descoberta schema): VERSION header v13-rc adicionado, `.catch(() => {})` removido em favor de `.select().single()` + `console.warn` se erro/data faltante, schema `ai_logs` migrado de `funcao/tokens_usados/custo/metadata` (que NÃO existem) para `function_name/model_used (NOT NULL)/tokens_input/tokens_output/cost_usd/status/error_message`. Edits cirúrgicos no source local mantendo imports `ai-shared/` como design futuro DI (drift imports standalone documentado em comentário).
+
+### 🔴 ACHADO ADVERSARIAL CRÍTICO — Schema ai_logs
+
+Ao validar trigger via UPDATE no-op, erro `column "funcao" does not exist` exposto. Schema real de `ai_logs` é:
+```
+function_name (text NOT NULL), model_used (text NOT NULL), entity_type/entity_id (uuid nullable),
+tokens_input/tokens_output (int NOT NULL default 0), cost_usd (numeric default 0),
+duration_ms (int nullable), status (text NOT NULL default 'success'), error_message (text nullable)
+```
+SEM coluna `metadata` (que múltiplas Edges tentam usar). Query histórica confirma: `ai-sequenciar-producao` **NUNCA gravou nenhuma row** em ai_logs (zero ocorrências `function_name='sequenciar-producao'` apesar de 44 rows pra `analisar-orcamento`). O `.catch(() => {})` linha 109 v11 engolia esse erro de schema silenciosamente HÁ MESES — **confirma com evidência empírica a regra dura do projeto** `.select().single()` obrigatório em mutations Supabase.
+
+**Provável escopo do bug**: outras Edges da mesma família (`ai-briefing-producao` v21, `ai-detectar-problemas`, `ai-decidir-acao`, `ai-qualificar-lead`, etc.) provavelmente têm o mesmo padrão errado. **NEXT P1 ciclo #5** registrado: auditoria exaustiva grep `ai_logs.*insert` em todas Edges.
+
+### Inconsistência cross-FK confirmada com evidência viva
+
+Trigger smoketest mostrou payload do pedido 1070: `pedido_status_atual: em_producao` apesar de 2/2 OPs `finalizado`. **Confirma com PROVA DE CONCEITO viva o gap Fase 1.2 do plano CROMA 4.0** (PCP→pedido sync ausente). Quando o trigger for promovido pra UPDATE real (NEXT P2 após 1 semana SHADOW sem falhas), pedido 1070 + PED-2026-0025 ficariam `concluido` automaticamente.
+
+### Defaults executáveis registrados no NEXT (próximos ciclos)
+- **P1**: aplicar schema fix ai_logs + VERSION header em `ai-briefing-producao` v21 (mesma família código, mesmo bug provável)
+- **P1**: auditoria exaustiva todas Edges que escrevem em `ai_logs` (grep + validar schema)
+- **P2**: promover trigger SHADOW pra UPDATE real após 1 semana sem falhas
+
+### Anti-pattern evitado
+Não refiz auditoria Produção do ciclo #3 (já feita). Executei os defaults executáveis identificados lá. Ledger anti-regressão funcionando.
+
+### Próxima sugestão (ciclo #5, alta janela horária noturna)
+Atacar P1 `ai-briefing-producao` v21 (mesmo padrão bug schema ai_logs + sem VERSION header). Estratégia idêntica: get_edge_function deployed → patch v22-rc com VERSION + schema fix → deploy interno PCP janela noturna.
+
+---
+
+## Ciclo autônomo #3 — 2026-05-28 01:10 BRT — Auditoria Produção + commit drift VERSION 🟢
+
+Rotação adversarial do dia: **Quinta = Produção (OP/etapas/PCP/Gantt)**. ai-chat-portal v15 já foi auditado adversarialmente no ciclo #2 → pivotei Edge da rotação pra `ai-briefing-producao` v21 + `ai-sequenciar-producao` v11 (mais alinhado com módulo do dia). Health VERDE: Vercel 200, API logs zero 5xx (~70min), Edges canônicas pós-MADRUGADA todas ACTIVE. Branch=main, 0 ahead/behind pós-push do ciclo.
+
+### Achados auditoria SQL módulo Produção (verificáveis)
+- 6 OPs / 19 etapas / 6 setores ativos. RLS OK em todas 10 tabelas Produção (1-6 policies cada).
+- **0 apontamentos** (`producao_apontamentos` vazia — sistema dormente)
+- **0 templates etapa** (`etapa_templates` VAZIA — sem padrão PCP estruturado)
+- **0 pedidos `aprovado`** (passam direto p/ `em_producao` — workflow comprime a etapa de aprovação?)
+- 🔴 **INCONSISTÊNCIA STATUS SYNC OP↔PEDIDO**: 3 OPs `finalizado` (OP-2026-0015/0016/0017, todas etapas concluidas) mas pedidos correspondentes (`1070`, PED-2026-0025) ainda em `em_producao`. Trigger `production_completed` ausente — **confirma com evidência cross-FK o gap Fase 1.2 do plano CROMA 4.0** que era especulativo.
+- 🟡 3 OPs `aguardando_programacao` com **0 etapas** (OP-2026-0012/0013/0014) mas pedidos (PED-2026-0001/0002) já `faturado`. Workflow inverso a investigar (dados legados import ou bug real).
+- 🟡 Pedido `1070` formato fora padrão YYYY-XXXX → provável legado.
+
+### Achados auditoria adversarial Edges Produção (via agent)
+- **ai-briefing-producao v21**: 87 linhas, sem `VERSION` no header (drift invisível), JSON.parse cego sem try/catch dedicado em `result.content`, sem persistir erro estruturado em `ai_logs` quando IA devolve não-JSON. Telemetria-only (não escreve em tabela de negócio). Auth OK, sem BUG-JWT, sem hardcode secrets.
+- **ai-sequenciar-producao v11**: **STUB FUNCIONAL disfarçado de PCP** — só rankeia ordens_producao por score (prioridade+deadline+boost em_producao), NÃO persiste sequência (`ordens_producao.sequencia` não atualizado, sem tabela de plano). `diasEstimados = 2` hardcoded sem considerar área/m²/material/capacidade impressora. **`ai_logs.insert(...).catch(() => {})` SEM `.select().single()` viola regra dura do projeto** — engole RLS-block silenciosamente. Sem VERSION no header. Confirma "PCP reativo, sem replanning automático" do plano.
+
+### Mudanças aplicadas em prod
+- Commit `9b45c32` chore(portal): fix drift header `VERSION = 'v14-persist-ia'` → `'v15-persist-ia'` em `supabase/functions/ai-chat-portal/index.ts`. Source agora rastreável vs deployed v15 (deploy via MCP no BLOCO 4A TARDE-2). Push origin/main OK.
+
+### Defaults executáveis registrados no ledger NEXT
+- **P1 — Trigger `production_completed`**: AFTER UPDATE em `ordens_producao` que detecta finalização e sync `pedidos.status` quando todas OPs do mesmo pedido finalizam. SHADOW first (pg_notify), smoketest com pedido `1070`. Migration idempotente.
+- **P1 — Fix `.select().single()` em ai-sequenciar-producao v11**: linhas 103-109. SHADOW v12-rc → smoketest → promover.
+- **P2 — Seed `etapa_templates`**: 5-6 templates padrão Croma (Pré-impressão/Impressão Latex/Acabamento/Embalagem/Expedição). Migration idempotente `ON CONFLICT (nome) DO NOTHING`.
+- **TRIVIAL — Adicionar `const VERSION`** nas 2 Edges Produção (atualmente sem rastreabilidade).
+- **INVESTIGAR — Workflow PCP→faturamento inverso** (3 OPs `aguardando_programacao` com 0 etapas + pedidos `faturado`). Query histórica via `pedido_historico`.
+
+### Anti-pattern evitado
+Não refiz a auditoria adversarial de ai-chat-portal v15 (já feita no ciclo #2). Pivotei pra Edges Produção que estavam virgens. Anti-regressão funcionando.
+
+### Bloqueio operacional descoberto
+Lock `.git/index.lock` fantasma no sandbox bash (`File exists` mesmo após `Test-Path` no Windows real retornar false). Workaround: usar `mcp__Windows-MCP__PowerShell` direto pra git commit/push. Mount filesystem do sandbox cacheia inode obsoleto. **Registrar pra próximos ciclos**: se bash git commit falhar com `index.lock`, usar Windows-MCP direto sem perder tempo tentando remover.
+
+### Próxima sugestão (ciclo #4, alta janela horária noturna)
+Atacar trigger `production_completed` em SHADOW: migration idempotente + pg_notify (sem efeito real) + smoketest com pedido `1070`. Validação cross-FK serviria como prova de conceito do fluxo Fase 1.2 do plano CROMA 4.0.
+
+---
+
+## Sessão 2026-05-28 MADRUGADA — REFUNDAÇÃO PARTE 7 — Tela aprovação + patches segurança + descoberta crítica stores ⚠️
 
 
 ## Sessão 2026-05-28 MADRUGADA — REFUNDAÇÃO PARTE 7 — Tela aprovação + patches segurança + descoberta crítica stores ⚠️
@@ -100,14 +424,12 @@ Junior retomou Parte 7 pedindo análise adversarial do REFUNDACAO-2026-05.md + e
 ### Anomalia conhecida (não tocada)
 - Edge `briefing-beira-rio` v10 marca SHADOW como `status='enviada'` em vez de `rascunho` — tela /orcamentos/pendentes-aprovacao usa heurística temp incluindo `enviada` no filtro. Quando Junior corrigir Edge, lembrar de remover `'enviada'` do IN()
 
-### Git
-- Zero commits. Working dir mexido (não commitado):
-  - 5 Edges patches BUG-JWT
-  - 1 Edge patch hardcode Telegram
-  - 4 arquivos frontend novos (tela aprovação)
-  - 3 arquivos frontend modificados (routes/nav/layout)
-  - 1 arquivo bot JARVIS modificado (mojibake)
-  - 1 migration aplicada (portal p_token TEXT — versionada em `supabase/migrations/20260527_portal_padronizar_p_token_text.sql`)
+### Git — 2 commits push origin/main
+- `5d154d4` **fix(security): BUG-JWT em 5 Edges + remove hardcode token Telegram** — 13 arquivos, +1228/-53 (tela aprovação ERP incluída neste commit por falha silenciosa de split — mensagem ficou subdimensionada vs conteúdo: contém 4 NOVOS arquivos do portal + 3 modificados frontend + 6 Edges patched)
+- `60d86bb` **chore(db,planning): padroniza p_token TEXT + view métricas Refundação** — 3 arquivos, +517/-1 (migration p_token + STATE.md + REFUNDACAO-METRICAS-W1.md)
+- Push: branch up-to-date com origin/main confirmado
+- ⚠️ **Bot JARVIS mojibake fix NÃO incluído** — `claudete_bot.py` vive em repo separado (`C:\Users\Caldera\Claude\JARVIS`), não foi commitado aqui
+- Working dir final: só `.claude/settings.local.json` (M) + 4 untracked `autonomous-*.md` + `scripts/hp-latex-sync_hidden.vbs` (fora escopo)
 
 ### Token usage estimado: ~360k (1 agent recon BLOCO 0.5 FASE 1+2 + 4 agents paralelos FASE 3/patches/mojibake/migration + queries SQL + apply_migration + TaskList ops)
 
