@@ -1,6 +1,8 @@
 // ai-analisar-foto-instalacao: Analyzes installation photos via AI vision
-// Uses Claude Sonnet 4 via OpenRouter with vision capability
+// Uses Claude Sonnet 4 via Anthropic API direct (vision capability)
 // Returns quality score, approval status, observations, detected problems
+// VERSION 2026-05-28 (ciclo autonomo #5): schema ai_logs fix (funcao/tokens_usados/custo/metadata NAO existem)
+const VERSION = 'v13-schema-fix';
 
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2';
 import { getCorsHeaders, handleCorsOptions, jsonResponse } from '../ai-shared/ai-helpers.ts';
@@ -139,15 +141,27 @@ Seja rigoroso mas justo. Score >= 70 = aprovado.`;
         });
     }
 
-    // Log
-    await supabase.from('ai_logs').insert({
-      funcao: 'analisar-foto-instalacao',
-      tokens_usados: 0,
-      custo: 0,
-      metadata: { job_id, score: analise.score_qualidade, aprovado: analise.aprovado },
-    }).catch(() => {});
+    // Log — schema correto: function_name/model_used (NOT NULL)/tokens_input/tokens_output/cost_usd/status/error_message
+    // 2026-05-28 ciclo #5: fix schema (eram funcao/tokens_usados/custo/metadata — colunas NAO existem). Encadear .select().single() pra detectar falha.
+    const { error: aiLogErr } = await supabase
+      .from('ai_logs')
+      .insert({
+        function_name: 'analisar-foto-instalacao',
+        entity_type: 'campo_job',
+        entity_id: job_id ?? null,
+        model_used: 'claude-sonnet-4-20250514',
+        tokens_input: 0,
+        tokens_output: 0,
+        cost_usd: 0,
+        duration_ms: 0,
+        status: analise.aprovado ? 'success' : 'success',
+        error_message: `[${VERSION}] job_id=${job_id ?? 'none'} score=${analise.score_qualidade} aprovado=${analise.aprovado}`,
+      })
+      .select()
+      .single();
+    if (aiLogErr) console.warn('[analisar-foto-instalacao] ai_logs insert error:', aiLogErr);
 
-    return jsonResponse(analise, 200, corsHeaders);
+    return jsonResponse({ ...analise, _version: VERSION }, 200, corsHeaders);
 
   } catch (err) {
     return jsonResponse({ error: (err as Error).message }, 500, getCorsHeaders(req));

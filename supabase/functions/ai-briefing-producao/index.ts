@@ -1,4 +1,6 @@
 // supabase/functions/ai-briefing-producao/index.ts
+// VERSION 2026-05-28 (ciclo autonomo #5): defensive JSON.parse + structured error log
+const VERSION = 'v22-defensive-parse';
 
 import { serve } from 'https://deno.land/std@0.168.0/http/server.ts';
 import { handleCorsOptions, getCorsHeaders, jsonResponse, authenticateAndAuthorize, getServiceClient } from '../ai-shared/ai-helpers.ts';
@@ -6,6 +8,37 @@ import { handleCorsOptions, getCorsHeaders, jsonResponse, authenticateAndAuthori
 import { callOpenRouter } from '../ai-shared/anthropic-provider.ts';
 import { buildSystemPrompt, buildUserPrompt, PROMPTS } from '../ai-shared/prompt-builder.ts';
 import { logAICall } from '../ai-shared/ai-logger.ts';
+
+// 2026-05-28 ciclo #5: helper local pra structured error log em ai_logs sem depender
+// do logAICall shared (que tem bug conhecido: .insert sem .select().single() + try/catch
+// silencioso em ai-logger.ts). NEXT P1 refactor central.
+async function logErrorLocal(
+  supabase: ReturnType<typeof getServiceClient>,
+  ctx: { pedido_id?: string; userId?: string; error: unknown; raw?: string }
+) {
+  try {
+    const { error: insErr } = await supabase
+      .from('ai_logs')
+      .insert({
+        user_id: ctx.userId ?? null,
+        function_name: 'briefing-producao',
+        entity_type: 'pedido',
+        entity_id: ctx.pedido_id ?? null,
+        model_used: 'unknown',
+        tokens_input: 0,
+        tokens_output: 0,
+        cost_usd: 0,
+        duration_ms: 0,
+        status: 'error',
+        error_message: `[${VERSION}] ${(ctx.error as Error)?.message ?? String(ctx.error)} | raw_preview=${(ctx.raw ?? '').slice(0, 200)}`,
+      })
+      .select()
+      .single();
+    if (insErr) console.error('[briefing-producao] ai_logs error log failed:', insErr);
+  } catch (e) {
+    console.error('[briefing-producao] logErrorLocal threw:', e);
+  }
+}
 
 serve(async (req: Request) => {
   const corsResponse = handleCorsOptions(req);
@@ -58,11 +91,29 @@ serve(async (req: Request) => {
     const userPrompt = buildUserPrompt(context);
     const result = await callOpenRouter(systemPrompt, userPrompt, { max_tokens: 3000, model: model || undefined });
 
-    const aiData = JSON.parse(result.content);
+    // 2026-05-28 ciclo #5: defensive JSON.parse — IA pode devolver texto fora-padrao
+    let aiData: Record<string, unknown>;
+    try {
+      aiData = JSON.parse(result.content);
+    } catch (parseErr) {
+      console.error(`[${VERSION}] JSON.parse failed:`, parseErr, 'raw:', result.content?.slice(0, 500));
+      await logErrorLocal(supabase, {
+        pedido_id,
+        userId: auth!.userId,
+        error: parseErr,
+        raw: result.content,
+      });
+      return jsonResponse(
+        { error: 'IA devolveu resposta nao parseavel', detail: (parseErr as Error).message, version: VERSION },
+        502,
+        corsHeaders
+      );
+    }
     const response = {
       ...aiData,
       model_used: result.model_used,
       tokens_used: result.tokens_input + result.tokens_output,
+      _version: VERSION,
     };
 
     await logAICall({
