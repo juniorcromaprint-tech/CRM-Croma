@@ -11,7 +11,7 @@ import { createClient } from 'https://esm.sh/@supabase/supabase-js@2';
 // 2026-05-21: OpenRouter ELIMINADO — Anthropic via provider compartilhado.
 import { callOpenRouter } from '../ai-shared/anthropic-provider.ts';
 
-const VERSION = 'v14-persist-ia';
+const VERSION = 'v15-persist-ia';
 
 const SUPABASE_URL = Deno.env.get('SUPABASE_URL')!;
 const SERVICE_ROLE_KEY = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!;
