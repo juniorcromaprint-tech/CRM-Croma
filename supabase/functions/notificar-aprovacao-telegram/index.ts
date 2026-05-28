@@ -1,14 +1,40 @@
-// notificar-aprovacao-telegram v1
+// notificar-aprovacao-telegram v2-vault-token
 // Chamada via pg_net quando cliente aprova proposta no portal.
 // Envia mensagem formatada pro Telegram do Junior.
+// v2: token Telegram lido via RPC vault (get_telegram_bot_token) com fallback
+//     pra env TELEGRAM_BOT_TOKEN. Hardcode REMOVIDO (rotacionar via @BotFather).
 
 import { serve } from 'https://deno.land/std@0.168.0/http/server.ts';
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2';
 
-const TELEGRAM_TOKEN = '8750164337:AAH8Diet4zGJddKHq_F2F1JobUA2djisU8s';
+const VERSION = 'v2-vault-token';
 const JUNIOR_CHAT_ID = 1065519625;
 const SUPABASE_URL = Deno.env.get('SUPABASE_URL') || '';
 const SERVICE_ROLE_KEY = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') || '';
+
+let _cachedTelegramToken: string | null = null;
+
+async function getTelegramToken(supabase: any): Promise<string | null> {
+  if (_cachedTelegramToken) return _cachedTelegramToken;
+  try {
+    const { data, error } = await supabase.rpc('get_telegram_bot_token');
+    if (error) {
+      console.error('[TELEGRAM] rpc get_telegram_bot_token err:', error.message);
+    } else if (typeof data === 'string' && data.length > 10) {
+      _cachedTelegramToken = data;
+      return _cachedTelegramToken;
+    }
+  } catch (err) {
+    console.error('[TELEGRAM] rpc throw:', err instanceof Error ? err.message : String(err));
+  }
+  // Fallback: secret do Supabase Functions
+  const fromEnv = Deno.env.get('TELEGRAM_BOT_TOKEN');
+  if (fromEnv && fromEnv.length > 10) {
+    _cachedTelegramToken = fromEnv;
+    return _cachedTelegramToken;
+  }
+  return null;
+}
 
 interface Payload {
   proposta_id: string;
@@ -18,8 +44,13 @@ interface Payload {
   comentario_cliente: string | null;
 }
 
-async function sendTelegram(text: string) {
-  const res = await fetch(`https://api.telegram.org/bot${TELEGRAM_TOKEN}/sendMessage`, {
+async function sendTelegram(supabase: any, text: string) {
+  const token = await getTelegramToken(supabase);
+  if (!token) {
+    console.error('Telegram send aborted: no token available (vault rpc + env both failed)');
+    return;
+  }
+  const res = await fetch(`https://api.telegram.org/bot${token}/sendMessage`, {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify({
@@ -104,7 +135,7 @@ serve(async (req: Request) => {
       'Acesse o sistema para dar continuidade.',
     ].filter(Boolean).join('\n');
 
-    await sendTelegram(msg);
+    await sendTelegram(db, msg);
 
     // Logar na tabela de notificacoes tambem
     await db.from('notifications').insert({
@@ -123,7 +154,8 @@ serve(async (req: Request) => {
     console.error('Erro notificar-aprovacao-telegram:', err);
     // Tenta avisar Junior mesmo em erro
     try {
-      await sendTelegram(`\u26A0\uFE0F Erro na notificacao de aprovacao: ${String(err).slice(0, 200)}`);
+      const dbErr = createClient(SUPABASE_URL, SERVICE_ROLE_KEY);
+      await sendTelegram(dbErr, `\u26A0\uFE0F Erro na notificacao de aprovacao: ${String(err).slice(0, 200)}`);
     } catch {}
     return new Response(JSON.stringify({ error: String(err) }), { status: 500 });
   }

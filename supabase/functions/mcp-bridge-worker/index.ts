@@ -1,14 +1,25 @@
-// mcp-bridge-worker v3 (2026-04-24 S2.7) — locking atômico + X-Internal-Call
-// - ATOMIC claim: UPDATE status='processing' WHERE status='pending' RETURNING (via RPC)
-// - Fallback: SELECT FOR UPDATE SKIP LOCKED então UPDATE (se RPC não existir)
-// - Usa header X-Internal-Call quando chama outras Edge Functions IA (fix S2.6)
+// mcp-bridge-worker v7 (2026-05-27 BUG-JWT) — getLegacyJwt + retry sob 401
+// - v3 (2026-04-24 S2.7): locking atômico + X-Internal-Call
 // - v6 (2026-05-22 Etapa 2.2 ponte Cowork): release tipo 'whatsapp-resposta' à fila
 //   pra consumer Cowork (scheduled task croma-whatsapp-responder) pegar.
+// - v7 (2026-05-27): troca Bearer SERVICE_ROLE_KEY pelo legacy JWT (RPC vault
+//   get_service_role_legacy_jwt cacheado em isolate) com retry forçando refresh
+//   se receber 401 — corrige gateway Supabase rejeitando publishable JWT.
 
 import { createClient, SupabaseClient } from 'https://esm.sh/@supabase/supabase-js@2';
 
 const SUPABASE_URL = Deno.env.get('SUPABASE_URL')!;
 const SERVICE_ROLE_KEY = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!;
+
+// Cache do legacy JWT no escopo do isolate (BUG-JWT fix)
+let _cachedLegacyJwt: string | null = null;
+async function getLegacyJwt(supabase: SupabaseClient, force = false): Promise<string> {
+  if (_cachedLegacyJwt && !force) return _cachedLegacyJwt;
+  const { data, error } = await supabase.rpc('get_service_role_legacy_jwt');
+  if (error || !data) throw new Error(`legacy_jwt rpc falhou: ${error?.message || 'sem retorno'}`);
+  _cachedLegacyJwt = data as string;
+  return _cachedLegacyJwt!;
+}
 
 const TIPO_TO_EDGE: Record<string, string> = {
   'analisar-orcamento': 'ai-analisar-orcamento',
@@ -131,7 +142,9 @@ async function claimPendingRequests(supabase: SupabaseClient, limit: number): Pr
 }
 
 // ── Chama Edge Function interna com header X-Internal-Call (fix S2.6) ──
+// v7 BUG-JWT: usa legacy JWT em vez de SERVICE_ROLE_KEY; retry com refresh sob 401.
 async function invokeEdgeFunctionInternal(fnName: string, r: any): Promise<any> {
+  const supabase = createClient(SUPABASE_URL, SERVICE_ROLE_KEY);
   const body = { ...(r.contexto ?? {}) };
   if (r.entity_id) {
     if (r.entity_type === 'cliente') body.cliente_id = r.entity_id;
@@ -139,15 +152,23 @@ async function invokeEdgeFunctionInternal(fnName: string, r: any): Promise<any> 
     else if (r.entity_type === 'pedido') body.pedido_id = r.entity_id;
     else if (r.entity_type === 'lead') body.lead_id = r.entity_id;
   }
-  const resp = await fetch(`${SUPABASE_URL}/functions/v1/${fnName}`, {
+  const doFetch = async (jwt: string) => fetch(`${SUPABASE_URL}/functions/v1/${fnName}`, {
     method: 'POST',
     headers: {
       'Content-Type': 'application/json',
-      'Authorization': `Bearer ${SERVICE_ROLE_KEY}`,
+      'Authorization': `Bearer ${jwt}`,
       'X-Internal-Call': 'true',
     },
     body: JSON.stringify(body),
   });
+
+  let jwt = await getLegacyJwt(supabase);
+  let resp = await doFetch(jwt);
+  if (resp.status === 401) {
+    // BUG-JWT: força refresh do cache e tenta de novo
+    jwt = await getLegacyJwt(supabase, true);
+    resp = await doFetch(jwt);
+  }
   if (!resp.ok) {
     const errText = await resp.text();
     throw new Error(`${fnName} retornou ${resp.status}: ${errText.substring(0, 200)}`);

@@ -33,6 +33,7 @@ import {
   Calendar, Megaphone, Package2, ArrowLeftRight, Building, Layers, BarChart2, GanttChart,
   TrendingUp, FileInput, Bot, Clock, RefreshCw,
   ChevronDown, ChevronRight, Crown, Brain, Gauge, Zap, Webhook,
+  Sparkles,
   type LucideIcon,
 } from "lucide-react";
 
@@ -44,6 +45,7 @@ const ICON_MAP: Record<string, LucideIcon> = {
   SlidersHorizontal, Key, BookOpen, Calculator, Cog, Database, Truck,
   Calendar, Megaphone, Package2, ArrowLeftRight, Building, Layers, BarChart2, Gantt: GanttChart,
   TrendingUp, FileInput, Bot, Clock, RefreshCw, Crown, Brain, Gauge, Zap, Webhook,
+  Sparkles,
 };
 
 // ---------------------------------------------------------------------------

@@ -1,9 +1,21 @@
-// whatsapp-webhook v40 (2026-05-22 — Etapa 2.3 ponte Cowork)
-// - PRIMARY: enfileira em ai_requests (tipo='whatsapp-resposta') → SKILL Cowork (croma-whatsapp-responder) processa
-// - FALLBACK: se INSERT em ai_requests falhar, segue caminho v39 (generateClaudeResponse + sendWhatsApp inline)
-// - generateClaudeResponse + bloco pós-IA INTACTOS como segurança
+// whatsapp-webhook v41 (2026-05-27 BUG-JWT) — gerarOrcamentoReal usa legacy JWT + retry 401
+// - v40 (2026-05-22 — Etapa 2.3 ponte Cowork):
+//   PRIMARY: enfileira em ai_requests (tipo='whatsapp-resposta') → SKILL Cowork processa.
+//   FALLBACK: se INSERT em ai_requests falhar, segue caminho v39 (generateClaudeResponse inline).
+// - v41 (2026-05-27): troca Bearer SERVICE_ROLE_KEY pelo legacy JWT via getLegacyJwt
+//   cacheado em isolate; retry com refresh sob 401.
 import { serve } from 'https://deno.land/std@0.168.0/http/server.ts';
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2';
+
+// Cache do legacy JWT no escopo do isolate (BUG-JWT fix)
+let _cachedLegacyJwt: string | null = null;
+async function getLegacyJwt(supabase: any, force = false): Promise<string> {
+  if (_cachedLegacyJwt && !force) return _cachedLegacyJwt;
+  const { data, error } = await supabase.rpc('get_service_role_legacy_jwt');
+  if (error || !data) throw new Error(`legacy_jwt rpc falhou: ${error?.message || 'sem retorno'}`);
+  _cachedLegacyJwt = data as string;
+  return _cachedLegacyJwt!;
+}
 const MODEL_COSTS = {
   'claude-opus-4-7': {
     input: 15.00,
@@ -615,19 +627,27 @@ async function gerarOrcamentoReal(supabase, conversationId, leadId, canal) {
         conteudo: m.conteudo
       }));
     const orcamentoUrl = `${Deno.env.get('SUPABASE_URL')}/functions/v1/ai-gerar-orcamento`;
-    const resp = await fetch(orcamentoUrl, {
+    const payload = JSON.stringify({
+      conversation_id: conversationId,
+      lead_id: leadId,
+      mensagens,
+      canal
+    });
+    const doFetch = async (jwt) => fetch(orcamentoUrl, {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
-        'Authorization': `Bearer ${Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')}`
+        'Authorization': `Bearer ${jwt}`
       },
-      body: JSON.stringify({
-        conversation_id: conversationId,
-        lead_id: leadId,
-        mensagens,
-        canal
-      })
+      body: payload
     });
+    // v41 BUG-JWT: usa legacy JWT em vez de SERVICE_ROLE_KEY; retry sob 401
+    let jwt = await getLegacyJwt(supabase);
+    let resp = await doFetch(jwt);
+    if (resp.status === 401) {
+      jwt = await getLegacyJwt(supabase, true);
+      resp = await doFetch(jwt);
+    }
     const result = await resp.json();
     if (result.status === 'proposta_criada') return {
       success: true,

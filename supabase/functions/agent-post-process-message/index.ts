@@ -1,13 +1,24 @@
-// agent-post-process-message v1 (2026-05-22 — Etapa 2.3 ponte Cowork)
-// Invocado pela SKILL Cowork (croma-whatsapp-responder) após gerar resposta estruturada via Claude Max.
-// Encapsula 4 ações que o webhook v39 fazia inline:
-//   1. gravarDadosExtraidos (UPDATE leads + INSERT atividades_comerciais)
-//   2. atualizarMemoriaLead (UPSERT lead_memoria)
-//   3. gerarOrcamentoReal (POST ai-gerar-orcamento se intent ∈ orcamento|formalizar)
-//   4. incrementar_contador_conversa (RPC)
-// Mantém paridade funcional do webhook antigo sem precisar inflar o prompt da SKILL.
+// agent-post-process-message v2 (2026-05-27 BUG-JWT) — gerarOrcamentoReal usa legacy JWT + retry 401
+// - v1 (2026-05-22 — Etapa 2.3 ponte Cowork): invocado pela SKILL Cowork (croma-whatsapp-responder).
+//   Encapsula 4 ações que o webhook v39 fazia inline:
+//     1. gravarDadosExtraidos (UPDATE leads + INSERT atividades_comerciais)
+//     2. atualizarMemoriaLead (UPSERT lead_memoria)
+//     3. gerarOrcamentoReal (POST ai-gerar-orcamento se intent ∈ orcamento|formalizar)
+//     4. incrementar_contador_conversa (RPC)
+// - v2 (2026-05-27): troca Bearer SERVICE_ROLE_KEY pelo legacy JWT via getLegacyJwt
+//   cacheado em isolate; retry com refresh sob 401.
 
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2';
+
+// Cache do legacy JWT no escopo do isolate (BUG-JWT fix)
+let _cachedLegacyJwt: string | null = null;
+async function getLegacyJwt(supabase: any, force = false): Promise<string> {
+  if (_cachedLegacyJwt && !force) return _cachedLegacyJwt;
+  const { data, error } = await supabase.rpc('get_service_role_legacy_jwt');
+  if (error || !data) throw new Error(`legacy_jwt rpc falhou: ${error?.message || 'sem retorno'}`);
+  _cachedLegacyJwt = data as string;
+  return _cachedLegacyJwt!;
+}
 
 const NOMES_BLOCKLIST =
   /^(assistente|atendente|atendimento|comercial|financeiro|suporte|bot|ura|robo|virtual|automatico|sac|callcenter|cobranca|recepcao|vendas|administracao|secretaria|gerencia)\b/i;
@@ -145,15 +156,23 @@ async function gerarOrcamentoReal(supabase: any, conversationId: string, leadId:
       .limit(20);
     const mensagens = (msgs ?? []).map((m: any) => ({ direcao: m.direcao, conteudo: m.conteudo }));
     const url = `${Deno.env.get('SUPABASE_URL')}/functions/v1/ai-gerar-orcamento`;
-    const resp = await fetch(url, {
+    const payload = JSON.stringify({ conversation_id: conversationId, lead_id: leadId, mensagens, canal });
+    const doFetch = async (jwt: string) => fetch(url, {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
-        'Authorization': `Bearer ${Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')}`,
+        'Authorization': `Bearer ${jwt}`,
         'X-Internal-Call': 'true',
       },
-      body: JSON.stringify({ conversation_id: conversationId, lead_id: leadId, mensagens, canal }),
+      body: payload,
     });
+    // v2 BUG-JWT: legacy JWT em vez de SERVICE_ROLE_KEY; retry sob 401
+    let jwt = await getLegacyJwt(supabase);
+    let resp = await doFetch(jwt);
+    if (resp.status === 401) {
+      jwt = await getLegacyJwt(supabase, true);
+      resp = await doFetch(jwt);
+    }
     const result = await resp.json();
     if (result.status === 'proposta_criada') {
       return {

@@ -1,10 +1,21 @@
 // supabase/functions/ai-compor-mensagem/index.ts
+// v2 (2026-05-27 BUG-JWT) — chamada interna ai-gerar-orcamento usa legacy JWT + retry 401
 
 import { serve } from 'https://deno.land/std@0.168.0/http/server.ts';
 import { handleCorsOptions, getCorsHeaders, jsonResponse, getServiceClient, authenticateAndAuthorize } from '../ai-shared/ai-helpers.ts';
 // 2026-05-21: OpenRouter ELIMINADO (Onda 2) — callOpenRouter = alias drop-in de callAnthropic.
 import { callOpenRouter } from '../ai-shared/anthropic-provider.ts';
 import { logAICall } from '../ai-shared/ai-logger.ts';
+
+// Cache do legacy JWT no escopo do isolate (BUG-JWT fix)
+let _cachedLegacyJwt: string | null = null;
+async function getLegacyJwt(supabase: any, force = false): Promise<string> {
+  if (_cachedLegacyJwt && !force) return _cachedLegacyJwt;
+  const { data, error } = await supabase.rpc('get_service_role_legacy_jwt');
+  if (error || !data) throw new Error(`legacy_jwt rpc falhou: ${error?.message || 'sem retorno'}`);
+  _cachedLegacyJwt = data as string;
+  return _cachedLegacyJwt!;
+}
 
 // ─────────────────────────────────────────────────────────────
 // System prompt — vendedor consultivo Croma Print
@@ -325,19 +336,27 @@ serve(async (req: Request) => {
     if (intentDetectada === 'orcamento' && activeConversation) {
       try {
         const orcamentoUrl = `${Deno.env.get('SUPABASE_URL')}/functions/v1/ai-gerar-orcamento`;
-        const orcamentoResp = await fetch(orcamentoUrl, {
+        const orcamentoPayload = JSON.stringify({
+          conversation_id: conversationId,
+          lead_id,
+          mensagens: recentMessages,
+          canal,
+        });
+        const doFetch = async (jwt: string) => fetch(orcamentoUrl, {
           method: 'POST',
           headers: {
             'Content-Type': 'application/json',
-            'Authorization': `Bearer ${Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')}`,
+            'Authorization': `Bearer ${jwt}`,
           },
-          body: JSON.stringify({
-            conversation_id: conversationId,
-            lead_id,
-            mensagens: recentMessages,
-            canal,
-          }),
+          body: orcamentoPayload,
         });
+        // v2 BUG-JWT: legacy JWT em vez de SERVICE_ROLE_KEY; retry sob 401
+        let _jwt = await getLegacyJwt(supabase);
+        let orcamentoResp = await doFetch(_jwt);
+        if (orcamentoResp.status === 401) {
+          _jwt = await getLegacyJwt(supabase, true);
+          orcamentoResp = await doFetch(_jwt);
+        }
         const orcamentoResult = await orcamentoResp.json();
 
         if (orcamentoResult.status === 'proposta_criada') {

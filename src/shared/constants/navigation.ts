@@ -33,6 +33,7 @@ export const NAV_GROUPS: NavGroup[] = [
       { name: 'Pipeline', path: '/pipeline', icon: 'Kanban', module: 'comercial' },
       { name: 'Clientes', path: '/clientes', icon: 'Building2', module: 'clientes' },
       { name: 'Orçamentos', path: '/orcamentos', icon: 'Calculator', module: 'comercial', badgeKey: 'orcamentos_pendentes' },
+      { name: 'Pendentes IA', path: '/orcamentos/pendentes-aprovacao', icon: 'Sparkles', module: 'comercial' },
       // Propostas removida da sidebar — conceito unificado com Orçamentos.
       // Rota /propostas continua funcional caso seja necessário no futuro.
       { name: 'Calendário', path: '/calendario', icon: 'Calendar', module: 'comercial' },

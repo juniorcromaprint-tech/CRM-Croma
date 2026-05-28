@@ -1,15 +1,27 @@
-// ai-requests-fallback-watchdog v1 (2026-05-22 — Etapa 2.4 ponte Cowork)
-// pg_cron */5min → busca ai_requests tipo='whatsapp-resposta' status IN ('pending','processing')
-// AND created_at < now()-5min AND fallback_used NOT TRUE.
-// Pra cada (até 3 por execução): chama Anthropic API Sonnet 4 → INSERT agent_messages aprovada
-// (metadata.manual=true pra bypass janela horária — é fallback de emergência) → POST whatsapp-enviar
-// → marca completed. Telegram alert no primeiro acionamento de cada janela 1h.
-// INDEPENDENTE do Cowork: se Cowork cair, esta função continua respondendo via API.
+// ai-requests-fallback-watchdog v2 (2026-05-27 BUG-JWT) — whatsapp-enviar usa legacy JWT + retry 401
+// - v1 (2026-05-22 — Etapa 2.4 ponte Cowork): pg_cron */5min → busca ai_requests
+//   tipo='whatsapp-resposta' status IN ('pending','processing') AND created_at < now()-5min
+//   AND fallback_used NOT TRUE. Pra cada (até 3 por execução): chama Anthropic API Sonnet 4
+//   → INSERT agent_messages aprovada → POST whatsapp-enviar → marca completed.
+//   Telegram alert no primeiro acionamento de cada janela 1h.
+//   INDEPENDENTE do Cowork: se Cowork cair, esta função continua respondendo via API.
+// - v2 (2026-05-27): troca Bearer SUPABASE_SERVICE_ROLE_KEY pelo legacy JWT via getLegacyJwt
+//   cacheado em isolate; retry com refresh sob 401.
 
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2';
 
 const SUPABASE_URL = Deno.env.get('SUPABASE_URL')!;
 const SUPABASE_SERVICE_ROLE_KEY = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!;
+
+// Cache do legacy JWT no escopo do isolate (BUG-JWT fix)
+let _cachedLegacyJwt: string | null = null;
+async function getLegacyJwt(supabase: any, force = false): Promise<string> {
+  if (_cachedLegacyJwt && !force) return _cachedLegacyJwt;
+  const { data, error } = await supabase.rpc('get_service_role_legacy_jwt');
+  if (error || !data) throw new Error(`legacy_jwt rpc falhou: ${error?.message || 'sem retorno'}`);
+  _cachedLegacyJwt = data as string;
+  return _cachedLegacyJwt!;
+}
 const ANTHROPIC_API_KEY = Deno.env.get('ANTHROPIC_API_KEY');
 const JUNIOR_CHAT_ID = '1065519625';
 const FALLBACK_MODEL = 'claude-sonnet-4-20250514';
@@ -146,14 +158,23 @@ async function processOne(supabase: any, req: any): Promise<{ ok: boolean; reaso
     messageId = ins.id;
   }
 
-  const sendResp = await fetch(`${SUPABASE_URL}/functions/v1/whatsapp-enviar`, {
+  const sendUrl = `${SUPABASE_URL}/functions/v1/whatsapp-enviar`;
+  const sendPayload = JSON.stringify({ message_id: messageId });
+  const doSend = async (jwt: string) => fetch(sendUrl, {
     method: 'POST',
     headers: {
       'Content-Type': 'application/json',
-      'Authorization': `Bearer ${SUPABASE_SERVICE_ROLE_KEY}`,
+      'Authorization': `Bearer ${jwt}`,
     },
-    body: JSON.stringify({ message_id: messageId }),
+    body: sendPayload,
   });
+  // v2 BUG-JWT: legacy JWT em vez de SERVICE_ROLE_KEY; retry sob 401
+  let _jwt = await getLegacyJwt(supabase);
+  let sendResp = await doSend(_jwt);
+  if (sendResp.status === 401) {
+    _jwt = await getLegacyJwt(supabase, true);
+    sendResp = await doSend(_jwt);
+  }
   if (!sendResp.ok) {
     const body = await sendResp.text();
     return { ok: false, reason: `whatsapp-enviar ${sendResp.status}: ${body.substring(0, 200)}`, cost };
