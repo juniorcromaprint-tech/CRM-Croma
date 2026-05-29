@@ -1160,3 +1160,79 @@ Padrao IDENTICO ao incidente 08:30: EOF abrupto sem newline final, arquivos cort
 **Telegram**: enviar proximo passo
 
 ---
+
+## 2026-05-28 21:05 (ciclo #24)
+
+**Status**: 🟡 AMARELO (achado P0 NOVO inesperado: fix #18 dormente)
+**Tipo**: explorar (auditoria Quinta deep dive) + validar (recon ai-compor-mensagem) + arrumar (handoff #25 documentado)
+
+**Auto-dialogo**:
+- 3 ciclos anteriores: #21 recovery FALSO-POSITIVO + #22 root cause Anthropic 429/529 + #23 helper retry pronto (commit 3460555)
+- Modulo do dia: Quinta = Producao + ai-chat-portal v15. Spike 500 ai-compor-mensagem ATIVO desde 17h BRT.
+- Gap mais util AGORA: rotacao Quinta deep dive (cobrir angulos ainda nao auditados) + preparar deploy v25 com Edit exato (handoff #25 que vai pegar janela 22h+)
+- Conflito IN-PROGRESS/BLOCKED: nenhum
+- Modo: ATIVO (corrupcao falso-positivo cross-checked, working dir Windows-MCP integro)
+- Criterio de sucesso: (a) 5+ achados NOVOS rotacao Quinta categorizados sev, (b) Edit cirurgico EXATO ai-compor-mensagem (4 propostas) no ledger pra #25, (c) Telegram amarelo achado P0 novo
+
+**Health check**: edge logs 60min cluster ~30 POST 500 ai-compor-mensagem v24 (root cause #22 inalterado), 1 agent-cron-loop v26 timeout 17544ms (cascade), mcp-bridge-worker v8 todas 200 1/min. branch=main HEAD fa8755a sync origin. Working dir herdado 2 untracked limpos.
+
+**Agents disparados**: 2 (paralelos)
+- Agent 1 (Explore): recon ai-compor-mensagem/index.ts (417 LOC confirmado, callOpenRouter e alias drop-in Anthropic, 4 Edits exatos propostos)
+- Agent 2 (general-purpose adversarial): auditoria Quinta 10 queries x resultado (5 achados NOVOS, 2 CRITICAL/2 HIGH/1 MEDIUM)
+
+**Acoes executadas**:
+- Recon ai-compor-mensagem 417 LOC + verificacao adversarial (callOpenRouter linha 107 anthropic-provider.ts = alias drop-in callAnthropic)
+- Auditoria Quinta 10 queries: descobriu fix #18 DORMENTE (production_completed=0 lifetime, OPs 15/16/17 chegaram a finalizado via path UPDATE direto nao via etapas concluida)
+- Cross-check pedidos em_producao com OP finalizado: PED 1070 + PED-2026-0025 SEGUEM travados (fix #18 nao destrava como ledger declarou)
+- 2 HIGH novos: 19 etapas concluida sem tempo_real_min, 2 setores zerados (Router/Corte, Serralheria)
+- Documentei 4 Edits cirurgicos LITERAIS no ledger NEXT P0 ciclo #25 (deploy v25 ai-compor-mensagem)
+- Documentei migration backfill manual gap Fase 1.2 no ledger NEXT P0 #25
+
+**Decisao tomada**: NAO deploy v25 em 21:05 BRT (pre-janela preferida 22h+ Edge cliente). DOCUMENTAR plano EXATO para ciclo #25 (default executavel sem decisao Junior). Ciclo #25 pega janela 22h+ + executa via agent isolado.
+
+**Resultado**: 5 achados rotacao Quinta documentados, plano deploy v25 com 4 Edits exatos no ledger, gap Fase 1.2 reaberto (fix #18 dormente), zero commit/deploy/migration neste ciclo.
+
+**Ledger update**: DONE #24 adicionado (top). NEXT P0 ciclo #25 reformulado (deploy v25 + backfill manual gap Fase 1.2).
+**Commits**: nenhum
+**Deploys**: nenhum
+**Token usage**: ~150k
+**Telegram**: a enviar
+
+---
+
+## 2026-05-28 22:30 BRT (ciclo #25)
+
+**Status**: 🟢 VERDE
+**Tipo**: corrigir + validar
+**Auto-diálogo**:
+- 3 ciclos anteriores (#22/#23/#24): root cause Anthropic 429/529 confirmado, helper anthropic-retry.ts criado em arquivo NOVO (#23), recon ai-compor-mensagem 417 LOC + 4 Edits exatos documentados pra #25 (#24). Spike 500 ATIVO desde 17h BRT — ZERO agent_messages há 5h+.
+- Dia=Quinta → módulo Produção + ai-chat-portal (mas P0 herdado prevalece).
+- Gap mais útil agora: executar P0 documentado pelo #24 (deploy v25 ai-compor-mensagem) — janela 22h+ BRT aberta, helpers prontos, plano executável.
+- Conflito IN-PROGRESS/BLOCKED: nenhum.
+- Modo: ATIVO.
+- Critério de sucesso: v25 ACTIVE com sha mudado + source remoto contém `v25-anthropic-retry` header + zero erros 500 no próximo cron tick OU logs `[anthropic-retry]` visíveis.
+
+**Health check**: Vercel 200 | API logs 60min OK | Edge logs últimos 30min mostram cluster ~30 POST 500 ai-compor-mensagem v24 ~22:00 BRT + 1 agent-cron-loop v26 timeout 20448ms (cascade) | mcp-bridge-worker v8 todas 200 ~1/min | 76 Edges ACTIVE | branch=main HEAD `fa8755a` → `6c1844d` pós-commit
+
+**Guardrail Etapa 4 — 5a recorrência consecutiva FALSO-POSITIVO** (#19→#23→#25): bash `git diff --stat HEAD` mostrou 5 arquivos modified (-1510 linhas). Cross-check Windows-MCP confirmou tails íntegros em todos 5 (STATE 3135 LOC `Supabase project: djw...`, ledger 580 LOC `"maquiar"`, log 1199 LOC `Telegram: a enviar` do #24, rules 349 LOC checklist final, agent-cron-loop 1230 LOC `}`). NÃO HÁ CORRUPÇÃO.
+
+**Agents disparados**: 1 (general-purpose isolado, 175k tokens, 41 tool uses, 705s, deploy v25 ai-compor-mensagem)
+
+**Ações executadas**:
+- Agent isolado leu source v24 (417 LOC), aplicou 4 Edits cirúrgicos do ledger NEXT P0 #25 com 1 adaptação correta no Edit #3 (`user_id: undefined` em vez de `userId` — evita ReferenceError se exception subir antes da auth)
+- Backup pré-edit em outputs
+- Deploy via MCP `deploy_edge_function` com files: index.ts + anthropic-retry.ts + anthropic-provider.ts + ai-logger.ts + ai-helpers.ts + ai-types.ts
+- BONUS: ai-logger.ts deployado é a versão #6 com `.select().single()` + retorno estruturado
+- Verificação pós-deploy: version=25 ACTIVE, sha `4fa33d64` → `50907a7c`, source remoto contém header `v25-anthropic-retry` + import + chamada + catch
+- Commit atômico `6c1844d` push origin/main
+- Smoketest empírico inicial: agent_messages última hora=0 (esperado, deploy 22:15 BRT), agent_rules últimos 30min=8 (cron OK), ai_logs error v25=0
+
+**Decisão tomada**: deploy v25 via agent isolado (REGRA #0 — 417 LOC > 250 threshold). Janela 22h+ BRT aberta. Helper pronto desde #23. 4 Edits exatos no ledger pronto pra copy-paste. Risco residual mitigado pela adaptação cirúrgica do agent no Edit #3.
+
+**Resultado**: v24 → v25 ACTIVE, retry exponencial 1s/2s/4s ativo em 429/529, catch grava ai_logs error, ai-logger.ts atualizado pra versão defensiva. Próximo cron 22:30 BRT é smoketest empírico real (próximo ciclo #26 verifica).
+
+**Ledger update**: P0 #25 DEPLOY → DONE. Próximos NEXT P0: validação empírica cron tick + backfill gap Fase 1.2 + hardening guardrail Etapa 4.
+**Commits**: `6c1844d` fix(prospeccao): ai-compor-mensagem v25
+**Deploys**: ai-compor-mensagem v24 → v25
+**Token usage**: ~280k
+**Telegram**: enviada

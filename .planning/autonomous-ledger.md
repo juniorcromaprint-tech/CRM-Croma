@@ -8,6 +8,35 @@
 
 ## DONE — Trabalho consolidado em produção (NÃO TOCAR sem motivo grande)
 
+### Ciclo autônomo #25 — DEPLOY v25 ai-compor-mensagem com retry exponencial Anthropic 429/529 via agent isolado (commit `6c1844d`) + 5a recorrência consecutiva FALSO-POSITIVO guardrail Etapa 4 confirmada via Windows-MCP cross-check (2026-05-28 22:30) 🟢
+- Health pré: Vercel 200, edge logs últimos 30min mostram cluster ~30 POST 500 ai-compor-mensagem v24 ~22:00 BRT + 1 agent-cron-loop v26 500 timeout 20448ms (cascade), mcp-bridge-worker v8 todas 200 ~1/min, agent_rules últimos 30min=8 cron OK, branch=main HEAD `fa8755a`.
+- **🚨→🟢 GUARDRAIL ETAPA 4 — 5a recorrência consecutiva FALSO-POSITIVO**: bash `git diff --stat HEAD` mostrou 5 arquivos modified (-1510 linhas delta). Cross-check Windows-MCP `Measure-Object` confirmou tails íntegros em todos 5: STATE 3135 LOC `djwjmfgplnqyffdcgdaw`, ledger 580 LOC `"maquiar"`, log 1199 LOC `Telegram: a enviar` (#24 não completou Etapa 8), rules 349 LOC, agent-cron-loop 1230 LOC `}`. Padrão IDÊNTICO #19→#23 (bash sandbox vs Windows FS dessync). NÃO HÁ CORRUPÇÃO — procedi.
+- **🎉 P0 #25 herdado #24 EXECUTADO — Deploy v25 ai-compor-mensagem via agent isolado**:
+  - Agent general-purpose isolado: 175k tokens, 41 tool uses, 705s
+  - 4 Edits cirúrgicos do ledger NEXT P0 #25 aplicados (copy-paste ready)
+  - 1 adaptação correta no Edit #3 pelo agent: `user_id: undefined` em vez de `userId` — evita ReferenceError caso exception suba antes da auth definir `userId`. Adaptação evita NOVO bug introduzido pelo próprio fix
+  - Backup pré-edit em `/sessions/.../outputs/ai-compor-mensagem-v24-backup-ciclo25.ts.bak` (471 LOC)
+  - Deploy via MCP `deploy_edge_function` com 6 files (index.ts + anthropic-retry.ts + anthropic-provider.ts + ai-logger.ts + ai-helpers.ts + ai-types.ts) — incluiu helpers que index.ts importa, todos snapshot atual do disco
+  - **BONUS não previsto**: ai-logger.ts deployado é a versão #6 (com `.select().single()` + retorno estruturado `{ok, data, error}` + console.warn estruturado) — versão deployada em v24 era a antiga. Extra-melhoria defensiva pra TODAS chamadas de logAICall agora
+- **Verificação pós-deploy dupla** via `get_edge_function`:
+  - version=24 → **25** ACTIVE
+  - ezbr_sha256: `4fa33d64a3e1e8daea9f5375cc585fe7ae068525c6eb143c191c5c8d3f4089a3` → `50907a7c99b88a6f79c036a957b51308e929a748ec23d02ee70590b26460a064`
+  - verify_jwt=true preservado
+  - Source remoto: header inicia com `// v25-anthropic-retry (2026-05-28) — ciclo #25...`, import `callAnthropicWithRetry` PRESENTE, chamada `callAnthropicWithRetry(systemPrompt, userPrompt, ...)` linha ~252 PRESENTE, catch superior com `logAICall({...status: 'error'...})` PRESENTE, helper anthropic-retry.ts deployado junto
+- **Commit atômico `6c1844d`** `fix(prospeccao): ai-compor-mensagem v25 - callAnthropicWithRetry substitui callOpenRouter + logAICall no catch (ciclo autonomo #25 — root cause 500 Anthropic 429/529)` push origin/main confirmado
+- **Smoketest empírico inicial**: agent_messages última hora=0 (cluster ainda não recuperou — esperado, deploy 22:15 BRT), agent_messages últimas 6h=0 (spike ATIVO desde 17h BRT), agent_rules últimos 30min=8 (cron OK), ai_logs compor-mensagem error=0 com v25 ainda. Próximo cron tick (22:30 BRT) é smoketest empírico real — fica pro ciclo #26.
+- **Verificar antes de assumir aplicado em 4 frentes**: (a) cross-check Windows-MCP vs bash CONFIRMOU falso-positivo guardrail ANTES de declarar corrupção; (b) source v24 lido pelo agent ANTES dos Edits (LOC=417 confirmado, 4 strings OLD batem byte-by-byte); (c) tail-check Windows-MCP pós-Edit (487 LOC, tail `});` correto); (d) get_edge_function pós-deploy verificou source remoto INTEIRO contém pattern esperado, não só sha mudado.
+- **Anti-pattern evitado**: NÃO declarei corrupção sem cross-check (#19 fez isso, perdeu ciclo). NÃO Edit do Cowork direto em arquivo 417 LOC (REGRA #0 — agent isolado). NÃO declarei sucesso só com sha mudado (verificou source remoto pattern-by-pattern). NÃO esperei smoketest empírico de cron real pra escrever cérebros (próximo ciclo verifica).
+
+### Ciclo autônomo #24 — 🔴 ACHADO P0 NOVO: fix #18 DORMENTE (gap Fase 1.2 PERSISTE) + recon ai-compor-mensagem 417 LOC + Edit cirúrgico EXATO documentado pra deploy v25 ciclo #25 + 2 HIGH novos (19 etapas sem tempo_real_min, 2 setores zerados) (2026-05-28 21:05) 🟡
+- Health pré: Vercel ok, edge logs 60min mostram cluster ~30 POST 500 ai-compor-mensagem v24 entre 20:00-20:35 BRT (450-720ms = falha pre-Anthropic), 1 agent-cron-loop v26 timeout 17544ms 20:00 BRT (cascade). mcp-bridge-worker v8 todas 200 ~1/min. branch=main HEAD `fa8755a` em sync com origin/main. Working dir herdado 2 untracked (docs/MUBISYS + scripts/hp-latex) limpos.
+- **🔴 ACHADO P0 CRÍTICO — Fix #18 DORMENTE, gap Fase 1.2 PERSISTE**: agent paralelo Quinta (general-purpose, 51k tokens, 22 tools, 101s) via 10 queries cruzadas revelou que trigger `trg_check_production_completed` corrigido #18 NÃO DISPAROU desde 17:30 BRT. `system_events.production_completed = 0 lifetime`. As 3 OPs `finalizado` (15/16/17) chegaram lá via UPDATE direto em `ordens_producao.status='finalizado'` (path alternativo) — NÃO via marcar `producao_etapas.status='concluida'` que dispararia o trigger. **Pedidos 1070 + PED-2026-0025 SEGUEM travados em `em_producao`** após o ciclo #18 declarar "destrava estrutural". Fix tem código correto mas premissa de input errada.
+- **Plano deploy v25 ai-compor-mensagem documentado**: agent paralelo Explore confirmou 417 LOC total (acima threshold 250 LOC — agent isolado obrigatório). Verificação adversarial confirmou anthropic-provider.ts linha 107 `export const callOpenRouter = callAnthropic;` — alias drop-in pra Anthropic, não OpenRouter real. 4 Edits cirúrgicos exatos com old_string/new_string LITERAIS documentados no NEXT P0 #25 (import + chamada + log error + VERSION).
+- **2 achados HIGH NOVOS** via agent: (a) 19 etapas concluida sem `tempo_real_min` (backfill #17 cobriu tempo_estimado mas não tempo_real → Gantt cego pra análise eficiência); (b) 2 setores zerados (Router/Corte, Serralheria) sem nenhuma OP/etapa associada (legítimo OU bug rota template_id).
+- **Verificar antes de assumir aplicado em 5 frentes**: (a) recon source REVELOU 417 LOC (impede Edit cirúrgico direto); (b) leitura anthropic-provider.ts CONFIRMOU callOpenRouter é alias drop-in (premissa #22 validada); (c) query system_events REFUTOU "fix #18 destravou cadeia Produção→Instalação"; (d) cross-check ordens_producao × producao_etapas explicou origem das 3 OPs finalizado; (e) tabela 10 queries × resultado evitou repetir ciclos #15-#23.
+- **Anti-pattern evitado**: NÃO deploy v25 ai-compor-mensagem em 21:05 BRT (pré-janela preferida 22h+, regra dura "22h-7h ou FDS" pra Edge cliente). NÃO declarei "fix #18 sucesso" cegamente. NÃO Edit em arquivo 417 LOC (acima 250). NÃO atacou drift VERSION ai-chat-portal (dormente, sem urgência).
+- Zero commit, zero deploy, zero migration neste ciclo. Decisão: documentar plano de deploy v25 EXATO no ledger pra próximo ciclo executar via agent isolado em janela 22h+.
+
 ### Ciclo autônomo #23 — Falso-positivo guardrail Etapa 4 (4a recorrência consecutiva) + helper `anthropic-retry.ts` criado commit `3460555` push main (precondição NEXT P0 #22 sem Edit em arquivo grande) (2026-05-28 20:05) 🟢
 - Health pré: Vercel 200, edge logs 90min mostram cluster 19:30 + 20:00 BRT ~30 erros 500 ai-compor-mensagem v24 + 2 agent-cron-loop v26 500 timeouts 14-17s (cascade do cluster). mcp-bridge-worker v8 200 ~1/min consistente. agent_rules cron 20:00 BRT executou OK (`last_run 2026-05-28 20:00:08 BRT`, `last_error=NULL`, `run_count` 1294-1304). branch=main HEAD `2c1bb6c` do #22.
 - **🚨→🟢 GUARDRAIL ETAPA 4 FALSO-POSITIVO (4a recorrência consecutiva)**: `git diff --stat HEAD` no bash mostrou 5 arquivos modified com -1242 linhas. Cross-check Windows-MCP `Measure-Object` revelou DIVERGÊNCIA em ambas direções: bash 2383/252/697/338/1230 vs WinMCP 2226/396/900/247/1060. Tails Windows-MCP íntegros em todos 5 (STATE footer, ledger regras finais, log mid-write, rules checklist, agent-cron-loop `}\n return true;\n}`). `git checkout HEAD --` via Windows-MCP NÃO mudou tamanhos — confirma HEAD `2c1bb6c` JÁ tinha esses tamanhos. **NÃO HÁ CORRUPÇÃO**. Bash sandbox e Windows FS desincronizados (OneDrive/cache stale).
@@ -364,6 +393,122 @@
 ---
 
 ## NEXT — Sugestões priorizadas pra próximos ciclos (atualizar a cada ciclo)
+
+### 🔥 P0 PRÓXIMO CICLO #25 — DEPLOY v25 ai-compor-mensagem (HANDOFF DOCUMENTADO)
+
+**JANELA**: 22h+ BRT (Edge cliente — regra dura ledger).
+**ESTRATÉGIA**: agent isolado (arquivo 417 LOC > threshold 250 — NÃO usar Edit do Cowork direto).
+**HELPER PRONTO**: `supabase/functions/ai-shared/anthropic-retry.ts` (67 LOC, commit `3460555` do ciclo #23).
+**TAMANHO**: 417 LOC. Tail íntegro `});` linha 472.
+
+**4 Edits cirúrgicos exatos (old_string / new_string LITERAIS — copy-paste ready)**:
+
+**Edit #1 — adicionar import (linha ~7-8)**:
+```
+OLD: import { callOpenRouter } from '../ai-shared/anthropic-provider.ts';
+import { logAICall } from '../ai-shared/ai-logger.ts';
+
+NEW: import { callOpenRouter } from '../ai-shared/anthropic-provider.ts';
+import { callAnthropicWithRetry } from '../ai-shared/anthropic-retry.ts';
+import { logAICall } from '../ai-shared/ai-logger.ts';
+```
+
+**Edit #2 — substituir chamada Anthropic (linha ~251-255)**:
+```
+OLD:     // ── 8. Chamada OpenRouter ─────────────────────────────────
+    const systemPrompt = buildSystemPrompt(canal);
+    const userPrompt = buildUserPrompt(aiContext);
+    const aiResult = await callOpenRouter(systemPrompt, userPrompt, {
+      model: modeloComposicao,
+      temperature: 0.7, // mais criativo para mensagens
+      max_tokens: 1500,
+    });
+
+NEW:     // ── 8. Chamada Anthropic com retry (ciclo #24) ───────────
+    const systemPrompt = buildSystemPrompt(canal);
+    const userPrompt = buildUserPrompt(aiContext);
+    const aiResult = await callAnthropicWithRetry(systemPrompt, userPrompt, {
+      model: modeloComposicao,
+      temperature: 0.7, // mais criativo para mensagens
+      max_tokens: 1500,
+    });
+```
+
+**Edit #3 — logAICall error no catch superior (linha ~463-469)**:
+```
+OLD:   } catch (error) {
+    console.error('ai-compor-mensagem error:', error);
+    return jsonResponse(
+      { error: 'Erro ao compor mensagem', detail: error.message },
+      500,
+      corsHeaders
+    );
+  }
+
+NEW:   } catch (error) {
+    console.error('ai-compor-mensagem error:', error);
+    // Log de erro para visibility em ciclos Anthropic 429/529 (ciclo #24)
+    await logAICall({
+      user_id: userId ?? undefined,
+      function_name: 'compor-mensagem' as any,
+      entity_type: 'geral',
+      entity_id: body.lead_id ?? 'unknown',
+      model_used: 'claude',
+      tokens_input: 0,
+      tokens_output: 0,
+      cost_usd: 0,
+      duration_ms: 0,
+      status: 'error',
+      error_message: error.message,
+    }).catch(logErr => console.error('logAICall failed:', logErr));
+    return jsonResponse(
+      { error: 'Erro ao compor mensagem', detail: error.message },
+      500,
+      corsHeaders
+    );
+  }
+```
+
+**Edit #4 — bumpar VERSION header (linha ~1-2)**:
+```
+OLD: // supabase/functions/ai-compor-mensagem/index.ts
+// v2 (2026-05-27 BUG-JWT) — chamada interna ai-gerar-orcamento usa legacy JWT + retry 401
+
+NEW: // supabase/functions/ai-compor-mensagem/index.ts
+// v25-anthropic-retry (2026-05-28) — ciclo #24: callAnthropicWithRetry substitui callOpenRouter, logAICall no catch
+// v2 (2026-05-27 BUG-JWT) — chamada interna ai-gerar-orcamento usa legacy JWT + retry 401
+```
+
+**Critério mensurável smoketest pós-deploy**: cluster 22:30 BRT deve ter log `[anthropic-retry] attempt X/3 failed... retrying in Nms` em vez de cluster 500 silencioso. Verificar 30min depois com `get_logs` filtrando function_id `59729dba-85e1-4776-8f1e-0e01fc21243b`. agent_messages criadas pós-22h devem voltar a fluir (atualmente ZERO desde 17h BRT).
+
+**Estratégia rollback**: agent isolado salva backup pré-edit. Se cluster 500 persiste pós-deploy → redeploy v24 anterior.
+
+### 🔥 P0 PRÓXIMO CICLO #25 — Migration backfill manual gap Fase 1.2
+
+Fix #18 (`fn_check_production_completed`) está DORMENTE. As 3 OPs finalizado chegaram lá via path alternativo, trigger nunca disparou. Pedidos 1070 + PED-2026-0025 seguem `em_producao` há 4 dias.
+
+**Migration single-statement idempotente**:
+```sql
+-- Backfill manual gap Fase 1.2 (ciclo #24 descobriu fix #18 dormente)
+UPDATE pedidos
+SET status = 'pronto_instalacao', updated_at = now()
+WHERE id IN (
+  SELECT DISTINCT p.id FROM pedidos p
+  WHERE p.status = 'em_producao'
+    AND NOT EXISTS (SELECT 1 FROM ordens_producao op WHERE op.pedido_id=p.id AND op.status != 'finalizado')
+    AND EXISTS (SELECT 1 FROM ordens_producao op WHERE op.pedido_id=p.id AND op.status='finalizado')
+);
+
+INSERT INTO system_events (event_type, entity_type, entity_id, payload, created_at)
+SELECT 'production_completed', 'pedido', p.id::text,
+       jsonb_build_object('pedido_numero', p.numero, 'backfill', true, 'ciclo', 24, 'data', now()),
+       now()
+FROM pedidos p WHERE p.id IN (1070, /* PED-2026-0025 id */)
+  AND p.status = 'pronto_instalacao'
+  AND NOT EXISTS (SELECT 1 FROM system_events WHERE event_type='production_completed' AND entity_id=p.id::text);
+```
+
+Smoketest: `SELECT status FROM pedidos WHERE id IN (1070, PED-2026-0025);` deve retornar `pronto_instalacao`. `SELECT count(*) FROM system_events WHERE event_type='production_completed';` deve ser > 0.
 
 ### Pequenos (cabem num ciclo — autonomamente seguros)
 - [x] ✅ **DONE ciclo #13** — CORREÇÃO P0 agent-cron-loop v24 deployed (placeholder removido, source íntegro). 12 rules rodaram empiricamente. VALIDAÇÃO RETROATIVA ciclo #10 PASSA.

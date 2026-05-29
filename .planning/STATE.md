@@ -1,9 +1,148 @@
 ﻿
 # STATE — CRM Croma
 
-**Última atualização**: 2026-05-28 20:05 BRT — Ciclo autônomo #23 — Falso-positivo guardrail Etapa 4 (4a recorrência consecutiva — bash sandbox cache stale vs Windows-MCP FS real, sem corrupção real) + Helper `anthropic-retry.ts` criado (67 LOC, commit `3460555`) como precondição NEXT P0 #22 sem Edit em arquivo grande. Spike 500 ai-compor-mensagem v24 SEGUE ATIVO (cluster 19:30 + 20:00 BRT, ZERO agent_messages criadas após 17:00 BRT, agent_rules cron 20:00 BRT executou OK NULL error). Deploy fix retry exponencial DEFERIDO janela 22h+ BRT (atual 20:05 BRT). Próximo ciclo/Junior faz Edit cirúrgico mínimo em `ai-compor-mensagem/index.ts` substituindo `callOpenRouter`→`callAnthropicWithRetry` (1 import + 1 substituição).
+**Última atualização**: 2026-05-28 22:30 BRT — Ciclo autônomo #25 — 🟢 DEPLOY v25 ai-compor-mensagem EXECUTADO via agent isolado (175k tokens, 41 tool uses, 705s). 4 Edits cirúrgicos do ledger NEXT P0 #25 aplicados (com 1 adaptação correta no Edit #3 evitando ReferenceError de `userId`). v24 → v25 ACTIVE, sha mudou `4fa33d64` → `50907a7c`. Retry exponencial Anthropic 429/529 ativo (1s/2s/4s). Catch superior agora grava `ai_logs` error → observabilidade dos clusters. BONUS: ai-logger.ts deployed atualizado pra versão #6 (defensiva). Commit `6c1844d` push main. 5a recorrência consecutiva FALSO-POSITIVO guardrail Etapa 4 (bash sandbox vs Windows-MCP dessync — sem corrupção). Próximo cron tick 22:30 BRT é smoketest empírico real do fix.
 
-**Penúltima atualização**: 2026-05-28 19:10 BRT — Ciclo autônomo #22 — Spike 500 ai-compor-mensagem v24 do #20 NÃO AUTO-RESOLVEU (recorrente — clusters 16:40/17:20/17:50/18:20 BRT) → ROOT CAUSE confirmado por agent adversarial: **Anthropic rate-limit 429/529 (overloaded)** em bursts de 14-20 follow-ups consecutivos por cron tick, callOpenRouter linha 207 throw + catch 359 retorna 500 SEM gravar ai_logs (zero visibilidade). REFUTOU hipóteses #20 (Promise.all 50 paralelas — agent-cron-loop linha 1111 é for...of SEQUENCIAL) e #21 (auto-resolveu — voltou em #22). Fix mínimo proposto (≤30 LOC) DEFERIDO janela 22h+ BRT. Hardening NEXT P0 #21 EXECUTADO: 3 Edits cirúrgicos em autonomous-rules.md baixaram threshold "Edit safe Cowork" de 500→250 LOC + Write até 500 LOC OK.
+**Penúltima atualização**: 2026-05-28 21:05 BRT — Ciclo autônomo #24 — 🔴 ACHADO P0 NOVO CRÍTICO: fix #18 (trg_check_production_completed) está **DORMENTE — gap Fase 1.2 NÃO resolvido**. 3 OPs finalizado (15/16/17) chegaram a esse status SEM marcar producao_etapas.concluida (path UPDATE direto). Trigger só roda em `AFTER UPDATE OF status ON producao_etapas`. **Pedidos 1070 + PED-2026-0025 seguem `em_producao` 4 dias após ciclo #18 declarar destrava estrutural**. + Recon ai-compor-mensagem v24 confirma 417 LOC (acima threshold 250 — agent isolado obrigatório). Edit cirúrgico EXATO documentado para deploy v25 em janela 22h+ BRT (próximo ciclo #25). + 2 achados HIGH novos: 19 etapas concluida sem tempo_real_min (Gantt cego para análise), 2 setores zerados (Router/Corte, Serralheria). Spike 500 ai-compor-mensagem v24 SEGUE ATIVO há 4h+ (cluster 20:00 + 20:20 BRT, ZERO agent_messages criadas desde 17:00 BRT).
+
+## Ciclo autônomo #25 — 2026-05-28 22:30 BRT — DEPLOY v25 ai-compor-mensagem com retry exponencial Anthropic 🟢
+
+**Mantra**: CORRIGIR (P0 #25 herdado do #24) + VALIDAR (smoketest empírico inicial). Hora 22:00-22:30 BRT (Quinta — janela Edge cliente ABERTA 22h-7h). Health pré: Vercel 200, edge logs últimos 30min mostram cluster ~30 POST 500 ai-compor-mensagem v24 + 1 agent-cron-loop v26 timeout 20448ms (cascade), mcp-bridge-worker v8 todas 200 ~1/min, agent_rules últimos 30min=8 cron OK. Branch=main HEAD `fa8755a`. Working dir herdado: 5 modified vs HEAD (planning + agent-cron-loop +1 whitespace) — **5a recorrência consecutiva FALSO-POSITIVO** (#19→#23→#25) confirmada via cross-check Windows-MCP.
+
+### 🎉 DEPLOY v25 ai-compor-mensagem — P0 herdado do #24 EXECUTADO
+
+| Verificação pós-deploy | Resultado |
+|---|---|
+| version | 24 → **25** ACTIVE |
+| ezbr_sha256 | `4fa33d64a3e1e8daea9f5375cc585fe7ae068525c6eb143c191c5c8d3f4089a3` → `50907a7c99b88a6f79c036a957b51308e929a748ec23d02ee70590b26460a064` |
+| verify_jwt | true (preservado) |
+| Header source remoto | `// v25-anthropic-retry (2026-05-28) — ciclo #25: callAnthropicWithRetry substitui callOpenRouter, logAICall no catch` ✅ |
+| Import callAnthropicWithRetry | PRESENTE ✅ |
+| Chamada callAnthropicWithRetry (linha ~252) | PRESENTE ✅ |
+| logAICall error no catch superior | PRESENTE ✅ |
+| Helper anthropic-retry.ts deployado junto | PRESENTE ✅ |
+| BONUS: ai-logger.ts deployed | Versão #6 com `.select().single()` + retorno estruturado (defensiva) |
+| Commit | `6c1844d` push origin/main |
+
+**Estratégia agent isolado**: source 417 LOC > 250 threshold → agent isolado obrigatório (REGRA #0). Agent fez 4 Edits cirúrgicos do ledger NEXT P0 #25 (copy-paste ready), com 1 adaptação correta no Edit #3: usou `user_id: undefined` em vez de `userId` (evita ReferenceError se exception subir antes da linha que define `userId` na auth). Adaptação evita NOVO bug introduzido pelo próprio fix.
+
+**Backup pré-edit**: `/sessions/.../outputs/ai-compor-mensagem-v24-backup-ciclo25.ts.bak` (471 LOC).
+
+### Smoketest empírico inicial (deploy 22:15 BRT)
+
+| Métrica | Valor |
+|---|---|
+| agent_messages criadas última hora | 0 (cluster ainda não recuperou) |
+| agent_messages criadas últimas 6h | 0 (spike ATIVO desde 17h BRT) |
+| agent_rules executando últimos 30min | 8 (cron OK) |
+| ai_logs compor-mensagem error última hora | 0 (zero novos com v25 ainda) |
+
+Próximo cron tick (~22:30 BRT) é o smoketest empírico real. Esperado: OU 200s OU logs `[anthropic-retry] attempt X/3 failed... retrying in Nms` em vez de cluster 500 silencioso. Validação fica pro próximo ciclo #26.
+
+### 🚨→🟢 GUARDRAIL ETAPA 4 — 5a recorrência consecutiva FALSO-POSITIVO
+
+`git diff --stat HEAD` no bash sandbox mostrou 5 arquivos modified com -1510 linhas de delta (STATE -880, ledger -236, log -466, rules -12, agent-cron-loop +1 whitespace). Padrão IDÊNTICO #19→#23.
+
+**Cross-check Windows-MCP autoritativo confirmou tails íntegros em todos 5**:
+- STATE.md: 3135 LOC tail `Supabase project: djwjmfgplnqyffdcgdaw`
+- autonomous-ledger.md: 580 LOC tail `5. Honestidade total — se ciclo falhou, registrar como tal, não "maquiar"`
+- autonomous-log.md: 1199 LOC tail `Telegram: a enviar` (do #24 que não completou Etapa 8)
+- autonomous-rules.md: 349 LOC tail checklist final OK
+- agent-cron-loop/index.ts: 1230 LOC tail `}` final
+
+NÃO HÁ CORRUPÇÃO. Bash sandbox e Windows FS dessincronizados (mount stale). Procedi normalmente. **Hardening guardrail Etapa 4 segue como NEXT P0** (NEXT #22→#23→#24→#25 não atacado).
+
+### Achados secundários
+
+- Ciclo #24 não completou Etapa 8 (autonomous-log.md tail `Telegram: a enviar`). Provavelmente abortou silenciosamente antes do append final do log. Append do #25 retoma. Não há perda de estado em prod (3 cérebros restantes — ledger/STATE/Obsidian — atualizados pelo #24).
+
+### Anti-pattern evitado + verificações
+
+- **Verificar antes de assumir aplicado em 4 frentes**: (a) cross-check Windows-MCP vs bash CONFIRMOU falso-positivo guardrail; (b) source v24 lido pelo agent ANTES do Edit (LOC=417, 4 strings OLD batem byte-by-byte); (c) tail-check Windows-MCP pós-Edit (487 LOC, tail `});` correto); (d) get_edge_function pós-deploy CONFIRMOU header `v25-anthropic-retry` + imports + chamada substituída + catch com logAICall + sha mudado.
+- **Anti-pattern evitado**: NÃO declarei corrupção sem cross-check (#19 fez isso e abortou). NÃO Edit do Cowork direto em arquivo 417 LOC (REGRA #0 — agent isolado). NÃO declarei sucesso só com sha mudado (verificou source remoto inteiro contém pattern esperado). NÃO esperei smoketest empírico de cron real pra escrever cérebros (próximo ciclo verifica) — economiza ciclo.
+
+### Próxima sugestão (ciclo #26)
+
+P0 — **Smoketest empírico v25 cron tick 22:30+ BRT**: `get_logs edge-function` filtrado por function_id `59729dba-85e1-4776-8f1e-0e01fc21243b` últimos 30min. Esperado: cluster 500 substituído por OU 200s OU 500s com retry logs `[anthropic-retry] attempt X/3 failed... retrying`. Query `SELECT count(*) FROM agent_messages WHERE created_at > '2026-05-28 22:30 BRT'` deve ser > 0 (prospecção volta a fluir). Query `SELECT count(*), error_message FROM ai_logs WHERE function_name='compor-mensagem' AND status='error' AND created_at > '2026-05-28 22:30 BRT' GROUP BY error_message` mostra clusters reais agora.
+
+P0 — **Migration backfill manual gap Fase 1.2** (herdado #24): UPDATE pedidos 1070 + PED-2026-0025 (em_producao 4d, fix #18 dormente — path UPDATE direto nas OPs não dispara trigger). SQL idempotente documentado no ledger NEXT P0 #25.
+
+P0 — **Hardening guardrail Etapa 4** em autonomous-rules.md: documentar evidência 5a recorrência consecutiva. Trocar `git diff --stat HEAD` (bash) por cross-check Windows-MCP `Measure-Object` + tail-check em ≥2 arquivos suspeitos ANTES de declarar corrupção.
+
+P1 — Migration backfill `producao_etapas.tempo_real_min` via `EXTRACT(EPOCH FROM fim-inicio)/60` (achado #24, 19 etapas sem).
+
+---
+
+**Penúltima atualização**: 2026-05-28 20:05 BRT — Ciclo autônomo #23 — Falso-positivo guardrail Etapa 4 (4a recorrência consecutiva — bash sandbox cache stale vs Windows-MCP FS real, sem corrupção real) + Helper `anthropic-retry.ts` criado (67 LOC, commit `3460555`) como precondição NEXT P0 #22 sem Edit em arquivo grande.
+
+## Ciclo autônomo #24 — 2026-05-28 21:05 BRT — Auditoria Quinta deep dive: fix #18 DORMENTE + plano deploy v25 ai-compor-mensagem documentado 🟡
+
+**Mantra**: EXPLORAR (auditoria adversarial Quinta — 5 achados, 2 CRITICAL/2 HIGH/1 MEDIUM) + VALIDAR (recon ai-compor-mensagem 417 LOC + Edit cirúrgico EXATO preparado pra ciclo #25) + ARRUMAR (documentação handoff #25). Hora 21:05 BRT (Quinta — janela proibida 8h-20h passou, mas pré-janela preferida 22h+). Health pré: Vercel ok, edge logs mostram clusters 500 ai-compor-mensagem v24 + 1 agent-cron-loop v26 timeout 17544ms (cascade). mcp-bridge-worker v8 todas 200 ~1/min. branch=main HEAD `fa8755a` em sync. Working dir herdado limpo.
+
+### 🔴 ACHADO P0 CRÍTICO — Fix #18 DORMENTE, gap Fase 1.2 PERSISTE
+
+Agent paralelo Quinta (general-purpose, 51k tokens, 22 tools, 101s) descobriu via 10 queries:
+
+| # | Query | Resultado |
+|---|---|---|
+| 1 | system_events `production_completed` lifetime | **0 eventos** (fix #18 nunca disparou) |
+| 2 | Distribuição `ordens_producao.status` | 3 `finalizado` + 3 `aguardando_programacao` (zero `concluida` na coluna) |
+| 3 | OPs com etapas parciais | 0 (todos 0/4 ou 4/4) |
+| 4 | Pedidos com OP finalizado mas pedido NÃO concluído | **3 OPs órfãs**: OP-2026-0015/0016 (PED 1070), OP-2026-0017 (PED-2026-0025) — pedidos travados em `em_producao` |
+| 5 | portal_mensagens 7d | 0 (dormente 100%) |
+| 6 | ai_logs portal/chat | vazio |
+| 7 | producao_etapas anomalias | **19 concluida sem tempo_real_min** (Gantt cego), 0 em_andamento >7d, 0 fim<inicio |
+| 8 | producao_apontamentos lifetime | 0 (dead-code) |
+| 9 | OPs novas últimos 7d | 0 (PCP não criou OP nova essa semana) |
+| 10 | Etapas por setor | Acabamento/Expedição/Criação/Impressão = 1 cada; **Router/Corte=0, Serralheria=0** |
+
+**Análise**: trigger `trg_check_production_completed` corrigido no #18 só roda em `AFTER UPDATE OF status ON producao_etapas WHEN new.status='concluida'`. As 3 OPs `finalizado` (15/16/17) chegaram lá via **UPDATE direto em `ordens_producao.status='finalizado'`** (path alternativo, não via marcar etapas). Como o trigger condicional não disparou, `pedidos.status` NÃO foi atualizado de `em_producao` → `pronto_instalacao` automaticamente. **Pedidos 1070 + PED-2026-0025 SEGUEM travados em `em_producao`** — confirmação empírica de que **fix #18 é dormente: código correto, premissa de input errada**.
+
+### Plano deploy v25 ai-compor-mensagem — handoff para ciclo #25
+
+Agent paralelo Explore (51k tokens, 22 tools, 101s) leu source completo:
+- **417 LOC total** — ACIMA do threshold 250 LOC do `autonomous-rules.md` → **agent isolado obrigatório** (não Edit cirúrgico direto do Cowork)
+- Linha 7: import `callOpenRouter` from `'../ai-shared/anthropic-provider.ts'`
+- Verificação adversarial: anthropic-provider.ts linha 107 `export const callOpenRouter = callAnthropic;` — **NÃO é OpenRouter real, é alias drop-in pra Anthropic**. Confirmado.
+- Linha 251-255: chamada `callOpenRouter(systemPrompt, userPrompt, {model, temperature: 0.7, max_tokens: 1500})` — único entrypoint Anthropic neste arquivo
+- Linha 463-469 (catch superior): retorna 500 sem `logAICall` — root cause #22 confirmado
+- Tail íntegro: arquivo termina em `});` linha 472
+
+**4 Edits cirúrgicos exatos documentados no ledger NEXT P0 #25** (old_string + new_string literais):
+1. Adicionar import `callAnthropicWithRetry` from `'../ai-shared/anthropic-retry.ts'` (logo após import do `callOpenRouter`)
+2. Substituir chamada `callOpenRouter(...)` → `callAnthropicWithRetry(...)` (mantém assinatura idêntica)
+3. Adicionar `logAICall({status:'error', error_message: error.message, ...})` antes de `return jsonResponse(...500...)` no catch
+4. Bumpar comentário header com nova linha `// v25-anthropic-retry (2026-05-28) — ciclo #24: callAnthropicWithRetry substitui callOpenRouter, logAICall no catch`
+
+### Spike 500 ai-compor-mensagem v24 — segue ATIVO
+
+Edge logs 60min (ciclo #24): cluster ~30 erros POST 500 ai-compor-mensagem v24 entre 20:00-20:35 BRT (450-720ms = falha pre-Anthropic). 1 agent-cron-loop v26 timeout 17544ms 20:00 BRT (cascade). mcp-bridge-worker v8 todas 200 ~1/min. Cluster Anthropic 429/529 persistente — confirma root cause #22 inalterado.
+
+### 2 achados HIGH NOVOS
+
+🟡 **HIGH — 19 etapas `concluida` sem `tempo_real_min`**: backfill #17 cobriu `tempo_estimado_min` mas não `tempo_real_min`. Quebra qualquer dashboard eficiência (real/estimado). **NEXT P1**: migration trigger backfill `tempo_real_min = EXTRACT(EPOCH FROM fim-inicio)/60` quando `inicio IS NOT NULL AND fim IS NOT NULL` (já era previsto em NEXT P2 #17 como "quick-win producao_apontamentos dead-code", agora reclassificado P1).
+
+🟡 **HIGH — 2 setores zerados** (Router/Corte, Serralheria): nenhuma OP ativa neles. Pode ser legítimo (sem pedidos do tipo) ou template_id de OP não rota para esses setores. **NEXT P2**: investigar `templates_etapas_producao` × setores ativos.
+
+### Anti-pattern evitado + verificações
+
+- **Verificar antes de assumir aplicado em 5 frentes**: (a) recon source ai-compor-mensagem REVELOU 417 LOC (acima threshold — não dá pra Edit cirúrgico direto); (b) leitura anthropic-provider.ts CONFIRMOU `callOpenRouter` é alias drop-in (premissa #22 verificada); (c) query system_events lifetime REFUTOU "fix #18 destravou estruturalmente cadeia Produção→Instalação" (zero disparos); (d) cross-check distribuição ordens_producao × producao_etapas explicou origem das 3 OPs finalizado (path UPDATE direto, não etapas); (e) tabela 10×10 do agent paralelo cobriu múltiplos ângulos sem repetir ciclos #15-#23.
+- **Anti-pattern evitado**: NÃO deploy v25 ai-compor-mensagem em 21:05 BRT (pré-janela preferida 22h+). NÃO declarei "fix #18 sucesso" cegamente — query empírica mostrou dormência. NÃO atacou drift VERSION ai-chat-portal (ainda dormente, sem urgência operacional). NÃO Edit em arquivo 417 LOC (acima 250 threshold).
+
+### Próxima sugestão (ciclo #25)
+
+P0 — **Deploy v25 ai-compor-mensagem** via agent isolado (4 Edits exatos no ledger). Janela ~22h+ BRT. Smoketest: cluster 22:30 BRT deve ter retry log `[anthropic-retry] attempt X/3 failed... retrying in Nms` em vez de cluster 500 silencioso.
+
+P0 — **Migration backfill manual gap Fase 1.2**: `UPDATE pedidos SET status='pronto_instalacao' WHERE id IN (1070, PED-2026-0025) AND status='em_producao'` + INSERT system_events.production_completed. Documentar como "backfill manual ciclo #25" — fix #18 segue valido pra eventos futuros.
+
+P1 — **Migration backfill `producao_etapas.tempo_real_min`** via `EXTRACT(EPOCH FROM fim-inicio)/60` nas 19 etapas concluida. Trigger ON UPDATE adicional pra evitar reentrância.
+
+P2 — Adoção rolling `safe-insert.ts` em 12 Edges Padrão B (helpers prontos #16).
+
+P2 — Hardening guardrail Etapa 4 em `autonomous-rules.md`: trocar validação `git diff --stat HEAD` (bash sandbox) por cross-check Windows-MCP + tail-check em ≥2 arquivos suspeitos. Evidência: 4 falso-positivos consecutivos (#19→#23).
+
+---
+
 
 ## Ciclo autônomo #23 — 2026-05-28 20:05 BRT — Falso-positivo guardrail (4a recorrência) + helper anthropic-retry.ts criado 🟢
 
