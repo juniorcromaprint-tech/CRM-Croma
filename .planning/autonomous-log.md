@@ -1709,3 +1709,21 @@ ZERO prod-write: alterar/desativar regra = decisao negocio Junior (regra legitim
 **Commits**: #45 cerebros + migration harden_secdef_search_path_cycle45 (push via host)
 **Deploys**: 0 Edge. 1 migration DDL metadata.
 **Telegram**: enviada (ok) mid=3159
+## 2026-05-29 20:11 (ciclo #46)
+
+**Status**: VERDE
+**Tipo**: arrumar (perf/infra DDL) + validar
+**Auto-dialogo (7)**: (1) #43 8 FKs, #44 validou 3 fixes seg Junior, #45 lead_quente runtime + SEC-004. (2) Sexta=Instalacao exausta #27-34 -> pivot perf advisor. (3) gap util: auth_rls_initplan (78, P1 default-exec desde #41, janela idle-Junior); detector cross-validado = advisor exato. (4) sem conflito (SEC-001/buckets/views/token=BLOCKED-Junior). (5) Obsidian sem blocker novo. (6) nao-passivo (#45 ha 46min). (7) criterio: 78->0 needs-fix, 0 double-wrap, Vercel 200.
+**Health check**: Vercel 200 | edge 60min ZERO 5xx (mcp-bridge-worker v9 ~1/min 200, agent-cron-loop v28 200 ~9-12s) | API tick 23:00 UTC limpo ZERO 400/5xx (fn_claim 200, system_events 201, lead_quente deduped sem flood, v28 9o ciclo) | branch=main HEAD caa2950=#45 | guardrail HOST LIMPO (tails 3578/856/1711, 2 untracked herdados, bash NAO consultado). NOW 20:06->20:11 BRT.
+**Agents disparados**: 0 (DDL prod-write = cross-check de catalogo inline; preview adversarial read-only; nao recon multi-arquivo).
+**Acoes executadas**:
+- Reconciliacao adversarial auth_rls_initplan: detector (strip wrapped -> bare remanesce) = 84 total, 78 public (= advisor EXATO), 6 cron/pessoal/storage fora de escopo. distinct_fns = auth.uid + auth.role apenas. 37/78 tem subquery (EXISTS), 33/78 tem WITH CHECK.
+- Preview read-only dos 78: n=78, double_wrap=0, still_bare=0, qual_unchanged=0; 8 samples eyeballados (helpers get_user_role intactos, subqueries preservadas, INSERT/arrays divergentes OK).
+- Migration optimize_rls_initplan_auth_wrap_cycle46: DO-block idempotente, lock_timeout 5s, ALTER POLICY x78 com unwrap-then-wrap (auth.uid|role -> (select ...)). success=true.
+**Decisao tomada**: executei o P1 default-exec auth_rls_initplan (carregado #41-45) - janela idle-Junior (Sex 20:06, Junior ultima atividade 17:26). apply_migration idempotente+validado=pre-aprovado. NAO toquei helpers get_user_role nem schemas cron/pessoal/storage.
+**Resultado (validado runtime/catalogo)**: VERDE. still_needs_fix 78->0; double_wrapped=0; now_wrapped=78; live catalog confirma wrap; Vercel 200 pos-apply = zero regressao. Perf: auth.uid/role agora avaliados 1x/query (initplan) ao inves de 1x/linha em 78 policies.
+**Ledger update**: auth_rls_initplan [P1 default-exec #41-45] -> DONE #46. NEXT: ~58 INVOKER search_path, multiple_permissive_policies (392), unused_index (327).
+**Commits**: fechamento #46 (hash no commit)
+**Migration**: optimize_rls_initplan_auth_wrap_cycle46 (78 ALTER POLICY)
+**Deploys**: nenhum
+**Telegram**: enviada (confirmacao no fechamento)
