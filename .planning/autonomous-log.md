@@ -1639,3 +1639,20 @@ ZERO prod-write: alterar/desativar regra = decisao negocio Junior (regra legitim
 **Deploys**: nenhum
 **Token usage**: sessão principal moderada-alta (dumps de log grandes) + 1 agent isolado ~50k
 **Telegram**: enviada (ok) — confirmação no fechamento
+
+## 2026-05-29 16:15 (ciclo #42)
+
+**Status**: VERDE
+**Tipo**: arrumar (perf/infra DDL) + validar
+**Auto-dialogo (7)**: (1) #39 lead_quente ruido / #40 SEC-001 de-risk / #41 advisors baseline + Financeiro REFUTADO. (2) Sexta=Instalacao exausta #27-34; mcp-bridge-worker v9 saudavel. (3) gap util: P1 default-exec NOVO do #41 NEXT - duplicate_index (35 grupos), net-new perf win risco ~zero, mas [NAO-VALIDADO] -> validar contra schema ANTES. (4) sem conflito IN-PROGRESS/BLOCKED. (5) Obsidian/STATE sem blocker novo. (6) NAO passivo (#41 ha 59min). (7) criterio: advisor duplicate_index pos-migration cai pelo nr dropado + zero regressao (sem 5xx, app 200).
+**Health check**: Vercel 200; edge 60min ZERO 5xx (mcp-bridge-worker v9 ~1/min 200, agent-cron-loop v28 200 ~7.6s, dispatch v5 200); API ZERO 5xx/400 (system_events 201, sentinel recalcular_scores GET 200, fn_claim_ai_requests 200 - 3x400/tick seguem ZERO, v28 estavel 5o ciclo); branch=main HEAD 7dd5c8d=#41; guardrail HOST LIMPO (tails STATE 3521 / ledger 786 / log 1641; 3 untracked herdados; bash NAO consultado p/ corrupcao).
+**Agents disparados**: 0 (prod-write exige cross-check inline meu; nao recon multi-arquivo). SQL catalogo inline.
+**Acoes executadas**:
+- Validacao adversarial dos duplicate_index via pg_index/pg_constraint/pg_get_indexdef normalizado (NAO confiei no dump de 642k do advisor). ARMADILHA EVITADA: 1a query (LEFT JOIN pg_constraint) inflou *_pkey (clientes_pkey n=17, profiles_pkey n=71, materiais_pkey n=20) por FAN-OUT de FKs que referenciam o PK (conindid) -> FALSO-POSITIVO catastrofico (dropar PK). Refiz com count(DISTINCT index_name)>1 -> 35 grupos REAIS (nomes distintos, backs=false, contype NULL), batendo EXATO o advisor duplicate_index=35.
+- Migration cleanup_duplicate_indexes_cycle42: DROP INDEX IF EXISTS em 37 indices redundantes (35 grupos; modelo_materiais.modelo_id e modelo_processos.modelo_id eram n=3 -> 2 drops cada). Gemeo de def IDENTICA preservado em todo grupo (zero regressao de plano). lock_timeout 5s + statement_timeout defensivos. Idempotente. {"success":true}.
+**Decisao tomada**: executei o P1 default-exec NOVO #41 (duplicate_index) - unico de alto valor sem decisao Junior (SEC-001/SEC-002/token/lead_quente=BLOCKED-Junior; auth_rls_initplan maior/arriscado fica NEXT). apply_migration idempotente+validado=pre-aprovado; DROP de duplicata redundante e seguro/reversivel/business-hours-OK (metadata op, gemeo mantem plano).
+**Resultado (com runtime)**: VERDE. Pos-migration: remaining_real_dup_groups=0; dropped_still_present=0 (37 sumiram); sample_twins_present=12/12. Vercel 200; edge mcp-bridge-worker 200 continuo 16:09-16:12 pos-apply = ZERO regressao runtime. Reclaim ~13MB+ (registros_auditoria 3 pares + system_events + outros).
+**Ledger update**: #41 NEXT [P1 duplicate_index] -> DONE #42. NEXT: unindexed_foreign_keys (11), auth_rls_initplan (78), function_search_path_mutable (65); BLOCKED-Junior SEC-001/SEC-002/buckets/token/lead_quente.
+**Commits**: fechamento #42 (hash no commit)
+**Migration**: cleanup_duplicate_indexes_cycle42 (37 DROP INDEX)
+**Telegram**: enviada (ok) - confirmacao no fechamento

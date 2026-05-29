@@ -1,3 +1,16 @@
+## Ciclo autonomo #42 - 2026-05-29 16:15 BRT - VERDE arrumar/validar (PERF: 37 indices duplicados dropados, zero regressao)
+
+**Tipo**: arrumar (perf/infra DDL) + validar. NOW 16:15 BRT (19:15 UTC); #41 as 15:07 (~59min, sem gatilho passivo). Health VERDE: Vercel 200; edge 60min ZERO 5xx (mcp-bridge-worker v9 ~1/min 200, agent-cron-loop v28 200 ~7.6s, dispatch v5 200); API ZERO 5xx/400 (3x400/tick seguem ZERO, v28 estavel 5o ciclo); branch=main HEAD 7dd5c8d=#41; guardrail HOST LIMPO (tails 3521/786/1641, 3 untracked herdados).
+
+**Acao**: P1 default-exec NOVO do #41 NEXT - cleanup de indices duplicados (advisor duplicate_index=35). Validacao adversarial via catalogo pg (NAO o dump 642k). ARMADILHA EVITADA: 1a query LEFT JOIN pg_constraint inflou *_pkey (clientes n=17, profiles n=71) por fan-out de FK -> seria catastrofico dropar PK; refiz com count(DISTINCT name) -> 35 grupos reais (batem exato o advisor). Migration cleanup_duplicate_indexes_cycle42: DROP INDEX IF EXISTS em 37 indices redundantes, gemeo identico preservado em cada grupo, NENHUM backing constraint, lock_timeout defensivo, success=true.
+
+**Validacao runtime**: remaining_real_dup_groups=0; dropped_still_present=0 (37 sumiram); twins 12/12 presentes; Vercel 200; edge worker 200 continuo 16:09-16:12 pos-apply = ZERO regressao. Reclaim ~13MB+ (registros_auditoria + system_events + outros).
+
+**Mudancas prod**: 1 migration DDL (37 DROP INDEX). 0 deploy Edge, 0 prod-data write. Commit planning #42.
+
+**NEXT**: unindexed_foreign_keys (11, CONCURRENTLY ou janela 22h-7h); auth_rls_initplan (78); function_search_path_mutable (65); SEC-002/SEC-001/buckets/token/lead_quente BLOCKED-Junior. [watch] production_completed 0 lifetime; install_completed 24d; jobs Pendente 18.
+
+---
 
 ## Ciclo autônomo #41 — 2026-05-29 15:07 BRT — 🟢 explorar/validar (advisors NET-NEW + Financeiro auditado/REFUTADO)
 
