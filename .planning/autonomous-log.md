@@ -1611,3 +1611,31 @@ ZERO prod-write: alterar/desativar regra = decisao negocio Junior (regra legitim
 **Deploys**: nenhum
 **Token usage**: ~125k
 **Telegram**: enviada (ok)
+
+## 2026-05-29 15:07 (ciclo #41)
+
+**Status**: 🟢 VERDE
+**Tipo**: explorar + validar (read-only, zero prod-write)
+**Auto-diálogo (7 perguntas)**:
+1. 3 ciclos anteriores: #38 deploy v28 agent-cron-loop (2 regras mortas ressuscitadas); #39 achou lead_quente ressuscitada disparando ~100 alertas Telegram/dia sobre backlog velho; #40 de-risk SEC-001 (Bloco1/2 safe-to-apply, só nps_respostas resta) + validou lead_quente dedup holding (sem re-flood).
+2. Dia=Sexta=Instalação (mcp-bridge-worker v9) — módulo já auditado 8x hoje (#27-34), exausto; mcp-bridge v9 saudável.
+3. Gap mais útil AGORA: P0/P1 NEXT quase todos BLOCKED-Junior (SEC-001 aplicar, token rotation, lead_quente threshold); lead_quente re-validação só ~amanhã 15:20 UTC. Pivot pra 2 net-new read-only alto-valor: (a) get_advisors security+performance (recomendado pela MCP Supabase, NUNCA rodado pelo loop em 40 ciclos); (b) auditoria adversarial Financeiro (CR/CP/boletos/comissões — módulo não tocado nos ciclos de hoje, domínio direto do Junior).
+4. Conflita com IN-PROGRESS/BLOCKED? Não. Read-only, net-novo. BLOCKEDs intocados.
+5. STATE/Obsidian contexto novo? Obsidian memory: protocolo Mubisys 05-28 (skip_auto_cr=true / skip_auto_op=true — Mubisys mantém cobrança) foi DECISIVO pra refutar o finding do agent; secret-leaks 05-27 já rastreados (SEC-001/token).
+6. MODO PASSIVO? Não — #40 ~53min atrás (>15min), health VERDE, branch=main, 0 5xx, HOST limpo, último log VERDE.
+7. Critério mensurável: (a) advisors classificados por nome+level com cross-ref vs SEC-001/conhecido, flag dos NOVOS; (b) Financeiro com veredito ✅/⚠️/🔴 por checagem + cross-check adversarial das premissas (não aceitar finding do agent sem prova).
+
+**Health check (ETAPA 4, HOST=fonte de verdade)**: Vercel 200 | edge 60min ZERO 5xx (mcp-bridge-worker v9 ~1/min 200, agent-cron-loop v28 200 ~8-9s, dispatch v5 200, ai-detectar-problemas v21 200) | API tick 18:00 UTC limpo (system_events 201, execute_sql_readonly 200, GET sentinel recalcular_scores entity_id=00000000 200 — 3x 400/tick seguem ZERO, v28 estável 4º ciclo) | branch=main HEAD 5e48198=#40 | guardrail HOST LIMPO (tails STATE 3507/ledger 768/log 1613, 3 untracked herdados, bash NÃO consultado p/ corrupção). NOW 15:07 BRT / 18:07 UTC.
+
+**Agents disparados**: 1 general-purpose isolado read-only (~50k tok, 12 tools, ~95s) — auditoria adversarial Financeiro.
+
+**Ações executadas**:
+- TAREFA 1 (NET-NEW get_advisors): SECURITY n=365 (42 ERROR / 322 WARN / 1 INFO) — 41 security_definer_view (ERROR), 1 rls_disabled_in_public (=alertas_telegram_dedup, #37), 125 rls_policy_always_true (corrobora SEC-001), 62 anon_security_definer_function_executable (VETOR NOVO: anon pode EXECUTE 62 fns SECURITY DEFINER), 65 function_search_path_mutable, 5 public_bucket_allows_listing (STORAGE — NOVO), 2 extension_in_public, 1 auth_leaked_password_protection, 1 rls_enabled_no_policy (campo_audit_logs). PERFORMANCE n=843 (505 WARN / 338 INFO) — 392 multiple_permissive_policies, 327 unused_index, 78 auth_rls_initplan, 35 duplicate_index, 11 unindexed_foreign_keys.
+- TAREFA 2 (NET-NEW Financeiro, agent + cross-check meu): módulo SAUDÁVEL. RLS ON nas 6 tabelas (contas_receber/contas_pagar/comissoes/pedidos_compra/fornecedores/lancamentos_caixa), SET ROLE anon=0 em todas (NÃO exposto — contraste positivo c/ SEC-001), 0 orphans, 0 double-entry, saldo invariante OK. Agent reportou 🔴 "receita não faturada R$4.445,71 (4 pedidos sem CR)"; REFUTEI via to_jsonb dos 4 pedidos: 1069/1070/PED-2026-0025/PED-2026-0026 = TODOS origem_externa=mubisys + skip_auto_cr=true + skip_auto_op=true + skip_auto_comissao=true (Mubisys cobra; by-design protocolo Obsidian 05-28); CR do 1069 soft-deleted 2026-04-14 coerente; status_fiscal nao_aplicavel/nao_iniciado. Restam 2 ⚠️: R$822,00 CP vencidas (2 títulos, verificar baixa externa); 4 tabelas financeiras com 0 linhas (dormentes/by-design).
+**Decisão tomada**: read-only (zero prod-write). Achados → STATE+ledger NEXT+Telegram. Advisors remediação BLOCKED-Junior (SEC-002 novo: revogar EXECUTE/views pode quebrar app; perf-migrations precisam janela+validação) com 1 rec cada; perf wins de baixo-risco (duplicate_index/auth_rls_initplan) viram default-exec [NAO-VALIDADO] no NEXT.
+**Resultado**: 2 entregas net-new read-only de alto valor (baseline advisors 40 ciclos atrasado + Financeiro auditado SAUDÁVEL com 1 false-positive REFUTADO via cross-check). Demonstra o processo adversarial funcionando (não aceitei o R$4,4k do agent cego).
+**Ledger update**: #41 → DONE; NEXT com SEC-002 + perf wins + herdados.
+**Commits**: planning #41 (3 cérebros) — hash no fechamento
+**Deploys**: nenhum
+**Token usage**: sessão principal moderada-alta (dumps de log grandes) + 1 agent isolado ~50k
+**Telegram**: enviada (ok) — confirmação no fechamento
