@@ -1,8 +1,9 @@
 # REGRAS DO MODO AUTÔNOMO CONTÍNUO (Scheduled Task — a cada 1h, 24/7)
 
-> Versão: 4.0 | Atualizado: 2026-05-28
+> Versão: 5.0 | Atualizado: 2026-05-29
 > Aplica APENAS quando rodando via scheduled task `croma-autonomous-progress`.
 > Sessão interativa com Junior segue regras do CLAUDE.md normalmente.
+> v5.0 (hardening pós-auditoria #1-#26): host Windows = fonte de verdade (anti falso-positivo virtiofs), fechamento blindado (Telegram+commit primeiro), agents obrigatórios em recon, mapear fluxo antes de corrigir, validar SQL antes de "pronto".
 
 ---
 
@@ -12,7 +13,7 @@ Ver `autonomous-mission.md`. Resumo:
 
 **Tornar a Croma Print a primeira gráfica gerida quase exclusivamente por IA.**
 **Mantra de cada ciclo: EXPLORAR → CORRIGIR → VALIDAR → ARRUMAR.**
-**Cadência: 1 ciclo/hora, 24/7. Tokens ilimitados (plano 20x). Autonomia decisória total.**
+**Cadência: 1 ciclo/hora, 24/7. Autonomia decisória total.**
 
 Plano-mãe: `docs/plano-ia/01_Estrategia/CROMA_4.0_PLANO_AUTONOMIA_TOTAL.md`
 
@@ -22,37 +23,35 @@ Plano-mãe: `docs/plano-ia/01_Estrategia/CROMA_4.0_PLANO_AUTONOMIA_TOTAL.md`
 
 Junior te deu autonomia AMPLA. **ESCOLHA** e EXECUTE. Justifique no log. **NUNCA termine o ciclo oferecendo "Opção A vs Opção B" pro Junior decidir.**
 
-Cada item NEXT precisa ter **default executável sem ele**. Itens que retornam pro ledger pedindo decisão do Junior = falha sua. Refine no momento de adicionar.
+Cada item NEXT precisa ter **default executável sem ele**. Se um achado exige decisão de negócio/risco do Junior, registra em BLOCKED com UMA recomendação tua (não A/B) + evidência, e segue pra outra tarefa — não trava o ciclo.
 
 Único caso pra parar: RESTRIÇÕES DURAS ou EMERGÊNCIA.
 
 ---
 
-## REGRA #1 — TRABALHO CONTÍNUO (CRÍTICO)
+## REGRA #1 — VERIFICAR ANTES DE ASSUMIR (CRÍTICO)
 
-Não há "ciclo passivo por falta de coisa pra fazer". O CRM tem:
-- Bugs latentes não descobertos
-- Drift entre source e deployed
-- Dados inconsistentes
-- Dívida técnica
-- Vulnerabilidades de segurança
-- Docs desatualizados
-- Refactors pequenos pendentes
-- Fases do CROMA 4.0 a avançar
-
-Sempre tem o que fazer. Modo PASSIVO só dispara em **gatilhos defensivos** (prod 5xx, build broken, etc.). Nunca por "nada a fazer".
+Não confiar em premissa sem checar:
+- Edge ACTIVE ≠ funcionando — smoketest real
+- "Configurado" ≠ funcional — query banco/env vars
+- Feature implementada ≠ completa — testar fluxo end-to-end
+- Migration no diretório ≠ aplicada — `list_migrations`
+- Schema diz consistente ≠ está — count cruzado FK
+- **"Fix aplicado" ≠ fix funcionou** — exige evidência de RUNTIME (evento no histórico/log real), não só inspeção estática
+- Antes de "tudo OK", PROVAR com evidência verificável
 
 ---
 
-## REGRA #2 — TOKENS NÃO SÃO RESTRIÇÃO (plano 20x)
+## REGRA #2 — PÉ NO ACELERADOR, MAS RESERVE O FECHAMENTO
 
-NÃO economizar:
-- Ler STATE.md inteiro se útil (123KB+)
-- Disparar 4-6 agents paralelos quando faz sentido
+NÃO economizar análise:
+- Ler STATE.md ≥500 linhas
+- Disparar agents paralelos quando faz sentido (DEFAULT, não luxo)
 - Análises profundas com múltiplas verificações
-- Não há limite de "30 min de execução" — usar o tempo necessário
 
-Limites razoáveis: max 6 agents simultâneos, max 250 LOC Edit cirúrgico em arquivo existente por ciclo (anti-corrupção Cowork — ver ciclo #21), max 500 LOC se for Write em arquivo NOVO.
+MAS: **tokens do PLANO são ilimitados, a JANELA DA SESSÃO não.** Recon pesado inline estoura a sessão e mata o fechamento (Etapa 8) — foi o que aconteceu nos ciclos #24 e #26 (escreveram cérebros mas não commitaram nem avisaram). Por isso AGENTS são DEFAULT (isolam contexto da sessão principal). **Reservar orçamento pro fechamento é obrigatório.**
+
+Limites: max 6 agents simultâneos; Edit cirúrgico em arquivo existente ≤250 LOC (anti-corrupção Cowork — #11/#14/#21); Write em arquivo NOVO até 500 LOC; arquivo grande → agent isolado ou Claude Code.
 
 ---
 
@@ -60,39 +59,31 @@ Limites razoáveis: max 6 agents simultâneos, max 250 LOC Edit cirúrgico em ar
 
 Cada execução é uma sessão isolada. Memória entre ciclos = arquivos do projeto + Obsidian.
 
+⚠️ **bash sandbox monta o repo via virtiofs com cache stale** — ele mente sobre o estado do working dir (ver Etapa 4). Para verdade do FS e para git commit/push, use o HOST via Windows-MCP.
+
 ---
 
 ## ACESSO A RECURSOS
 
 ### Mounts bash sandbox
-`CRM-Croma`, `Claude`, `outputs`, `uploads`. NÃO mounta Obsidian.
+`CRM-Croma`, `Claude`, `outputs`, `uploads`. NÃO mounta Obsidian. ⚠️ cache stale (virtiofs) — não confiar em `git status`/`git diff` do bash.
 
-### Obsidian (via Windows-MCP — CONFIRMADO funciona)
-```
-Ler memory: mcp__Windows-MCP__PowerShell
-  command: Get-Content -Path "C:\Users\Caldera\Obsidian\JARVIS\99-Meta\memory.md" -TotalCount 300 -Encoding UTF8
-
-Ler daily: mcp__Windows-MCP__PowerShell
-  command: $d=Get-Date -Format 'yyyy-MM-dd'; if(Test-Path "C:\Users\Caldera\Obsidian\JARVIS\10-Daily\$d.md"){Get-Content "C:\Users\Caldera\Obsidian\JARVIS\10-Daily\$d.md" -Encoding UTF8}
-
-Escrever daily: mcp__Windows-MCP__PowerShell
-  command: Add-Content -Path "C:\Users\Caldera\Obsidian\JARVIS\10-Daily\$(Get-Date -Format 'yyyy-MM-dd').md" -Value "## Autonomo HH:MM`n- ..." -Encoding UTF8
-```
-
-### MCP Croma (preferir execute_sql quando possível)
-A maioria das tools Croma são wrappers SQL → `execute_sql` direto resolve 95%.
-
-Para tools que precisam binário:
+### Obsidian + git commit/push + verdade do FS (via Windows-MCP — host real)
 ```
 mcp__Windows-MCP__PowerShell
-  command: & "C:\Users\Caldera\Claude\CRM-Croma\mcp-server\croma.cmd" <tool> '<json_sem_acentos>'
+  Ler memory: Get-Content -Path "C:\Users\Caldera\Obsidian\JARVIS\99-Meta\memory.md" -TotalCount 300 -Encoding UTF8
+  Escrever daily: Add-Content -Path "C:\Users\Caldera\Obsidian\JARVIS\10-Daily\$(Get-Date -Format 'yyyy-MM-dd').md" -Value "..." -Encoding UTF8
+  Git (commit/push pelo HOST): cd C:\Users\Caldera\Claude\CRM-Croma; git add -A; git commit -m "..."; git push; git log --oneline -1
 ```
+
+### MCP Croma (preferir execute_sql)
+A maioria das tools Croma são wrappers SQL → `execute_sql` direto resolve 95%. Binário via `& "...\mcp-server\croma.cmd" <tool> '<json_sem_acentos>'`.
 
 ### Supabase (sempre disponível)
 MCP `d972dcbc-...` — execute_sql, apply_migration, deploy_edge_function, get_logs, list_edge_functions.
 
 ### Web/Git (sempre disponível)
-`mcp__workspace__web_fetch` + `mcp__workspace__bash` com git.
+`mcp__workspace__web_fetch` + `mcp__workspace__bash` (git do bash só pra LER recon, NUNCA como prova de corrupção nem pra commit).
 
 ---
 
@@ -106,120 +97,89 @@ Múltiplos Read no mesmo message:
 - `.planning/autonomous-rules.md` (este)
 - `.planning/autonomous-ledger.md` ← OBRIGATÓRIO
 - `.planning/autonomous-log.md` (últimas 500 linhas)
-- `.planning/STATE.md` ← **CÉREBRO ATIVO** — últimas 500 linhas mínimo, ler inteiro se útil (~123KB OK)
+- `.planning/STATE.md` ← **CÉREBRO ATIVO** — últimas 500 linhas mínimo
 - `.planning/REQUIREMENTS.md`
 
-**STATE.md é cérebro vivo do CRM. Tratar como tal — ler profundo, Grep dirigido quando precisar histórico específico de uma Edge/módulo, NÃO economizar.**
+### Etapa 2 — Auto-diálogo (registrar literalmente no log — 7 perguntas)
 
-### Etapa 2 — Auto-diálogo
-
-Registre literalmente no log:
 1. "O que os 3 ciclos anteriores fizeram?"
-2. "Qual gap mais útil pra atacar AGORA?" (explorar/corrigir/validar/arrumar)
-3. "Conflita com IN-PROGRESS ou BLOCKED?"
-4. "Estou em MODO PASSIVO?"
-5. "Critério de sucesso mensurável?"
+2. "Dia da semana → módulo+Edge da rotação?"
+3. "Qual gap mais útil pra atacar AGORA?" (rotação | P0/P1 NEXT | bug crítico | arrumar drift)
+4. "Conflita com IN-PROGRESS ou BLOCKED?"
+5. "STATE.md ou Obsidian me dão contexto novo?"
+6. "Estou em MODO PASSIVO?"
+7. "Critério de sucesso mensurável (1 por tarefa escolhida)?"
 
 ### Etapa 3 — Vault Obsidian (CÉREBRO CROSS-PROJETO ATIVO, via Windows-MCP)
 
-NÃO é "best effort opcional". Vault Obsidian é cérebro cross-projeto que VOCÊ usa.
-
-**Sempre ler em paralelo**:
-1. `99-Meta/memory.md` — 500 linhas (cross-projeto, decisões arquiteturais, lições)
-2. Daily de hoje (`10-Daily/YYYY-MM-DD.md`) — se existe
-3. Daily de ontem — pra continuidade
-4. `Get-ChildItem` no root do vault — mapear pastas relevantes pra contexto futuro
-
+**Sempre ler em paralelo**: `99-Meta/memory.md` (500 linhas), daily de hoje, daily de ontem, `Get-ChildItem` no root do vault.
 ```
 mcp__Windows-MCP__PowerShell
-  command: $d=Get-Date -Format 'yyyy-MM-dd'; $y=(Get-Date).AddDays(-1).ToString('yyyy-MM-dd'); Write-Output "=== memory ==="; Get-Content "C:\Users\Caldera\Obsidian\JARVIS\99-Meta\memory.md" -TotalCount 500 -Encoding UTF8 -ErrorAction SilentlyContinue; foreach($f in @("$d","$y")){ $p="C:\Users\Caldera\Obsidian\JARVIS\10-Daily\$f.md"; if(Test-Path $p){ Write-Output "=== daily $f ==="; Get-Content $p -Encoding UTF8 } }; Write-Output "=== pastas vault ==="; Get-ChildItem -Path "C:\Users\Caldera\Obsidian\JARVIS" -Directory | Select-Object -ExpandProperty Name
+  command: $d=Get-Date -Format 'yyyy-MM-dd'; $y=(Get-Date).AddDays(-1).ToString('yyyy-MM-dd'); Write-Output "=== memory ==="; Get-Content "C:\Users\Caldera\Obsidian\JARVIS\99-Meta\memory.md" -TotalCount 500 -Encoding UTF8 -ErrorAction SilentlyContinue; foreach($f in @("$d","$y")){ $p="C:\Users\Caldera\Obsidian\JARVIS\10-Daily\$f.md"; if(Test-Path $p){ Write-Output "=== daily $f ==="; Get-Content $p -Encoding UTF8 } }; Write-Output "=== pastas ==="; Get-ChildItem -Path "C:\Users\Caldera\Obsidian\JARVIS" -Directory | Select-Object -ExpandProperty Name
 ```
 
-Se algo falhar individualmente, seguir com o resto.
+### Etapa 4 — Health check + GUARDRAIL (HOST = fonte de verdade)
 
-### Etapa 4 — Health check paralelo (COM GUARDRAIL ANTI-CORRUPÇÃO)
-
-- Vercel `web_fetch` → 200 (se timeout, fallback Windows-MCP `Invoke-WebRequest`)
+- Vercel `web_fetch` → 200 (fallback Windows-MCP `Invoke-WebRequest`)
 - Supabase `get_logs` 60min (api E edge) → 5xx count
 - `list_edge_functions` → ACTIVE conforme ledger
-- `git status --short` + `git branch --show-current` + `git diff --stat HEAD`
-- Branch ≠ main → ABORTAR
+- Branch via Windows-MCP `git branch --show-current` ≠ main → ABORTAR
 
-**🚨 GUARDRAIL ANTI-CORRUPÇÃO** (incidente 2026-05-28 08:30):
-- Se `git diff --stat HEAD` mostra **≥3 arquivos modified FORA de `.planning/` ou `STATE.md`** → CORRUPÇÃO PROVÁVEL
-- Validar com `tail -3` em 2-3 arquivos suspeitos: se `\ No newline at end of file` + corte abrupto (`<`, palavra incompleta, comentário cortado) → **CONFIRMADO CORRUPÇÃO**
-- **AÇÃO**: ABORTAR ciclo + Telegram 🔴 `CORRUPCAO_DETECTADA + N arquivos + listar suspeitos` + log VERMELHO + STATE append "ciclo abortado por corrupção working dir"
-- NÃO tentar consertar via `git checkout` autonomamente (próximo ciclo OU Junior decide)
-- Verificar `.git/index.lock` antes de qualquer comando git: se existe há >5min, remover; se recente, ABORTAR (outro ciclo rodando)
+**🚨 GUARDRAIL ANTI-CORRUPÇÃO — o BASH MENTE sobre o working dir:**
+O bash sandbox (virtiofs cache stale) mostra arquivos "modified" / deltas fantasma (ex.: −1500 linhas) que NÃO existem no host. Foram **5 falsos-positivos seguidos (#19-#25)**, cada um queimando o ciclo. `git status`/`git diff` do BASH **NÃO é evidência de corrupção**.
 
-### Etapa 5 — Decidir e executar (VOCÊ ESCOLHE — pé no acelerador)
+FONTE DE VERDADE = HOST via Windows-MCP:
+```
+mcp__Windows-MCP__PowerShell
+  command: cd C:\Users\Caldera\Claude\CRM-Croma; git status --short; foreach($f in @(".planning\STATE.md",".planning\autonomous-ledger.md",".planning\autonomous-log.md","supabase\functions\agent-cron-loop\index.ts")){ if(Test-Path $f){ "$f | $((Get-Content $f).Count)L | tail=$((Get-Content $f -Tail 1))" } }
+```
+CORRUPÇÃO só é REAL se o **HOST** mostrar arquivo truncado (linhas << esperado) OU tail cortado no meio (não termina em `}` `)` `;` `*/` ou texto coerente). Host limpo → bash mentiu → log "guardrail: bash falso-positivo, host limpo" e **SEGUIR NORMAL**. **NUNCA abortar por diff do bash.** `git checkout` só com corrupção REAL confirmada no host.
+
+### Etapa 5 — Decidir e executar (VOCÊ ESCOLHE — 1-3 tarefas)
 
 Heurística de prioridade:
+1. **CORRIGIR bug crítico em prod** (5xx ativo) → fix imediato
+2. **CORRIGIR P0/P1 já no ledger NEXT**
+3. **ROTAÇÃO SISTEMÁTICA — módulo + Edge do dia** (ver `autonomous-mission.md`): query banco + smoketest + agent adversarial Edge + gap report
+4. **ARRUMAR**: drift source/deploy, cleanup TEST (cascade explícito), refactor pequeno, sync docs/.context
+5. **VALIDAR**: smoketest RPCs, regression check pós-deploy
+6. **AVANÇAR CROMA 4.0**: Edge autonomous-cycle-runner, pré-req Fase 2, seed agent_*, prospecção SHADOW, triggers formais, Memory Layer
 
-**1. CORRIGIR bug crítico em prod** (5xx ativo) → fix imediato
+**Múltiplas categorias num ciclo OK.**
 
-**2. CORRIGIR vulnerabilidade/P0 já no ledger** (ex: patch ai-chat-portal v16, BUG-JWT)
+**REGRAS DE OURO DA EXECUÇÃO (anti-retrabalho — lições #17-#26):**
+- **MAPEAR ANTES DE CORRIGIR**: antes de "consertar" um fluxo, mapear TODOS triggers+funções+states (`SELECT proname FROM pg_proc WHERE prosrc ILIKE '%<dominio>%'` + triggers das tabelas + ler validator de state-machine) e confirmar com contagem de eventos no histórico QUAL função dispara no path REAL. (#17-#25 perseguiram `fn_check_production_completed` — 0 eventos — por 4 ciclos.)
+- **NÃO declarar vitória sem runtime**: "fix aplicado" só vira DONE com evidência de execução real, nunca só inspeção estática. (#10 "rules corrigidas" com cron morto 4 dias; #18 "cadeia destravada" com trigger dormente.)
+- **SQL/migration só "pronto" no NEXT se VALIDADO** contra schema real (EXPLAIN/SELECT do WHERE/tipos via information_schema/pg_enum). Senão marca `[NAO-VALIDADO]`. (Backfill Fase 1.2 ficou inválido 2 ciclos.)
 
-**3. ROTAÇÃO SISTEMÁTICA — módulo + Edge do dia** (ver `autonomous-mission.md` tabela):
-   - Seg: Comercial + whatsapp-webhook v44
-   - Ter: Orçamento + briefing-beira-rio v10
-   - Qua: Pedidos + ai-gerar-orcamento v29
-   - Qui: Produção + ai-chat-portal v15
-   - Sex: Instalação + mcp-bridge-worker v7
-   - Sáb: Financeiro + portal-upload-assinatura v1 + pricing-engine
-   - Dom: Estoque/Fiscal/IA + auditoria migrations/RLS
+### Etapa 6 — Executar (ORQUESTRADOR AGRESSIVO)
 
-   **Aplicar princípio "verificar antes de assumir"**: query banco + smoketest + análise de código, não confiar em "deveria funcionar"
+**Agents paralelos = DEFAULT.** Max 6 simultâneos.
 
-**4. ARRUMAR**: drift source/deploy, cleanup TEST (com cascade explícito), refactor pequeno, sync docs/.context
+Ambição por ciclo: 1-3 tarefas substanciais, múltiplos commits atômicos, deploy SHADOW + smoketest normal.
 
-**5. VALIDAR**: smoketest exaustivo de RPCs, regression check pós-deploy recente
+Briefing obrigatório de cada agent: escopo EXATO (filepath/linhas/função), critério mensurável, modo adversarial ("questione premissas, verificações cruzadas"), "verificar antes de assumir", resposta ≤300 palavras.
 
-**6. AVANÇAR CROMA 4.0**: P0/P1 do NEXT (Edge autonomous-cycle-runner, seed agent_*, prospecção SHADOW, triggers formais, ai_requests/ai_responses, Memory Layer)
+**Inline só pra tool call único OU ≤2 leituras triviais.** Recon/exploração que toque >2 funções/arquivos/Edges = AGENT(S) PARALELO(S) OBRIGATÓRIO (≥2 quando há alvos independentes). Recon de fluxo inteiro inline é ANTI-PATTERN (#26). Se passar de ~80k tokens sem agent, você errou — delegue.
 
-**Múltiplas categorias num ciclo só** OK (plano 20x): ex: ciclo pode fazer (a) ROTAÇÃO módulo do dia + (b) ARRUMAR drift detectado + (c) commit/deploy se aplicável. Apenas garantir cada uma com critério de sucesso claro.
-
-### Etapa 6 — Executar (ORQUESTRADOR AGRESSIVO, PÉ NO ACELERADOR)
-
-**Agents paralelos = DEFAULT.** Max 6 simultâneos no mesmo turno.
-
-**Ambição por ciclo (plano 20x permite)**:
-- 1-3 tarefas substanciais por ciclo (era 1-2)
-- Múltiplos commits permitidos (cada feat/fix/chore atômico separado)
-- Deploy SHADOW + smoketest é fluxo normal, não exceção
-- Refactor: Edit cirúrgico em arquivo existente até **250 LOC** (era 500 — baixado ciclo #21 após Edit em arquivo de 252 LOC corromper tail). Write em arquivo NOVO pode ir até 500 LOC.
-
-Briefing obrigatório de cada agent:
-- Escopo EXATO (filepath, linhas, função)
-- Critério mensurável
-- Modo adversarial: "questione premissas, verificações cruzadas"
-- Princípio "verificar antes de assumir" aplicado
-- Resposta ≤300 palavras
-
-Inline só pra tool call único.
-
-Claude Code recomendar SE arquivo >800 linhas (era 500) ou refactor cross-arquivo grande → criar `HANDOFF-CLAUDE-CODE-YYYY-MM-DD-HHMM.md` + Telegram.
+Claude Code recomendar SE arquivo >800 linhas ou refactor cross-arquivo grande → `HANDOFF-CLAUDE-CODE-YYYY-MM-DD-HHMM.md` + Telegram.
 
 ### Etapa 7 — Validar
 
-Smoketest idempotente. Deploy quebrou → ROLLBACK + 🔴.
+Smoketest idempotente. Commit confirmado pelo HOST (`git log --oneline -1` + push no remote — NÃO confiar no git do bash). Deploy quebrou → ROLLBACK + 🔴.
 
-### Etapa 8 — Atualizar 3 CÉREBROS (PARALELO, OBRIGATÓRIO)
+### Etapa 8 — FECHAMENTO BLINDADO (ordem fixa, OBRIGATÓRIO)
 
-Múltiplos Edit/PowerShell no mesmo turno:
+Lição #24/#26: ciclos morreram ANTES de commitar/avisar. Fechamento é PRIORIDADE, não sobra. Se o contexto estiver acabando, PARE tarefas novas e FECHE.
 
-1. **`autonomous-log.md`** — append SEMPRE (formato definido)
-2. **`autonomous-ledger.md`** — NEXT→DONE/IN-PROGRESS. NÃO APAGAR DONE. Cada NEXT novo precisa default executável sem Junior.
-3. **`STATE.md`** — **ATUALIZAR SEMPRE** (não condicional). Append entrada nova "## Ciclo autônomo #N — YYYY-MM-DD HH:MM" no topo (após cabeçalho), 1-2 parágrafos sobre o que fez + achados. Mesmo ciclos passivos: registrar "passivo: motivo + health snapshot". **STATE.md é histórico vivo do CRM.**
-4. **Vault Obsidian daily** — **SEMPRE via Windows-MCP**:
+ORDEM:
+1. **3 cérebros**: `autonomous-log.md` (append), `autonomous-ledger.md` (NEXT→DONE/IN-PROGRESS, NÃO apagar DONE, NEXT com default executável + sem Opção A/B), `STATE.md` (entrada nova "## Ciclo autônomo #N — YYYY-MM-DD HH:MM" no topo + achados + mudanças prod).
+2. **TELEGRAM JÁ — com prova de retorno** (`"ok":true`/HTTP 200). Via 1 curl, fallback Via 2 Windows-MCP. Logar "enviada (ok)" OU "FALHOU 2x". **PROIBIDO "a enviar".**
+3. **COMMIT + PUSH pelo HOST**: `mcp__Windows-MCP__PowerShell` → `cd C:\Users\Caldera\Claude\CRM-Croma; git add -A .planning STATE.md; git commit -m "chore(autonomo): ciclo #N cerebros"; git push; git log --oneline -1`. Confirmar commit no remote.
+4. **Obsidian daily** via Windows-MCP (+ memory.md só se insight cross-projeto):
    ```
    $d=Get-Date -Format 'yyyy-MM-dd'; $h=Get-Date -Format 'HH:mm'; $p="C:\Users\Caldera\Obsidian\JARVIS\10-Daily\$d.md"; if(-not (Test-Path $p)){ "# $d`n`n## Ciclos Autonomos CRM-Croma`n" | Set-Content -Path $p -Encoding UTF8 }; Add-Content -Path $p -Value "`n## Autonomo $h (ciclo #N)`n- Tipo: <tipo>`n- Tarefa: <titulo>`n- Resultado: <breve>`n" -Encoding UTF8
    ```
-5. **Vault Obsidian memory** — APENAS se descoberta cross-projeto importante (padrão novo, decisão arquitetural, lição cross-stack):
-   ```
-   Add-Content -Path "C:\Users\Caldera\Obsidian\JARVIS\99-Meta\memory.md" -Value "`n## $(Get-Date -Format 'yyyy-MM-dd HH:mm') — CRM-Croma autonomo`n- <insight>`n" -Encoding UTF8
-   ```
-6. **Telegram**
 
 ---
 
@@ -230,10 +190,11 @@ Autonomo #N <EMOJI>
 HH:MM CRM Croma
 
 Tipo: explorar | corrigir | validar | arrumar
-Tarefa: <título>
+Modulo do dia: <...>
+Tarefa(s): <1-3 títulos>
 Resultado: <2 linhas>
 
-[se commit] Commit: <hash7>
+[se commit] Commits: <hash7>
 [se deploy] Edge: <nome vN>
 [se achados] Achados: <breve>
 
@@ -241,7 +202,7 @@ Logs: planning/autonomous-log
 Ledger: planning/autonomous-ledger
 ```
 
-🟢 VERDE | 🟡 AMARELO | 🔴 VERMELHO
+🟢 VERDE | 🟡 AMARELO | 🔴 VERMELHO. Estado terminal SEMPRE "enviada (ok)" ou "FALHOU" — nunca "a enviar".
 
 ---
 
@@ -252,21 +213,24 @@ Ledger: planning/autonomous-ledger
 ✅ Health checks
 ✅ Append logs/planning/STATE/ledger/Obsidian
 ✅ Telegram
-✅ Commit + push main (atômico, conventional)
-✅ `apply_migration` idempotente
-✅ `deploy_edge_function` (respeitar janela horária pra Edges cliente)
+✅ Commit + push main pelo HOST (atômico, conventional)
+✅ `apply_migration` idempotente E validado contra schema
+✅ `deploy_edge_function` (respeitar janela horária)
 ✅ SQL WRITE em TEST/SHADOW
 ✅ Cleanup TEST com cascade explícito (preservar evidências DONE)
 ✅ Criar/modificar docs/planning
-✅ 4-6 agents paralelos
+✅ 6 agents paralelos
 ✅ Patches em produção com SHADOW + smoketest
 
 ---
 
 ## RESTRIÇÕES DURAS (segurança não negocia)
 
-⛔ Deploy de Edge cliente (whatsapp-webhook, briefing-beira-rio, ai-gerar-orcamento, portal-upload-assinatura) entre 8h-20h BRT — janela 22h-7h ou FDS. Edges internas (ai-chat-portal SHADOW, mcp-bridge-worker) qualquer hora.
-⛔ Edit cirúrgico em arquivo existente >250 LOC num ciclo (Cowork Edit tool corrompe tail silenciosamente — evidência ciclos #11, #14, #21). Use Write em arquivo NOVO ou delegue a agent isolado/Claude Code local. Quebra em PRs se necessário.
+⛔ Deploy de Edge cliente (whatsapp-webhook, briefing-beira-rio, ai-gerar-orcamento, portal-upload-assinatura) entre 8h-20h BRT — janela 22h-7h ou FDS. Edges internas qualquer hora.
+⛔ Edit cirúrgico em arquivo existente >250 LOC (Cowork Edit corrompe tail — #11/#14/#21). Write em arquivo NOVO ou agent isolado/Claude Code.
+⛔ **Abortar ciclo por diff do BASH sem confirmar corrupção no HOST (Windows-MCP)**
+⛔ **Declarar "a enviar" no Telegram — ou enviou (com prova) ou FALHOU**
+⛔ **Marcar SQL "pronto" no NEXT sem validar contra schema**
 ⛔ Push --force, drop coluna, rewrite history, DELETE em massa sem filtro
 ⛔ Branch ≠ main → ABORTAR
 ⛔ Refazer DONE
@@ -281,13 +245,13 @@ Ledger: planning/autonomous-ledger
 
 - Supabase >10 erros 5xx última hora
 - Vercel build broken
-- Working dir mudanças não esperadas
+- **Corrupção REAL confirmada no HOST** (não falso-positivo do bash)
 - Branch ≠ main
 - Último log VERMELHO sem Junior responder
 - Mesma tarefa 3 ciclos sem progresso
 - Ciclo anterior <15 min atrás
 
-→ Log "passivo: <motivo>" + 🟡 + ENCERRA
+→ Log "passivo: <motivo>" + STATE + Obsidian daily + 🟡 + ENCERRA (com Telegram)
 
 ---
 
@@ -298,7 +262,7 @@ Ledger: planning/autonomous-ledger
 - Push quebrou build em main
 - Bot Claudete sem heartbeat >2h
 
-→ NÃO CONSERTAR. 🔴 + log VERMELHO + ENCERRA.
+→ NÃO CONSERTAR. 🔴 + log VERMELHO + STATE + Obsidian + Telegram + ENCERRA.
 
 ---
 
@@ -309,41 +273,32 @@ Ledger: planning/autonomous-ledger
 
 **Status**: 🟢 VERDE | 🟡 AMARELO | 🔴 VERMELHO
 **Tipo**: explorar | corrigir | validar | arrumar
-**Auto-diálogo**:
-- 3 ciclos anteriores: ...
-- Gap mais útil agora: ...
-- Conflito IN-PROGRESS/BLOCKED: ...
-- Modo: ATIVO | PASSIVO
-- Critério de sucesso: ...
-
-**Health check**: Vercel ... | logs ... | Edges ... | branch=main ...
-
+**Auto-diálogo**: (7 perguntas respondidas)
+**Health check**: Vercel ... | logs ... | Edges ... | branch=main ... | guardrail host: OK/falso-positivo
 **Agents disparados**: <N + escopo>
-
-**Ações executadas**:
-- ...
-
+**Ações executadas**: - ...
 **Decisão tomada**: <justificativa breve>
-
-**Resultado**: <2-3 linhas>
-
+**Resultado**: <2-3 linhas, com evidência de runtime quando "fix">
 **Ledger update**: <DONE/IN-PROGRESS/NEXT alterado>
-**Commits**: <hash7 + msg> (se aplicável)
+**Commits**: <hash7 + msg> (confirmado no remote via host)
 **Deploys**: <Edge vN> (se aplicável)
 **Token usage**: ~XXk
-**Telegram**: enviada | falhou
+**Telegram**: enviada (ok) | FALHOU
 ```
 
 ---
 
 ## CHECKLIST FINAL
 
-- [ ] Auto-diálogo registrado
-- [ ] Health check completo
+- [ ] Auto-diálogo registrado (7 perguntas)
+- [ ] Health check + GUARDRAIL via HOST (Windows-MCP), não bash
 - [ ] Ledger consultado, DONE intacto
+- [ ] Recon multi-arquivo via AGENTS paralelos (não inline)
+- [ ] MAPEAR fluxo antes de corrigir; vitória só com evidência de runtime
 - [ ] Tarefa(s) executadas e justificadas (sem "Opção A/B")
-- [ ] Agents paralelos usados (≥1 se trabalho substancial)
+- [ ] SQL no NEXT validado contra schema (ou marcado [NAO-VALIDADO])
 - [ ] Validação pós-execução
 - [ ] log/ledger/STATE atualizados
 - [ ] Obsidian daily escrito via Windows-MCP
-- [ ] Telegram enviado SEM markdown SEM `.md` em paths
+- [ ] Telegram enviado COM prova de retorno (nunca "a enviar")
+- [ ] Commit dos 3 cérebros pushado pelo HOST e confirmado (git log -1)
