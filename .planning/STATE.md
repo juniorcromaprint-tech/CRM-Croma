@@ -1,4 +1,4 @@
-
+﻿
 # STATE — CRM Croma
 
 **Última atualização**: 2026-05-29 00:30 BRT — Ciclo autônomo #27 — 🟢 Rotação SEXTA, 1a auditoria do módulo Instalação (nunca tocado — ciclos #1-#26 foram TODOS Quinta/Produção). Chain Instalação CABEADA via 4 triggers DB (não-stub) MAS installation_completed MORTO desde 2026-05-05 (jobs/OIs criados, max hoje 14:04 BRT, porém 0 finalizados em 25d+; 15 Pendente empilhando) — P0 INSTAL-01. App Campo "offline-first" é LABEL: VitePWA só NetworkFirst, sem IndexedDB/fila/replay, JobSignature bloqueia assinatura offline → conclusão exige rede = provável causa raiz (P0 INSTAL-02, build Claude Code). mcp-bridge-worker v8 saudável (worker genérico MCP↔ERP, não Instalação) mas ai_responses.insert L84 sem .select().single() (BUG MCP-01, perda silenciosa sob RLS). v25 ai-compor-mensagem deployado/correto mas retry NUNCA exercitado (prospecção idle desde 16:02 BRT 28/05, pool candidatos vazio = exaustão provável benigna). RLS ✅ ON nas 15 tabelas campo; campo_audit_logs morto (0 policies/0 rows). Zero prod write (P0 arquiteturais/operacionais; fix MCP-01 documentado pra agent isolado). Sync rotation v7→v8 + commit planning.
@@ -9,7 +9,23 @@
 
 **Penúltima atualização**: 2026-05-28 21:05 BRT — Ciclo autônomo #24 — 🔴 ACHADO P0 NOVO CRÍTICO: fix #18 (trg_check_production_completed) está **DORMENTE — gap Fase 1.2 NÃO resolvido**. 3 OPs finalizado (15/16/17) chegaram a esse status SEM marcar producao_etapas.concluida (path UPDATE direto). Trigger só roda em `AFTER UPDATE OF status ON producao_etapas`. **Pedidos 1070 + PED-2026-0025 seguem `em_producao` 4 dias após ciclo #18 declarar destrava estrutural**. + Recon ai-compor-mensagem v24 confirma 417 LOC (acima threshold 250 — agent isolado obrigatório). Edit cirúrgico EXATO documentado para deploy v25 em janela 22h+ BRT (próximo ciclo #25). + 2 achados HIGH novos: 19 etapas concluida sem tempo_real_min (Gantt cego para análise), 2 setores zerados (Router/Corte, Serralheria). Spike 500 ai-compor-mensagem v24 SEGUE ATIVO há 4h+ (cluster 20:00 + 20:20 BRT, ZERO agent_messages criadas desde 17:00 BRT).
 
-## Ciclo autonomo #28 - 2026-05-29 01:07 BRT - INSTAL-03 observabilidade (view risco-zero) + agent REFUTOU premissa #27 + watch-items frescos VERDE
+## Ciclo autonomo #29 - 2026-05-29 02:05 BRT - MCP-01 fix DEPLOYADO v9 (runtime-validado) + INSTAL-04 emitter achado (drift DB-only) VERDE
+
+**Mantra**: CORRIGIR (MCP-01 deploy v9) + EXPLORAR (INSTAL-04 emitter) + VALIDAR (smoketest runtime + HOST integrity). Hora 02:05 BRT Sexta (janela aberta; #28 as 01:25, 40min - sem gatilho passivo). Health pre VERDE: Vercel 200, edge 60min ZERO 5xx (mcp-bridge-worker v8 ~1/min 200), API 0 5xx, 76 Edges ACTIVE, branch=main HEAD 802f037, guardrail HOST LIMPO. 2 agents paralelos (1 write + 1 read).
+
+### TAREFA 1 - MCP-01 deploy v9 mcp-bridge-worker (agent isolado)
+Bug MCP-01 (auditorias #27/#28) confirmado adversarial: insert ai_responses sem .select().single() + 4 .update() sem checagem -> sob RLS perda silenciosa (request marcado completed sem resposta gravada). Fix cirurgico minimo (sem novos imports/helpers): adicionado .select().single() + captura {data,error} + console.error estruturado no insert; 4 updates instrumentados. Deploy v8->v9, sha 2853ad7b->eaeabecf2950c304, verify_jwt:true PRESERVADO. SMOKETEST RUNTIME: 3 ciclos cron v9 todos 200 (05:14/05:15/05:16 UTC), cutover limpo do v8 (ult 05:13), 0 5xx. Local sincronizado via Write (261 LOC, tail }), git diff +17/-7, HOST verificado com fix presente. Backup v8 em outputs.
+
+### TAREFA 2 - INSTAL-04 reconciliacao emitter (agent paralelo read-only)
+installation_order_auto_created (22 lifetime, disparou hoje 14:04 BRT) e emitido por public.fn_notificar_nova_oi() SECURITY DEFINER via trigger trg_notificar_nova_oi AFTER INSERT em ordens_instalacao. Payload {pedido_id, pedido_numero, cliente_id, cliente_nome, auto_generated, notificar_junior} bate com os 5 eventos inspecionados (CALCADOS BEIRA RIO, ultimo PED-2026-0026). VEREDICTO: DRIFT DB-ONLY - DDL so existe como spec em planning/phases/FASE-3-AUTOMACAO-FLUXO L549-567 (nao executavel); grep zero em migrations e mcp-server. Refutado migration 099 e MCP server. View vw_instalacao_oi_sem_job (#28) confirmada OK (count 0).
+
+### Decisao + anti-pattern evitado
+NAO usei Cowork Edit no index.ts 251 LOC (>250 corrompe - licao #21); agent usou Write completo + tail-check, HOST confirmou integridade (261 LOC tail }). NAO versionei fn_notificar_nova_oi de madrugada unmonitored (SECURITY DEFINER, prod funciona, sem urgencia -> NEXT com def ja capturada). NAO apliquei INSTAL-03 emit migration (janela MONITORADA, Junior dormindo).
+
+### Proxima sugestao (ciclo #30)
+P1 - versionar fn_notificar_nova_oi + trg em migration idempotente (fecha drift INSTAL-04; def capturada pelo agent). P1 - INSTAL-03 emit migration (janela monitorada). P1 - adotar safe-insert.ts nas 12 Edges Padrao B. Handoff - INSTAL-02 offline-first (Claude Code). Watch - prospeccao idle 16h+; chain instalacao 24d sem conclusao, jobs Pendente 18.
+
+---## Ciclo autonomo #28 - 2026-05-29 01:07 BRT - INSTAL-03 observabilidade (view risco-zero) + agent REFUTOU premissa #27 + watch-items frescos VERDE
 
 **Mantra**: EXPLORAR (mapear fn_create_job_from_ordem) + CORRIGIR/ARRUMAR (view observabilidade) + VALIDAR (watch-items). Hora 01:07 BRT Sexta (janela Edge cliente aberta; #27 as 00:30, 37min - sem gatilho passivo). Health pre: Vercel 200, edge 60min ZERO 5xx (cascade #22-26 encerrado), 76 Edges ACTIVE, branch=main HEAD 00c71ff, guardrail HOST LIMPO (0 modified, tails integros).
 

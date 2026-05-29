@@ -1336,3 +1336,14 @@ Padrao IDENTICO ao incidente 08:30: EOF abrupto sem newline final, arquivos cort
 **Deploys**: nenhum (1 migration DDL view)
 **Token usage**: ~120k
 **Fechamento**: Telegram enviada (ok) message_id 3032 | commit+push origin/main | Obsidian daily atualizado.
+
+## Autonomo 02:05 (ciclo #29)
+- Tipo: corrigir + explorar + validar (2 agents paralelos, 1 write + 1 read)
+- Modulo do dia: Instalacao (Sexta) - executei os NEXT documentados #27/#28 (MCP-01 + INSTAL-04)
+- Health pre VERDE: Vercel 200, edge 60min ZERO 5xx (mcp-bridge-worker v8 ~1/min 200), API 0 5xx, 76 Edges ACTIVE, branch=main HEAD 802f037, guardrail HOST LIMPO (3 untracked herdados, 0 modified). #28 as 01:25 (40min - sem gatilho passivo).
+- TAREFA 1 (corrigir) MCP-01: deploy v9 mcp-bridge-worker via agent isolado. Bug confirmado adversarial: ai_responses insert SEM .select().single() + 4 .update() sem check -> perda silenciosa sob RLS (request completed sem resposta). Fix cirurgico minimo sem novos imports: +.select().single()+{data,error}+console.error no insert; 4 updates instrumentados. verify_jwt:true PRESERVADO. sha 2853ad7b->eaeabecf. SMOKETEST RUNTIME: 3 ciclos cron v9 200 (05:14/05:15/05:16 UTC), cutover limpo v8 05:13->v9 05:14, 0 5xx. Local sync via Write (261 LOC tail }), git diff +17/-7, HOST verificado fix presente. Backup v8 em outputs.
+- TAREFA 2 (explorar) INSTAL-04: agent paralelo read-only achou emitter de installation_order_auto_created = fn_notificar_nova_oi() SECURITY DEFINER via trigger trg_notificar_nova_oi AFTER INSERT ordens_instalacao. Payload bate com 5 eventos (CALCADOS BEIRA RIO, ultimo PED-2026-0026 14:04 BRT). VEREDICTO: DRIFT DB-ONLY - DDL so como spec em planning/phases/FASE-3 (nao executavel), zero em migrations/mcp-server. View vw_instalacao_oi_sem_job (#28) OK count 0.
+- Verificar antes de assumir: agent 1 confirmou bug ANTES do fix + smoketest runtime (nao so sha); agent 2 provou emitter via pg_get_functiondef + payload cross-check; HOST integrity check pos-Write ANTES de commit.
+- Anti-pattern evitado: NAO Cowork Edit no index.ts 251 LOC (>250 corrompe #21 - agent usou Write+tail-check). NAO versionei fn_notificar_nova_oi de madrugada (SECURITY DEFINER, sem urgencia -> NEXT). NAO apliquei INSTAL-03 emit migration (janela MONITORADA, Junior dormindo).
+- Resultado: VERDE. 1 deploy interno (v9), 0 migration, commits planning+source.
+- Fechamento: Telegram + commit+push HOST + Obsidian daily (abaixo).

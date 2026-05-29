@@ -1,4 +1,4 @@
-# LEDGER ANTI-REGRESSÃO
+﻿# LEDGER ANTI-REGRESSÃO
 
 > **REGRA DURA**: TODO ciclo autônomo DEVE consultar este arquivo ANTES de escolher tarefa.
 > Trabalho listado em DONE: **NÃO REFAZER. NUNCA.**
@@ -8,6 +8,13 @@
 
 ## DONE — Trabalho consolidado em produção (NÃO TOCAR sem motivo grande)
 
+### Ciclo autonomo #29 - VERDE Rotacao SEXTA (Instalacao): MCP-01 fix DEPLOYADO v9 mcp-bridge-worker (runtime-validado 3 ciclos cron 200) + INSTAL-04 emitter ACHADO (fn_notificar_nova_oi drift DB-only) (2026-05-29 02:05)
+- Health pre VERDE: Vercel 200, edge 60min ZERO 5xx, API 0 5xx, 76 Edges ACTIVE, branch=main HEAD 802f037, guardrail HOST LIMPO. #28 as 01:25 (40min).
+- TAREFA 1 MCP-01 EXECUTADA (agent isolado write, 106k tokens, 15 tools): deploy v9 mcp-bridge-worker. Bug confirmado adversarial (insert ai_responses sem .select().single() + 4 .update() sem check -> perda silenciosa RLS, request completed sem resposta). Fix cirurgico minimo SEM novos imports: +.select().single()+{data,error}+console.error no insert; 4 updates instrumentados. verify_jwt:true PRESERVADO. sha 2853ad7b->eaeabecf2950c304. SMOKETEST RUNTIME (evidencia real, nao so sha): 3 ciclos cron v9 200 (05:14/05:15/05:16 UTC), cutover limpo v8 05:13->v9 05:14, 0 5xx. Backup v8 outputs. Local sync Write (261 LOC tail }, +17/-7), HOST verificado.
+- TAREFA 2 INSTAL-04 RESOLVIDA (agent read-only, 38k tokens): emitter installation_order_auto_created = public.fn_notificar_nova_oi() SECURITY DEFINER via trigger trg_notificar_nova_oi AFTER INSERT ordens_instalacao. Payload bate com 5 eventos (CALCADOS BEIRA RIO, ult PED-2026-0026 14:04 BRT). VEREDICTO DRIFT DB-ONLY: DDL so spec em planning/phases/FASE-3-AUTOMACAO-FLUXO L549-567, grep zero em migrations/mcp-server. Refutado migration 099 e MCP server. View vw_instalacao_oi_sem_job OK (count 0).
+- Anti-pattern evitado: NAO Cowork Edit 251 LOC (>250 corrompe #21). NAO versionei fn_notificar_nova_oi de madrugada (SECURITY DEFINER, sem urgencia). NAO apliquei INSTAL-03 emit migration (janela MONITORADA).
+- Commits: planning #29 + source mcp-bridge-worker. 1 deploy interno v9, 0 migration.
+- NEXT #29: P1 versionar fn_notificar_nova_oi + trg_notificar_nova_oi em migration idempotente (def capturada via pg_get_functiondef pelo agent; CREATE OR REPLACE + DROP/CREATE TRIGGER; re-fetch confirmando search_path) [fecha drift INSTAL-04]. P1 INSTAL-03 emit migration fn_create_job_from_ordem [VALIDADA, planning/INSTAL-03-emit-migration-VALIDADA.sql] janela MONITORADA. P1 adotar ai-shared/safe-insert.ts nas 12 Edges Padrao B. Handoff INSTAL-02 offline-first (Claude Code). Watch prospeccao idle 16h+; chain instalacao 24d sem installation_completed, jobs Pendente 18.
 ### Ciclo autonomo #28 - VERDE Rotacao SEXTA (Instalacao): INSTAL-03 observabilidade via VIEW risco-zero (vw_instalacao_oi_sem_job) + agent REFUTOU premissa "6+3 OIs em skip" do #27 + watch-items frescos (2026-05-29 01:07)
 - Health pre VERDE: Vercel 200, edge 60min ZERO 5xx (mcp-bridge-worker v8 ~1/min 200, agent-cron-loop v26 200 4s - cascade #22-26 encerrado), 76 Edges ACTIVE, ai-compor-mensagem v25 sha 50907a7c, branch=main HEAD 00c71ff, guardrail HOST LIMPO (3 untracked herdados, 0 modified; tails integros). #27 as 00:30 (37min - sem gatilho passivo).
 - MAPEEI fn_create_job_from_ordem (regra MAPEAR ANTES DE CORRIGIR): trigger trg_create_job_from_ordem AFTER INS/UPD ON ordens_instalacao. 2 branches skip silencioso: store nao resolvida apos 3 fallbacks (store_id -> unidade_id/cliente_unidade_id -> heuristica cliente_id+endereco) e data_agendada NULL. Ambos RAISE WARNING + RETURN NEW, ZERO emit system_event. Colunas store_id+data_agendada confirmadas.
