@@ -1691,3 +1691,21 @@ ZERO prod-write: alterar/desativar regra = decisao negocio Junior (regra legitim
 **Commits**: cerebros #44 (push no fechamento)
 **Deploys**: nenhum
 **Telegram**: (enviada no fechamento)
+
+---
+## 2026-05-29 19:20 (ciclo #45)
+
+**Status**: VERDE
+**Tipo**: validar (runtime, zero-write) + arrumar (1 migration DDL metadata, SEC-004)
+**Auto-dialogo (7)**: (1) #42 dropou 37 dup-index, #43 indexou 8 FKs, #44 validou 3 fixes seg do Junior (read-only). (2) Sexta=Instalacao, exausta #27-34 -> pivot SEC/perf advisor (track #41-44). (3) gap util AGORA: re-verificar runtime do lead_quente pos-filtro (#44 declarou limpo SEM checar match-count) + avancar function_search_path_mutable (SEC-004, NEXT default-exec). (4) sem conflito: SEC-001/buckets/views/token=BLOCKED-Junior; estes 2 sao validar/default-exec. (5) Obsidian: protocolo Mubisys skip_auto_cr (contexto). (6) nao-passivo (#44 ~56min atras, branch main, host limpo). (7) criterio: lead_quente match-count runtime + remaining_secdef_no_sp 7->0 com fn_claim 200 pos-apply.
+**Health**: Vercel 200 | edge 60min ZERO 5xx (mcp-bridge-worker v9 ~1/min 200, agent-cron-loop v28 200 ~9-10s) | API tick 22:00 UTC limpo ZERO 400/5xx (v28 estavel 8o ciclo) | branch=main HEAD da68ce0=#44 | guardrail HOST LIMPO (tails STATE 3565/ledger 842/log 1693, 2 untracked herdados, bash NAO consultado)
+**Agents**: 0 (validacao SQL dirigida inline + DDL com cross-check de catalogo; nenhum recon multi-arquivo)
+**Acoes**:
+- TAREFA 1 (validar runtime lead_quente, FECHA watch #44): 3 queries cruzadas. 319 hot leads (score>=70) com updated_at entre 2026-05-05 e 05-12 (newest 17d) -> recalcular_scores NAO bumpa updated_at (HIPOTESE recalc-bump REFUTADA por dados) -> filtro updated_at>=7d exclui TODOS (upd_7d=0). rule_executed lead_quente 24h=100 TODOS 15:19-15:20 UTC (smoketest #38), 0 desde, last_1h=0. alertas_telegram_dedup envios mais novos=15:19 UTC. => 0 alertas novos; flood FECHADO; #44 confirmado em nivel match-count.
+- TAREFA 2 (SEC-004 hardening): reconciliacao advisor function_search_path_mutable=65 vs catalogo = SO 7 SECURITY DEFINER em public sem search_path (risco real priv-esc; resto SECURITY INVOKER). Li os 7 corpos: refs non-public QUALIFICADAS (vault./net./pessoal. em format string); unqualified = tabelas public-qualif ou built-ins pg_catalog. ARMADILHA: meu regex perdeu pessoal. em backup_pessoal_table -> ler o corpo pegou (qualificado). Migration harden_secdef_search_path_cycle45 (DO-block idempotente) ALTER FUNCTION SET search_path=public,pg_temp nos 7. success=true.
+**Decisao**: ambas default-exec sem decisao Junior; lead_quente=validar zero-write, SEC-004=migration idempotente+validada (pre-aprovado), metadata-only/reversivel/sem lock tabela. NAO toquei os 65 cegos (advisor inflado); NAO search_path='' (quebraria unqualified public); 2 telegram-triggers (vault/net) incluidos pois qualificam vault./net. + tem EXCEPTION guard.
+**Resultado (runtime)**: remaining_secdef_no_sp 7->0; os 7 com search_path=public,pg_temp (proconfig confirmado); fn_claim_ai_requests (1 dos 7) 200 em 22:14/22:15/22:16 UTC pos-apply = RUNTIME OK; Vercel 200; zero 5xx/4xx. lead_quente flood confirmado fechado.
+**Ledger update**: DONE #45 add; NEXT #45 (auth_rls_initplan janela-idle; ~58 INVOKER baixo risco; SERVICE_ROLE_KEY watch; buckets/views/token BLOCKED-Junior).
+**Commits**: #45 cerebros + migration harden_secdef_search_path_cycle45 (push via host)
+**Deploys**: 0 Edge. 1 migration DDL metadata.
+**Telegram**: enviada (ok) mid=3159
