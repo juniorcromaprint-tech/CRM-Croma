@@ -1676,3 +1676,18 @@ ZERO prod-write: alterar/desativar regra = decisao negocio Junior (regra legitim
 **Deploys**: nenhum
 **Token usage**: alta (dumps log api/edge no health)
 **Telegram**: enviada (ok) - msgid no fechamento
+
+## 2026-05-29 18:10 (ciclo #44)
+
+**Status**: VERDE
+**Tipo**: validar (read-only, ZERO prod-write)
+**Auto-dialogo**: (1) #41 advisors baseline / #42 duplicate_index / #43 FK indexes. (2) Sexta=Instalacao exausta #27-34. (3) gap util: HEAD=0e8a493 era commit NOVO do Junior (SEC-002), NAO #43 cerebros - validar adversarialmente as 3 mudancas de seguranca dele = VALIDAR P0 + verify-before-assume. (4) sem conflito; itens eram BLOCKED-Junior agora aplicados por ele. (5) git revelou Junior ativo 17:00-17:26 BRT. (6) nao-passivo (#43 ha 50min). (7) criterio: cada mudanca com veredito por evidencia runtime (privilege LIVE + advisor + logs + cross-check caller).
+**Health check**: Vercel 200 | edge 60min ZERO 5xx (mcp-bridge-worker v9 200, agent-cron-loop v28 200 ~10s) | API tick 21:00 UTC limpo (v28 7o ciclo, lead_quente deduped sem flood) | branch=main HEAD 0e8a493 | guardrail HOST LIMPO (2 untracked, tails 3548/824/1678)
+**Agents disparados**: 1 (general-purpose read-only adversarial, 82k tok, 22 tools - enumerou fns revogadas + cross-check frontend/Edge/runtime/advisor)
+**Acoes executadas**: validacao read-only de 0e8a493 (SEC-002) + a2aeea0 (SEC-001 + lead_quente); 4 SQL inline cross-check (privilege count 62->35, fns especificas anon=false, policies leads/clientes, condicao lead_quente literal); git show meta do commit
+**Decisao tomada**: ZERO prod-write - Junior ativo no main (3 commits <1.5h, ultimo 17:26), aplicar migration minha agora arriscaria race/ordering. Cycle puro VALIDAR.
+**Resultado**: 3 mudancas de seguranca do Junior VALIDADAS LIMPAS. SEC-002: anon_execrable_secdef 62->35, 4 criticas (vault/backup/execute_sql_readonly) anon=false, zero caller anon legitimo quebrado, zero 42501 runtime. SEC-001: leads/clientes_all_read -> authenticated (anon-read trancado). lead_quente: filtro recencia 7d presente+ativo (corta flood). 1 WATCH: portal-upload-assinatura:53 fallback anon->get_service_role_legacy_jwt depende de env SERVICE_ROLE_KEY ser JWT.
+**Ledger update**: SEC-001/SEC-002/lead_quente filtro -> DONE (resolvidos por Junior, validados por mim). NEXT: watch env service key + auth_rls_initplan (idle-Junior) + perf/buckets/views/token.
+**Commits**: cerebros #44 (push no fechamento)
+**Deploys**: nenhum
+**Telegram**: (enviada no fechamento)

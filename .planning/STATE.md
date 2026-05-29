@@ -1,3 +1,20 @@
+## Ciclo autonomo #44 - 2026-05-29 18:10 BRT - VERDE validar (3 mudancas de seguranca do JUNIOR validadas adversarialmente: SEC-002 revoke anon EXECUTE + SEC-001 anon-read lock + lead_quente filtro recencia - TODAS LIMPAS, zero regressao)
+
+**Tipo**: validar (read-only, ZERO prod-write). NOW 18:08 BRT (21:08 UTC); #43 as 17:17 (~50min, sem gatilho passivo). Health VERDE: Vercel 200; edge 60min ZERO 5xx (mcp-bridge-worker v9 ~1/min 200, agent-cron-loop v28 200 ~10s); API tick 21:00 UTC limpo (execute_sql_readonly 200, recalcular_scores entity 00000000 200, lead_quente idempotency-GET 200 deduped SEM flood - v28 estavel 7o ciclo); branch=main; guardrail HOST LIMPO (tails STATE 3548/ledger 824/log 1678, 2 untracked herdados, bash NAO consultado).
+
+**Achado-chave**: HEAD nao era #43 cerebros (3afb4d6) e sim 3 commits NOVOS do Junior (ativo 17:00-17:26 BRT) aplicando recomendacoes do loop #37-43: a2aeea0 (SEC-001 anon-read lock + lead_quente filtro recencia 7d) + 0e8a493 (SEC-002 revoke anon EXECUTE em 31 fns SECURITY DEFINER). Validei os 3 adversarialmente (1 agent read-only 82k + 4 SQL inline cross-check). Decisao: ZERO prod-write p/ evitar race com a sessao ativa dele.
+
+**TAREFA 1 - SEC-002 (0e8a493)**: VEREDITO SEGURO. anon_execrable_secdef 62->35 (advisor + has_function_privilege LIVE batem). 4 criticas (vault_read_secret/vault_upsert_secret/backup_pessoal_table/execute_sql_readonly) agora anon=false; get_telegram_bot_token/fn_claim_ai_requests/fn_recalcular_todos_scores tb revogadas; get_user_role + is_admin/is_role/user_has_module_access (helpers RLS) + 9 portal_* RETIDAS (design). Cross-check (agent): paginas pre-login (Portal/NPS) chamam SO portal_* (portal.service.ts:125-276); fns revogadas usadas no frontend estao em telas ERP authenticated (authenticated tem GRANT); Edge callers usam service_role. Runtime logs api 24h: 100% 2xx, ZERO 401/403/42501. 1 WATCH: portal-upload-assinatura:53 usa anon-key como FALLBACK p/ get_service_role_legacy_jwt (agora anon=false) - so quebra se SUPABASE_SERVICE_ROLE_KEY env for sb_secret_* (nao-JWT); primario tenta service 1o (L87-92).
+
+**TAREFA 2 - SEC-001 (a2aeea0)**: OK. leads.leads_all_read + clientes.clientes_all_read agora roles={authenticated} (era public). anon read de leads(3460)/clientes(336) TRANCADO. Bate exato Bloco1 recomendado #37/#40.
+
+**TAREFA 3 - lead_quente filtro recencia (a2aeea0)**: OK. condicao = "NOT EXISTS proposta via clientes.lead_id AND leads.updated_at >= now() - interval '7 days'", ativo=true. Bate EXATO recomendacao #39/#40. Corta flood ~100 alertas Telegram/dia sobre leads frios. Tick 21:00 UTC deduped sem novo flood.
+
+**Mudancas prod**: NENHUMA (read-only puro). 3 itens BLOCKED-Junior RESOLVIDOS por ele, validados por mim.
+
+**NEXT**: [P1 watch] confirmar SUPABASE_SERVICE_ROLE_KEY (env Edges) e JWT (eyJ...) nao sb_secret_* - senao portal-upload-assinatura:53 fallback quebra (NAO re-grantar anon=re-abre SEC-002). [P1 default-exec idle-Junior] auth_rls_initplan (78 policies wrap select). [P2] function_search_path_mutable (65, lotes). [P1 BLOCKED-Junior] public_bucket_allows_listing (5) + security_definer_view (41 ERROR) + ROTACIONAR token Telegram. [watch] production_completed 0 lifetime; install_completed 24d; jobs Pendente 18.
+
+---
 ## Ciclo autonomo #43 - 2026-05-29 17:17 BRT - VERDE arrumar/validar (PERF: 8 FKs sem indice INDEXADOS, 14 advisor-flagged refutados como falso-positivo, zero regressao)
 
 **Tipo**: arrumar (perf/infra DDL) + validar. NOW 17:17 BRT (20:xx UTC); #42 as 16:15 (~53min, sem gatilho passivo). Health VERDE: Vercel 200; edge 60min ZERO 5xx (mcp-bridge-worker v9 ~1/min 200, agent-cron-loop v28 200 ~10s, dispatch v5 200); API ZERO 5xx/400 (tick natural 20:00 UTC limpo; lead_quente idempotency-GET 200 = dedup 24h holding SEM re-flood - confirma #40; v28 estavel 6o ciclo); branch=main HEAD #42 cerebros; guardrail HOST LIMPO (tails 3534/806/1658, 3 untracked herdados, bash NAO consultado).
