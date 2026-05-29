@@ -9,6 +9,26 @@
 
 **Penúltima atualização**: 2026-05-28 21:05 BRT — Ciclo autônomo #24 — 🔴 ACHADO P0 NOVO CRÍTICO: fix #18 (trg_check_production_completed) está **DORMENTE — gap Fase 1.2 NÃO resolvido**. 3 OPs finalizado (15/16/17) chegaram a esse status SEM marcar producao_etapas.concluida (path UPDATE direto). Trigger só roda em `AFTER UPDATE OF status ON producao_etapas`. **Pedidos 1070 + PED-2026-0025 seguem `em_producao` 4 dias após ciclo #18 declarar destrava estrutural**. + Recon ai-compor-mensagem v24 confirma 417 LOC (acima threshold 250 — agent isolado obrigatório). Edit cirúrgico EXATO documentado para deploy v25 em janela 22h+ BRT (próximo ciclo #25). + 2 achados HIGH novos: 19 etapas concluida sem tempo_real_min (Gantt cego para análise), 2 setores zerados (Router/Corte, Serralheria). Spike 500 ai-compor-mensagem v24 SEGUE ATIVO há 4h+ (cluster 20:00 + 20:20 BRT, ZERO agent_messages criadas desde 17:00 BRT).
 
+## Ciclo autonomo #35 - 2026-05-29 08:30 BRT - v27-followup-guard ACHADO LIVE (Junior deployou+commitou) + reschedule RUNTIME-VALIDADO + send gated OFF + chain Fase1.2 remediada VERDE
+
+**Mantra**: VALIDAR (P1 do #34 NEXT: prospeccao no 1o tick >=11 UTC) + observar acao do Junior. Hora 08:06 BRT Sexta (11:06 UTC; #34 as 07:30, ~36min, sem gatilho passivo). Health pre VERDE: Vercel 200, edge 60min ZERO 5xx (mcp-bridge-worker v9 ~1/min 200, agent-cron-loop v27 200, ai-detectar-problemas 200), API 0 5xx (2x 400 client em system_events LOW). Guardrail HOST inicio: agent-cron-loop M (+155/-17, 1369L tail }) = NAO corrupcao, era o fix v27 nao-commitado; durante o ciclo Junior commitou+pushou (e875853 -> 16e1ee2 -> 4195dc7, origin/main em sync). 1 agent isolado (general-purpose 37k read-only, SHA256) + 11 SQL inline.
+
+### Junior shippou 2 fixes hoje de manha (ambos pushados)
+- 16e1ee2 agent-cron-loop v27-followup-guard: getLegacyJwt + invokeEdgeFunctionInternal (0 invoke cru em codigo -> resolve 401 do #13/#32), guard followup_engine_ativo (kill-switch), reschedule on-failure (mata stuck-pool #32), safeInsert ai_logs. Deployado v26->v27 (updated 11:00 UTC). Agent confirmou deployado==local por SHA256.
+- 4195dc7 fn_op_finalizada_transicao "2 hops validos" + erro nao-silencioso + 2 pedidos remediados: ataca o BLOCKED arquitetural #26 (chain Producao->Instalacao). Evidencia Junior ativo: auth password 200 + agent-cron-loop?force=1 (26s) as 11:00 UTC + tag "(sessao monitor)" no commit.
+
+### Validacao runtime (adversarial)
+- v27 RESCHEDULE PATH: ON e VALIDADO. cron jobid20 11:00 UTC succeeded, cronloop err pos-11UTC=0; 15 conversas atualizadas no tick, 119 reagendadas pro futuro, eligible 195->180. Stuck-pool #32 DRENANDO.
+- v27 SEND PATH: OFF by-design (followup_engine_ativo=false). 0 compor follow-up + 0 agent_messages novas pos-11UTC (ultima 16:02 BRT 28/05 = batch abertura antigo; compor_24h=118 sao TODAS desse batch). 152 nunca-contatados / mais-antigo 2026-05-11 inalterados = consistente com OFF. => 401-fix+reschedule LIVE e reschedule runtime-provado; SEND end-to-end NAO exercitado (gated, valida quando Junior ligar a flag).
+- chain 4195dc7: pedidos 1070=concluido + PED-2026-0025=concluido (os 2 travados em em_producao desde #26 remediados). MAS production_completed=0 lifetime ainda, op_finalizadas=3, oi_total=10 (inalterado). => 2 pedidos remediados via DADO; o PATH do trigger NAO tem evento runtime ainda (armadilha #18/#24 "fix dormente"). NEXT validar 1o production_completed real.
+
+### Decisao + mudancas
+Zero deploy/migration/prod-data write por mim. ARRUMAR (commit do v27) ficou MOOT - Junior ja commitou (16e1ee2). NAO liguei followup_engine_ativo (decisao de negocio: mass-send a 152 frios 18d = risco, do Junior). So 3 cerebros + Obsidian + Telegram + commit planning.
+
+### Watch + NEXT
+[watch] followup_engine_ativo=false (send aguarda Junior); chain Fase1.2 production_completed=0 (trigger path sem runtime); 2x 400 system_events no tick (LOW); install_completed 24d; jobs Pendente 15; STATE top "Ultima atualizacao" stale #27 (cosmetico). NEXT detalhado no ledger #35.
+
+---
 ## Ciclo autonomo #34 - 2026-05-29 07:30 BRT - Ressalva P2 #33 FECHADA (portal NAO usa JWT authenticated) + DB-001..005 validados RESOLVIDOS VERDE
 
 **Mantra**: EXPLORAR/VALIDAR (fecha o unico fio solto da rotacao Instalacao + valida watch-items + bonus 5 P0s de abril). Hora 07:08 BRT Sexta (#33 as 06:15, ~53min, sem gatilho passivo). Health pre VERDE: Vercel 200, edge 90min ZERO 5xx (mcp-bridge-worker v9 ~1/min 200), branch=main HEAD d420ec8, guardrail HOST LIMPO (0 modified, tails 3391/702/1437/1230 L). Cron prospeccao OFF ate 11 UTC. 1 agent isolado (sonnet 52k read-only) + 5 SQL inline.

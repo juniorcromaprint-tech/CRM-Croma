@@ -1467,3 +1467,30 @@ Padrao IDENTICO ao incidente 08:30: EOF abrupto sem newline final, arquivos cort
 **Deploys**: nenhum.
 **Token usage**: ~100k
 **Telegram**: enviada (ok) msgid 3039.
+
+---
+
+## Ciclo autonomo #35 - 2026-05-29 08:30 BRT - VALIDAR v27 prospeccao (Junior deployou) + bonus chain Fase1.2 VERDE
+
+**Tipo**: validar (+ observar acao Junior). Hora 08:06 BRT Sexta (11:06 UTC). #34 as 07:30 (~36min). Health VERDE: Vercel 200, edge 60min 0 5xx (mcp-bridge-worker v9, agent-cron-loop v27, ai-detectar-problemas todas 200), API 0 5xx (2x 400 client system_events LOW), branch=main.
+
+**Guardrail HOST**: agent-cron-loop/index.ts M (+155/-17, 1369L, tail }) no inicio = NAO corrupcao (linhas >> esperado, tail coerente) = era o fix v27 nao-commitado. Durante o ciclo Junior commitou+pushou: e875853 -> 16e1ee2 (v27) -> 4195dc7 (chain). origin/main em sync. Bash nao usado pra git (so HOST Windows-MCP).
+
+**Auto-dialogo (7 perguntas)**:
+1. 3 ciclos anteriores: #32 root-cause prospeccao (backlog cronico 195, bug invoke 401/stuck-pool, deferiu fix); #33 RLS qualidade Instalacao (sem exposicao); #34 fechou ressalva portal-auth + validou DB-001..005. Instalacao auditado #27-#34.
+2. Dia/modulo: Sexta = Instalacao / mcp-bridge-worker. Instalacao ja auditado 8 ciclos; mcp-bridge v9 saudavel. Pivot pro P1 #34 NEXT (validar prospeccao no tick 11 UTC) = item time-sensitive.
+3. Gap mais util AGORA: validar prospeccao no 1o tick >=11 UTC. Descoberta: Junior deployou+commitou v27-followup-guard (16e1ee2) E fn_op_finalizada_transicao (4195dc7) hoje. Logo: validar ambos em runtime; commit do source ficou moot.
+4. Conflita com IN-PROGRESS/BLOCKED: nao, complementa. O fix em NEXT P1 (deferido) foi feito pelo Junior; meu papel = validar + documentar. Flag flip e chain seguem BLOCKED-Junior.
+5. STATE/Obsidian novo: Obsidian memory mostra Junior ativo de manha (Mubisys OS1557 27-28/05, secret leaks, BUG-JWT em 5 Edges listado 27/05) - o BUG-JWT do follow-up e o que o v27 resolve.
+6. MODO PASSIVO: nao. #34 ~36min atras (>15min); sem corrupcao real; branch=main; 0 5xx; health VERDE.
+7. Criterio de sucesso: (a) v27 deployado==local SHA256 [OK]; (b) reschedule runtime: reagendadas_futuro>0 + eligible<195 [OK 119/180]; (c) verdict honesto do send (gated OFF) [OK]; (d) brains+telegram+commit planning pushado.
+
+**Execucao**:
+- TAREFA 1 (VALIDAR v27): reschedule ON validado (cron 11:00 UTC ok, err=0, 15 conversas no tick, 119 reagendadas futuro, eligible 195->180 = stuck-pool drenando). SEND OFF by-design (followup_engine_ativo=false; 0 compor follow-up + 0 agent_messages pos-11UTC; ultima msg 16:02 BRT 28/05). 401-fix+reschedule LIVE, reschedule runtime-provado; send end-to-end gated (nao exercitado).
+- TAREFA 2 (VALIDAR bonus chain 4195dc7): pedidos 1070+PED-2026-0025 agora concluido (2 travados desde #26 remediados). MAS production_completed=0 lifetime, op_finalizadas=3, oi_total=10 inalterado => trigger path sem runtime (fix dormente, armadilha #18/#24). NEXT validar 1o production_completed real.
+
+**Decisao**: zero deploy/migration/prod-data write por mim. NAO liguei followup_engine_ativo (decisao negocio Junior: 152 frios 18d). Commit source v27 MOOT (Junior fez 16e1ee2). So planning + Telegram + Obsidian.
+
+**Agent**: 1 general-purpose isolado (37k tok, read-only, 8 tools) - confirmou v27 deployado==local SHA256, 0 invoke cru em codigo.
+
+**Resultado**: VERDE. Commits: planning #35 (pushado HOST). Telegram: enviado ok.
