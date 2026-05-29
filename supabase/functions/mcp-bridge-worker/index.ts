@@ -1,10 +1,14 @@
-// mcp-bridge-worker v7 (2026-05-27 BUG-JWT) — getLegacyJwt + retry sob 401
+// mcp-bridge-worker v8 (2026-05-29 BUG MCP-01) — error capture insert/update (perda silenciosa visível)
 // - v3 (2026-04-24 S2.7): locking atômico + X-Internal-Call
 // - v6 (2026-05-22 Etapa 2.2 ponte Cowork): release tipo 'whatsapp-resposta' à fila
 //   pra consumer Cowork (scheduled task croma-whatsapp-responder) pegar.
 // - v7 (2026-05-27): troca Bearer SERVICE_ROLE_KEY pelo legacy JWT (RPC vault
 //   get_service_role_legacy_jwt cacheado em isolate) com retry forçando refresh
 //   se receber 401 — corrige gateway Supabase rejeitando publishable JWT.
+// - v8 (2026-05-29 BUG MCP-01): insert ai_responses agora encadeia .select().single()
+//   e captura { data, error }; se RLS bloquear silenciosamente, loga console.error
+//   (perda antes era invisível). Os 4 .update() de ai_requests também capturam error
+//   e logam estruturado. Fluxo best-effort preservado (não derruba o ciclo).
 
 import { createClient, SupabaseClient } from 'https://esm.sh/@supabase/supabase-js@2';
 
@@ -52,7 +56,8 @@ Deno.serve(async (req) => {
 
     for (const r of claimed) {
       if (r.expires_at && new Date(r.expires_at) < new Date()) {
-        await supabase.from('ai_requests').update({ status: 'expired', error_message: 'Expired before processing' }).eq('id', r.id);
+        const { error: expErr } = await supabase.from('ai_requests').update({ status: 'expired', error_message: 'Expired before processing' }).eq('id', r.id);
+        if (expErr) console.error('[mcp-bridge-worker] ai_requests update(expired) falhou (RLS?):', { request_id: r.id, error: expErr });
         results.push({ id: r.id, status: 'expired' });
         continue;
       }
@@ -69,14 +74,16 @@ Deno.serve(async (req) => {
           // 2026-05-22 (Etapa 2.2 ponte Cowork): tipo dedicado ao consumer
           // Cowork (scheduled task croma-whatsapp-responder). Devolve a fila
           // pra que o consumer Cowork pegue no proximo ciclo dele.
-          await supabase.from('ai_requests').update({ status: 'pending' }).eq('id', r.id);
+          const { error: relErr } = await supabase.from('ai_requests').update({ status: 'pending' }).eq('id', r.id);
+          if (relErr) console.error('[mcp-bridge-worker] ai_requests update(released_to_cowork) falhou (RLS?):', { request_id: r.id, error: relErr });
           results.push({ id: r.id, tipo: r.tipo, status: 'released_to_cowork' });
           continue;
         } else {
           throw new Error(`Tipo desconhecido: ${r.tipo}`);
         }
 
-        await supabase.from('ai_responses').insert({
+        // BUG MCP-01: .select().single() torna o bloqueio RLS visível (antes era perda silenciosa).
+        const { data: respData, error: insErr } = await supabase.from('ai_responses').insert({
           request_id: r.id,
           conteudo: response,
           summary: response?.summary ?? null,
@@ -85,19 +92,22 @@ Deno.serve(async (req) => {
           tokens_used: response?.tokens_used ?? null,
           cost_usd: response?.cost_usd ?? 0,
           duration_ms: Date.now() - reqStart,
-        });
+        }).select().single();
+        if (insErr || !respData) console.error('[mcp-bridge-worker] ai_responses insert falhou (RLS?):', { request_id: r.id, error: insErr });
 
-        await supabase.from('ai_requests').update({
+        const { error: compErr } = await supabase.from('ai_requests').update({
           status: 'completed', processed_at: new Date().toISOString(),
         }).eq('id', r.id);
+        if (compErr) console.error('[mcp-bridge-worker] ai_requests update(completed) falhou (RLS?):', { request_id: r.id, error: compErr });
 
         results.push({ id: r.id, tipo: r.tipo, status: 'completed', duration_ms: Date.now() - reqStart });
       } catch (err) {
-        await supabase.from('ai_requests').update({
+        const { error: errUpdErr } = await supabase.from('ai_requests').update({
           status: 'error',
           error_message: (err as Error).message.substring(0, 500),
           processed_at: new Date().toISOString(),
         }).eq('id', r.id);
+        if (errUpdErr) console.error('[mcp-bridge-worker] ai_requests update(error) falhou (RLS?):', { request_id: r.id, error: errUpdErr });
         results.push({ id: r.id, tipo: r.tipo, status: 'error', error: (err as Error).message });
       }
     }
