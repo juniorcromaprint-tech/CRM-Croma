@@ -1,9 +1,23 @@
-// agent-cron-loop v2: Motor de execução de regras + Follow-ups
+// agent-cron-loop v27-followup-guard: Motor de execução de regras + Follow-ups
+// v27 (2026-05-29 follow-up engine): (a) GUARD fail-safe lendo agent_config
+//   'followup_engine_ativo' — só compõe/envia follow-up se valor===true; caso
+//   contrário NAO dispara (fail-safe) e apenas reagenda p/ drenar stuck-pool.
+//   (b) reschedule SEMPRE (mesmo em falha de composição) → mata stuck-pool dos
+//   195 elegíveis presos com tentativas=0. (c) .catch(()=>{}) dos ai_logs →
+//   safeInsert (PostgrestBuilder não tem .catch). invoke 401 já resolvido no v25.
 // Roda a cada 30min (08:00-23:00 BRT)
 //
 // FASE 3.1: Executa agent_rules (cobrança, alertas, estoque, produção, follow-ups)
 // FASE 3.2: Cobrança escalonada D1→D3→D7→D15→D30
 // Preserva: lógica existente de follow-up de leads via ai-decidir-acao
+//
+// v25 (2026-05-28 BUG-JWT P2): troca supabase.functions.invoke() pelo padrão
+//   getLegacyJwt() + fetch direto com Bearer legacy JWT (replicado de
+//   mcp-bridge-worker v7). Resolve 401 silencioso causado pela nova
+//   service_role_key (sb_secret_…) sendo rejeitada pelo gateway que ainda
+//   exige legacy HS256 JWT em Edges com verify_jwt:true (ai-compor-mensagem,
+//   whatsapp-enviar, agent-enviar-email). Cache no isolate + retry com
+//   refresh sob 401. Header X-Internal-Call preservado p/ defesa em profundidade.
 //
 // Uses service role (no user auth — this is a cron job)
 
@@ -12,9 +26,64 @@ import {
   getWhatsAppCredentials,
   postToMetaCloud,
 } from '../ai-shared/whatsapp-credentials.ts';
+import { safeInsert } from '../ai-shared/safe-insert.ts';
 
+const VERSION = 'v27-followup-guard';
 const SUPABASE_URL = Deno.env.get('SUPABASE_URL')!;
 const SERVICE_ROLE_KEY = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!;
+
+// ── BUG-JWT (v25): cache do legacy JWT no isolate + helper invoke interno ──
+// Replicado de mcp-bridge-worker v7 (linhas 14-22 / 144-177).
+// O gateway Supabase rejeita publishable/secret keys novas (sb_secret_…) em
+// Edges com verify_jwt:true; só aceita legacy HS256 JWT. RPC vault retorna
+// esse JWT que é cacheado por isolate e refrescado sob 401.
+let _cachedLegacyJwt: string | null = null;
+async function getLegacyJwt(supabase: SupabaseClient, force = false): Promise<string> {
+  if (_cachedLegacyJwt && !force) return _cachedLegacyJwt;
+  const { data, error } = await supabase.rpc('get_service_role_legacy_jwt');
+  if (error || !data) throw new Error(`[v25] legacy_jwt rpc falhou: ${error?.message || 'sem retorno'}`);
+  _cachedLegacyJwt = data as string;
+  return _cachedLegacyJwt!;
+}
+
+// invokeEdgeFunctionInternal: substitui supabase.functions.invoke().
+// Aceita body (objeto JSON-serializável). Retorna { data, error } no mesmo
+// formato do client supabase pra minimizar churn no call site.
+async function invokeEdgeFunctionInternal(
+  supabase: SupabaseClient,
+  fnName: string,
+  body: Record<string, unknown>,
+): Promise<{ data: any | null; error: { message: string; status?: number } | null }> {
+  const doFetch = async (jwt: string) => fetch(`${SUPABASE_URL}/functions/v1/${fnName}`, {
+    method: 'POST',
+    headers: {
+      'Content-Type': 'application/json',
+      'Authorization': `Bearer ${jwt}`,
+      'X-Internal-Call': 'true',
+    },
+    body: JSON.stringify(body ?? {}),
+  });
+
+  try {
+    let jwt = await getLegacyJwt(supabase);
+    let resp = await doFetch(jwt);
+    if (resp.status === 401) {
+      console.warn(`[v25] ${fnName} retornou 401 — forçando refresh do legacy JWT e retry`);
+      jwt = await getLegacyJwt(supabase, true);
+      resp = await doFetch(jwt);
+    }
+    if (!resp.ok) {
+      const errText = await resp.text();
+      return { data: null, error: { message: `${fnName} ${resp.status}: ${errText.substring(0, 300)}`, status: resp.status } };
+    }
+    // Trata respostas vazias (204 ou body vazio)
+    const text = await resp.text();
+    const data = text ? JSON.parse(text) : null;
+    return { data, error: null };
+  } catch (err) {
+    return { data: null, error: { message: `[v25] ${fnName} fetch falhou: ${(err as Error).message}` } };
+  }
+}
 
 // ── Types ────────────────────────────────────────────────────────────
 interface AgentRule {
@@ -171,7 +240,7 @@ Deno.serve(async (req) => {
     // ── 6. Log execution ──
     const duration = Date.now() - startTime;
 
-    await supabase.from('ai_logs').insert({
+    await safeInsert(supabase, 'ai_logs', {
       function_name: 'agent-cron-loop',
       entity_type: 'geral',
       model_used: 'rules-engine',
@@ -180,7 +249,7 @@ Deno.serve(async (req) => {
       cost_usd: 0,
       duration_ms: duration,
       status: 'success',
-    }).catch(() => {});
+    });
 
     // Register system_event for monitoring
     // NOTE: entity_id é NOT NULL — usar UUID sentinel '000...000' para eventos de sistema
@@ -229,14 +298,14 @@ Deno.serve(async (req) => {
         valor: JSON.stringify({ message: (err as Error)?.message ?? String(err), stack: ((err as Error)?.stack ?? '').slice(0, 1800), at: new Date().toISOString() }),
       }, { onConflict: 'chave' });
     } catch (e2) { console.error('debug_cron_last_error upsert failed:', e2); }
-    await supabase.from('ai_logs').insert({
+    await safeInsert(supabase, 'ai_logs', {
       function_name: 'agent-cron-loop',
       entity_type: 'geral',
       model_used: 'rules-engine',
       tokens_input: 0, tokens_output: 0, cost_usd: 0,
       duration_ms: duration, status: 'error',
       error_message: (err as Error).message,
-    }).catch(() => {});
+    });
 
     return new Response(JSON.stringify({ error: (err as Error).message }), {
       status: 500, headers: { 'Content-Type': 'application/json' },
@@ -1029,12 +1098,13 @@ async function processApprovedMessages(supabase: SupabaseClient, config: any): P
         const canal = msg.canal || (msg.agent_conversations as any)?.canal || 'whatsapp';
         const dispatchFn = canal === 'email' ? 'agent-enviar-email' : 'whatsapp-enviar';
 
-        const { error: invokeErr } = await supabase.functions.invoke(dispatchFn, {
-          body: { message_id: msg.id },
+        // [v25] BUG-JWT: usa invokeEdgeFunctionInternal (legacy JWT + X-Internal-Call)
+        const { error: invokeErr } = await invokeEdgeFunctionInternal(supabase, dispatchFn, {
+          message_id: msg.id,
         });
 
         if (invokeErr) {
-          result.errors.push(`${msg.id}: ${invokeErr.message}`);
+          result.errors.push(`[v25] ${msg.id}: ${invokeErr.message}`);
           continue;
         }
 
@@ -1106,7 +1176,35 @@ async function processLeadFollowUps(supabase: SupabaseClient, config: any): Prom
 
     if (!convs || convs.length === 0) return { status: 'ok', total: 0, enviadas: 0 };
 
+    // ── v27 GUARD FAIL-SAFE ─────────────────────────────────────────────
+    // Salvaguarda inviolável (pedido do Junior): "corrige o motor mas SEGURA
+    // o disparo". Lê agent_config.followup_engine_ativo. SÓ compõe/envia se
+    // valor===true. Qualquer outra coisa (false/null/erro de leitura) → engine
+    // OFF: NÃO dispara nada (fail-safe). Mesmo OFF, reagenda proximo_followup
+    // p/ drenar o stuck-pool (195 conversas presas elegíveis a cada tick).
+    let engineAtivo = false;
+    try {
+      const { data: fcfg, error: fcfgErr } = await supabase
+        .from('agent_config')
+        .select('valor')
+        .eq('chave', 'followup_engine_ativo')
+        .maybeSingle();
+      if (fcfgErr) {
+        console.error('[follow-up] erro lendo followup_engine_ativo — fail-safe OFF:', fcfgErr.message);
+        engineAtivo = false;
+      } else {
+        engineAtivo = fcfg?.valor === true; // estrito: só boolean true libera
+      }
+    } catch (cfgErr) {
+      console.error('[follow-up] excecao lendo followup_engine_ativo — fail-safe OFF:', (cfgErr as Error).message);
+      engineAtivo = false;
+    }
+    if (!engineAtivo) {
+      console.log('[follow-up] engine OFF — aguardando liberacao Junior (followup_engine_ativo!=true). Reagendando sem disparar.');
+    }
+
     let enviadas = 0;
+    let drenadas = 0; // conversas reagendadas com engine OFF (sem disparo)
 
     for (const conv of convs) {
       if (enviadas >= (config.max_contatos_dia ?? 20)) break;
@@ -1121,13 +1219,41 @@ async function processLeadFollowUps(supabase: SupabaseClient, config: any): Prom
         continue;
       }
 
+      const diasFollowup = config.dias_entre_followup ?? 3;
+
+      // ── ENGINE OFF: não dispara; reagenda +1 dia SEM consumir tentativa nem
+      //    avançar etapa (preserva estado p/ quando o Junior liberar). Mata o
+      //    stuck-pool: tira a conversa da janela elegível imediata. ───────────
+      if (!engineAtivo) {
+        const prox = new Date();
+        prox.setDate(prox.getDate() + 1);
+        await supabase.from('agent_conversations').update({
+          proximo_followup: prox.toISOString(),
+        }).eq('id', conv.id);
+        drenadas++;
+        continue;
+      }
+
+      // ── ENGINE ON: caminho normal de composição/envio ─────────────────────
       try {
-        // Compor mensagem via ai-compor-mensagem (agora aceita service_role)
-        const { data: msgResult, error: msgError } = await supabase.functions.invoke(
+        // [v25] BUG-JWT: ai-compor-mensagem é verify_jwt:true → exige legacy JWT.
+        // invokeEdgeFunctionInternal força legacy JWT + X-Internal-Call (resolve 401).
+        const { data: msgResult, error: msgError } = await invokeEdgeFunctionInternal(
+          supabase,
           'ai-compor-mensagem',
-          { body: { lead_id: conv.lead_id, canal: conv.canal, etapa: conv.etapa }, headers: { 'X-Internal-Call': 'true' } }
+          { lead_id: conv.lead_id, canal: conv.canal, etapa: conv.etapa },
         );
-        if (msgError || !msgResult?.message_id) continue;
+        if (msgError || !msgResult?.message_id) {
+          if (msgError) console.error(`[v27] ai-compor-mensagem conv ${conv.id}:`, msgError.message);
+          // v27 FIX stuck-pool: NÃO dar continue sem reagendar. Reagenda com
+          // backoff +6h SEM consumir tentativa (a composição não "valeu").
+          const prox = new Date();
+          prox.setTime(prox.getTime() + 6 * 3600_000);
+          await supabase.from('agent_conversations').update({
+            proximo_followup: prox.toISOString(),
+          }).eq('id', conv.id);
+          continue;
+        }
 
         // Auto-aprovar se configurado
         const autoApprove = conv.auto_aprovacao === true;
@@ -1139,13 +1265,17 @@ async function processLeadFollowUps(supabase: SupabaseClient, config: any): Prom
           }).eq('id', msgResult.message_id);
 
           // Enviar
+          // [v25] BUG-JWT: idem para whatsapp-enviar / agent-enviar-email.
           const dispatchFn = conv.canal === 'whatsapp' ? 'whatsapp-enviar' : 'agent-enviar-email';
-          await supabase.functions.invoke(dispatchFn, { body: { message_id: msgResult.message_id } });
-          enviadas++;
+          const { error: dispatchErr } = await invokeEdgeFunctionInternal(supabase, dispatchFn, { message_id: msgResult.message_id });
+          if (dispatchErr) {
+            console.error(`[v27] ${dispatchFn} conv ${conv.id}:`, dispatchErr.message);
+          } else {
+            enviadas++;
+          }
         }
 
-        // Atualizar próximo follow-up
-        const diasFollowup = config.dias_entre_followup ?? 3;
+        // Atualizar próximo follow-up (composição OK → consome tentativa + avança etapa)
         const proxFollowup = new Date();
         proxFollowup.setDate(proxFollowup.getDate() + diasFollowup);
 
@@ -1156,10 +1286,18 @@ async function processLeadFollowUps(supabase: SupabaseClient, config: any): Prom
         }).eq('id', conv.id);
       } catch (err) {
         console.error(`Follow-up error conv ${conv.id}:`, (err as Error).message);
+        // v27 FIX stuck-pool: reagenda mesmo em exceção inesperada (+6h, sem consumir tentativa).
+        try {
+          const prox = new Date();
+          prox.setTime(prox.getTime() + 6 * 3600_000);
+          await supabase.from('agent_conversations').update({
+            proximo_followup: prox.toISOString(),
+          }).eq('id', conv.id);
+        } catch (_re) { /* best-effort */ }
       }
     }
 
-    return { status: 'ok', total: convs.length, enviadas };
+    return { status: 'ok', total: convs.length, enviadas, drenadas, engine_ativo: engineAtivo };
   } catch (err) {
     return { status: 'error', motivo: (err as Error).message };
   }
