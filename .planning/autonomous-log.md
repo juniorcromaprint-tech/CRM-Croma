@@ -1347,3 +1347,30 @@ Padrao IDENTICO ao incidente 08:30: EOF abrupto sem newline final, arquivos cort
 - Anti-pattern evitado: NAO Cowork Edit no index.ts 251 LOC (>250 corrompe #21 - agent usou Write+tail-check). NAO versionei fn_notificar_nova_oi de madrugada (SECURITY DEFINER, sem urgencia -> NEXT). NAO apliquei INSTAL-03 emit migration (janela MONITORADA, Junior dormindo).
 - Resultado: VERDE. 1 deploy interno (v9), 0 migration, commits planning+source.
 - Fechamento: Telegram + commit+push HOST + Obsidian daily (abaixo).
+
+---
+
+## 2026-05-29 03:10 (ciclo #30)
+
+**Status**: 🟢 VERDE
+**Tipo**: arrumar (versionar emitter INSTAL-04) + explorar/handoff (INSTAL-02)
+**Auto-dialogo** (7 perguntas):
+1. 3 ciclos anteriores: #28 view observabilidade INSTAL-03; #29 deploy v9 mcp-bridge-worker (MCP-01, runtime-validado) + recon emitter INSTAL-04 (drift DB-only).
+2. Dia/rotacao: SEXTA = Instalacao + mcp-bridge-worker (v9 saudavel - logs 60min todas 200).
+3. Gap mais util AGORA: #1 NEXT do #29 = versionar fn_notificar_nova_oi (fecha drift INSTAL-04) + handoff INSTAL-02 (default executavel de item arquitetural Claude Code).
+4. Conflita IN-PROGRESS/BLOCKED? Nao (BLOCKED chain state-machine e Producao; IN-PROGRESS vazio).
+5. STATE/Obsidian contexto novo? Obsidian confirmou protocolo Mubisys + dailies #27-29; nada que mude direcao.
+6. Modo passivo? Nao (Vercel 200, 0 5xx 60min, #29 ha ~1h, branch=main, guardrail HOST limpo).
+7. Criterio sucesso: (T1) migration versionada com def VERBATIM do live (SECURITY DEFINER+search_path preservados) committed; (T2) doc handoff escrito verificando #27 item-a-item com filepaths.
+
+**Health check**: Vercel 200 | edge 60min ZERO 5xx (mcp-bridge-worker v9 ~1/min 200 - cutover v8->v9 do #29 estavel) | API 0 5xx (fn_claim_ai_requests cron 200, 1 email_events 201) | 76 Edges ACTIVE | branch=main HEAD f8aedd9 | guardrail HOST LIMPO (3 untracked herdados, 0 modified; tails integros 3319/663/1349/261 L)
+**Agents disparados**: 1 (general-purpose isolado, 67k tokens, 18 tools, ~293s - handoff INSTAL-02 read-only recon do App Campo)
+**Acoes executadas**:
+- T1 INSTAL-04: pg_get_functiondef + pg_get_triggerdef capturaram fn_notificar_nova_oi (SECURITY DEFINER, search_path 'public','pg_temp') + trg_notificar_nova_oi (AFTER INSERT ordens_instalacao). Cross-check: emitter UNICO, trigger enabled (tgenabled=O), 22 eventos lifetime (last 28/05 17:04 UTC). Migration idempotente versionada supabase/migrations/20260529_version_fn_notificar_nova_oi_instal04.sql (verbatim).
+- T2 INSTAL-02: agent confirmou #27 (vite.config.ts NetworkFirst only, 0 IndexedDB/fila/replay, JobSignature.tsx:51 bloqueia offline, conclusao gated online = causa raiz INSTAL-01) + REFUTOU 1 nuance (SW registrado via injectRegister:auto; "label" so p/ ESCRITA). Doc HANDOFF-CLAUDE-CODE-2026-05-29-INSTAL-02-offline-first (203L).
+**Decisao tomada**: versionar SEM re-aplicar (no-op verbatim de fn SECURITY DEFINER; madrugada unmonitored; honra deferral #29; pre-aprovacao de apply existe mas valor funcional=0). applied==versioned por construcao. INSTAL-04 fechado em source-control.
+**Resultado**: INSTAL-04 drift fechado (migration versiona emitter live verbatim). INSTAL-02 com handoff Claude Code pronto (default executavel sem decisao Junior). Zero prod write, zero deploy.
+**Ledger update**: #30 -> DONE. NEXT: INSTAL-03 emit migration (janela monitorada) + safe-insert 12 Edges + INSTAL-02 build (Claude Code) + P2 checar drift DB-only nas outras fns da chain.
+**Commits**: a confirmar no fechamento (planning #30 + migration file)
+**Token usage**: ~130k
+**Telegram**: a confirmar no fechamento

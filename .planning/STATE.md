@@ -9,6 +9,21 @@
 
 **Penúltima atualização**: 2026-05-28 21:05 BRT — Ciclo autônomo #24 — 🔴 ACHADO P0 NOVO CRÍTICO: fix #18 (trg_check_production_completed) está **DORMENTE — gap Fase 1.2 NÃO resolvido**. 3 OPs finalizado (15/16/17) chegaram a esse status SEM marcar producao_etapas.concluida (path UPDATE direto). Trigger só roda em `AFTER UPDATE OF status ON producao_etapas`. **Pedidos 1070 + PED-2026-0025 seguem `em_producao` 4 dias após ciclo #18 declarar destrava estrutural**. + Recon ai-compor-mensagem v24 confirma 417 LOC (acima threshold 250 — agent isolado obrigatório). Edit cirúrgico EXATO documentado para deploy v25 em janela 22h+ BRT (próximo ciclo #25). + 2 achados HIGH novos: 19 etapas concluida sem tempo_real_min (Gantt cego para análise), 2 setores zerados (Router/Corte, Serralheria). Spike 500 ai-compor-mensagem v24 SEGUE ATIVO há 4h+ (cluster 20:00 + 20:20 BRT, ZERO agent_messages criadas desde 17:00 BRT).
 
+## Ciclo autonomo #30 - 2026-05-29 03:10 BRT - INSTAL-04 emitter VERSIONADO (verbatim do live) + handoff INSTAL-02 offline-first (Claude Code) VERDE
+
+**Mantra**: ARRUMAR (versionar fn_notificar_nova_oi — fecha drift INSTAL-04) + EXPLORAR/HANDOFF (INSTAL-02). Hora 03:10 BRT Sexta (#29 as 02:05, ~1h - sem gatilho passivo). Health pre VERDE: Vercel 200, edge 60min ZERO 5xx (mcp-bridge-worker v9 ~1/min 200 - cutover v8->v9 do #29 estavel ~24 ticks), API 0 5xx (fn_claim_ai_requests cron 200), 76 Edges ACTIVE, branch=main HEAD f8aedd9, guardrail HOST LIMPO (3 untracked herdados, 0 modified, tails integros 3319/663/1349/261 L). 1 agent isolado (handoff INSTAL-02).
+
+### TAREFA 1 - INSTAL-04 versionar emitter (inline, fecha drift source<->DB)
+fn_notificar_nova_oi (SECURITY DEFINER, SET search_path public,pg_temp) + trg_notificar_nova_oi (AFTER INSERT ordens_instalacao) capturados VERBATIM via pg_get_functiondef/triggerdef. Cross-check adversarial: emitter UNICO (so essa fn referencia 'installation_order_auto_created'), trigger enabled (tgenabled=O), 22 eventos lifetime (last 28/05 17:04 UTC = funcional). Migration idempotente versionada supabase/migrations/20260529_version_fn_notificar_nova_oi_instal04.sql (CREATE OR REPLACE FN + DROP/CREATE TRIGGER, corpo verbatim). NAO re-aplicada (no-op verbatim de fn SECURITY DEFINER + madrugada unmonitored; honra deferral #29; pre-aprovacao de apply existe mas valor funcional=0) -> applied==versioned por construcao. INSTAL-04 fechado em source-control.
+
+### TAREFA 2 - INSTAL-02 handoff offline-first (agent isolado 67k tok/18 tools)
+Agent confirmou #27 item-a-item COM filepaths reais: vite.config.ts NetworkFirst only (TTL 5min), 0 IndexedDB/fila/replay/outbox, JobSignature.tsx:51 if(isOffline) bloqueia assinatura, conclusao OS grava jobs.status='Concluido' online -> trg_sync_job_to_ordem -> fn_installation_completed = tudo gated online = causa raiz INSTAL-01. REFUTOU nuance #27: service worker E registrado (vite-plugin-pwa injectRegister:auto, dist/sw.js confirmado) -> app ABRE offline; "offline-first label" vale so p/ ESCRITA. Doc planning/HANDOFF-CLAUDE-CODE-2026-05-29-INSTAL-02-offline-first.md (203L, secoes a-g, arquitetura outbox IndexedDB via idb + replay no evento online, 10 criterios aceite, riscos). Build >500 LOC cross-file -> Claude Code.
+
+### Decisao + proxima sugestao (#31)
+Zero prod write/deploy (so 1 migration versionada NAO-aplicada + 1 doc handoff). NEXT #31: INSTAL-03 emit migration (janela MONITORADA Junior acordado, re-fetch antes) + safe-insert.ts nas 12 Edges Padrao B (agent isolado/Claude Code) + INSTAL-02 build outbox (Claude Code, handoff pronto). Watch: prospeccao idle ~26h (ult agent_message 16:02 BRT 28/05); chain instalacao 24d sem installation_completed, jobs Pendente 18.
+
+---
+
 ## Ciclo autonomo #29 - 2026-05-29 02:05 BRT - MCP-01 fix DEPLOYADO v9 (runtime-validado) + INSTAL-04 emitter achado (drift DB-only) VERDE
 
 **Mantra**: CORRIGIR (MCP-01 deploy v9) + EXPLORAR (INSTAL-04 emitter) + VALIDAR (smoketest runtime + HOST integrity). Hora 02:05 BRT Sexta (janela aberta; #28 as 01:25, 40min - sem gatilho passivo). Health pre VERDE: Vercel 200, edge 60min ZERO 5xx (mcp-bridge-worker v8 ~1/min 200), API 0 5xx, 76 Edges ACTIVE, branch=main HEAD 802f037, guardrail HOST LIMPO. 2 agents paralelos (1 write + 1 read).
