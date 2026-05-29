@@ -1494,3 +1494,21 @@ Padrao IDENTICO ao incidente 08:30: EOF abrupto sem newline final, arquivos cort
 **Agent**: 1 general-purpose isolado (37k tok, read-only, 8 tools) - confirmou v27 deployado==local SHA256, 0 invoke cru em codigo.
 
 **Resultado**: VERDE. Commits: planning #35 (pushado HOST). Telegram: enviado ok.
+
+## 2026-05-29 10:07 (ciclo #36)
+
+**Status**: VERDE
+**Tipo**: explorar + validar
+**Auto-dialogo**: (1) 3 anteriores: #33 RLS-quality Instalacao, #34 portal-auth + DB-001..005 resolvidos, #35 validar v27-followup-guard. (2) Sexta=Instalacao+mcp-bridge-worker v9, JA auditada 8x hoje (#27-34). (3) gap mais util: P2 do #35 NEXT nunca root-causado (3x 400/tick do cron, runtime-live no log API) > 9a passada em Instalacao. (4) sem conflito IN-PROGRESS/BLOCKED. (5) STATE/Obsidian confirmam historico; sem novidade que mude rota. (6) NAO passivo (1h37 desde #35; 0 5xx; host limpo). (7) criterio: root-causar >=2 dos 3 400 com evidencia runtime + fix validado contra schema.
+**Health check**: Vercel 200 | edge 60min ZERO 5xx (mcp-bridge-worker v9 ~1/min, agent-cron-loop v27 200 ~8-10s, dispatch v5 200) | API 0 5xx (os 400 sao 4xx client = este achado) | branch=main HEAD ff5409e=#35 | guardrail HOST LIMPO (3 untracked herdados, 0 modified, tails 3428/719/1496 L)
+**Agents disparados**: 1 general-purpose isolado read-only (70k tok, 13 tools, ~83s) - root-cause dos 400
+**Acoes executadas**:
+- TAREFA 1 (P2 #35): root-cause dos 3x 400/tick do agent-cron-loop. system_events.entity_id=uuid NOT NULL (info_schema). (a)+(b) recalcular_scores L526 id='batch' -> entity_id na idempotency-GET L582 + INSERT rule_executed L637-643 -> 'batch'::uuid=22P02 -> 2 system_events 400; rule_executed nunca grava + fn_recalcular_todos_scores re-roda todo tick. (c) lead_quente_sem_orcamento L478 cl.lead_origem_id (inexistente; real clientes.lead_id) -> execute_sql_readonly 42703 400 -> regra 100% MORTA. Cross-ref: lead_origem_id foi #9 "corrigido" no #10 mas so no data-layer; copia source escapou.
+- TAREFA 2 (P1 #35): reschedule v27 DRENANDO stuck-pool: eligible 195(#32)->180(#35)->135; tentativas_zero 152->108; oldest_due 05-11->05-14. SEND gated OFF (followup_engine_ativo=false). Watch: jobs Pendente 18, install_completed 24d, production_completed 0 lifetime.
+**Decisao tomada**: NAO deploy v28 - Junior shippou v27 hoje cedo e esta ativo no arquivo; bugs de semanas (sem regressao); 1369 LOC = agent isolado/Claude Code, nao Cowork Edit. 2 fixes de 2 linhas [VALIDADOS] no NEXT.
+**Resultado**: 2 bugs reais root-causados com runtime (400 ao vivo + 22P02/42703 reproduzidos) + 2 fixes validados contra schema; dreno do reschedule confirmado.
+**Ledger update**: #36 -> DONE; NEXT #36 com 2 fixes default-executavel.
+**Commits**: planning #36 (pushado HOST)
+**Deploys**: nenhum
+**Token usage**: ~125k
+**Telegram**: enviada (ok)
