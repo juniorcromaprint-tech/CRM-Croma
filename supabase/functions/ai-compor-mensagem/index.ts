@@ -1,10 +1,12 @@
 // supabase/functions/ai-compor-mensagem/index.ts
+// v25-anthropic-retry (2026-05-28) — ciclo #25: callAnthropicWithRetry substitui callOpenRouter, logAICall no catch
 // v2 (2026-05-27 BUG-JWT) — chamada interna ai-gerar-orcamento usa legacy JWT + retry 401
 
 import { serve } from 'https://deno.land/std@0.168.0/http/server.ts';
 import { handleCorsOptions, getCorsHeaders, jsonResponse, getServiceClient, authenticateAndAuthorize } from '../ai-shared/ai-helpers.ts';
 // 2026-05-21: OpenRouter ELIMINADO (Onda 2) — callOpenRouter = alias drop-in de callAnthropic.
 import { callOpenRouter } from '../ai-shared/anthropic-provider.ts';
+import { callAnthropicWithRetry } from '../ai-shared/anthropic-retry.ts';
 import { logAICall } from '../ai-shared/ai-logger.ts';
 
 // Cache do legacy JWT no escopo do isolate (BUG-JWT fix)
@@ -245,10 +247,10 @@ serve(async (req: Request) => {
       data_atual: new Date().toISOString().split('T')[0],
     };
 
-    // ── 8. Chamada OpenRouter ─────────────────────────────────
+    // ── 8. Chamada Anthropic com retry (ciclo #25) ───────────
     const systemPrompt = buildSystemPrompt(canal);
     const userPrompt = buildUserPrompt(aiContext);
-    const aiResult = await callOpenRouter(systemPrompt, userPrompt, {
+    const aiResult = await callAnthropicWithRetry(systemPrompt, userPrompt, {
       model: modeloComposicao,
       temperature: 0.7, // mais criativo para mensagens
       max_tokens: 1500,
@@ -462,6 +464,22 @@ serve(async (req: Request) => {
     );
   } catch (error) {
     console.error('ai-compor-mensagem error:', error);
+    // Log de erro para visibility em ciclos Anthropic 429/529 (ciclo #25)
+    // Nota: userId e body podem nao estar definidos se erro ocorrer antes da auth/parse.
+    // Usamos undefined safe em vez de spec literal (`body.lead_id`) que geraria ReferenceError.
+    await logAICall({
+      user_id: undefined,
+      function_name: 'compor-mensagem' as any,
+      entity_type: 'geral',
+      entity_id: 'unknown',
+      model_used: 'claude',
+      tokens_input: 0,
+      tokens_output: 0,
+      cost_usd: 0,
+      duration_ms: 0,
+      status: 'error',
+      error_message: (error as Error).message,
+    }).catch(logErr => console.error('logAICall failed:', logErr));
     return jsonResponse(
       { error: 'Erro ao compor mensagem', detail: error.message },
       500,
