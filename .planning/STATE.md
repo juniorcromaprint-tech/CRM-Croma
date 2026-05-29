@@ -1,3 +1,17 @@
+## Ciclo autonomo #43 - 2026-05-29 17:17 BRT - VERDE arrumar/validar (PERF: 8 FKs sem indice INDEXADOS, 14 advisor-flagged refutados como falso-positivo, zero regressao)
+
+**Tipo**: arrumar (perf/infra DDL) + validar. NOW 17:17 BRT (20:xx UTC); #42 as 16:15 (~53min, sem gatilho passivo). Health VERDE: Vercel 200; edge 60min ZERO 5xx (mcp-bridge-worker v9 ~1/min 200, agent-cron-loop v28 200 ~10s, dispatch v5 200); API ZERO 5xx/400 (tick natural 20:00 UTC limpo; lead_quente idempotency-GET 200 = dedup 24h holding SEM re-flood - confirma #40; v28 estavel 6o ciclo); branch=main HEAD #42 cerebros; guardrail HOST LIMPO (tails 3534/806/1658, 3 untracked herdados, bash NAO consultado).
+
+**Acao**: P1 default-exec NOVO do #42 NEXT - unindexed_foreign_keys (irmao perf do #42 duplicate_index). RECONCILIACAO ADVERSARIAL do advisor (#41 reportou 11): query live = 24 FKs sem indice full-covering; cross-check de predicado (pg_get_expr indpred) separou 14 partial WHERE fkcol IS NOT NULL (cobrem FK enforcement = FALSO-POSITIVO advisor) + 2 partial outro-predicado (job_attachments.job_id/estoque_reservas_op.material_id, gap edge tabela minuscula = watch) + 8 SEM indice algum (alvos reais). ARMADILHA EVITADA: indexar os 24 cego recriaria 16 indices redundantes sobre partials = anti-#42 + inflaria unused_index. Migration add_missing_fk_indexes_cycle43: CREATE INDEX IF NOT EXISTS nos 8 (fiscal_documentos x2, agent_campanhas.criada_por, fiscal_series.ambiente_id, pedido_compra_itens x2, proposta_itens x2), tabelas <=32kB, lock 5s, success=true.
+
+**Validacao runtime**: fks_zero_index_remaining 8->0; new_indexes_valid=8 (indisvalid); Vercel 200 pos-apply = zero regressao.
+
+**Mudancas prod**: 1 migration DDL (8 CREATE INDEX). 0 deploy Edge, 0 prod-data write. Commit planning #43 + migration.
+
+**NEXT**: auth_rls_initplan (78, migration select-wrap [NAO-VALIDADO]); function_search_path_mutable (65, em lotes, validar schema-qualif antes [NAO-VALIDADO]); job_attachments.job_id + estoque_reservas_op.material_id (watch, partial outro-predicado); 14 FKs partial-IS-NOT-NULL = NAO indexar (falso-positivo); SEC-001/SEC-002/buckets/token/lead_quente BLOCKED-Junior. [watch] production_completed 0 lifetime; install_completed 24d; jobs Pendente 18.
+
+---
+
 ## Ciclo autonomo #42 - 2026-05-29 16:15 BRT - VERDE arrumar/validar (PERF: 37 indices duplicados dropados, zero regressao)
 
 **Tipo**: arrumar (perf/infra DDL) + validar. NOW 16:15 BRT (19:15 UTC); #41 as 15:07 (~59min, sem gatilho passivo). Health VERDE: Vercel 200; edge 60min ZERO 5xx (mcp-bridge-worker v9 ~1/min 200, agent-cron-loop v28 200 ~7.6s, dispatch v5 200); API ZERO 5xx/400 (3x400/tick seguem ZERO, v28 estavel 5o ciclo); branch=main HEAD 7dd5c8d=#41; guardrail HOST LIMPO (tails 3521/786/1641, 3 untracked herdados).

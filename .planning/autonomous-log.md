@@ -1656,3 +1656,23 @@ ZERO prod-write: alterar/desativar regra = decisao negocio Junior (regra legitim
 **Commits**: fechamento #42 (hash no commit)
 **Migration**: cleanup_duplicate_indexes_cycle42 (37 DROP INDEX)
 **Telegram**: enviada (ok) - confirmacao no fechamento
+
+## 2026-05-29 17:17 (ciclo #43)
+
+**Status**: VERDE
+**Tipo**: arrumar (perf/infra DDL) + validar
+**Auto-dialogo (7)**: (1) #40 de-risk SEC-001 + lead_quente dedup holding; #41 advisors baseline + Financeiro REFUTADO; #42 cleanup 37 indices duplicados. (2) Sexta=Instalacao (mcp-bridge-worker v9) exausta #27-34; v9 saudavel. (3) gap util: P1 default-exec NOVO do #42 NEXT = unindexed_foreign_keys, irmao perf do #42. SEC-001/SEC-002/buckets/token/lead_quente=BLOCKED-Junior. (4) sem conflito IN-PROGRESS/BLOCKED. (5) Obsidian sem blocker novo. (6) nao-passivo (#42 ~53min, health VERDE, branch main, HOST limpo). (7) criterio: pos-migration FKs sem indice algum=0, new_indexes_valid=8, zero regressao.
+**Health check**: Vercel 200 | edge 60min ZERO 5xx (mcp-bridge-worker v9 ~1/min 200, agent-cron-loop v28 200 ~10s, dispatch v5 200) | API ZERO 5xx/400 (tick natural 20:00 UTC limpo; lead_quente idempotency-GET 200 = dedup 24h holding SEM re-flood; v28 estavel 6o ciclo) | branch=main HEAD #42 cerebros | guardrail HOST LIMPO (tails 3534/806/1658, 3 untracked herdados, bash NAO consultado). NOW 17:17 BRT.
+**Agents disparados**: 0 (prod-write DDL = cross-check inline; catalogo pg inline; nao recon multi-arquivo).
+**Acoes executadas**:
+- Reconciliacao adversarial do advisor unindexed_foreign_keys (#41 reportou 11): query live (pg_constraint+pg_index prefix-cover c/ indpred+indisvalid) = 24 FKs sem indice FULL valido; destes 16 tem indice PARCIAL liderando pela col FK e 8 NAO tem indice algum.
+- Inspecao de predicado (pg_get_expr indpred): 14 com WHERE fkcol IS NOT NULL = cobrem FK enforcement (so non-null referencia pai) = FALSO-POSITIVO advisor; 2 com predicado em OUTRA coluna (job_attachments.job_id deleted_at IS NULL; estoque_reservas_op.material_id liberado_em IS NULL) = partial intencional, tabela minuscula/vazia, gap edge.
+- Migration add_missing_fk_indexes_cycle43: CREATE INDEX IF NOT EXISTS nos 8 sem indice (fiscal_documentos.ambiente_id/serie_id, agent_campanhas.criada_por, fiscal_series.ambiente_id, pedido_compra_itens.terceirizacao_catalogo_id/proposta_item_id, proposta_itens.terceirizacao_catalogo_id/fornecedor_id). Tabelas <=32kB -> build instantaneo, lock_timeout 5s, business-hours-safe. success=true.
+**Decisao tomada**: indexar SO os 8 sem indice (REGRA #0). NAO indexar os 14 partial-IS-NOT-NULL (redundante, recriaria o que #42 limpou + inflaria unused_index) nem os 2 partial-outro-predicado (intencional, tabela minuscula -> watch). apply_migration idempotente+validado contra schema = pre-aprovado.
+**Resultado (validado)**: fks_zero_index_remaining 8->0; new_indexes_valid=8 (indisvalid); Vercel 200 pos-apply = zero regressao. Cobertura FK enforcement 100% nos 8 alvos reais.
+**Ledger update**: #42 NEXT [P1 unindexed_foreign_keys] -> DONE #43 (8 reais indexados, 14 falso-positivo, 2 watch). NEXT: auth_rls_initplan (78), function_search_path_mutable (65 em lotes).
+**Commits**: fechamento #43 (hash no commit)
+**Migration**: add_missing_fk_indexes_cycle43 (8 CREATE INDEX IF NOT EXISTS)
+**Deploys**: nenhum
+**Token usage**: alta (dumps log api/edge no health)
+**Telegram**: enviada (ok) - msgid no fechamento
