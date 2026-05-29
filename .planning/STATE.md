@@ -9,6 +9,24 @@
 
 **Penúltima atualização**: 2026-05-28 21:05 BRT — Ciclo autônomo #24 — 🔴 ACHADO P0 NOVO CRÍTICO: fix #18 (trg_check_production_completed) está **DORMENTE — gap Fase 1.2 NÃO resolvido**. 3 OPs finalizado (15/16/17) chegaram a esse status SEM marcar producao_etapas.concluida (path UPDATE direto). Trigger só roda em `AFTER UPDATE OF status ON producao_etapas`. **Pedidos 1070 + PED-2026-0025 seguem `em_producao` 4 dias após ciclo #18 declarar destrava estrutural**. + Recon ai-compor-mensagem v24 confirma 417 LOC (acima threshold 250 — agent isolado obrigatório). Edit cirúrgico EXATO documentado para deploy v25 em janela 22h+ BRT (próximo ciclo #25). + 2 achados HIGH novos: 19 etapas concluida sem tempo_real_min (Gantt cego para análise), 2 setores zerados (Router/Corte, Serralheria). Spike 500 ai-compor-mensagem v24 SEGUE ATIVO há 4h+ (cluster 20:00 + 20:20 BRT, ZERO agent_messages criadas desde 17:00 BRT).
 
+## Ciclo autonomo #40 - 2026-05-29 14:14 BRT - VERDE VALIDAR + de-risk P0: SEC-001 anon-read PROVADO inofensivo (Bloco1/2 safe-to-apply) + lead_quente NAO re-disparou (dedup holding) + filtro recencia [VALIDADO] 319->0
+
+**Mantra**: VALIDAR (P1 #38/#39 pos-deploy) + EXPLORAR de-risk do P0 SEC-001 (backlog abril). Hora 14:14 BRT (17:14 UTC), #39 as 13:15 (~59min, sem gatilho passivo). Health VERDE: Vercel 200, edge 60min ZERO 5xx (mcp-bridge-worker v9, agent-cron-loop v28 200 ~9-11s, dispatch v5, ai-detectar-problemas v21), API 0 5xx, branch=main HEAD ce34a6c=#39, guardrail HOST LIMPO (tails 3489/759/1593/1368, 3 untracked herdados, bash nao consultado). 1 agent read-only (55k) + 2 SQL inline.
+
+### TAREFA 1 - lead_quente NAO re-disparou (runtime, fecha watch #39)
+system_events rule_executed HOJE: lead_quente_sem_orcamento=100 (first 15:19:49 / last 15:20:28 UTC) = SOMENTE o smoketest FORCADO do #38; ZERO desde (rule_exec since 16:15UTC=40, todos follow_up_lead_24h). dedup 24h holding -> sem flood ativo; 1a recorrencia possivel ~amanha 15:20 UTC. recalcular_scores=1 (sentinel uuid ok). agent-cron-loop v28 ticks naturais 16:00+17:00 UTC 200; 3x 400/tick seguem ZERO. v28 estavel no 3o ciclo.
+
+### TAREFA 2 - SEC-001 de-risk anon-read (adianta P0, agent read-only)
+Veredito (file:line): NENHUMA das 6 tabelas sensiveis (leads/clientes/produtos/catalogo/ai_alertas/telegram_messages) e lida por rota PRE-LOGIN via anon key direto (.from). Rotas pre-auth: /login, /p/:token (Portal le proposta via Edge service_role, 0 .from), /nps/:token. catalogo e telegram_messages NAO existem como .from() em nenhum frontend (ERP+Campo+Landing). => Bloco1 (leads_all_read/clientes_all_read TO public->authenticated) + Bloco2 (telegram_messages/ai_alertas) SEGUROS p/ aplicar. 2 das 3 NEEDS-CONFIRM #37 FECHADAS (telegram_messages, catalogo). RESTA nps_respostas: NpsPage.tsx:46,60 LE+UPDATE via anon em /nps/:token publico -> policy nps_public_update_by_token USING(true) NECESSARIA; NAO restringir authenticated (quebraria NPS); fix = gatear por token.
+
+### TAREFA 3 - filtro recencia lead_quente [VALIDADO] contra schema
+condicao real={campo:leads.score, valor:70, operador:>=, filtro NOT EXISTS proposta via clientes.lead_id}, acao=alerta_telegram, ativo=true, run_count=1316. leads.updated_at=timestamptz EXISTE. Query do filtro proposto roda no schema real: matches atuais=319, com "AND leads.updated_at >= now() - interval '7 days'" = 0 -> TODOS os 319 hot-leads-sem-proposta sao VELHOS (confirma #39). Filtro parseia e reduz, mas a 7d ZERA a regra (0 match); threshold = decisao Junior.
+
+### Decisao + mudancas + watch
+ZERO prod-write/deploy/migration. SEC-001 application + lead_quente filtro seguem BLOCKED-Junior, agora 1-comando (evidencia pronta). Doc: planning/SEC-001-anon-read-derisk-2026-05-29. [watch] production_completed 0 lifetime (dormente, chain 4195dc7 sem runtime); installation_completed 9 (24d, INSTAL-01); payment_received 2; payment_overdue 0; jobs Pendente 18; eligible_followups DRENADO 135->0 (v27 reschedule esvaziou stuck-pool; SEND ainda gated followup_engine_ativo=false). Commit planning #40.
+
+---
+
 ## Ciclo autonomo #39 - 2026-05-29 13:15 BRT - 🟡 VALIDAR: v28 CONFIRMADO em ticks NATURAIS + ACHADO: lead_quente ressuscitada = ~100 alertas Telegram/dia sobre backlog VELHO
 
 **Mantra**: VALIDAR os 2 P1 default-exec do #38 NEXT (pos-deploy v28). Sexta=Instalacao exausta #27-34. Hora 13:07->13:15 BRT (16:07 UTC), #38 as 12:25 (~42min, sem gatilho passivo). Health VERDE: Vercel 200, edge 60min ZERO 5xx (mcp-bridge-worker v9, agent-cron-loop v28 200 11s), branch=main HEAD bae4381=#38, guardrail HOST LIMPO (tails 3475/751/1567/1368, bash NAO consultado p/ corrupcao). Validacao dirigida inline (SQL+log+source), sem agent.

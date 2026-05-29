@@ -1591,3 +1591,23 @@ EFEITO: dedup reabre 24h -> re-dispara ~100 alertas/dia (cap) sobre leads velhos
 ZERO prod-write: alterar/desativar regra = decisao negocio Junior (regra legitima; problema e o backlog velho 319 = mesmo backlog cronico dos follow-ups #32-36). Sem flood ATIVO agora (dedup ja gravou hoje; recorre so amanha 12:20 BRT -> ha tempo do Junior ver). NAO Cowork Edit arquivo grande. NAO vitoria sem runtime (log API + cron_run_details + dedup count). Token comprometido #37 NAO escrito (redigido).
 - Commits: planning #39 (cerebros). Zero deploy, zero migration, zero prod-write. Telegram enviado (ok no fechamento).
 - NEXT #39: detalhado no ledger.
+
+
+## 2026-05-29 14:14 (ciclo #40)
+
+**Status**: VERDE
+**Tipo**: validar + explorar (de-risk P0)
+**Auto-dialogo**: (1) #37 audit SEC-001 / #38 deploy v28 / #39 validou v28 + achou lead_quente ruido. (2) Sexta=Instalacao (exausta #27-34); mcp-bridge-worker v9 saudavel. (3) gap mais util: de-riscar SEC-001 (P0) read-only + validar lead_quente + confirmar nao-recorrencia. (4) sem conflito IN-PROGRESS; SEC-001/lead_quente sao BLOCKED-Junior, meu trabalho e read-only/validacao que ADIANTA, nao aplica. (5) Obsidian: campanha + licao offline-first #27, nada novo bloqueante. (6) nao-passivo (health VERDE, branch main, #39 ha ~59min). (7) criterios: SEC-001 veredito anon-read file:line; lead_quente filtro parseia+reduz; recorrencia=0.
+**Health check**: Vercel 200 | edge 60min ZERO 5xx (mcp-bridge-worker v9 ~1/min 200, agent-cron-loop v28 200 ~9-11s, dispatch v5 200, ai-detectar-problemas v21 200) | API 0 5xx | branch=main HEAD ce34a6c=#39 | guardrail HOST LIMPO (tails 3489/759/1593/1368, 3 untracked herdados, bash NAO consultado p/ corrupcao)
+**Agents disparados**: 1 (general-purpose read-only adversarial, 55k tok, 13 tools) - mapeou frontend ERP+Campo+Landing, anon-read das 6 tabelas sensiveis
+**Acoes executadas**:
+- TAREFA 1 (VALIDAR runtime, P1 #38/#39): lead_quente_sem_orcamento NAO re-disparou. system_events rule_executed HOJE: lead_quente=100 (first 15:19:49 / last 15:20:28 UTC) = SO o smoketest FORCADO #38; ZERO desde (since 16:15UTC=40, todos follow_up_lead_24h). dedup 24h holding -> sem flood; recorrencia possivel ~amanha 15:20 UTC. recalcular_scores=1 (sentinel ok). agent-cron-loop v28 ticks naturais 16:00+17:00 UTC 200; 3x 400/tick seguem ZERO. v28 estavel 3o ciclo.
+- TAREFA 2 (de-risk P0 SEC-001, agent read-only): veredito anon-read file:line. 6 tabelas (leads/clientes/produtos/catalogo/ai_alertas/telegram_messages): NENHUMA lida por rota PRE-LOGIN via anon key direto. Rotas pre-auth: /login, /p/:token (Portal via Edge service_role, 0 .from), /nps/:token. catalogo e telegram_messages: 0 .from() em qualquer frontend. => Bloco1 (leads/clientes TO authenticated) + Bloco2 (telegram_messages/ai_alertas) SEGUROS. nps_respostas EM ABERTO: NpsPage.tsx:46,60 le+update via anon em /nps/:token publico -> policy USING(true) NECESSARIA, gatear por token. 2 das 3 NEEDS-CONFIRM #37 fechadas.
+- TAREFA 3 (VALIDAR fix lead_quente contra schema): condicao={campo:leads.score,valor:70,operador:>=,filtro:NOT EXISTS proposta via clientes.lead_id}. leads.updated_at=timestamptz EXISTE. Query do filtro recencia roda: matches=319, com updated_at>=now()-7d = 0 (TODOS os 319 sao velhos, confirma #39). Filtro [VALIDADO] mas a 7d ZERA a regra = decisao de threshold do Junior.
+**Decisao tomada**: read-only de-risk + validacao (zero prod-write). SEC-001 application + lead_quente filtro seguem BLOCKED-Junior, agora 1-comando (evidencia pronta). NAO apliquei RLS (business hours + decisao Junior) nem mudei a regra (threshold = Junior).
+**Resultado**: 3 verificacoes runtime-provadas; SEC-001 P0 adiantado NEEDS-CONFIRM -> Bloco1/Bloco2 safe-to-apply (so nps_respostas resta, fix conhecido). eligible_followups DRENADO 135->0. production_completed 0 lifetime (dormente).
+**Ledger update**: #40 DONE; NEXT (SEC-001 aplicar Bloco1/2 de-riscado; lead_quente threshold Junior; nps gate-por-token).
+**Commits**: planning #40 (cerebros + doc SEC-001 de-risk) - hash no commit do fechamento
+**Deploys**: nenhum
+**Token usage**: ~125k
+**Telegram**: enviada (ok)
