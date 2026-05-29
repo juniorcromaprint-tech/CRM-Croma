@@ -9,6 +9,23 @@
 
 **Penúltima atualização**: 2026-05-28 21:05 BRT — Ciclo autônomo #24 — 🔴 ACHADO P0 NOVO CRÍTICO: fix #18 (trg_check_production_completed) está **DORMENTE — gap Fase 1.2 NÃO resolvido**. 3 OPs finalizado (15/16/17) chegaram a esse status SEM marcar producao_etapas.concluida (path UPDATE direto). Trigger só roda em `AFTER UPDATE OF status ON producao_etapas`. **Pedidos 1070 + PED-2026-0025 seguem `em_producao` 4 dias após ciclo #18 declarar destrava estrutural**. + Recon ai-compor-mensagem v24 confirma 417 LOC (acima threshold 250 — agent isolado obrigatório). Edit cirúrgico EXATO documentado para deploy v25 em janela 22h+ BRT (próximo ciclo #25). + 2 achados HIGH novos: 19 etapas concluida sem tempo_real_min (Gantt cego para análise), 2 setores zerados (Router/Corte, Serralheria). Spike 500 ai-compor-mensagem v24 SEGUE ATIVO há 4h+ (cluster 20:00 + 20:20 BRT, ZERO agent_messages criadas desde 17:00 BRT).
 
+## Ciclo autonomo #34 - 2026-05-29 07:30 BRT - Ressalva P2 #33 FECHADA (portal NAO usa JWT authenticated) + DB-001..005 validados RESOLVIDOS VERDE
+
+**Mantra**: EXPLORAR/VALIDAR (fecha o unico fio solto da rotacao Instalacao + valida watch-items + bonus 5 P0s de abril). Hora 07:08 BRT Sexta (#33 as 06:15, ~53min, sem gatilho passivo). Health pre VERDE: Vercel 200, edge 90min ZERO 5xx (mcp-bridge-worker v9 ~1/min 200), branch=main HEAD d420ec8, guardrail HOST LIMPO (0 modified, tails 3391/702/1437/1230 L). Cron prospeccao OFF ate 11 UTC. 1 agent isolado (sonnet 52k read-only) + 5 SQL inline.
+
+### Portal auth (fecha ressalva P2 do #33): clientes NAO seguram JWT authenticated
+Agent (source) + DB cross-check. Portal = share_token opaco em /p/:token: App.tsx:94 rota sem ProtectedRoute; supabase/client.ts anon key sem signIn de cliente; ai-chat-portal/index.ts:17,89 SERVICE_ROLE + auth via share_token ("no login required"); portal-upload-assinatura verify_jwt=false; RPCs portais SECURITY DEFINER. DB: auth.users=6 contas TODAS role authenticated (time interno), ZERO cliente. -> Veredicto #33 "SEM EXPOSICAO" CONFIRMADO: qual=true em jobs/ordens_instalacao/job_photos so acionavel por funcionario logado = by-design app interno de campo. Ressalva herdada do #18/#33 fechada.
+
+### Validacao watch-items (snapshot 10:13 UTC)
+jobs Pendente 15 / Concluido 21 / Em andamento 1 (corrige drift: #28-#33 logaram 18; real 15 = #27). OI concluida 8 / aguardando_agendamento 1. install_completed ultimo 2026-05-05 (24d), n=9 -> INSTAL-01 persiste. Follow-up: 195 elegiveis / 152 tentativas=0 / mais antigo 2026-05-11 (18d) = IDENTICO #32 -> backlog CONGELADO (nao esgotado). cron jobid20 agent-cron-loop-30min active, last 02:30 UTC succeeded, off-window ate 11 UTC -> infra saudavel, so fora de janela. jobid23 fallback-watchdog active=FALSE desde 05-22 (worker principal jobid17 1/min OK).
+
+### Bonus: DB-001..005 (duplicate triggers abril) validados RESOLVIDOS (1a vez pelo loop)
+Via pg_trigger: ordens_producao 1 baixa de estoque (trg_auto_baixa_producao; os 2 duplicados sumiram); pedidos_compra 1 conta_pagar + 1 recebimento; area_m2 1 por tabela; pedidos 1 so CR (aprovado, sem 2o em concluido). Migration 125/126 efetiva. SEM risco double stock-debit/AP/CR.
+
+### Decisao + NEXT
+Ciclo read-only (unmonitored 07h, janela Edge cliente ~fechada). Zero prod write/deploy/migration. Modulo Instalacao exaustivamente auditado (#27-#34). NEXT: validar prospeccao no 1o tick >=11 UTC (runtime do bug follow-up); P1 fix follow-up deferido (janela diurna monitorada + Junior); NOVO direcionamento produtivo = re-validar backlog de abril nunca tocado pelo loop (SEC-*/INT-*/DB-*/CRM-*), comecar SEC-001 + INT-001 via agent. Detalhe: autonomous-log #34 + ledger #34.
+
+---
 ## Ciclo autonomo #33 - 2026-05-29 06:15 BRT - Auditoria RLS QUALIDADE do dominio Instalacao: SEM EXPOSICAO (qual=true todas authenticated, zero anon/public) VERDE
 
 **Mantra**: EXPLORAR/VALIDAR (angulo NOVO - #27-31 so checaram RLS ON/OFF, nunca a qualidade das policies). Hora 06:15 BRT Sexta (#32 as 05:06, ~1h, sem gatilho passivo). Health pre VERDE: edge/API 60min ZERO 5xx (mcp-bridge-worker v9 ~1/min 200, fn_claim_ai_requests cron 200 + email_events 201), branch=main HEAD 1e4d60b, guardrail HOST LIMPO (3 untracked herdados, 0 modified, tails 3375/691/1423/1230 L). Cron prospeccao OFF (jobid 20 janela 11-23 UTC; resume 11 UTC) -> follow-up #32 NAO validavel ainda. 3 SQL read-only inline (sem agent - tool calls unicos).

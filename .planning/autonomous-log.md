@@ -1435,3 +1435,35 @@ Padrao IDENTICO ao incidente 08:30: EOF abrupto sem newline final, arquivos cort
 - Mudancas: doc novo planning/INSTAL-RLS-AUDIT-2026-05-29 + 3 cerebros. Zero deploy, zero migration, zero prod write.
 - NEXT #33: [P2 default executavel] confirmar modelo de auth do portal (clientes recebem JWT authenticated do Supabase? checar ai-chat-portal/portal-upload-assinatura + supabase auth users role) -> se employee-only marcar RLS campo by-design; se nao, migration escopando jobs/ordens_instalacao/job_photos por tenant. [P2] dedup policies redundantes jobs+anexos (DROP POLICY idempotente, janela monitorada). [P1 herdado #32] fix invoke follow-up agent-cron-loop (legacy-JWT + reschedule-on-failure + safeInsert) via agent/Claude Code em janela DIURNA monitorada; VALIDAR 1o tick >=11 UTC (compor invocacoes>0 + agent_messages>0). [BLOCKED-Junior] 195 backlog follow-up (cap nos recentes + revisar copy). [watch] cron resume 11 UTC; instalacao 24d sem installation_completed; jobs Pendente 18.
 - Telegram: a confirmar nesta etapa. Commit: a confirmar pelo HOST.
+
+## 2026-05-29 07:30 (ciclo #34)
+
+**Status**: VERDE
+**Tipo**: explorar + validar
+**Auto-dialogo**:
+1. 3 ciclos anteriores: #31 reconciliou chain Instalacao verbatim; #32 root-cause prospeccao (backlog 195); #33 auditoria RLS qualidade dominio campo (SEM EXPOSICAO) deixando ressalva P2 (modelo auth do portal nao confirmado).
+2. Dia: Sexta -> modulo Instalacao + Edge mcp-bridge-worker v9.
+3. Gap mais util AGORA: fechar a ressalva P2 do #33 (modelo de auth do portal) - unico fio solto concreto da rotacao Instalacao. Prospeccao (P1 maior) NAO validavel ainda: cron jobid 20 resume 11 UTC, agora 10:08 UTC.
+4. Conflita com IN-PROGRESS/BLOCKED? Nao. Follow-up fix esta deferido (BLOCKED-Junior); portal auth e read-only.
+5. STATE/Obsidian dao contexto novo? Confirmam cron OFF ate 11 UTC; backlog 195 e install_completed parados.
+6. MODO PASSIVO? Nao. #33 as 06:15 (~53min, >15min); health VERDE; branch main; sem corrupcao real; sem 5xx.
+7. Criterio de sucesso: (a) veredicto binario com evidencia sobre JWT do portal; (b) numeros frescos de backlog/jobs/install; (c) checar duplicate-trigger P0s de abril (DB-001..005).
+
+**Health check**: Vercel 200 | edge 90min ZERO 5xx (mcp-bridge-worker v9 ~1/min 200, resend-webhook 200) | branch=main HEAD d420ec8 | guardrail HOST LIMPO (3 untracked herdados, 0 modified, tails 3391/702/1437/1230 L) | NOW 07:08 BRT (10:08 UTC) Sexta.
+
+**Agents disparados**: 1 (general-purpose sonnet, 52k tok, 26 tools, read-only) - auditoria do modelo de auth do portal.
+
+**Acoes executadas**:
+- TAREFA 1 (rotacao Instalacao, explorar/validar): fechar ressalva P2 #33 - modelo auth do portal. VEREDICTO: clientes do portal NAO seguram JWT role=authenticated do Supabase. Evidencia source (agent): App.tsx:94 rota /p/:token sem ProtectedRoute; integrations/supabase/client.ts anon key sem signIn de cliente; ai-chat-portal/index.ts:17,89 SERVICE_ROLE_KEY + auth via share_token (comentario "no login required"); portal-upload-assinatura verify_jwt=false auth via share_token; RPCs portais SECURITY DEFINER. Evidencia DB: auth.users=6 contas TODAS role authenticated (time interno), ZERO conta de cliente. -> #33 "SEM EXPOSICAO" CONFIRMADO: qual=true em jobs/ordens_instalacao/job_photos so acionavel por funcionario logado (by-design app interno). Ressalva P2 herdada do #18/#33 FECHADA.
+- TAREFA 2 (validar, snapshot 10:13 UTC): jobs Pendente 15 / Concluido 21 / Em andamento 1 (corrige drift: #28-#33 logaram "18", real=15=#27). OI concluida 8 / aguardando_agendamento 1. install_completed last 2026-05-05 (24d), n=9 -> INSTAL-01 persiste. Follow-up: 195 elegiveis / 152 tentativas=0 / mais antigo 2026-05-11 (18d) = IDENTICO #32, backlog CONGELADO. cron jobid20 agent-cron-loop-30min active, last_run 02:30 UTC succeeded, off-window ate 11 UTC (infra saudavel). jobid23 ai-requests-fallback-watchdog active=FALSE desde 05-22 (worker principal jobid17 1/min OK).
+- TAREFA 3 (validar, 1a vez pelo loop): duplicate-trigger P0s de abril (DB-001..005, auditoria v6) via pg_trigger. TODOS RESOLVIDOS: ordens_producao 1 so baixa de estoque (trg_auto_baixa_producao; os 2 dups sumiram); pedidos_compra 1 conta_pagar + 1 recebimento; area_m2 1/tabela; pedidos 1 so CR (aprovado, sem 2o em concluido). Migration 125/126 efetiva. SEM risco double stock-debit/AP/CR.
+
+**Decisao tomada**: ciclo read-only (07:08 BRT unmonitored, janela de deploy Edge cliente ~fechada 8h-20h). Foco em fechar o fio solto da rotacao + validar watch-items + bonus 5 P0s de abril nunca checados pelo loop. Zero prod write/deploy/migration.
+
+**Resultado**: ressalva P2 portal-auth FECHADA com evidencia cruzada (source + auth.users=6 empregados/0 clientes). DB-001..005 validados RESOLVIDOS. Backlog prospeccao confirmado congelado (195/152, 18d) - P1 segue deferido p/ janela diurna monitorada + decisao Junior. Modulo Instalacao exaustivamente auditado (#27-#34); proxima rotacao util = validar prospeccao quando cron voltar (>=11 UTC) OU atacar backlog P0/P1 das auditorias de abril (SEC-*/INT-*/DB-*/CRM-*) nunca tocado pelo loop.
+
+**Ledger update**: #34 -> DONE. NEXT atualizado.
+**Commits**: a confirmar pelo HOST (push nesta etapa).
+**Deploys**: nenhum.
+**Token usage**: ~100k
+**Telegram**: enviada (ok) msgid 3039.
