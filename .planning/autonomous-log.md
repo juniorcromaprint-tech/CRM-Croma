@@ -1512,3 +1512,27 @@ Padrao IDENTICO ao incidente 08:30: EOF abrupto sem newline final, arquivos cort
 **Deploys**: nenhum
 **Token usage**: ~125k
 **Telegram**: enviada (ok)
+
+## Ciclo autonomo #37 — 2026-05-29 11:07 BRT — 🔴 SEGURANCA (backlog abril) / 🟢 SAUDE
+
+### Auto-dialogo (7 perguntas)
+1. 3 ciclos anteriores: #34 portal-auth + DB-001..005 (read-only), #35 validou v27 que o Junior shippou (read-only), #36 root-cause dos 3x 400/tick do agent-cron-loop (2 fixes validados, NAO deployados). Padrao: 3 ciclos read-only/validacao, zero prod-write meu.
+2. Dia: Sexta = Instalacao + mcp-bridge-worker. Mas Instalacao auditada 8x hoje (#27-34) e mcp-bridge ja v9 saudavel (#29). Rotacao do dia ESGOTADA.
+3. Gap mais util AGORA: backlog de SEGURANCA de abril (SEC-001 RLS, INT-001 cron JWT, INT-005 secrets) NUNCA tocado pelo loop, 5 ciclos no NEXT (#32-36), corroborado por Obsidian (3 secret leaks 05-27 URGENTE). Read-only, risco zero, alto valor, vencido.
+4. Conflita com IN-PROGRESS/BLOCKED? Nao. Net-novo. BLOCKEDs ativos (followup_engine flag, state-machine op_finalizada) intocados.
+5. STATE/Obsidian deram contexto novo? SIM — Obsidian memory 05-27: token Telegram hardcoded + Supabase PAT + BUG-JWT flagados URGENTE -> direcionou INT-005.
+6. Modo passivo? NAO. #36 46min atras (>15min), health VERDE, branch=main, 0 5xx, sem corrupcao HOST, ultimo log nao-vermelho.
+7. Criterio mensuravel: veredicto verificado (✅/⚠️/🔴) por item com evidencia CRUZADA (nao assumida) + gap report + recomendacao executavel.
+
+### Health + guardrail (ETAPA 4, HOST = fonte de verdade)
+NOW 11:07 BRT. Vercel 200. Edge 60min ZERO 5xx (mcp-bridge-worker v9 ~1/min 200, agent-cron-loop v27 200 ~10s, dispatch-approved-messages v5 200, resend-webhook v4 200). git HOST: branch=main, HEAD 72ba282=#36 cerebros; ultimo push do Junior foi de manha (16e1ee2/4195dc7, ~3h atras) -> NAO ativo agora. Working dir: 3 untracked herdados (HANDOFF-MONITORAMENTO-CRONS-V2, MUBISYS_MIRROR_PROTOCOL, hp-latex-sync_hidden.vbs), 0 modified. Tails HOST 3440/730/1514/1368 integros. GUARDRAIL: bash mount mostrou 2836L STATE (STALE) vs HOST 3440L -> confirmado o falso-positivo do bash, segui pelo HOST.
+
+### Execucao (inline — queries dirigidas bounded de seguranca, nao recon de fluxo; + 1 HOST Select-String)
+SEC-001: (a) summary pg_class/pg_policies: 181 tabelas, 180 RLS on, 1 off, 2 com policy anon, 37 com policy public, 1 RLS-on-zero-policies. (b) detalhe classificou as 37 public + 2 anon por USING/CHECK. (c) anon grants: anon tem GRANT ALL em TODAS as tabelas (default Supabase). (d) PROVA RUNTIME SET ROLE anon: leads 3460 / ai_alertas 357 / clientes 336 / produtos 107 / telegram_messages 42 / regras_precificacao 11 VISIVEIS; controles pedidos/contas_receber/jobs = 0 (get_user_role gated). => exposicao real, vetor = policies TO public USING(true) + GRANT anon.
+INT-001: cron.job (14 jobs) — 0 has_jwt_literal; Edge-callers usam private.get_service_role_key(); pg_get_functiondef confirma sec_def + uses_vault=true. REFUTADO.
+INT-005: HOST Select-String em functions/mcp-server/scripts (7 hits / 2825 arquivos): telegram-webhook/index.ts:11 TELEGRAM_TOKEN hardcoded (🔴 vivo); notificar-aprovacao-telegram = v2-vault-token (✅ corrigido); mcp-server/src/supabase-client.ts:20 ANON key hardcoded (🟡 publica); zod test fixtures (falso-positivo). RPC vault get_telegram_bot_token ja existe (sec_def, uses_vault).
+
+### Decisao + entregas
+ZERO prod write. Achados de risco/negocio -> BLOCKED + 1 recomendacao (sem A/B). NAO alterei RLS em business hours (mudar core/catalogo pode quebrar ERP/portal; exposicao de meses). NAO toquei o token (rotacao = @BotFather = Junior; code-change sem rotacao incompleto; webhook cliente unmonitored = risco). Entregas: planning/SEC-AUDIT-2026-05-29-anon-exposure.md + planning/SEC-001-remediacao-anon-rls-VALIDADA.sql (idempotente, validada contra pg_policies real, NAO-aplicada). NEXT completo no ledger #37. Anti-pattern evitado: NAO declarei "RLS OK" sem prova runtime (rodei SET ROLE anon); NAO repeti o rotulo "37 tabelas RLS off" de abril sem checar (era policy public, nao RLS off); NAO Cowork Edit nos cerebros (>250 LOC; via HOST .NET UTF8); NAO deploy/migration arriscado unmonitored.
+
+**Telegram**: enviada (ok) — ver msgid no fechamento.
