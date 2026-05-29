@@ -1,4 +1,4 @@
-﻿
+
 # STATE — CRM Croma
 
 **Última atualização**: 2026-05-29 00:30 BRT — Ciclo autônomo #27 — 🟢 Rotação SEXTA, 1a auditoria do módulo Instalação (nunca tocado — ciclos #1-#26 foram TODOS Quinta/Produção). Chain Instalação CABEADA via 4 triggers DB (não-stub) MAS installation_completed MORTO desde 2026-05-05 (jobs/OIs criados, max hoje 14:04 BRT, porém 0 finalizados em 25d+; 15 Pendente empilhando) — P0 INSTAL-01. App Campo "offline-first" é LABEL: VitePWA só NetworkFirst, sem IndexedDB/fila/replay, JobSignature bloqueia assinatura offline → conclusão exige rede = provável causa raiz (P0 INSTAL-02, build Claude Code). mcp-bridge-worker v8 saudável (worker genérico MCP↔ERP, não Instalação) mas ai_responses.insert L84 sem .select().single() (BUG MCP-01, perda silenciosa sob RLS). v25 ai-compor-mensagem deployado/correto mas retry NUNCA exercitado (prospecção idle desde 16:02 BRT 28/05, pool candidatos vazio = exaustão provável benigna). RLS ✅ ON nas 15 tabelas campo; campo_audit_logs morto (0 policies/0 rows). Zero prod write (P0 arquiteturais/operacionais; fix MCP-01 documentado pra agent isolado). Sync rotation v7→v8 + commit planning.
@@ -9,6 +9,25 @@
 
 **Penúltima atualização**: 2026-05-28 21:05 BRT — Ciclo autônomo #24 — 🔴 ACHADO P0 NOVO CRÍTICO: fix #18 (trg_check_production_completed) está **DORMENTE — gap Fase 1.2 NÃO resolvido**. 3 OPs finalizado (15/16/17) chegaram a esse status SEM marcar producao_etapas.concluida (path UPDATE direto). Trigger só roda em `AFTER UPDATE OF status ON producao_etapas`. **Pedidos 1070 + PED-2026-0025 seguem `em_producao` 4 dias após ciclo #18 declarar destrava estrutural**. + Recon ai-compor-mensagem v24 confirma 417 LOC (acima threshold 250 — agent isolado obrigatório). Edit cirúrgico EXATO documentado para deploy v25 em janela 22h+ BRT (próximo ciclo #25). + 2 achados HIGH novos: 19 etapas concluida sem tempo_real_min (Gantt cego para análise), 2 setores zerados (Router/Corte, Serralheria). Spike 500 ai-compor-mensagem v24 SEGUE ATIVO há 4h+ (cluster 20:00 + 20:20 BRT, ZERO agent_messages criadas desde 17:00 BRT).
 
+## Ciclo autonomo #32 - 2026-05-29 05:06 BRT - P1 prospeccao "idle benigno" REFUTADO (backlog cronico 195) + overnight=schedule 🟡
+
+**Mantra**: EXPLORAR+VALIDAR (root-cause prospeccao idle - P1 do #26 NEXT nunca executado). Hora 05:06 BRT Sexta (#31 as 04:07, ~59min, sem gatilho passivo). Health pre VERDE: Vercel 200, edge/API 60min ZERO 5xx (mcp-bridge-worker v9 + fn_claim_ai_requests cron ~1/min), branch=main HEAD fe6d36b, guardrail HOST LIMPO (0 modified, tails integros). 1 agent isolado adversarial (sonnet 45k) + verificacao cruzada inline (8 SQL + 3 reads de source).
+
+### Veredicto root-cause prospeccao (corrige 5 ciclos de "exaustao benigna")
+Dois fenomenos, separados:
+- Overnight (sem eventos cron ~7h) = BENIGNO por schedule: pg_cron jobid 20 "*/30 11-23,0,2 * * 1-6" UTC = roda BRT 08-20 a cada 30min + ticks 21/22/23h. Ult run 02:30 UTC (BRT 23:30) succeeded; agora 08 UTC = janela OFF; resume 11 UTC (BRT 08). cron.job_run_details 0 falhas.
+- Follow-up = NAO benigno: 195 agent_conversations elegiveis AGORA (status=ativa, proximo_followup<=now), pool NAO esgotado. 152 com tentativas=0 (nunca contatados), todos overdue >5d, mais antigo due 2026-05-11 (18d) = backlog CRONICO. 119 WA + 76 email. ai-compor-mensagem 0 invocacoes/48h (os 119 agent_messages recentes sao abertura-em-massa/processApprovedMessages, nao follow-up).
+
+### Causa + correcao do registro
+NAO e join orfao (elig_with_lead 195/195, lead_null 0, orphan 0). Aponta pro invoke cru index.ts:1126 supabase.functions.invoke("ai-compor-mensagem") vs verify_jwt=true -> 401 (documentado #13). Stuck-pool: index.ts:1130 falha de compor faz continue SEM reschedular -> conv perma-elegivel. Sub-agent ERROU linha/causa: .catch real e L183/L239, roda DEPOIS de processLeadFollowUps (L169) -> nao bloqueia follow-ups (confirma #13 cosmetico); L189 cron_loop_executed e correto; debug_cron_last_error em admin_config.
+
+### Decisao (sem A/B) + mudancas prod
+ZERO prod write/deploy/migration. Fix exige Edit em 1230 LOC (agent isolado/Claude Code) E, ao funcionar, auto-envia a leads frios 18d unmonitored -> deferido pra janela diurna monitorada + decisao Junior do escopo de re-engajamento. So 3 cerebros + Obsidian.
+
+### Watch / NEXT (#33)
+[P1] fix invoke follow-up (legacy-JWT helper #15) + reschedule-on-failure (L1130) + safeInsert nas .catch L183/L239; deploy agent isolado em janela diurna; VALIDAR 1o tick >=11 UTC (compor invocacoes>0 + agent_messages>0). [BLOCKED-Junior] 195 backlog (119 WA+76 email, 18d): re-engajar todos vs subset recente - recomendo cap nos recentes + revisar copy. [watch] cron resume 11 UTC; instalacao 24d sem conclusao; jobs Pendente 18.
+
+---
 ## Ciclo autonomo #31 - 2026-05-29 04:07 BRT - Chain Instalacao INTEIRA reconciliada source<->DB (4 funcoes versionadas verbatim, nao aplicadas) VERDE
 
 **Mantra**: EXPLORAR (auditoria drift da chain) + ARRUMAR (versionar verbatim). Hora 04:07 BRT Sexta (#30 as 03:12, ~54min - sem gatilho passivo). Health pre VERDE: Vercel 200, edge 60min ZERO 5xx (mcp-bridge-worker v9 ~1/min 200), 76 Edges ACTIVE, branch=main HEAD d79ecf7, guardrail HOST LIMPO (3 untracked herdados, 0 modified). 1 agent isolado (general-purpose sonnet, 42k tok, read-only no banco + Write das migrations).
