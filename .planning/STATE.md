@@ -9,6 +9,26 @@
 
 **Penúltima atualização**: 2026-05-28 21:05 BRT — Ciclo autônomo #24 — 🔴 ACHADO P0 NOVO CRÍTICO: fix #18 (trg_check_production_completed) está **DORMENTE — gap Fase 1.2 NÃO resolvido**. 3 OPs finalizado (15/16/17) chegaram a esse status SEM marcar producao_etapas.concluida (path UPDATE direto). Trigger só roda em `AFTER UPDATE OF status ON producao_etapas`. **Pedidos 1070 + PED-2026-0025 seguem `em_producao` 4 dias após ciclo #18 declarar destrava estrutural**. + Recon ai-compor-mensagem v24 confirma 417 LOC (acima threshold 250 — agent isolado obrigatório). Edit cirúrgico EXATO documentado para deploy v25 em janela 22h+ BRT (próximo ciclo #25). + 2 achados HIGH novos: 19 etapas concluida sem tempo_real_min (Gantt cego para análise), 2 setores zerados (Router/Corte, Serralheria). Spike 500 ai-compor-mensagem v24 SEGUE ATIVO há 4h+ (cluster 20:00 + 20:20 BRT, ZERO agent_messages criadas desde 17:00 BRT).
 
+## Ciclo autonomo #38 - 2026-05-29 12:25 BRT - 🟢 CORRIGIR: deploy v28 agent-cron-loop - 2 regras MORTAS ~1 mes RESSUSCITADAS com runtime + 3x 400/tick eliminados
+
+**Mantra**: CORRIGIR + VALIDAR. Executei o P1 default-executavel do #36/#37 (deploy v28) que estava [VALIDADO] mas NUNCA tentado. Sexta=Instalacao ja auditada 8x (#27-34); SEC-001/token #37 sao BLOCKED-Junior; v28 era o unico P1 com default-exec. Hora 12:06->12:25 BRT (#37 as 11:07, ~59min, sem gatilho passivo). Health VERDE: Vercel 200, edge 60min ZERO 5xx, branch=main HEAD f95211d=#37, guardrail HOST LIMPO (tails 3455/740/1538/1368). 1 agent isolado (~202k tok) deploy+smoketest + SQL/HOST inline.
+
+### Por que deploy AGORA (deferral #36/#37 expirou)
+agent-cron-loop e Edge INTERNA (sem restricao de horario 8-20h) e o cron jobid20 estava em janela ATIVA (11-23 UTC) => runtime imediato no mesmo ciclo. Junior sem commit no arquivo desde 08:10 (~4h) + 0 atividade manual nos logs => premissa "Junior fresco no arquivo" caducou. v28 nunca tentado (so documentado) => 1o attempt, nao repeticao.
+
+### 2 fixes (re-verificados LIVE + schema antes de aplicar)
+- FIX1 lead_quente_sem_orcamento (L478): cl.lead_origem_id (inexistente) -> cl.lead_id. Causava 42703 -> execute_sql_readonly 400/tick -> regra 100% morta.
+- FIX2 recalcular_scores (L526): id:'batch' -> id:'00000000-0000-0000-0000-000000000000'. 'batch'::uuid em entity_id uuid NOT NULL -> 22P02 -> 2x 400 system_events/tick + re-roda fn_recalcular_todos_scores todo tick; rule_executed 0 desde 2026-04-24.
+Bugs LIVE confirmados no tick 12:00 BRT no log API (3x 400). Schema confirmado (clientes.lead_id existe, entity_id uuid NOT NULL). Source HOST confirmado (L478/L526, 1x cada).
+
+### Deploy + runtime (vitoria com evidencia, nao so sha)
+Agent: get_edge_function 3 arquivos (index + ai-shared/whatsapp-credentials + safe-insert), 2 replaces literais no index, deploy v28 verify_jwt=TRUE, sha 22fa81ae->b59ab972 (+24 bytes). Smoketest manual (net.http_post+Bearer legacy, tick 15:20 UTC): 0x 400 nos 3 endpoints; lead_quente_sem_orcamento=100 rule_executed (last_error NULL), recalcular_scores=1 entity_id=00000000... (dedup gravando), follow_up_lead_24h=20; cron_loop_executed OK, guard fail-safe OK (15 drenados, 0 enviados). Validacao SQL INDEPENDENTE: recalc_last_exec 2026-04-24 -> 2026-05-29 15:20 (viva), leadquente=100. Source HOST sincronizado (2 replaces .NET, git diff 2+/2-, 1368L tail }) => git == v28.
+
+### Mudancas prod + watch
+1 deploy interno v28 (agent-cron-loop). 0 migration, 0 prod-data write (UPDATEs vieram da execucao natural das regras, nao por mim). NEXT: validar 3x 400=ZERO no tick NATURAL >=15:30 UTC (nao so forcado) + checar se lead_quente_sem_orcamento (100 matches) dispara acao real ou so audita; P0 BLOCKED-Junior herdado (SEC-001 RLS anon + rotacionar token telegram); re-validar SEND follow-up qdo Junior ligar followup_engine_ativo. [watch] production_completed 0 lifetime; install_completed 24d; jobs Pendente 18; followup_engine_ativo=false.
+
+---
+
 ## Ciclo autonomo #37 - 2026-05-29 11:07 BRT - 🔴 SEGURANCA: EXPOSICAO ANON runtime-provada (leads/clientes/telegram_messages legiveis SEM login) + INT-001 refutado + token telegram ainda hardcoded — 🟢 SAUDE / 🔴 ACHADO
 
 **Mantra**: explorar+validar o backlog de SEGURANCA de abril nunca tocado pelo loop (SEC-001/INT-001/INT-005), 5 ciclos no NEXT #32-36, corroborado por Obsidian (3 secret leaks 05-27 URGENTE). Hora 11:07 BRT Sexta (#36 as 10:21, ~46min, sem gatilho passivo). Health VERDE: Vercel 200, edge 60min ZERO 5xx (mcp-bridge-worker v9, agent-cron-loop v27 200 10s, dispatch v5, resend v4), branch=main HEAD 72ba282=#36, guardrail HOST LIMPO (tails 3440/730/1514/1368; bash mount stale 2836L vs HOST 3440L -> usei HOST). Modulo do dia (Instalacao) exausto #27-34; v28 do #36 parqueado. Queries dirigidas inline + 1 HOST scan.

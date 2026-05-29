@@ -475,7 +475,7 @@ async function evaluateRule(supabase: SupabaseClient, rule: AgentRule): Promise<
         FROM leads l
         WHERE l.score >= 70 AND l.status NOT IN ('convertido','perdido','descartado')
         AND NOT EXISTS (SELECT 1 FROM propostas p JOIN clientes cl ON cl.id = p.cliente_id
-          WHERE cl.lead_origem_id = l.id)`;
+          WHERE cl.lead_id = l.id)`;
       break;
 
     case 'follow_up_lead_24h':
@@ -523,7 +523,7 @@ async function evaluateRule(supabase: SupabaseClient, rule: AgentRule): Promise<
     // ── SCORE RECALCULATION ──
     case 'recalcular_scores':
       // Returns a single dummy match to trigger the batch recalculation
-      return [{ id: 'batch', tipo: 'recalcular_scores' }];
+      return [{ id: '00000000-0000-0000-0000-000000000000', tipo: 'recalcular_scores' }];
 
     // ── LIMITES (não geram ação automática — apenas bloqueio no frontend) ──
     case 'desconto_maximo_sem_aprovacao':

@@ -1536,3 +1536,32 @@ INT-005: HOST Select-String em functions/mcp-server/scripts (7 hits / 2825 arqui
 ZERO prod write. Achados de risco/negocio -> BLOCKED + 1 recomendacao (sem A/B). NAO alterei RLS em business hours (mudar core/catalogo pode quebrar ERP/portal; exposicao de meses). NAO toquei o token (rotacao = @BotFather = Junior; code-change sem rotacao incompleto; webhook cliente unmonitored = risco). Entregas: planning/SEC-AUDIT-2026-05-29-anon-exposure.md + planning/SEC-001-remediacao-anon-rls-VALIDADA.sql (idempotente, validada contra pg_policies real, NAO-aplicada). NEXT completo no ledger #37. Anti-pattern evitado: NAO declarei "RLS OK" sem prova runtime (rodei SET ROLE anon); NAO repeti o rotulo "37 tabelas RLS off" de abril sem checar (era policy public, nao RLS off); NAO Cowork Edit nos cerebros (>250 LOC; via HOST .NET UTF8); NAO deploy/migration arriscado unmonitored.
 
 **Telegram**: enviada (ok) — ver msgid no fechamento.
+
+## 2026-05-29 12:25 (ciclo #38)
+
+**Status**: 🟢 VERDE
+**Tipo**: corrigir + validar
+**Auto-diálogo**:
+1. 3 ciclos anteriores: #35 validou v27 (reschedule ON / send OFF) + chain 4195dc7 remediada (mas trigger sem runtime); #36 root-causou os 3x 400/tick do agent-cron-loop (2 fixes [VALIDADOS] no NEXT); #37 auditou segurança (SEC-001 exposição anon runtime-provada, INT-001 refutado, INT-005 token telegram hardcoded) — SEC-001 e token BLOCKED-Junior.
+2. Dia=Sexta=Instalação (mcp-bridge-worker v9 saudável, módulo já auditado 8x #27-34) → heurística P1 NEXT.
+3. Gap mais útil AGORA: deploy v28 agent-cron-loop (P1 default-exec do #36/#37, documentado mas NUNCA tentado). 3x 400/tick confirmado LIVE no tick 12:00 BRT. Edge interna + cron em janela ativa = valida runtime no mesmo ciclo.
+4. Conflita? Não. SEC-001/token = BLOCKED-Junior (não executável autônomo). v28 é o único P1 com default executável. Junior sem commit no arquivo desde 08:10 (~4h), 0 atividade manual nos logs.
+5. STATE/Obsidian novo? Obsidian confirma #27-37; secret leaks 05-27 corroboram INT-005 (já BLOCKED). Nada muda a decisão.
+6. Passivo? Não — 0 5xx, Vercel 200, branch=main, HOST limpo, #37 há ~59min (>15min). v28 nunca foi TENTADO (só documentado) → não é "mesma tarefa 3 ciclos sem progresso".
+7. Critério mensurável: pós-v28, no tick 0x 400 system_events(entity_id=batch) + 0x 400 execute_sql_readonly + rule_executed de recalcular_scores volta a gravar (era 0/mês). verify_jwt=true preservado, 0 5xx.
+
+**Health check**: Vercel 200 | edge 60min ZERO 5xx (mcp-bridge-worker v9 ~1/min 200, agent-cron-loop v27→v28 200, dispatch v5, resend v4) | API: os 3x 400/tick eram O ACHADO (4xx client, não 5xx) | branch=main HEAD f95211d=#37 | guardrail HOST LIMPO (tails 3455/740/1538/1368, bash NÃO consultado p/ corrupção)
+**Agents disparados**: 1 isolado (general-purpose, ~202k tok, 33 tools) — deploy v28 + smoketest runtime; read+deploy, NÃO tocou HOST nem commit.
+**Ações executadas**:
+- Re-verifiquei os 2 bugs LIVE no tick 12:00 BRT (API log: POST 400 system_events + GET 400 entity_id=eq.batch&rule_name=recalcular_scores + POST 400 execute_sql_readonly) + schema (clientes.lead_id existe / lead_origem_id não; system_events.entity_id uuid NOT NULL) + source HOST (L478 cl.lead_origem_id 1x, L526 id:'batch' 1x).
+- Agent: get_edge_function → 3 arquivos do bundle (source/index.ts + ai-shared/whatsapp-credentials.ts + ai-shared/safe-insert.ts); 2 replaces literais SÓ no index; deploy v28 (verify_jwt=TRUE preservado); sha 22fa81ae→b59ab972; delta +24 bytes.
+- Smoketest manual (net.http_post+Bearer legacy, tick 15:20 UTC): 0x 400 nos 3 endpoints; lead_quente_sem_orcamento=100 rule_executed (last_error NULL), recalcular_scores=1 entity_id=00000000… (dedup gravando), follow_up_lead_24h=20; cron_loop_executed OK; guard fail-safe OK (15 follow-ups drenados, 0 disparados — followup_engine_ativo=false).
+- Sincronizei source HOST (mesmos 2 replaces literais via .NET String.Replace, +24 bytes, git diff 2+/2-, 1368L tail }) → git == deployado v28.
+- Validação INDEPENDENTE da sessão (SQL): recalc_20min=1 (entity 00000000…), leadquente_20min=100, recalc_last_exec 2026-04-24 → 2026-05-29 15:20 (morta ~1 mês → viva), leadquente_last 15:20.
+**Decisão tomada**: deploy v28 (REGRA #0, sem A/B). Edge INTERNA (sem janela horária), fix 2 linhas validado contra schema, cron ativo p/ runtime imediato. Deferido #36/#37 mas nunca tentado — 1º attempt, não repetição. Agent isolado (1368 LOC, não Cowork Edit).
+**Resultado**: 2 regras mortas há ~1 mês (lead_quente_sem_orcamento + recalcular_scores) RESSUSCITADAS com evidência de RUNTIME. 3x 400/tick eliminados. verify_jwt preservado. 0 5xx pós-deploy.
+**Ledger update**: NEXT [P1 deploy v28] do #36/#37 → DONE #38. Novos NEXT no ledger.
+**Commits**: ver fechamento (source v28 + 3 cérebros)
+**Deploys**: agent-cron-loop v28 (interno)
+**Token usage**: sessão principal moderada + 1 agent isolado ~202k
+**Telegram**: enviada (ok) — msgid no fechamento (Obsidian daily).
