@@ -1317,3 +1317,22 @@ Padrao IDENTICO ao incidente 08:30: EOF abrupto sem newline final, arquivos cort
 **Migrations**: nenhuma
 **Token usage**: ~140k
 **Telegram**: enviada (ok) message_id 3031
+
+## 2026-05-29 01:07 (ciclo #28)
+
+**Status**: VERDE
+**Tipo**: explorar + corrigir + validar + arrumar
+**Auto-dialogo**: (1) #25 deploy v25 / #26 achado arquitetural chain Prod->Instal / #27 1a auditoria Instalacao. (2) Sexta=Instalacao/mcp-bridge-worker - ja auditado ha 37min pelo #27, nao re-fazer. (3) Executar NEXT do #27: INSTAL-03 observabilidade do skip silencioso, menor risco. (4) Nao conflita IN-PROGRESS/BLOCKED. (5) Obsidian: chain morta + job_attachments CHECK estrito. (6) Nao-passivo (ultimo ciclo 37min, health verde, sem corrupcao). (7) Criterio: view validada + emit migration validada documentada + watch-items frescos.
+**Health**: Vercel 200 | edge 60min ZERO 5xx (mcp-bridge-worker v8 ~1/min 200, agent-cron-loop v26 200 4s) | 76 Edges ACTIVE, ai-compor-mensagem v25 sha 50907a7c | branch=main HEAD 00c71ff | guardrail HOST LIMPO (3 untracked herdados, 0 modified; tails integros 3280/646/1319/304/1230 L)
+**Agents**: 1 general-purpose sonnet (recon adversarial read-only INSTAL-03 + watch-items; 39k tokens, 16 tools, 131s)
+**Acoes**:
+- MAPEEI fn_create_job_from_ordem: trigger trg_create_job_from_ordem AFTER INS/UPD ON ordens_instalacao; 2 branches skip silencioso (store nao resolvida apos 3 fallbacks / data_agendada NULL); ZERO emit system_event no skip. Colunas store_id+data_agendada confirmadas.
+- REFUTEI achado #27 "6 OIs sem store_id + 3 sem data": hoje 0 OIs ativas em skip (3 sem job = concluida de 05/05, historicas). Risco prospectivo.
+- Verifiquei 17 colunas via information_schema antes do write.
+- Apliquei migration idempotente CREATE OR REPLACE VIEW vw_instalacao_oi_sem_job (risco-zero, read-only) + arquivo versionado supabase/migrations/20260529_create_vw_instalacao_oi_sem_job.sql. Validei: registrada em information_schema.views, retorna 0, 1 OI ativa total (com job).
+**Decisao**: NAO modifiquei a funcao viva (recomendacao do agent) - reproduzir ~80 LOC de trigger function da chain em run nao-monitorado de madrugada = anti-pattern #11/#14/#21; SECURITY DEFINER/search_path nao confirmado; 0 casos ativos. VIEW read-only = mesma observabilidade prospectiva, risco-zero. Emit migration VALIDADA em planning/INSTAL-03-emit-migration-VALIDADA.sql pra janela monitorada.
+**Resultado**: view observabilidade INSTAL-03 em prod (evidencia runtime: SELECT da view OK + registrada). Watch: prospeccao idle ~15h (ultimo 16:02 BRT 28/05, 0 em 3h); chain instalacao 24d sem installation_completed; jobs Pendente 15->18.
+**Ledger update**: #28 DONE. NEXT: emit migration VALIDADA (janela monitorada) + MCP-01 safe-insert + INSTAL-04 reconciliar + INSTAL-02 handoff.
+**Deploys**: nenhum (1 migration DDL view)
+**Token usage**: ~120k
+**Fechamento**: Telegram enviada (ok) message_id 3032 | commit+push origin/main | Obsidian daily atualizado.

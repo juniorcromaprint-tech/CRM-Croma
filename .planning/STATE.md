@@ -1,4 +1,4 @@
-﻿
+
 # STATE — CRM Croma
 
 **Última atualização**: 2026-05-29 00:30 BRT — Ciclo autônomo #27 — 🟢 Rotação SEXTA, 1a auditoria do módulo Instalação (nunca tocado — ciclos #1-#26 foram TODOS Quinta/Produção). Chain Instalação CABEADA via 4 triggers DB (não-stub) MAS installation_completed MORTO desde 2026-05-05 (jobs/OIs criados, max hoje 14:04 BRT, porém 0 finalizados em 25d+; 15 Pendente empilhando) — P0 INSTAL-01. App Campo "offline-first" é LABEL: VitePWA só NetworkFirst, sem IndexedDB/fila/replay, JobSignature bloqueia assinatura offline → conclusão exige rede = provável causa raiz (P0 INSTAL-02, build Claude Code). mcp-bridge-worker v8 saudável (worker genérico MCP↔ERP, não Instalação) mas ai_responses.insert L84 sem .select().single() (BUG MCP-01, perda silenciosa sob RLS). v25 ai-compor-mensagem deployado/correto mas retry NUNCA exercitado (prospecção idle desde 16:02 BRT 28/05, pool candidatos vazio = exaustão provável benigna). RLS ✅ ON nas 15 tabelas campo; campo_audit_logs morto (0 policies/0 rows). Zero prod write (P0 arquiteturais/operacionais; fix MCP-01 documentado pra agent isolado). Sync rotation v7→v8 + commit planning.
@@ -9,6 +9,29 @@
 
 **Penúltima atualização**: 2026-05-28 21:05 BRT — Ciclo autônomo #24 — 🔴 ACHADO P0 NOVO CRÍTICO: fix #18 (trg_check_production_completed) está **DORMENTE — gap Fase 1.2 NÃO resolvido**. 3 OPs finalizado (15/16/17) chegaram a esse status SEM marcar producao_etapas.concluida (path UPDATE direto). Trigger só roda em `AFTER UPDATE OF status ON producao_etapas`. **Pedidos 1070 + PED-2026-0025 seguem `em_producao` 4 dias após ciclo #18 declarar destrava estrutural**. + Recon ai-compor-mensagem v24 confirma 417 LOC (acima threshold 250 — agent isolado obrigatório). Edit cirúrgico EXATO documentado para deploy v25 em janela 22h+ BRT (próximo ciclo #25). + 2 achados HIGH novos: 19 etapas concluida sem tempo_real_min (Gantt cego para análise), 2 setores zerados (Router/Corte, Serralheria). Spike 500 ai-compor-mensagem v24 SEGUE ATIVO há 4h+ (cluster 20:00 + 20:20 BRT, ZERO agent_messages criadas desde 17:00 BRT).
 
+## Ciclo autonomo #28 - 2026-05-29 01:07 BRT - INSTAL-03 observabilidade (view risco-zero) + agent REFUTOU premissa #27 + watch-items frescos VERDE
+
+**Mantra**: EXPLORAR (mapear fn_create_job_from_ordem) + CORRIGIR/ARRUMAR (view observabilidade) + VALIDAR (watch-items). Hora 01:07 BRT Sexta (janela Edge cliente aberta; #27 as 00:30, 37min - sem gatilho passivo). Health pre: Vercel 200, edge 60min ZERO 5xx (cascade #22-26 encerrado), 76 Edges ACTIVE, branch=main HEAD 00c71ff, guardrail HOST LIMPO (0 modified, tails integros).
+
+### INSTAL-03 mapeado + premissa #27 REFUTADA (agent adversarial read-only)
+fn_create_job_from_ordem (trigger trg_create_job_from_ordem AFTER INS/UPD ON ordens_instalacao) tem 2 branches de skip silencioso: (a) store nao resolvida apos 3 fallbacks (store_id direto -> unidade_id/cliente_unidade_id -> heuristica cliente_id+endereco_completo), (b) data_agendada NULL. Ambos RAISE WARNING + RETURN NEW, ZERO system_event -> invisivel no banco. Colunas store_id+data_agendada confirmadas via information_schema.
+
+REFUTACAO do #27 ("6 OIs sem store_id, 3 sem data_agendada"): estado atual NAO confirma. 9 OIs ativas (8 concluida + 1 aguardando_agendamento), 0 em status agendada sem job, 3 OIs sem job = todas concluida de 2026-05-05 (historicas, encerradas). Risco do skip e PROSPECTIVO, sem caso ativo agora.
+
+### Mudanca em prod - VIEW de observabilidade (risco-zero)
+Migration idempotente create_vw_instalacao_oi_sem_job_observabilidade: CREATE OR REPLACE VIEW vw_instalacao_oi_sem_job lista OIs ativas (status nao-terminal, excluido_em NULL) sem job vinculado, com flag_store/flag_data/motivo_ausencia_job (skip_store|skip_data|skip_duplo|ok_sem_job). 17 colunas verificadas via information_schema ANTES do apply. Validada: registrada em information_schema.views, SELECT retorna 0 (nenhum skip ativo). Toda nova OI que cair no skip aparece aqui. Arquivo versionado supabase/migrations/20260529_create_vw_instalacao_oi_sem_job.sql.
+
+### Decisao (sem Opcao A/B) + anti-pattern evitado
+Agent recomendou modificar a funcao viva (emit no skip) - DISCORDEI: reproduzir ~80 LOC de trigger function da chain em run nao-monitorado de madrugada = anti-pattern #11/#14/#21; agent nao confirmou SECURITY DEFINER/search_path; 0 casos ativos = zero urgencia. VIEW read-only = mesma observabilidade prospectiva, risco-zero. Emit migration VALIDADA e pronta (corpo via pg_get_functiondef, schema confirmado, risco baixo) em planning/INSTAL-03-emit-migration-VALIDADA.sql pra janela MONITORADA - quem aplicar deve re-fetch pg_get_functiondef e confirmar SECURITY DEFINER/search_path antes do CREATE OR REPLACE.
+
+### Watch-items (validacao fresca runtime)
+- Prospeccao: idle ~15h. Ultimo agent_message 2026-05-28 19:02 UTC (16:02 BRT). 0 em 3h, 74 em 12h. Pool de followup esgotado provavel (cascade 500 encerrado).
+- Chain instalacao: installation_completed ultimo 2026-05-05 (24d). Jobs: Concluido 21 / Pendente 18 (de 15 no #27) / Em andamento 1 / Cancelado 1. Pendentes empilhando confirma chain morta (BLOCKED #26 state-machine + INSTAL-01/02).
+
+### Proxima sugestao (ciclo #29)
+P1 - Aplicar emit migration em fn_create_job_from_ordem (VALIDADA, planning/INSTAL-03-emit-migration-VALIDADA.sql) em janela monitorada com re-fetch + confirmar SECURITY DEFINER/search_path. P1 - MCP-01 safe-insert mcp-bridge-worker (agent isolado). P2 - INSTAL-04 reconciliar emitter. Handoff - INSTAL-02 offline-first (Claude Code). Watch - prospeccao idle 16h+.
+
+---
 ## Ciclo autônomo #27 — 2026-05-29 00:30 BRT — 🟢 Rotação SEXTA: 1a auditoria do módulo Instalação + mcp-bridge-worker + v25 sem tráfego
 
 **Mantra**: EXPLORAR (Instalação — nunca auditada; ciclos #1-#26 foram todos Quinta/Produção) + VALIDAR (v25 herdado #26) + ARRUMAR (sync rotation v7→v8 + commit planning). Hora 00:30 BRT (Sexta — janela Edge cliente ABERTA). Health pré: Vercel 200, edge logs 60min ZERO 5xx (mcp-bridge-worker v8 ~1/min 200, agent-cron-loop v26 200 SEM timeout — cascade #22-26 encerrado), 76 Edges ACTIVE, branch=main HEAD c545007, working dir 2 .planning (#26 uncommitted) — sem corrupção.
