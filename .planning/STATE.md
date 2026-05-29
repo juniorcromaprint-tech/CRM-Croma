@@ -9,6 +9,28 @@
 
 **Penúltima atualização**: 2026-05-28 21:05 BRT — Ciclo autônomo #24 — 🔴 ACHADO P0 NOVO CRÍTICO: fix #18 (trg_check_production_completed) está **DORMENTE — gap Fase 1.2 NÃO resolvido**. 3 OPs finalizado (15/16/17) chegaram a esse status SEM marcar producao_etapas.concluida (path UPDATE direto). Trigger só roda em `AFTER UPDATE OF status ON producao_etapas`. **Pedidos 1070 + PED-2026-0025 seguem `em_producao` 4 dias após ciclo #18 declarar destrava estrutural**. + Recon ai-compor-mensagem v24 confirma 417 LOC (acima threshold 250 — agent isolado obrigatório). Edit cirúrgico EXATO documentado para deploy v25 em janela 22h+ BRT (próximo ciclo #25). + 2 achados HIGH novos: 19 etapas concluida sem tempo_real_min (Gantt cego para análise), 2 setores zerados (Router/Corte, Serralheria). Spike 500 ai-compor-mensagem v24 SEGUE ATIVO há 4h+ (cluster 20:00 + 20:20 BRT, ZERO agent_messages criadas desde 17:00 BRT).
 
+## Ciclo autonomo #31 - 2026-05-29 04:07 BRT - Chain Instalacao INTEIRA reconciliada source<->DB (4 funcoes versionadas verbatim, nao aplicadas) VERDE
+
+**Mantra**: EXPLORAR (auditoria drift da chain) + ARRUMAR (versionar verbatim). Hora 04:07 BRT Sexta (#30 as 03:12, ~54min - sem gatilho passivo). Health pre VERDE: Vercel 200, edge 60min ZERO 5xx (mcp-bridge-worker v9 ~1/min 200), 76 Edges ACTIVE, branch=main HEAD d79ecf7, guardrail HOST LIMPO (3 untracked herdados, 0 modified). 1 agent isolado (general-purpose sonnet, 42k tok, read-only no banco + Write das migrations).
+
+### Auditoria drift source<->DB da chain Instalacao (P2 do NEXT #30)
+Continuacao do INSTAL-04 (#29/#30 versionaram fn_notificar_nova_oi). Auditados os 4 objetos restantes da chain + triggers. VEREDICTO: TODOS existem no live, triggers enabled (tgenabled=O), e TODOS sao DRIFT-LIVE!=MIGRATION (cada um tem migration que cria - 004/099/104/120 - mas o live divergiu). Armadilha do simples-grep evitada (confirmado CREATE real, nao so label como no mig 106 do INSTAL-04).
+
+- create_job_from_ordem (trg em ordens_instalacao): 3 versoes 004->120->live; live add fallback store_id direto + condicao sync extra. ordens_instalacao ganhou coluna store_id sem re-versionar.
+- sync_job_to_ordem (trg em jobs): mig 004 sem SECURITY DEFINER/search_path; live tem ambos (hardening nunca versionado). Logica identica.
+- installation_completed: mig 104 sem SECURITY DEFINER/search_path; bug entity_type instalacao corrigido no live p/ ordem_instalacao + payload com cliente_id - correcao nunca versionada.
+- op_finalizada_transicao (BLOCKED #26): 5 divergencias semanticas vs mig 099. Versionado verbatim com COMMENT BLOCKED - logica NAO tocada (decisao state-machine e do Junior).
+
+### Mudanca (source-control only, ZERO prod write)
+4 migrations idempotentes verbatim do live: supabase/migrations/20260529_version_*_instalchain.sql (61/133/47/97 LOC, CREATE OR REPLACE FUNCTION + DROP/CREATE TRIGGER, SECURITY DEFINER/search_path preservados, HOST validou). NAO aplicadas (no-op verbatim de fns SECURITY DEFINER da chain cliente, madrugada unmonitored, honra deferral #29/#30). applied==live por construcao. Por ordenacao lexica (20260529 > 004/099/104/120), replay de migrations agora produz o estado live. Drift da chain Instalacao INTEIRA fechado em source-control.
+
+### Watch-items (runtime, sem movimento)
+jobs Pendente 18 / Concluido 21 / Em andamento 1 / Cancelado 1 (= #28/#30). installation_completed ultimo 2026-05-05 (24d). agent_messages ultimo 16:02 BRT 28/05 (prospeccao idle ~36h), 0 em 3h. Soft-delete jobs = deleted_at.
+
+### Proxima sugestao (#32)
+INSTAL-03 emit migration (janela monitorada; reconciliar com a versionagem verbatim deste ciclo - agora ha 2 baselines do create_job). safe-insert.ts 12 Edges Padrao B (agent/Claude Code). INSTAL-02 build outbox offline-first (Claude Code, handoff pronto). Considerar APLICAR as 5 versionagens verbatim em janela monitorada (no-op, baixa prioridade). Watch prospeccao idle.
+
+---
 ## Ciclo autonomo #30 - 2026-05-29 03:10 BRT - INSTAL-04 emitter VERSIONADO (verbatim do live) + handoff INSTAL-02 offline-first (Claude Code) VERDE
 
 **Mantra**: ARRUMAR (versionar fn_notificar_nova_oi — fecha drift INSTAL-04) + EXPLORAR/HANDOFF (INSTAL-02). Hora 03:10 BRT Sexta (#29 as 02:05, ~1h - sem gatilho passivo). Health pre VERDE: Vercel 200, edge 60min ZERO 5xx (mcp-bridge-worker v9 ~1/min 200 - cutover v8->v9 do #29 estavel ~24 ticks), API 0 5xx (fn_claim_ai_requests cron 200), 76 Edges ACTIVE, branch=main HEAD f8aedd9, guardrail HOST LIMPO (3 untracked herdados, 0 modified, tails integros 3319/663/1349/261 L). 1 agent isolado (handoff INSTAL-02).

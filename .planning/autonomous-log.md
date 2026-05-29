@@ -1374,3 +1374,33 @@ Padrao IDENTICO ao incidente 08:30: EOF abrupto sem newline final, arquivos cort
 **Commits**: a confirmar no fechamento (planning #30 + migration file)
 **Token usage**: ~130k
 **Telegram**: a confirmar no fechamento
+
+## 2026-05-29 04:07 (ciclo #31)
+
+**Status**: 🟢 VERDE
+**Tipo**: explorar + arrumar (rotacao SEXTA Instalacao - reconciliacao drift source<->DB da chain)
+**Auto-dialogo** (7 perguntas):
+1. 3 ciclos anteriores: #28 view observabilidade INSTAL-03; #29 deploy v9 mcp-bridge-worker (MCP-01 runtime-validado) + achou emitter INSTAL-04 drift DB-only; #30 versionou fn_notificar_nova_oi verbatim + handoff INSTAL-02.
+2. Dia/rotacao: SEXTA = Instalacao + mcp-bridge-worker v9 (saudavel, 60min todas 200).
+3. Gap mais util AGORA: P2 do NEXT #30 = checar drift no RESTANTE da chain (create_job, sync_job, installation_completed, op_finalizada_transicao). Madrugada-safe (read + versionar verbatim sem aplicar). INSTAL-03 emit e INSTAL-02 build sao janela monitorada/Claude Code (Junior dormindo 04h).
+4. Conflita IN-PROGRESS/BLOCKED? Nao - versionar verbatim != consertar; op_finalizada_transicao segue BLOCKED (logica nao tocada).
+5. STATE/Obsidian novo? Obsidian confirmou protocolo Mubisys (jobs origem externa pulam OI). Nada muda direcao.
+6. Modo passivo? Nao (Vercel 200, 0 5xx 60min, #30 ha 54min, branch=main, guardrail HOST limpo).
+7. Criterio sucesso: cada objeto classificado VERSIONED/DRIFT com evidencia; drift nao-BLOCKED versionado verbatim, tail-check OK.
+
+**Health check**: Vercel 200 | edge 60min ZERO 5xx (mcp-bridge-worker v9 ~1/min 200) | 76 Edges ACTIVE | branch=main HEAD d79ecf7 | guardrail HOST LIMPO (3 untracked herdados + 4 novos migration, 0 modified; tails 3334/670/1376/1230/261 L)
+**Agents disparados**: 1 (general-purpose sonnet isolado, 42k tokens, 16 tools, 165s - auditoria drift chain + Write das 4 migrations verbatim, read-only no banco)
+**Acoes executadas**:
+- Auditoria adversarial: TODOS os 4 objetos da chain existem no live + 4 triggers enabled (tgenabled=O). VEREDICTO: TODOS DRIFT-LIVE!=MIGRATION (migrations 004/099/104/120 existem mas live divergiu - armadilha do simples-grep evitada, confirmado CREATE real).
+  - create_job_from_ordem: 3 versoes (004->120->live); live add fallback store_id direto + condicao sync extra (ordens_instalacao ganhou store_id sem re-versionar).
+  - sync_job_to_ordem: mig 004 sem SECURITY DEFINER/search_path; live tem ambos (hardening nao versionado); logica identica.
+  - installation_completed: mig 104 sem SECURITY DEFINER/search_path; bug entity_type instalacao -> live corrigiu ordem_instalacao; payload add cliente_id.
+  - op_finalizada_transicao: 5 divergencias semanticas vs mig 099 (BLOCKED #26 state-machine; versionado verbatim com COMMENT BLOCKED, logica NAO tocada).
+- Versionados verbatim (Write NOVO, NAO aplicados): supabase/migrations/20260529_version_{sync_job_to_ordem,create_job_from_ordem,installation_completed,op_finalizada_transicao}_instalchain.sql (61/133/47/97 LOC). HOST validou secdef+searchpath+createfn+createtrg presentes, tails coerentes.
+**Decisao tomada**: versionar SEM aplicar (no-op verbatim de fns SECURITY DEFINER da chain cliente + madrugada unmonitored + honra deferral #29/#30; op_finalizada BLOCKED nao toca prod). applied==live por construcao. Drift da chain Instalacao INTEIRA fechado em source-control (com fn_notificar_nova_oi do #30 = 5 objetos versionados).
+**Resultado**: 🟢 VERDE. 4 migrations versionadas (nao aplicadas). Zero prod write/deploy. Achado: chain inteira tinha drift live!=migration (hardening+bugfixes nunca versionados), nao so o INSTAL-04.
+**Watch-items**: jobs Pendente 18 / Concluido 21 (sem movimento vs #28/#30); installation_completed ultimo 2026-05-05 (24d); agent_messages ultimo 16:02 BRT 28/05 (prospeccao idle ~36h); 0 em 3h. Soft-delete jobs = deleted_at (nao excluido_em - agent corrigiu premissa).
+**Ledger update**: #31 -> DONE. NEXT: INSTAL-03 emit (janela monitorada, reconciliar com baseline verbatim deste ciclo) + safe-insert 12 Edges + INSTAL-02 build (Claude Code) + considerar aplicar as 5 versionagens verbatim (no-op, baixa prio).
+**Commits**: 4 migrations instalchain + planning #31 (hash no git log -1 / Obsidian daily)
+**Token usage**: ~165k
+**Telegram**: enviada (ok) message_id 3035
