@@ -1236,3 +1236,84 @@ Padrao IDENTICO ao incidente 08:30: EOF abrupto sem newline final, arquivos cort
 **Deploys**: ai-compor-mensagem v24 → v25
 **Token usage**: ~280k
 **Telegram**: enviada
+
+## 2026-05-28 23:10 (ciclo #26)
+
+**Status**: 🟡 AMARELO
+**Tipo**: explorar + validar + arrumar
+**Auto-dialogo**:
+- 3 ciclos anteriores: #23 criou helper anthropic-retry.ts; #24 recon ai-compor-mensagem 417 LOC + achou fix #18 dormente; #25 deploy v25 ai-compor-mensagem (retry exponencial Anthropic 429/529).
+- Dia/rotacao: Quinta = Producao + ai-chat-portal v15.
+- Gap mais util agora: VALIDAR v25 (P0 herdado #25) + rotacao Producao (gap Fase 1.2).
+- Conflito IN-PROGRESS/BLOCKED: nao (IN-PROGRESS vazio).
+- STATE/Obsidian contexto novo: STATE #25 deu NEXT P0 explicito (smoketest v25 + backfill Fase 1.2 + tempo_real_min); Obsidian memory confirmou historico prospeccao/conversas-zumbi.
+- Modo: ATIVO (working dir limpo, sem 5xx novo, ultimo ciclo 50min atras).
+- Criterio sucesso: (a) v25 cluster 500 parou? (b) diagnostico Fase 1.2 com evidencia empirica.
+
+**Health check**: Vercel 200 | edge logs: cluster 500 ai-compor-mensagem e v24 pre-deploy, agent-cron-loop 23:00 BRT=200 | 76 Edges ACTIVE (ai-compor-mensagem v25 sha 50907a7c) | branch=main HEAD c545007 | working dir LIMPO (3 untracked, ZERO modified - guardrail Etapa 4 SEM falso-positivo, 1a vez desde #19)
+
+**Agents disparados**: 0 (investigacao inline via execute_sql dirigido - escopo cabia em queries)
+
+**Acoes executadas**:
+- VALIDAR v25: edge logs + SQL provaram cascade 500 PAROU (cluster era v24 pre-deploy); agent-cron-loop 23:00 BRT=200; retry NAO exercitado (0 trafego compor pos-deploy)
+- EXPLORAR Producao: descobri fn_op_finalizada_transicao (chain real Producao->Instalacao) + conflito state-machine com fn_validar_transicao_status = root cause REAL Fase 1.2 (4 ciclos missaram)
+- ARRUMAR: neutralizei SQL invalido no ledger NEXT (Fase 1.2) + documentei BLOCKED arquitetural + abortei backfill tempo_real_min (garbage)
+
+**Decisao tomada**: Zero prod write. SQL Fase 1.2 documentado era invalido (status 'pronto_instalacao' inexistente + p.id uuid-as-int) e a causa real e conflito de contrato que exige decisao arquitetural Junior. tempo_real_min nao derivavel (inicio/fim sinteticos 1-19s). Reportar com evidencia > escrever blind a meia-noite.
+
+**Resultado**: v25 cascade-stop confirmado (validacao definitiva pendente de trafego). Achado arquitetural P0 (chain Producao->Instalacao quebrada por state-machine) em BLOCKED. 2 backfills ruins prevenidos.
+
+**Ledger update**: #26 -> DONE; Fase 1.2 NEXT marcado INVALIDO; BLOCKED novo (chain state-machine, 2 opcoes p/ Junior); tempo_real_min reclassificado nao-viavel
+**Commits**: nenhum
+**Deploys**: nenhum
+**Migrations**: nenhuma
+**Token usage**: ~115k
+**Telegram**: a enviar
+
+---
+
+## 2026-05-29 00:30 (ciclo #27)
+
+**Status**: 🟢 VERDE
+**Tipo**: explorar (rotação Sexta — Instalação, 1a auditoria) + validar (v25 herdado #26) + arrumar (sync rotation v7→v8 + commit planning)
+
+**Auto-diálogo**:
+- 3 ciclos anteriores: #24 recon ai-compor-mensagem + achou fix#18 dormente; #25 deploy v25 (retry Anthropic 429/529); #26 achado arquitetural chain Produção→Instalação quebrada (BLOCKED Junior) + 2 backfills ruins prevenidos.
+- Dia/rotação: SEXTA = Instalação + mcp-bridge-worker. PRIMEIRA auditoria do módulo Instalação pelo sistema autônomo — ciclos #1-#26 foram TODOS Quinta/Produção (cron nasceu quinta 28/05).
+- Gap mais útil agora: rotação Sexta (Instalação nunca tocada) + fechar VALIDAR v25 (P0 #26).
+- Conflito IN-PROGRESS/BLOCKED: não (IN-PROGRESS vazio; BLOCKED chain state-machine é Produção, não Instalação).
+- STATE/Obsidian contexto novo: Obsidian memory deu protocolo Mubisys (OS 1557, job_attachments tipo CHECK, jobs origem externa pulam OI) — explicou jobs(37) >> OI(9).
+- Modo: ATIVO (Vercel 200, ZERO 5xx 60min, último ciclo 55min atrás, working dir só 2 .planning = sem corrupção).
+- Critério sucesso: (a) gap report Instalação com dados verificados (counts/FK/RLS) + adversarial mcp-bridge-worker; (b) status definitivo v25.
+
+**Health check**: Vercel 200 | edge logs 60min ZERO 5xx (mcp-bridge-worker v8 ~1/min 200, agent-cron-loop v26 200 SEM timeout — cascade #22-26 encerrado) | 76 Edges ACTIVE | branch=main HEAD c545007 | working dir 2 .planning modified (#26 uncommitted) + 3 untracked herdados — guardrail Etapa 4 SEM corrupção (só planning)
+
+**Agents disparados**: 2 paralelos (general-purpose adversarial)
+- Agent 1 (44k tok, 12 tools): mcp-bridge-worker v8 deployado + local — worker genérico MCP↔ERP, não Instalação
+- Agent 2 (67k tok, 21 tools): fluxo Instalação end-to-end (4 triggers DB + App Campo)
+
+**Ações executadas**:
+- Auditoria Instalação: schema (18 tabelas campo), counts, FK linkage OI×job, RLS (15 tabelas), system_events install
+- Cross-check próprio dos 2 agents via SQL (verificar antes de assumir — INSTAL-04 refutou parcialmente claim do agent)
+- VALIDAR v25: agent_messages + compor traffic ambos pararam 16:02 BRT, retry NUNCA exercitado
+- ARRUMAR: rotation table v7→v8 (ledger+mission+rules) + commit planning #26+#27
+
+**Achados** (ver STATE #27 + ledger NEXT):
+- 🔴 P0 INSTAL-01: installation_completed morto desde 2026-05-05, jobs_max_finished 2026-04-30; OIs/jobs CRIADOS (max hoje 14:04) mas 0 finalizados 25d+ (15 Pendente)
+- 🔴 P0 INSTAL-02: App Campo "offline-first" é label — sem IndexedDB/fila/replay; JobSignature bloqueia offline. Provável causa do P0-01. (Claude Code — build arquitetural)
+- 🟡 P1 INSTAL-03: fn_create_job_from_ordem RAISE WARNING silencioso quando store_id/data_agendada faltam (6 OIs sem store, 3 sem data)
+- 🟡 P1 INSTAL-04: installation_order_auto_created drift source↔DB (disparou hoje 14:04 mas emitter não está nas migrations)
+- 🟡 BUG MCP-01: mcp-bridge-worker ai_responses.insert L84 sem .select().single() → perda silenciosa sob RLS; não usa helpers ai-shared
+- ⚠️ campo_audit_logs RLS ON + 0 policies + 0 rows (audit nunca cabeado)
+- 🟢 jobs 31/37 sem OI = Mubisys origem externa (by-design); RLS ✅ 15 tabelas; chain CABEADA (não-stub)
+
+**Decisão tomada**: EXPLORE pesado + VALIDATE + ARRUMAR seguro. Zero prod write arriscado a meia-noite: P0s Instalação são arquiteturais (offline-first=Claude Code) ou operacionais (execução campo parada=Junior); bug mcp-bridge-worker (251 LOC) documentado com fix exato pra agent isolado (padrão #24→#25), não deploy blind no MCP backbone. v25 correto mas sem tráfego pra validar.
+
+**Resultado**: 1a auditoria Instalação completa, 5 achados priorizados + fix exato mcp-bridge-worker. v25 status: deployado e correto, retry não-exercitado (prospecção idle 8h, pool candidatos vazio = exaustão provável benigna).
+
+**Ledger update**: #27 → DONE; P0 #25 confirmado DONE; NEXT bloco Instalação (INSTAL-01..04 + MCP-01 + watch prospecção); rotation v7→v8 sync
+**Commits**: planning #26+#27 (Windows-MCP)
+**Deploys**: nenhum
+**Migrations**: nenhuma
+**Token usage**: ~140k
+**Telegram**: enviada (ok) message_id 3031

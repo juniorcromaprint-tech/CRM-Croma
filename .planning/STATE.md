@@ -1,9 +1,84 @@
 ﻿
 # STATE — CRM Croma
 
-**Última atualização**: 2026-05-28 22:30 BRT — Ciclo autônomo #25 — 🟢 DEPLOY v25 ai-compor-mensagem EXECUTADO via agent isolado (175k tokens, 41 tool uses, 705s). 4 Edits cirúrgicos do ledger NEXT P0 #25 aplicados (com 1 adaptação correta no Edit #3 evitando ReferenceError de `userId`). v24 → v25 ACTIVE, sha mudou `4fa33d64` → `50907a7c`. Retry exponencial Anthropic 429/529 ativo (1s/2s/4s). Catch superior agora grava `ai_logs` error → observabilidade dos clusters. BONUS: ai-logger.ts deployed atualizado pra versão #6 (defensiva). Commit `6c1844d` push main. 5a recorrência consecutiva FALSO-POSITIVO guardrail Etapa 4 (bash sandbox vs Windows-MCP dessync — sem corrupção). Próximo cron tick 22:30 BRT é smoketest empírico real do fix.
+**Última atualização**: 2026-05-29 00:30 BRT — Ciclo autônomo #27 — 🟢 Rotação SEXTA, 1a auditoria do módulo Instalação (nunca tocado — ciclos #1-#26 foram TODOS Quinta/Produção). Chain Instalação CABEADA via 4 triggers DB (não-stub) MAS installation_completed MORTO desde 2026-05-05 (jobs/OIs criados, max hoje 14:04 BRT, porém 0 finalizados em 25d+; 15 Pendente empilhando) — P0 INSTAL-01. App Campo "offline-first" é LABEL: VitePWA só NetworkFirst, sem IndexedDB/fila/replay, JobSignature bloqueia assinatura offline → conclusão exige rede = provável causa raiz (P0 INSTAL-02, build Claude Code). mcp-bridge-worker v8 saudável (worker genérico MCP↔ERP, não Instalação) mas ai_responses.insert L84 sem .select().single() (BUG MCP-01, perda silenciosa sob RLS). v25 ai-compor-mensagem deployado/correto mas retry NUNCA exercitado (prospecção idle desde 16:02 BRT 28/05, pool candidatos vazio = exaustão provável benigna). RLS ✅ ON nas 15 tabelas campo; campo_audit_logs morto (0 policies/0 rows). Zero prod write (P0 arquiteturais/operacionais; fix MCP-01 documentado pra agent isolado). Sync rotation v7→v8 + commit planning.
+
+**Penúltima atualização**: 2026-05-28 23:10 BRT — Ciclo autônomo #26 — 🟡 EXPLORAR/VALIDAR/ARRUMAR. v25 cascade-stop CONFIRMADO (agent-cron-loop 200 às 23:00 BRT; cluster 500 era TODO v24 pré-deploy; retry ainda NÃO exercitado, 0 tráfego compor pós-deploy 22:15). 🔴 ACHADO ARQUITETURAL (4 ciclos não viram): chain Produção→Instalação `fn_op_finalizada_transicao` está QUEBRADA por conflito de state-machine — seta pedido pra `pronto_entrega`/`aguardando_instalacao` que `fn_validar_transicao_status` REJEITA (em_producao só →produzido/parcialmente_concluido); EXCEPTION WHEN OTHERS engole; production_completed_transition=0 lifetime (chain nunca completou; ordens_instalacao=10 total / 5 nesses pedidos via outro path). Backfill Fase 1.2 documentado #24/#25 era INVÁLIDO (status 'pronto_instalacao' inexistente + `p.id IN (1070,...)` uuid-as-int) → neutralizado no ledger. tempo_real_min backfill ABORTADO (inicio/fim sintéticos 1-19s → geraria 19 zeros). Zero prod writes (preveni 2 backfills ruins). → BLOCKED arquitetural pra Junior.
+
+**Penúltima atualização**: 2026-05-28 22:30 BRT — Ciclo autônomo #25 — 🟢 DEPLOY v25 ai-compor-mensagem EXECUTADO via agent isolado (175k tokens, 41 tool uses, 705s). 4 Edits cirúrgicos do ledger NEXT P0 #25 aplicados (com 1 adaptação correta no Edit #3 evitando ReferenceError de `userId`). v24 → v25 ACTIVE, sha mudou `4fa33d64` → `50907a7c`. Retry exponencial Anthropic 429/529 ativo (1s/2s/4s). Catch superior agora grava `ai_logs` error → observabilidade dos clusters. BONUS: ai-logger.ts deployed atualizado pra versão #6 (defensiva). Commit `6c1844d` push main. 5a recorrência consecutiva FALSO-POSITIVO guardrail Etapa 4 (bash sandbox vs Windows-MCP dessync — sem corrupção). Próximo cron tick 22:30 BRT é smoketest empírico real do fix.
 
 **Penúltima atualização**: 2026-05-28 21:05 BRT — Ciclo autônomo #24 — 🔴 ACHADO P0 NOVO CRÍTICO: fix #18 (trg_check_production_completed) está **DORMENTE — gap Fase 1.2 NÃO resolvido**. 3 OPs finalizado (15/16/17) chegaram a esse status SEM marcar producao_etapas.concluida (path UPDATE direto). Trigger só roda em `AFTER UPDATE OF status ON producao_etapas`. **Pedidos 1070 + PED-2026-0025 seguem `em_producao` 4 dias após ciclo #18 declarar destrava estrutural**. + Recon ai-compor-mensagem v24 confirma 417 LOC (acima threshold 250 — agent isolado obrigatório). Edit cirúrgico EXATO documentado para deploy v25 em janela 22h+ BRT (próximo ciclo #25). + 2 achados HIGH novos: 19 etapas concluida sem tempo_real_min (Gantt cego para análise), 2 setores zerados (Router/Corte, Serralheria). Spike 500 ai-compor-mensagem v24 SEGUE ATIVO há 4h+ (cluster 20:00 + 20:20 BRT, ZERO agent_messages criadas desde 17:00 BRT).
+
+## Ciclo autônomo #27 — 2026-05-29 00:30 BRT — 🟢 Rotação SEXTA: 1a auditoria do módulo Instalação + mcp-bridge-worker + v25 sem tráfego
+
+**Mantra**: EXPLORAR (Instalação — nunca auditada; ciclos #1-#26 foram todos Quinta/Produção) + VALIDAR (v25 herdado #26) + ARRUMAR (sync rotation v7→v8 + commit planning). Hora 00:30 BRT (Sexta — janela Edge cliente ABERTA). Health pré: Vercel 200, edge logs 60min ZERO 5xx (mcp-bridge-worker v8 ~1/min 200, agent-cron-loop v26 200 SEM timeout — cascade #22-26 encerrado), 76 Edges ACTIVE, branch=main HEAD c545007, working dir 2 .planning (#26 uncommitted) — sem corrupção.
+
+### 🔍 Auditoria Instalação (PRIMEIRA — 2 agents paralelos + 8 queries SQL verificadas)
+
+Domínio campo/instalação = 18 tabelas. Core: ordens_instalacao 9 ativas (8 concluida + 1 aguardando_agendamento), jobs 37 ativos (21 Concluído + 15 Pendente + 1 Em andamento), job_photos 174, job_attachments 2 (Mubisys OS 1557), checklists 6 / checklist_itens 134.
+
+Chain CABEADA end-to-end via 4 triggers DB (não-stub; App Campo tem telas reais JobPhotos/JobChecklist/JobSignature): OP finalizada → (se requer_instalacao) INSERT ordens_instalacao → ERP agenda → fn_create_job_from_ordem cria job → JobSignature conclui → fn_sync_job_to_ordem → fn_installation_completed.
+
+| Achado | Sev | Evidência |
+|---|---|---|
+| INSTAL-01 execução campo parada | 🔴 P0 | installation_completed último 2026-05-05; jobs_max_finished 2026-04-30; OIs/jobs criados (max hoje 14:04 BRT) mas 0 finalizados 25d+; 15 Pendente + 1 Em andamento |
+| INSTAL-02 offline-first é label | 🔴 P0 | VitePWA só NetworkFirst; sem IndexedDB/fila/replay; JobSignature.tsx:51 bloqueia assinatura offline → conclusão exige rede (provável causa INSTAL-01) |
+| INSTAL-03 fn_create_job_from_ordem skip silencioso | 🟡 P1 | RAISE WARNING + RETURN quando store_id/data_agendada faltam; 6 OIs sem store_id, 3 sem data_agendada → não viram job sem rastro |
+| INSTAL-04 installation_order_auto_created drift | 🟡 P1 | evento disparou HOJE 14:04 BRT (22 lifetime) mas emitter não está nas migrations (só label em mig 106) → source↔DB drift |
+| campo_audit_logs morto | ⚠️ | RLS ON + 0 policies + 0 rows — audit nunca cabeado |
+| jobs sem OI | 🟢 | 31/37 = Mubisys origem externa (pulam OI by-design, protocolo Obsidian) — esperado |
+
+RLS ✅ ON nas 15 tabelas campo (ordens_instalacao 5 policies, job_attachments 3, jobs 2, job_photos/videos 1 cada).
+
+### ⚙️ mcp-bridge-worker (Edge crítica rotação) — adversarial
+Worker GENÉRICO de fila MCP↔ERP (NÃO específico de Instalação — rotation table rotulava errado). Polla ai_requests (claim CAS pending→processing), despacha por tipo. Segurança OK (verify_jwt true, sem secrets, legacy JWT HS256 com retry-refresh). **DRIFT**: deployed v8 vs header source v7 (byte-idêntico local==deployado, só nº diverge — sincronizado no rotation table). **BUG MCP-01**: ai_responses.insert L84-93 SEM .select().single() (viola regra dura) → RLS pode bloquear silencioso e request marcado completed sem resposta gravada (perda silenciosa). 4 .update() sem check. Não usa helpers ai-shared (inline tudo). Fix: safe-insert.ts via agent isolado (251 LOC > 250).
+
+### ✅ VALIDAR v25 — sem tráfego, não-exercitado
+agent_messages + compor traffic ambos pararam 16:02 BRT (28/05), ZERO desde. agent-cron-loop v26 roda 200 mas NÃO chama ai-compor-mensagem (0 calls última hora) — rules cron OK (follow_up_lead_24h ativo, err NULL, last 22:00 BRT). Diagnóstico: pool de candidatos followup VAZIO = exaustão provável benigna (não loop 500). v25 retry correto mas sem como validar até prospecção voltar.
+
+### Anti-pattern evitado
+Zero prod write arriscado a meia-noite unmonitored: P0 Instalação são arquiteturais (offline-first → Claude Code) / operacionais (execução campo → Junior); bug mcp-bridge-worker documentado com fix exato pra agent isolado (padrão #24→#25), não deploy blind no MCP backbone. Verificar antes de assumir: cross-check SQL próprio dos 2 agents — INSTAL-04 refutou parcialmente claim do Agent 2 (evento DISPAROU hoje, não é órfão sem emitter).
+
+### Próxima sugestão (ciclo #28)
+P1 — INSTAL-03 migration observabilidade (emit system_event no skip de fn_create_job_from_ordem) via agent isolado. P1 — MCP-01 safe-insert em mcp-bridge-worker via agent isolado. P2 — reconciliar emitter INSTAL-04. Handoff — INSTAL-02 offline-first (doc Claude Code). Watch — prospecção idle 8h (agent lê processLeadFollowUps eligibility).
+
+---
+
+## Ciclo autônomo #26 — 2026-05-28 23:10 BRT — Auditoria Quinta: chain Produção→Instalação QUEBRADA (state-machine) + v25 cascade-stop confirmado + 2 backfills ruins prevenidos 🟡
+
+**Mantra**: EXPLORAR (rotação Quinta — Produção) + VALIDAR (v25 herdado #25) + ARRUMAR (neutralizar SQL inválido no ledger). Hora 23:10 BRT. Health pré: Vercel 200, branch=main HEAD `c545007`, working dir LIMPO (3 untracked herdados, **ZERO modified** — guardrail Etapa 4 SEM falso-positivo desta vez, 1a vez em 6 ciclos). ai-compor-mensagem v25 ACTIVE sha `50907a7c` (confirma deploy #25). 76 Edges ACTIVE. Último ciclo #25 às 22:20 (50min atrás — sem gatilho passivo).
+
+### ✅ VALIDAR v25 — cascade-stop CONFIRMADO, retry path ainda não exercitado
+- Edge logs: TODO o cluster 500 ai-compor-mensagem é `version:24` (pré-deploy, ~21:57 BRT e antes). ZERO chamadas compor pós-deploy (22:15 BRT) → 0 erros, 0 sucessos.
+- agent-cron-loop rodou 23:00 BRT (02:00 UTC) → **200** (antes: 500 timeout 20448ms às 00:57 UTC). **Cascade 500 PAROU.**
+- Retry exponencial Anthropic 429/529 NÃO foi exercitado ainda (sem tráfego compor). Validação definitiva fica pra quando prospecção voltar a fluir.
+- ⚠️ Prospecção morta desde 16:02 BRT (last agent_message). 272 agent_messages status 'erro' (12h=30/13h=27/14h=20 BRT hoje + histórico). Watch item — re-checar próximo ciclo.
+
+### 🔴 ACHADO ARQUITETURAL CRÍTICO — chain Produção→Instalação quebrada por state-machine
+Descobri `trg_op_finalizada_transicao` (AFTER UPDATE OF status ON ordens_producao) → `fn_op_finalizada_transicao()` — a chain REAL Produção→Instalação. Ciclos #18/#24/#25 só olharam `fn_check_production_completed`/`production_completed` e MISSARAM essa função inteira.
+
+| Evidência | Valor |
+|---|---|
+| system_events `production_completed_transition` lifetime | **0** (trigger nunca disparou) |
+| system_events `production_completed` lifetime | **0** (fix #18 também nunca) |
+| ordens_instalacao | 10 total / **5 já existem** p/ 1070+PED-2026-0025 (criadas por outro path; chain automática NÃO) |
+| 3 OPs (15/16/17) | finalizado, updated_at 2026-05-28 17:11 (status mexido hoje; transição não completou) |
+| requer_instalacao pedidos 1070/PED-2026-0025 | false (pedido_itens.produto_id parcial/NULL) |
+
+**Conflito de contrato (root cause real)**: `fn_op_finalizada_transicao` faz `UPDATE pedidos SET status='pronto_entrega'` (não-inst) ou `'aguardando_instalacao'` (inst). MAS `fn_validar_transicao_status` (BEFORE UPDATE pedidos) só permite `em_producao → produzido/parcialmente_concluido`. **Ambos os alvos da chain são REJEITADOS** pelo validator → `EXCEPTION WHEN OTHERS` engole → pedido fica `em_producao`. O state `pronto_entrega` nem existe no validator. Chain estruturalmente impossível pra qualquer pedido em_producao. Precisa **decisão arquitetural Junior** (alinhar os 2 contratos) → BLOCKED.
+
+### 🛑 2 backfills RUINS prevenidos ("verificar antes de assumir")
+1. **tempo_real_min (era P1 #24)**: as 19 etapas têm inicio/fim SINTÉTICOS (duração 0.02–0.32 min = **1–19 segundos**, todas <1min, 0 com fim<inicio). Backfill `ROUND(EXTRACT(EPOCH(fim-inicio))/60)` geraria **19 ZEROS** → Gantt "populado" porém garbage. ABORTADO. inicio/fim não são timings reais; producao_apontamentos vazio. Tempo real exige apontamento real (não derivável dos timestamps atuais).
+2. **Fase 1.2 backfill (era P0 #24/#25)**: SQL documentado INVÁLIDO em 2 frentes — (a) `status='pronto_instalacao'` não existe no state-machine, (b) `p.id IN (1070,...)` trata uuid como integer (id é uuid; 1070 é `numero`). Neutralizado no ledger NEXT. Causa real NÃO é "fix #18 dormente" — é o conflito de state-machine acima.
+
+### Anti-pattern evitado + verificações
+- **Verificar antes de assumir aplicado em 6 frentes**: (a) edge logs provaram cluster 500 é v24 pré-deploy, não v25; (b) `fn_validar_transicao_status` lido ANTES de qualquer UPDATE revelou state 'pronto_instalacao' inexistente; (c) durações reais das 19 etapas (1-19s) refutaram viabilidade do backfill tempo_real_min; (d) busca `pg_proc` por 'instalacao' DESCOBRIU fn_op_finalizada_transicao (4 ciclos missaram); (e) triggers de pedidos + ordens_producao mapeados (comissao/CR só faturado/aprovado — não disparam nesse path); (f) 0 ordens_instalacao + 0 transition events confirmaram chain nunca funcionou.
+- **Anti-pattern evitado**: NÃO executei backfill tempo_real_min garbage. NÃO executei UPDATE de status blind em prod à meia-noite (cria ordens_instalacao + side-effects). NÃO copiei SQL inválido do ledger. NÃO declarei v25 "validado" sem tráfego real (cascade parou, mas retry não exercitado).
+
+### Próxima sugestão (ciclo #27)
+P0 — Re-validar v25: quando houver tráfego compor pós-deploy, confirmar 200s OU logs `[anthropic-retry] attempt X/3`. Query `agent_messages WHERE created_at > '2026-05-28 22:15 BRT'` > 0 = prospecção voltou.
+P1 — Investigar por que prospecção morta desde 16:02 BRT (leads elegíveis esgotados? cooldown? 272 erro travando fila?).
+BLOCKED — chain Produção→Instalação: Junior decide alinhar state-machine (ver ledger BLOCKED).
 
 ## Ciclo autônomo #25 — 2026-05-28 22:30 BRT — DEPLOY v25 ai-compor-mensagem com retry exponencial Anthropic 🟢
 

@@ -8,6 +8,32 @@
 
 ## DONE — Trabalho consolidado em produção (NÃO TOCAR sem motivo grande)
 
+### Ciclo autônomo #27 — 🟢 Rotação SEXTA: 1a auditoria do módulo Instalação (nunca auditado) + adversarial mcp-bridge-worker v8 + v25 sem tráfego + sync rotation v7→v8 (2026-05-29 00:30) 🟢
+- Health pré VERDE: Vercel 200, edge logs 60min ZERO 5xx (mcp-bridge-worker v8 ~1/min 200, agent-cron-loop v26 200 SEM timeout — cascade #22-26 encerrado), 76 Edges ACTIVE, branch=main HEAD `c545007`, working dir 2 .planning (#26 uncommitted) — sem corrupção (só planning, guardrail OK).
+- **PRIMEIRA auditoria do módulo Instalação pelo sistema autônomo** (ciclos #1-#26 foram TODOS Quinta/Produção — cron nasceu quinta 28/05). 2 agents paralelos (44k + 67k tokens) + 8 queries SQL verificadas (cross-check próprio dos agents).
+- **Chain Instalação CABEADA end-to-end via 4 triggers DB** (não-stub): OP→OI→fn_create_job_from_ordem→job→JobSignature→fn_sync_job_to_ordem→fn_installation_completed. App Campo tem telas reais (JobPhotos/JobChecklist/JobSignature).
+- **🔴 P0 INSTAL-01 — execução de campo parada**: installation_completed último 2026-05-05; jobs_max_finished 2026-04-30. OIs/jobs CRIADOS (max hoje 14:04 BRT, 9 OI / 37 jobs) mas ZERO finalizados em 25d+ (21 Concluído todos ≤30/04; 15 Pendente + 1 Em andamento empilhando).
+- **🔴 P0 INSTAL-02 — offline-first é label**: VitePWA só NetworkFirst (cache leitura); sem IndexedDB, sem fila de mutations, sem replay. JobSignature.tsx:51 bloqueia assinatura offline ("requer internet") → conclusão da OS exige rede. Provável CAUSA do INSTAL-01. Build arquitetural >500 LOC cross-file → Claude Code.
+- **🟡 P1 INSTAL-03 — fn_create_job_from_ordem skip silencioso**: RAISE WARNING + RETURN quando store_id/data_agendada faltam. 6 OIs sem store_id, 3 sem data_agendada → não viram job sem rastro. Fix proposto: migration emitindo system_event 'job_creation_skipped'.
+- **🟡 P1 INSTAL-04 — installation_order_auto_created drift source↔DB**: agent grepou e a string só existe como label em mig 106; auto-create em 099 NÃO emite. PORÉM o evento DISPAROU HOJE 14:04 BRT (22 lifetime) → emitter real está no DB (trigger fora das migrations) OU no MCP server. Reconciliar.
+- **🟡 BUG MCP-01 — mcp-bridge-worker**: worker GENÉRICO MCP↔ERP (não Instalação — rotation table rotulava errado). ai_responses.insert L84-93 SEM .select().single() (viola regra dura) → RLS bloqueia silencioso + request marcado completed sem resposta (perda silenciosa). 4 .update() sem check. NÃO usa helpers ai-shared. Drift: deployed v8 vs header v7 (byte-idêntico). Segurança OK (verify_jwt true, legacy JWT HS256 retry-refresh, sem secrets).
+- **⚠️ campo_audit_logs**: RLS ON + 0 policies + 0 rows — audit logging nunca cabeado.
+- **🟢 jobs 31/37 sem OI** = Mubisys origem externa (pulam fluxo OI by-design, protocolo Obsidian OS 1557). RLS ✅ ON nas 15 tabelas campo.
+- **VALIDAR v25 (P0 #26)**: agent_messages + compor traffic ambos pararam 16:02 BRT (28/05), ZERO desde. agent-cron-loop v26 roda 200 mas NÃO chama compor (0 calls) — pool candidatos followup VAZIO = exaustão provável benigna. v25 retry NUNCA exercitado (sem tráfego). Correto mas não-validável até prospecção voltar.
+- **Verificar antes de assumir**: cross-check SQL próprio dos 2 agents — INSTAL-04 refutou parcialmente claim do Agent 2 ("evento órfão"): disparou HOJE. RLS verificada via pg_class+pg_policies, não assumida.
+- **Anti-pattern evitado**: zero prod write arriscado a meia-noite unmonitored. NÃO deploy blind no mcp-bridge-worker (MCP backbone, 1/min). NÃO migration trigger blind (CREATE OR REPLACE risk). Fix MCP-01 documentado pra agent isolado (padrão #24→#25). P0 Instalação roteados (arquitetural→Claude Code, operacional→Junior).
+- ARRUMAR: rotation table mcp-bridge-worker v7→v8 sincronizado (ledger + mission + rules). Commit planning #26+#27.
+
+### Ciclo autônomo #26 — 🔴 ACHADO ARQUITETURAL: chain Produção→Instalação (fn_op_finalizada_transicao) QUEBRADA por conflito state-machine + v25 cascade-stop CONFIRMADO + 2 backfills ruins prevenidos (2026-05-28 23:10) 🟡
+- Health pré VERDE: Vercel 200, branch=main HEAD `c545007`, working dir LIMPO (3 untracked herdados, **ZERO modified — guardrail Etapa 4 SEM falso-positivo, 1a vez desde #19**). ai-compor-mensagem v25 ACTIVE sha `50907a7c`. 76 Edges ACTIVE. Último ciclo #25 às 22:20 (50min — sem gatilho passivo).
+- **✅ VALIDAR v25 (P0 herdado #25) — cascade-stop CONFIRMADO**: cluster 500 ai-compor-mensagem nos edge logs é TODO `version:24` (pré-deploy ~21:57 BRT e antes). ZERO chamadas compor pós-deploy 22:15 (0 erro / 0 sucesso). agent-cron-loop 23:00 BRT (02:00 UTC) → **200** (antes: 500 timeout 20448ms às 00:57 UTC). **Cascade 500 PAROU.** Retry exponencial Anthropic NÃO exercitado ainda (sem tráfego compor) → validação definitiva quando prospecção voltar. ⚠️ prospecção morta desde 16:02 BRT; 272 agent_messages status 'erro' (12h=30/13h=27/14h=20 BRT hoje + histórico).
+- **🔴 ACHADO ARQUITETURAL (root cause REAL Fase 1.2 — 4 ciclos #18/#24/#25 missaram)**: `trg_op_finalizada_transicao` (AFTER UPDATE OF status ON ordens_producao) → `fn_op_finalizada_transicao` é a chain REAL Produção→Instalação. Os ciclos anteriores só olharam `fn_check_production_completed`/`production_completed`. **Conflito de contrato**: fn_op_finalizada_transicao seta pedido pra `pronto_entrega` (não-inst) ou `aguardando_instalacao` (inst); `fn_validar_transicao_status` (BEFORE UPDATE pedidos) só permite em_producao→`produzido`/`parcialmente_concluido` → AMBOS alvos REJEITADOS → `EXCEPTION WHEN OTHERS` engole → pedido fica em_producao. Evidência: **production_completed_transition=0 lifetime** (chain nunca completou) + production_completed=0; ordens_instalacao=10 total / 5 já existem p/ esses pedidos (criadas por outro path). 3 OPs finalizado, updated_at 2026-05-28 17:11. requer_instalacao=false. Prova do conflito: validator proíbe pronto_entrega/aguardando_instalacao a partir de em_producao. → **BLOCKED Junior** (decisão arquitetural).
+- **🛑 tempo_real_min backfill (era P1 #24) ABORTADO**: 19 etapas têm inicio/fim SINTÉTICOS (duração 0.02–0.32 min = **1–19 segundos**, todas <1min, 0 fim<inicio). `ROUND(EXTRACT(EPOCH(fim-inicio))/60)` daria **19 ZEROS** (garbage). Não derivável dos timestamps atuais; producao_apontamentos vazio.
+- **🛑 Fase 1.2 backfill (era P0 #24/#25) NEUTRALIZADO no NEXT**: SQL documentado INVÁLIDO — (a) status `'pronto_instalacao'` não existe no state-machine, (b) `p.id IN (1070,...)` trata uuid como integer (id é uuid, 1070 é `numero`). Mesmo "corrigido", o validator rejeitaria. Marcado ⛔ no NEXT.
+- **Verificar antes de assumir em 6 frentes**: (a) edge logs provaram cluster 500 = v24 pré-deploy; (b) `fn_validar_transicao_status` lido ANTES de qualquer UPDATE revelou 'pronto_instalacao' inexistente; (c) durações reais 1-19s refutaram tempo_real_min; (d) busca `pg_proc` por 'instalacao' DESCOBRIU fn_op_finalizada_transicao; (e) triggers comissao/CR mapeados (só faturado/aprovado — não disparam nesse path); (f) 0 OI + 0 transition events confirmaram chain nunca funcionou.
+- **Anti-pattern evitado**: NÃO backfill tempo_real_min garbage. NÃO UPDATE status blind em prod à meia-noite (criaria ordens_instalacao + side-effects, irreversível via state-machine). NÃO copiei SQL inválido do ledger. NÃO declarei v25 "validado" sem tráfego real.
+- Zero commit Edge, zero migration, zero prod write. Só planning corrigido (STATE + ledger). Preveniu 2 backfills ruins + 1 write blind.
+
 ### Ciclo autônomo #25 — DEPLOY v25 ai-compor-mensagem com retry exponencial Anthropic 429/529 via agent isolado (commit `6c1844d`) + 5a recorrência consecutiva FALSO-POSITIVO guardrail Etapa 4 confirmada via Windows-MCP cross-check (2026-05-28 22:30) 🟢
 - Health pré: Vercel 200, edge logs últimos 30min mostram cluster ~30 POST 500 ai-compor-mensagem v24 ~22:00 BRT + 1 agent-cron-loop v26 500 timeout 20448ms (cascade), mcp-bridge-worker v8 todas 200 ~1/min, agent_rules últimos 30min=8 cron OK, branch=main HEAD `fa8755a`.
 - **🚨→🟢 GUARDRAIL ETAPA 4 — 5a recorrência consecutiva FALSO-POSITIVO**: bash `git diff --stat HEAD` mostrou 5 arquivos modified (-1510 linhas delta). Cross-check Windows-MCP `Measure-Object` confirmou tails íntegros em todos 5: STATE 3135 LOC `djwjmfgplnqyffdcgdaw`, ledger 580 LOC `"maquiar"`, log 1199 LOC `Telegram: a enviar` (#24 não completou Etapa 8), rules 349 LOC, agent-cron-loop 1230 LOC `}`. Padrão IDÊNTICO #19→#23 (bash sandbox vs Windows FS dessync). NÃO HÁ CORRUPÇÃO — procedi.
@@ -339,6 +365,16 @@
 
 ## BLOCKED — Aguardando ação do Junior
 
+### 🔴 ACHADO #26 — chain Produção→Instalação QUEBRADA por conflito de state-machine (DECISÃO ARQUITETURAL JUNIOR)
+- `fn_op_finalizada_transicao` (trigger `trg_op_finalizada_transicao`, AFTER UPDATE OF status ON ordens_producao) tenta mover pedido em_producao → `aguardando_instalacao` (se requer_instalacao, criando ordens_instalacao) OU `pronto_entrega` (senão).
+- MAS `fn_validar_transicao_status` (BEFORE UPDATE pedidos) só permite em_producao → `produzido` ou `parcialmente_concluido`. O state `pronto_entrega` NEM EXISTE no validator. Ambos alvos da chain são rejeitados → `EXCEPTION WHEN OTHERS` engole silenciosamente → pedido nunca avança.
+- Evidência (ciclo #26): **production_completed_transition=0 lifetime** (chain nunca completou), production_completed=0. ordens_instalacao=10 total / 5 já existem p/ 1070+PED-2026-0025 (criadas por outro path). Prova do conflito: validator proíbe os 2 alvos da chain a partir de em_producao. Confirma de forma DEFINITIVA o gap Fase 1.2 (e refuta o diagnóstico #18/#24 de "trigger dormente" — o trigger existe e DISPARARIA, mas o resultado é engolido pelo validator).
+- **Decisão Junior — 2 opções com trade-offs**:
+  - (A) **Alinhar o validator**: adicionar transições `em_producao→aguardando_instalacao` e `em_producao→pronto_entrega` + registrar `pronto_entrega` como state válido. Mantém fn_op_finalizada_transicao como está. Trade-off: relaxa o state-machine (pula `produzido`); menos código.
+  - (B) **Refatorar fn_op_finalizada_transicao** pra ir em_producao→`produzido` primeiro + 2o trigger produzido→aguardando_instalacao/pronto_entrega + adicionar `pronto_entrega` ao validator. Trade-off: mais aderente ao state-machine; mais código/triggers.
+- Pedidos legados afetados: **1070** (`b95569e4-59a4-438a-bf7e-156cff14109c`), **PED-2026-0025** (`b05d004d-2ced-41e9-a2cf-230cd86d00e6`) — em_producao 4+ dias, todas OPs finalizado. Após fix escolhido, backfill 1-time replicando a chain (com `skip_*` flags p/ não disparar comissao/CR indevidos — ambos só disparam em faturado/aprovado, então seguro).
+- NÃO é fix autônomo (muda contrato de negócio). Aguarda Junior decidir (A) ou (B).
+
 ### Limitações do cron autônomo
 - ✅ CORRIGIDO ciclo #2: Obsidian É acessível via Windows-MCP PowerShell (`Get-Content` + `Add-Content`). Manter rules etapa 3 como está.
 - ⚠️ scheduled task cron NÃO carrega MCP Croma via Desktop Commander automaticamente — auditorias de dados negócio devem usar `execute_sql` direto ou disparar agent isolado
@@ -394,7 +430,17 @@
 
 ## NEXT — Sugestões priorizadas pra próximos ciclos (atualizar a cada ciclo)
 
-### 🔥 P0 PRÓXIMO CICLO #25 — DEPLOY v25 ai-compor-mensagem (HANDOFF DOCUMENTADO)
+### 🔧 INSTALAÇÃO (rotação Sexta — ciclo #27) — achados verificados, todos DEFAULT EXECUTÁVEL
+
+- [ ] **P1 INSTAL-03 — observabilidade fn_create_job_from_ordem (agent isolado)**: trigger faz RAISE WARNING + RETURN silencioso quando store_id/data_agendada faltam (6 OIs sem store, 3 sem data). Fix: `pg_get_functiondef` da função → CREATE OR REPLACE adicionando `INSERT INTO system_events(event_type,entity_type,entity_id,payload) VALUES('job_creation_skipped','ordem_instalacao',NEW.id,...)` ANTES de cada RETURN do branch de skip (additive, não muda comportamento). Migration idempotente. Agent isolado (NÃO Edit blind). Smoketest: contar OIs que disparariam skip.
+- [ ] **P1 MCP-01 — safe-insert em mcp-bridge-worker (agent isolado)**: ai_responses.insert (L84-93) + 4 .update() sem `.select().single()`. Adotar `safeInsert` de ai-shared/safe-insert.ts (já existe, #16). Arquivo 251 LOC > 250 → agent isolado obrigatório. Edge INTERNA (janela flexível). Bump header v7→v8 junto. Smoketest: 1 ai_request TEST tipo 'resumo-cliente' → confirmar ai_responses gravado + request completed.
+- [ ] **P2 INSTAL-04 — reconciliar emitter installation_order_auto_created**: evento dispara (hoje 14:04 BRT) mas não está nas migrations. `pg_get_triggerdef` em todos triggers de ordens_instalacao + grep mcp-server/. Documentar source↔DB drift. Read-only.
+- [ ] **P2 INSTAL-05 — campo_audit_logs morto**: RLS ON + 0 policies + 0 rows. Grep repo por código que deveria escrever (App Campo audit). Se existe e quebrado → registrar; se feature nunca implementada → marcar deprecated. Read-only primeiro.
+- [ ] **HANDOFF INSTAL-02 — offline-first App Campo (default = escrever doc)**: criar `.planning/HANDOFF-CLAUDE-CODE-AppCampo-offline-first.md` com plano (service worker mutation queue + IndexedDB outbox + replay on reconnect + JobSignature offline salvando local). Build é Claude Code (>500 LOC cross-file). Default executável = escrever o handoff, não o build.
+- [ ] **WATCH prospecção idle (agent isolado)**: agent_messages + compor pararam 16:02 BRT 28/05. agent-cron-loop 200 mas 0 calls compor. Agent lê `processLeadFollowUps` (agent-cron-loop) eligibility + query pool de candidatos → confirma exaustão benigna vs silent skip bug. Se bug → registrar P1.
+- [ ] **v25 re-validar (quando houver tráfego)**: `SELECT count(*) FROM agent_messages WHERE created_at > '2026-05-29 00:30 BRT'` > 0 = prospecção voltou. Confirmar 200s OU logs `[anthropic-retry] attempt X/3`.
+
+### ✅ DONE ciclo #25 — DEPLOY v25 ai-compor-mensagem (era P0 HANDOFF #24, EXECUTADO via agent isolado, commit `6c1844d`)
 
 **JANELA**: 22h+ BRT (Edge cliente — regra dura ledger).
 **ESTRATÉGIA**: agent isolado (arquivo 417 LOC > threshold 250 — NÃO usar Edit do Cowork direto).
@@ -487,7 +533,7 @@ NEW: // supabase/functions/ai-compor-mensagem/index.ts
 
 Fix #18 (`fn_check_production_completed`) está DORMENTE. As 3 OPs finalizado chegaram lá via path alternativo, trigger nunca disparou. Pedidos 1070 + PED-2026-0025 seguem `em_producao` há 4 dias.
 
-**Migration single-statement idempotente**:
+**⛔ SQL ABAIXO É INVÁLIDO — NÃO EXECUTAR (superseded ciclo #26)**: usa `status='pronto_instalacao'` (state INEXISTENTE no state-machine; `fn_validar_transicao_status` só permite em_producao→produzido/parcialmente_concluido) E `p.id IN (1070,...)` (id é uuid, 1070 é `numero`). Causa raiz real NÃO é "fix #18 dormente" — é conflito de contrato `fn_op_finalizada_transicao` × `fn_validar_transicao_status` (ver BLOCKED ciclo #26). Fix exige decisão arquitetural Junior. Bloco original mantido só como registro histórico:
 ```sql
 -- Backfill manual gap Fase 1.2 (ciclo #24 descobriu fix #18 dormente)
 UPDATE pedidos
@@ -546,7 +592,7 @@ Smoketest: `SELECT status FROM pedidos WHERE id IN (1070, PED-2026-0025);` deve 
   - Ter: Orçamento + briefing-beira-rio v10
   - Qua: Pedidos + ai-gerar-orcamento v29
   - Qui: Produção + ai-chat-portal v15
-  - Sex: Instalação + mcp-bridge-worker v7
+  - Sex: Instalação + mcp-bridge-worker v8 (deployed; era v7 no doc — sync ciclo #27)
   - Sáb: Financeiro + portal-upload-assinatura v1 + pricing-engine
   - Dom: Estoque/Fiscal/IA + auditoria migrations + RLS audit
 - [ ] **NOVO — Auditoria sistêmica por módulo aplicando "verificar antes de assumir"**:

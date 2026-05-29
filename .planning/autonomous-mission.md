@@ -45,7 +45,7 @@ CROMA tem 9 módulos principais. Auditoria adversarial rotativa por dia da seman
 | Terça | **Orçamento** (Mubisys + materiais + modelos) | briefing-beira-rio v10 | Pricing engine + cálculos + composição |
 | Quarta | **Pedidos** (conversão + status + CR) | ai-gerar-orcamento v29 | State machine + integridade financeira |
 | Quinta | **Produção** (OP + etapas + PCP + Gantt) | ai-chat-portal v15 | Sequenciamento + capacidade + replanning |
-| Sexta | **Instalação** (App Campo + fotos + assinatura) | mcp-bridge-worker v7 | PWA + offline-first + checklist |
+| Sexta | **Instalação** (App Campo + fotos + assinatura) | mcp-bridge-worker v8 | PWA + offline-first + checklist |
 | Sábado | **Financeiro** (boletos + fluxo + DRE + aging) | portal-upload-assinatura v1 + pricing-engine | Conciliação + boletos CNAB + métricas |
 | Domingo | **Estoque + Fiscal + IA** (alertas + NF-e + AISidebar) | auditoria migrations + RLS audit | Inventário + NFe homolog + dívida IA |
 
