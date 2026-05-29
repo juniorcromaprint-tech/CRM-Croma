@@ -9,6 +9,20 @@
 
 **Penúltima atualização**: 2026-05-28 21:05 BRT — Ciclo autônomo #24 — 🔴 ACHADO P0 NOVO CRÍTICO: fix #18 (trg_check_production_completed) está **DORMENTE — gap Fase 1.2 NÃO resolvido**. 3 OPs finalizado (15/16/17) chegaram a esse status SEM marcar producao_etapas.concluida (path UPDATE direto). Trigger só roda em `AFTER UPDATE OF status ON producao_etapas`. **Pedidos 1070 + PED-2026-0025 seguem `em_producao` 4 dias após ciclo #18 declarar destrava estrutural**. + Recon ai-compor-mensagem v24 confirma 417 LOC (acima threshold 250 — agent isolado obrigatório). Edit cirúrgico EXATO documentado para deploy v25 em janela 22h+ BRT (próximo ciclo #25). + 2 achados HIGH novos: 19 etapas concluida sem tempo_real_min (Gantt cego para análise), 2 setores zerados (Router/Corte, Serralheria). Spike 500 ai-compor-mensagem v24 SEGUE ATIVO há 4h+ (cluster 20:00 + 20:20 BRT, ZERO agent_messages criadas desde 17:00 BRT).
 
+## Ciclo autonomo #39 - 2026-05-29 13:15 BRT - 🟡 VALIDAR: v28 CONFIRMADO em ticks NATURAIS + ACHADO: lead_quente ressuscitada = ~100 alertas Telegram/dia sobre backlog VELHO
+
+**Mantra**: VALIDAR os 2 P1 default-exec do #38 NEXT (pos-deploy v28). Sexta=Instalacao exausta #27-34. Hora 13:07->13:15 BRT (16:07 UTC), #38 as 12:25 (~42min, sem gatilho passivo). Health VERDE: Vercel 200, edge 60min ZERO 5xx (mcp-bridge-worker v9, agent-cron-loop v28 200 11s), branch=main HEAD bae4381=#38, guardrail HOST LIMPO (tails 3475/751/1567/1368, bash NAO consultado p/ corrupcao). Validacao dirigida inline (SQL+log+source), sem agent.
+
+### TAREFA 1 - v28 CONFIRMADO em ticks NATURAIS (fecha P1 #38)
+#38 so validou no tick FORCADO (15:20 UTC). Confirmei agora nos NATURAIS (cron jobid20 15:30 + 16:00 UTC succeeded). Log API 16:00:08-12: execute_sql_readonly 200 (era 400 - FIX1 cl.lead_id), GET system_events entity_id=00000000...&rule_name=recalcular_scores 200 (era 400 entity=batch - FIX2 sentinel), POST system_events 201. cron_loop_executed 15:30+16:00 actions_failed=0, rules_skipped=101. ZERO 400/5xx no window. 3x 400/tick ELIMINADOS em ciclo nao-forcado. v28 estavel.
+
+### TAREFA 2 - lead_quente dispara Telegram REAL e e RUIDO (achado adversarial)
+A regra ressuscitada no #38 (acao=alerta_telegram -> sendTelegramAlert -> chat 1065519625) disparou 100 alertas HOJE, TODOS no smoketest FORCADO do #38 (15:19-15:20 UTC); 0 nos ticks naturais (dedup wasRecentlyProcessed 24h). admin_config TELEGRAM_BOT_TOKEN=true -> os 100 FORAM ENTREGUES ao Junior ~12:20 BRT. matches=319 (score>=70 sem proposta), RECENTES(7d)=0 -> 100% backlog VELHO. dedup reabre 24h -> re-dispara ~100/dia (cap) sobre leads velhos; 1a recorrencia ~amanha 15:20 UTC. Efeito colateral nao-avaliado do deploy #38.
+
+### Decisao + mudancas + watch
+ZERO prod-write (alterar regra = decisao negocio Junior; sem flood ativo, recorre so amanha). RECOMENDO (ledger #39): filtro de recencia (leads.updated_at>=now()-7d) na condicao da lead_quente -> corta ~100/dia de ruido, preserva sinal; confirmar intencao Junior antes (recebeu 100 hoje). Herdado: SEC-001 RLS anon + rotacionar token Telegram (BLOCKED Junior); re-validar SEND follow-up qdo flag ligar. [watch] production_completed 0 lifetime; install_completed 24d; jobs Pendente 15; followup_engine_ativo=false. Commit planning #39. Zero deploy/migration/prod-write.
+
+---
 ## Ciclo autonomo #38 - 2026-05-29 12:25 BRT - 🟢 CORRIGIR: deploy v28 agent-cron-loop - 2 regras MORTAS ~1 mes RESSUSCITADAS com runtime + 3x 400/tick eliminados
 
 **Mantra**: CORRIGIR + VALIDAR. Executei o P1 default-executavel do #36/#37 (deploy v28) que estava [VALIDADO] mas NUNCA tentado. Sexta=Instalacao ja auditada 8x (#27-34); SEC-001/token #37 sao BLOCKED-Junior; v28 era o unico P1 com default-exec. Hora 12:06->12:25 BRT (#37 as 11:07, ~59min, sem gatilho passivo). Health VERDE: Vercel 200, edge 60min ZERO 5xx, branch=main HEAD f95211d=#37, guardrail HOST LIMPO (tails 3455/740/1538/1368). 1 agent isolado (~202k tok) deploy+smoketest + SQL/HOST inline.

@@ -1565,3 +1565,29 @@ ZERO prod write. Achados de risco/negocio -> BLOCKED + 1 recomendacao (sem A/B).
 **Deploys**: agent-cron-loop v28 (interno)
 **Token usage**: sessão principal moderada + 1 agent isolado ~202k
 **Telegram**: enviada (ok) — msgid no fechamento (Obsidian daily).
+
+## Autonomo 13:15 (ciclo #39)
+- Tipo: validar (P1 do #38 NEXT) + adversarial
+- Modulo do dia: Instalacao (Sexta) - ja auditada 8x #27-34; foco nos 2 P1 default-exec do #38 NEXT
+- Hora 13:07->13:15 BRT (16:07 UTC). #38 as 12:25 (~42min, sem gatilho passivo). Health VERDE: Vercel 200, edge 60min ZERO 5xx (mcp-bridge-worker v9 ~1/min 200, agent-cron-loop v28 200 11s), branch=main HEAD bae4381=#38, guardrail HOST LIMPO (tails 3475/751/1567/1368, bash NAO consultado p/ corrupcao). SQL+log+source inline (validacao dirigida bounded, sem agent).
+
+### TAREFA 1 (VALIDAR P1 #38) - v28 CONFIRMADO em ticks NATURAIS
+#38 so validou no tick FORCADO (15:20 UTC). Agora confirmei nos NATURAIS (cron jobid20 15:30 + 16:00 UTC, succeeded). Log API 16:00:08-12:
+- POST /rpc/execute_sql_readonly -> 200 (era 400; FIX1 cl.lead_id)
+- GET /system_events entity_id=eq.00000000-...&rule_name=eq.recalcular_scores -> 200 (era 400 entity=batch; FIX2 sentinel)
+- POST /system_events (rule_executed) -> 201
+- cron_loop_executed 15:30 + 16:00: actions_failed=0, rules_processed=8, rules_skipped=101. ZERO 400, ZERO 5xx no window.
+VEREDICTO: 3x 400/tick ELIMINADOS em ciclo nao-forcado. Fix v28 estavel. P1 #38 FECHADO.
+
+### TAREFA 2 (ADVERSARIAL P1 #38) - lead_quente dispara Telegram REAL, ~100/dia sobre backlog VELHO
+acao lead_quente_sem_orcamento = alerta_telegram -> sendTelegramAlert (source L599/L814-846) -> insere alertas_telegram_dedup (1 por regra+entidade+dia) -> sendTelegram chat 1065519625 (Junior). Evidencia:
+- system_events rule_executed lead_quente HOJE=100, TODOS 15:19:49-15:20:28 UTC (= smoketest FORCADO #38). 0 nos ticks naturais (wasRecentlyProcessed 24h -> rules_skipped 101).
+- alertas_telegram_dedup alert_date=hoje: lead_quente=100 (cross-check bate).
+- admin_config TELEGRAM_BOT_TOKEN presente=true -> os 100 FORAM ENTREGUES ao Junior ~12:20 BRT (durante deploy #38).
+- matches atuais=319 (score>=70 sem proposta); RECENTES updated_at<=7d = 0 -> 100% backlog VELHO.
+EFEITO: dedup reabre 24h -> re-dispara ~100 alertas/dia (cap) sobre leads velhos; 1a recorrencia ~amanha 15:20 UTC (12:20 BRT). Ruido, nao sinal. Efeito colateral do #38 (ressuscitou regra morta ~1mes sem avaliar downstream).
+
+### Decisao (sem A/B) + anti-pattern
+ZERO prod-write: alterar/desativar regra = decisao negocio Junior (regra legitima; problema e o backlog velho 319 = mesmo backlog cronico dos follow-ups #32-36). Sem flood ATIVO agora (dedup ja gravou hoje; recorre so amanha 12:20 BRT -> ha tempo do Junior ver). NAO Cowork Edit arquivo grande. NAO vitoria sem runtime (log API + cron_run_details + dedup count). Token comprometido #37 NAO escrito (redigido).
+- Commits: planning #39 (cerebros). Zero deploy, zero migration, zero prod-write. Telegram enviado (ok no fechamento).
+- NEXT #39: detalhado no ledger.
