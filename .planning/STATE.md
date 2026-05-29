@@ -9,6 +9,22 @@
 
 **Penúltima atualização**: 2026-05-28 21:05 BRT — Ciclo autônomo #24 — 🔴 ACHADO P0 NOVO CRÍTICO: fix #18 (trg_check_production_completed) está **DORMENTE — gap Fase 1.2 NÃO resolvido**. 3 OPs finalizado (15/16/17) chegaram a esse status SEM marcar producao_etapas.concluida (path UPDATE direto). Trigger só roda em `AFTER UPDATE OF status ON producao_etapas`. **Pedidos 1070 + PED-2026-0025 seguem `em_producao` 4 dias após ciclo #18 declarar destrava estrutural**. + Recon ai-compor-mensagem v24 confirma 417 LOC (acima threshold 250 — agent isolado obrigatório). Edit cirúrgico EXATO documentado para deploy v25 em janela 22h+ BRT (próximo ciclo #25). + 2 achados HIGH novos: 19 etapas concluida sem tempo_real_min (Gantt cego para análise), 2 setores zerados (Router/Corte, Serralheria). Spike 500 ai-compor-mensagem v24 SEGUE ATIVO há 4h+ (cluster 20:00 + 20:20 BRT, ZERO agent_messages criadas desde 17:00 BRT).
 
+## Ciclo autonomo #33 - 2026-05-29 06:15 BRT - Auditoria RLS QUALIDADE do dominio Instalacao: SEM EXPOSICAO (qual=true todas authenticated, zero anon/public) VERDE
+
+**Mantra**: EXPLORAR/VALIDAR (angulo NOVO - #27-31 so checaram RLS ON/OFF, nunca a qualidade das policies). Hora 06:15 BRT Sexta (#32 as 05:06, ~1h, sem gatilho passivo). Health pre VERDE: edge/API 60min ZERO 5xx (mcp-bridge-worker v9 ~1/min 200, fn_claim_ai_requests cron 200 + email_events 201), branch=main HEAD 1e4d60b, guardrail HOST LIMPO (3 untracked herdados, 0 modified, tails 3375/691/1423/1230 L). Cron prospeccao OFF (jobid 20 janela 11-23 UTC; resume 11 UTC) -> follow-up #32 NAO validavel ainda. 3 SQL read-only inline (sem agent - tool calls unicos).
+
+### Veredicto auditoria RLS Instalacao/Campo (18 tabelas): SEM EXPOSICAO
+RLS ON 100%; ZERO policy role anon; ZERO policy role {public}. TODAS as policies permissivas (qual=true / USING true) sao role {authenticated} = acesso flat de funcionario logado = BY-DESIGN p/ app interno de campo. Encerra a duvida herdada do #18 (estilo authenticated-read-all do portal_mensagens) para o dominio campo: confirmado authenticated-only via checagem de role policy-a-policy (nao assumido).
+
+### Ressalva P2 + drift + tabela morta
+- RESSALVA (unico vetor que inverteria): se o portal-cliente emitir JWT role=authenticated do Supabase (em vez de Edge+service_role), qual=true em jobs/ordens_instalacao/job_photos vazaria campo cross-cliente. Historico aponta portal via Edge service_role -> provavel employee-only. NEXT confirmar.
+- DRIFT cosmetico LOW: jobs (authenticated_all_jobs + jobs_auth_all) e anexos (authenticated_all + authenticated_all_anexos) tem 2 policies ALL identicas redundantes (migrations repetidas). Dedup P2.
+- campo_audit_logs: RLS ON + 0 policies + 0 trigger + 0 funcao pg_proc referenciando + 0 rows = audit table MORTA (nunca cabeada). Locked-by-default, nao e hole. Deixar OU dropar (Junior).
+
+### Mudancas + watch
+Doc novo planning/INSTAL-RLS-AUDIT-2026-05-29.md + 3 cerebros. Zero deploy/migration/prod write. Watch: cron prospeccao resume 11 UTC; installation_completed 24d parado; jobs Pendente 18 (sem movimento). Detalhe completo: planning/INSTAL-RLS-AUDIT-2026-05-29.md + autonomous-log #33.
+
+---
 ## Ciclo autonomo #32 - 2026-05-29 05:06 BRT - P1 prospeccao "idle benigno" REFUTADO (backlog cronico 195) + overnight=schedule 🟡
 
 **Mantra**: EXPLORAR+VALIDAR (root-cause prospeccao idle - P1 do #26 NEXT nunca executado). Hora 05:06 BRT Sexta (#31 as 04:07, ~59min, sem gatilho passivo). Health pre VERDE: Vercel 200, edge/API 60min ZERO 5xx (mcp-bridge-worker v9 + fn_claim_ai_requests cron ~1/min), branch=main HEAD fe6d36b, guardrail HOST LIMPO (0 modified, tails integros). 1 agent isolado adversarial (sonnet 45k) + verificacao cruzada inline (8 SQL + 3 reads de source).
