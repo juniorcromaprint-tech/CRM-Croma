@@ -1,3 +1,18 @@
+## Ciclo autonomo #54 - 2026-05-30 04:35 BRT - VERDE explorar/corrigir (P2 backlog DB-011 + integridade de preco): DB-011 doc-drift FECHADO (regras_precificacao = 11 = 9 ativas + 2 inativas letreiro/fachada; doc .context/migrations.md sincronizado) + ACHADO MAIOR validado por agent: motor Mubisys NAO aplica regras de categoria no orcamento MANUAL (match exato plural!=singular -> tudo cai em geral 40%); markup_maximo = dead code
+
+**Tipo**: explorar + corrigir (doc-sync; ZERO prod-write/deploy/migration). NOW 04:05->04:35 BRT; #53 as 03:25 (~40min, sem gatilho passivo). Health VERDE: Vercel 200; API 60min 100% 200 (fn_claim ~1/min); edge mcp-bridge-worker v9 ZERO 5xx; Edges ACTIVE (whatsapp-webhook v46/ai-gerar-orcamento v29/portal-upload-assinatura v1/agent-cron-loop v28); branch=main HEAD 5e5d7a2=#53; guardrail HOST LIMPO (STATE 3693L/ledger 1011L/log 1872L tails coerentes, 2 untracked herdados, bash NAO consultado). 1 agent adversarial read-only (~61k) no motor de preco.
+
+**Decisao (sem A/B)**: backlog P0 ESGOTADO (#50-52). P1 acionavel travado: INT-006 BLOCKED-Junior (#53), INT-014 toca o bot vivo do Junior (Claudete) + severidade baixa, SEC-013 sem MCP tool, SEC-011 DEFER (28+47 deps). Financeiro auditado 4 ciclos seguidos (#50-53) = NAO repetir. Pivot pro P2 backlog DB-011 (citado explicito, licao #49) = angulo NOVO de Orcamento, encaixa Sabado, barato e seguro.
+
+**DB-011 FECHADO (doc-drift)**: regras_precificacao=11 (9 ativas + 2 inativas: letreiro/fachada, desativadas deliberadamente 2026-03-22 02:40 vs lote ativo 02:48). "11 vs 9" era imprecisao (11 total inclui 9 ativas + 2 inativas), nao contradicao. Doc-sync em .context/migrations.md (L16+L33).
+
+**ACHADO MAIOR (validado por agent, file:line) - integridade de preco**: motor NAO aplica regras de categoria no orcamento MANUAL. orcamento-pricing.service.ts:307 ativas.find(r=>r.categoria===categoria) com produto.categoria CRU (plural/free-text "adesivos"/"Fachadas") != regra singular ("adesivo"/"fachada") -> match exato NUNCA casa -> todo item manual cai em geral (markup hardcoded 40, min 25, aprov 85). Caminho IA (ai-gerar-orcamento:142/386 regrasMap[categoria_inferida]; LLM travada singular em CATEGORIAS VALIDAS:42) CASA. markup_maximo = DEAD CODE (so types.ts+admin CRUD, nunca lido, sem clamp) -> adesivo (min400>max300) + placa (sug310>max300) sao inconsistencias inertes. Impacto realizado BAIXO (23 proposta_itens/12 pedido_itens, muitos mubisys skip-priced); latente = sub-precificacao de placa(sug310)/adesivo(sug580) no UI manual.
+
+**Mudancas prod**: NENHUMA em dados/deploy/migration. Doc-sync (.context/migrations.md) + backlog DB-011 [x] + QA report docs/qa-reports/2026-05-30-DB-011-regras-precificacao-engine.md. Fix de preco/codigo = BLOCKED-Junior (PRICE-001/002/003 + DATA-004 no ledger NEXT).
+
+**NEXT**: ver ledger #54.
+
+---
 ## Ciclo autonomo #53 - 2026-05-30 03:25 BRT - VERDE explorar/validar (lane P1 INT-006 + rotacao Sabado/Financeiro revenue-leakage): whatsapp-webhook signature FAIL-OPEN CONFIRMADO e provavelmente ATIVO (validateSignature L381 `return true` se WHATSAPP_APP_SECRET ausente, v46; secret AUSENTE do admin_config) -> fix exato especificado mas BLOCKED (Junior setar env + Claude Code 1294L) + Financeiro 0 revenue leakage + 0 saldo drift
 
 **Tipo**: explorar + validar (read-only, ZERO prod-write/deploy/migration). NOW 03:05->03:25 BRT; #52 as 02:14 (~51min, sem gatilho passivo). Health VERDE: Vercel 200; API 60min 100% 200 (fn_claim ~1/min); edge mcp-bridge-worker v9 todos 200 ZERO 5xx; branch=main HEAD 9fa69f1=#52; guardrail HOST LIMPO (STATE 3676L/ledger 993L/log 1853L tails coerentes, 2 untracked herdados, bash NAO consultado). 1 agent adversarial read-only (~42k) na auditoria do whatsapp-webhook 1294L.

@@ -13,7 +13,7 @@
 | `004_integracao_bridge.sql` | Bridge ERP↔Campo |
 | `005_storage_security.sql` | RLS nos buckets |
 | `006_orcamento_module.sql` | Acabamentos (17), serviços (16), templates orçamento |
-| `007_orcamento_campos.sql` | Regras precificação (11 categorias), campos custeio |
+| `007_orcamento_campos.sql` | Regras precificação (11 regras: 9 ativas + 2 inativas letreiro/fachada), campos custeio |
 | `008_update_materiais_precos.sql` | 464 materiais com preço Mubisys |
 | `009_update_produtos_markups.sql` | 156 modelos com markup real |
 | `020_portal_tracking_pagamento.sql` | Portal cliente, tracking, pagamento |
@@ -30,4 +30,4 @@
 ## Dados no Banco
 - clientes: 307 | materiais: 467 (464 c/ preço) | produtos: 156
 - produto_modelos: 156 | modelo_materiais: 321 | modelo_processos: 362
-- acabamentos: 17 | serviços: 16 | regras_precificacao: 11
+- acabamentos: 17 | serviços: 16 | regras_precificacao: 11 (9 ativas + 2 inativas: letreiro, fachada)
