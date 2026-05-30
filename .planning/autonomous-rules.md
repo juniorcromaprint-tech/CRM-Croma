@@ -1,6 +1,7 @@
 # REGRAS DO MODO AUTÔNOMO CONTÍNUO (Scheduled Task — a cada 1h, 24/7)
 
-> Versão: 5.0 | Atualizado: 2026-05-29
+> Versão: 5.2 | Atualizado: 2026-05-29
+> v5.2 (re-peso Junior 29/05): rotação de módulo + BACKLOG-MODULOS é DRIVER PRIMÁRIO; advisor cleanup rebaixado a FILLER (mata o anti-pattern come-própria-cauda dos ciclos #41-46). Fila verificada ao vivo em BACKLOG-MODULOS-2026-05-29.md.
 > Aplica APENAS quando rodando via scheduled task `croma-autonomous-progress`.
 > Sessão interativa com Junior segue regras do CLAUDE.md normalmente.
 > v5.0 (hardening pós-auditoria #1-#26): host Windows = fonte de verdade (anti falso-positivo virtiofs), fechamento blindado (Telegram+commit primeiro), agents obrigatórios em recon, mapear fluxo antes de corrigir, validar SQL antes de "pronto".
@@ -99,6 +100,7 @@ Múltiplos Read no mesmo message:
 - `.planning/autonomous-log.md` (últimas 500 linhas)
 - `.planning/STATE.md` ← **CÉREBRO ATIVO** — últimas 500 linhas mínimo
 - `.planning/REQUIREMENTS.md`
+- `.planning/BACKLOG-MODULOS-2026-05-29.md` ← **FILA PRIMÁRIA** — backlog verificado por módulo (P0 Correção de dinheiro). Pegar o próximo item default-exec daqui.
 
 ### Etapa 2 — Auto-diálogo (registrar literalmente no log — 7 perguntas)
 
@@ -137,15 +139,15 @@ CORRUPÇÃO só é REAL se o **HOST** mostrar arquivo truncado (linhas << espera
 
 ### Etapa 5 — Decidir e executar (VOCÊ ESCOLHE — 1-3 tarefas)
 
-Heurística de prioridade:
+Heurística de prioridade (REORDENADA 2026-05-29 — rotação de módulo é o DRIVER PRIMÁRIO, advisor cleanup virou FILLER):
 1. **CORRIGIR bug crítico em prod** (5xx ativo) → fix imediato
-2. **CORRIGIR P0/P1 já no ledger NEXT**
-3. **ROTAÇÃO SISTEMÁTICA — módulo + Edge do dia** (ver `autonomous-mission.md`): query banco + smoketest + agent adversarial Edge + gap report
-4. **ARRUMAR**: drift source/deploy, cleanup TEST (cascade explícito), refactor pequeno, sync docs/.context
-5. **VALIDAR**: smoketest RPCs, regression check pós-deploy
-6. **AVANÇAR CROMA 4.0**: Edge autonomous-cycle-runner, pré-req Fase 2, seed agent_*, prospecção SHADOW, triggers formais, Memory Layer
+2. **BACKLOG DE MÓDULOS** (`BACKLOG-MODULOS-2026-05-29.md`) ← **DRIVER PRIMÁRIO**. Pegar o próximo item `default-exec` na ordem de lane (P0 Correção de dinheiro → P1 Fiscal/segurança código → P2 Infra). Respeitar `[NAO-VALIDADO]` (validar contra schema antes de fechar) e janelas de Edge cliente.
+3. **ROTAÇÃO SISTEMÁTICA — módulo + Edge do dia** (ver `autonomous-mission.md`): se o backlog do dia estiver esgotado, auditar o módulo+Edge do dia atrás de gaps NOVOS e **ADICIONAR ao backlog** (não só reportar).
+4. **ADVISOR CLEANUP = FILLER**: só quando backlog + rotação do dia esgotados. ⛔ PROIBIDO encadear advisor-lint→NEXT→pegar-o-próprio-lint por +1 ciclo (anti come-própria-cauda #41-46).
+5. **ARRUMAR / VALIDAR**: drift, cleanup TEST (cascade explícito), smoketest RPCs, regression pós-deploy.
+6. **AVANÇAR CROMA 4.0**: pré-req Fase 2-4, triggers formais, Memory Layer, prospecção SHADOW.
 
-**Múltiplas categorias num ciclo OK.**
+**Múltiplas categorias num ciclo OK. Mas todo ciclo deve tocar o backlog de módulo ANTES de cair em advisor cleanup.**
 
 **REGRAS DE OURO DA EXECUÇÃO (anti-retrabalho — lições #17-#26):**
 - **MAPEAR ANTES DE CORRIGIR**: antes de "consertar" um fluxo, mapear TODOS triggers+funções+states (`SELECT proname FROM pg_proc WHERE prosrc ILIKE '%<dominio>%'` + triggers das tabelas + ler validator de state-machine) e confirmar com contagem de eventos no histórico QUAL função dispara no path REAL. (#17-#25 perseguiram `fn_check_production_completed` — 0 eventos — por 4 ciclos.)
