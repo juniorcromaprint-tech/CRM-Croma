@@ -1749,3 +1749,15 @@ ZERO prod-write: alterar/desativar regra = decisao negocio Junior (regra legitim
 **Deploys**: nenhum.
 **Token usage**: ~125k.
 **Telegram**: enviada (ok)
+
+---
+## Ciclo autonomo #48 - 2026-05-29 22:15 BRT - VERDE validar (P1 watch SERVICE_ROLE_KEY fechado com runtime)
+- Health pre VERDE: Vercel 200; edge 60min ZERO 5xx (mcp-bridge-worker v9 ~1/min 200, agent-cron-loop v28 200 7.8-11.6s); branch=main HEAD 21903d9=#47; guardrail HOST LIMPO (tails STATE 3609/ledger 905/log 1751, 4 untracked herdados, bash NAO consultado). #47 as 21:11 (~53min). NOW 22:15 BRT. Janela deploy cliente ABERTA. 0 agents (1 read source 173 LOC + 3 SQL + 1 smoketest inline).
+- Auto-dialogo (7): (1) #45 SEC-004 search_path + lead_quente runtime; #46 auth_rls_initplan 78; #47 re-audit Instalacao read-only. (2) Sexta=Instalacao/mcp-bridge-worker v9 - re-auditado #47 + exausta #27-34. (3) gap util AGORA: P1 watch SERVICE_ROLE_KEY=JWT (portal-upload-assinatura:53) carregado 4 ciclos #44-47 sem verificacao + janela smoketest aberta. (4) sem conflito (verificacao read-only). (5) Obsidian: SEC-002 revogou anon de varias fns; protocolo Mubisys. (6) nao-passivo. (7) criterio: smoketest prova se path primario (RPC/service) retorna JWT -> fallback nunca exercitado.
+- DECISAO (sem A/B): fechar o watch SERVICE_ROLE_KEY com evidencia definitiva - read-only, janela aberta, risco latente real carregado 4 ciclos.
+- VERIFICACAO: (1) get_service_role_legacy_jwt retorna JWT valido (left3=eyJ, boolean-only sem leak), SECDEF, search_path=vault,public. (2) anon_exec=FALSE (SEC-002), authenticated/service_role=true -> fallback anon->rpc daria permission denied -> 500. (3) source 173 LOC: primario usa SERVICE_ROLE_KEY direto, fallback so se probe der erro JWT. (4) propostas total_assinadas=0 lifetime (feature v1 nunca usada).
+- SMOKETEST (token invalido, zero write): POST portal-upload-assinatura -> HTTP 401 token invalido (NAO 500) -> probe do service client teve sucesso -> SERVICE_ROLE_KEY E JWT -> fallback anon NUNCA alcancado.
+- VEREDITO: watch RESOLVIDO. SEC-002 nao quebra portal-upload-assinatura. Assinatura do portal saudavel. Risco condicional (NEXT): fallback e dead-code que 500-aria se SERVICE_ROLE_KEY rotacionar pra sb_secret_*; fix exige env/code (NAO re-grantar anon). Decisao Junior.
+- Anti-pattern evitado: NAO declarei break sem runtime (401 refutou); NAO re-grantei anon (re-abre SEC-002 + vaza service JWT); NAO vazei secret (boolean/left3); NAO Cowork Edit cerebros (>250 LOC, HOST .NET UTF8).
+- Commits: planning #48 (cerebros). 0 deploy, 0 migration, 0 prod-write.
+- Telegram: enviada (ok) mid=3165.
