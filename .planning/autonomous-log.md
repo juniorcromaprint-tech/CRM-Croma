@@ -1792,3 +1792,43 @@ ZERO prod-write: alterar/desativar regra = decisao negocio Junior (regra legitim
 **Ledger update**: DB-012 -> DONE refutado; DB-013 -> NEXT [VALIDADO shadow]. #50 DONE.
 **Commits**: fechamento #50 (hash no commit). **Deploys**: nenhum. **Migration**: nenhuma aplicada (1 staged validada).
 **Telegram**: enviada (ok)
+
+---
+
+## 2026-05-30 01:35 (ciclo #51)
+
+**Status**: VERDE
+**Tipo**: corrigir (1 migration DDL: 2 fns + 1 trigger) + validar (3 provas) + rotacao Sabado/Financeiro (read-only)
+**Auto-dialogo**:
+1. 3 ciclos anteriores: #48 portal-upload SERVICE_ROLE_KEY=JWT (smoketest 401) -> #49 Memory Layer fn_detectar_padroes_memoria fonte=calculo (400/tick eliminado) -> #50 DB-012 refutado + DB-013 mapeado (shadow staged)
+2. Dia=Sabado -> rotacao Financeiro. MAS ETAPA 5 poe P0 ledger NEXT acima da rotacao do dia.
+3. Gap mais util AGORA: DB-013 shadow validator (P0 default-exec VALIDADO no #50 NEXT, fully-specified, idempotente, warn-only). Financeiro como check leve.
+4. Conflito IN-PROGRESS/BLOCKED: nenhum (HOST limpo, 2 untracked herdados)
+5. STATE/Obsidian: Obsidian 05-29 = Junior auditou Claudete/JARVIS overnight (secret leaks: service_role JWT hardcoded 3 arquivos pushed; brio misroute fix) - nada no repo CRM
+6. MODO PASSIVO: NAO (#50 ha ~41min >15min; branch main; host limpo; zero 5xx)
+7. Criterio mensuravel: trigger+2fns wired (catalogo) + deterministico 12/12 + RUNTIME smoketest delta=1 rolled-back
+
+**Health check**: Vercel 200; edge 60min ZERO 5xx (mcp-bridge-worker v9 200, agent-cron-loop v28 200 2.7s); API 60min ZERO 4xx/5xx (fn_claim ~1/min 200; 3x400/tick #49 eliminados); branch=main HEAD 613c4d3=#50; guardrail HOST LIMPO (tails STATE 3651/ledger 956/log 1794, 2 untracked herdados, bash NAO consultado)
+
+**Agents disparados**: 0 (DDL idempotente + verificacao schema dirigida + 3 validacoes inline; escopo pequeno e bem-definido pelo #50)
+
+**Acoes executadas**:
+1. Read paralelo (ledger 144 + log 300 + STATE 120+120) + Obsidian PowerShell (memory 200 + dailies) + list_edge_functions + 2x get_logs (edge+api) + web_fetch Vercel + git guardrail HOST
+2. Auto-dialogo 7 perguntas registrado
+3. Verificacao schema (mapear antes): system_events cols+constraints, ordens_producao_status_check, triggers existentes em ordens_producao, cols CR/CP
+4. Migration db013_shadow_validator_op_status_transition_cycle51 (fn_op_transition_is_known IMMUTABLE + fn_op_status_transition_shadow SECURITY DEFINER + trg_op_status_transition_shadow)
+5. 3 validacoes: deterministico 12/12, catalogo, RUNTIME smoketest rolled-back delta=1
+6. Pollution check: 0 anomaly rows leftover
+7. Rotacao Financeiro: aging CR/CP
+8. 3 cerebros (HOST .NET UTF8) + Telegram + commit + Obsidian
+
+**Decisao tomada**: P0 ledger NEXT (DB-013) acima da rotacao do dia (ETAPA 5). Trigger ISOLADO warn-only em vez de endurecer fn_validar_transicao_status (que quebraria prod - #50). SECURITY DEFINER + search_path pinned (SEC-004). Smoketest rolled-back p/ runtime sem prod-write. NAO endurecer p/ RAISE (warn-only ate 1 sem de evidencia + decisao Junior).
+
+**Resultado**: VERDE. DB-013 shadow validator em prod com 3 provas (incl RUNTIME delta=1). Observabilidade do gap de transicao de ordens_producao destravada sem risco. Financeiro saudavel (CR 2 pago R$0 aberto; CP 3 a_pagar vencidos R$1.322,32 = watch cresceu de R$822, decisao Junior).
+
+**Ledger update**: #51 DONE adicionado; NEXT = DB-013-evidencia (1 sem) + DB-013b DEFAULT pendente + heranca DB-006/INT-014/SEC-013 + watch Financeiro CP R$1.322,32.
+
+**Commits**: planning #51 + migration db013 (push HOST)
+**Deploys**: 0
+**Migrations**: 1 (db013_shadow_validator_op_status_transition_cycle51)
+**Telegram**: enviada (ok)

@@ -1,4 +1,21 @@
-﻿## Ciclo autonomo #50 - 2026-05-30 00:25 BRT - VERDE explorar/validar (backlog P0 Sabado/Financeiro, ZERO prod-write): DB-012 REFUTADO + DB-013 MAPEADO (prod-breakage evitado)
+## Ciclo autonomo #51 - 2026-05-30 01:35 BRT - VERDE corrigir+validar (P0 ledger DB-013 + rotacao Sabado/Financeiro): shadow validator de transicao de status de ordens_producao APLICADO (trigger ISOLADO warn-only) com prova de RUNTIME (smoketest delta=1, rolled-back) + Financeiro auditado
+
+**Tipo**: corrigir (1 migration DDL: 2 fns + 1 trigger) + validar (3 provas) + rotacao Financeiro read-only. NOW 01:06->01:35 BRT; #50 as 00:25 (~41min, sem gatilho passivo). Health VERDE: Vercel 200; edge 60min ZERO 5xx (mcp-bridge-worker v9 200, agent-cron-loop v28 200 2.7s); API 60min ZERO 4xx/5xx (fn_claim ~1/min 200; 3x400/tick #49 seguem eliminados); branch=main HEAD 613c4d3=#50; guardrail HOST LIMPO (tails STATE 3651/ledger 956/log 1794, 2 untracked herdados, bash NAO consultado).
+
+**DB-013 (P0 default-exec VALIDADO do #50 NEXT) APLICADO**: migration db013_shadow_validator_op_status_transition_cycle51. fn_validar_transicao_status (BEFORE UPDATE via trigger_validar_status_ordens_producao) cai em ELSE NULL p/ ordens_producao = gap sem validacao. Endurecer agora QUEBRARIA prod (#50 provou: aguard_prog->em_conferencia real 3x seria rejeitado). Solucao = trigger ISOLADO warn-only, NAO toca o validator money-critical (pedidos/propostas). Criados: (1) fn_op_transition_is_known(text,text) IMMUTABLE pura (mapa-superset dos 8 status); (2) fn_op_status_transition_shadow() SECURITY DEFINER search_path=public,pg_temp, BEGIN/EXCEPTION WHEN OTHERS THEN NULL = jamais aborta UPDATE, loga system_events event_type=op_status_transition_anomaly; (3) trigger trg_op_status_transition_shadow AFTER UPDATE OF status WHEN (new<>old).
+
+**Mapear antes (verify-before-assume)**: system_events SEM check constraint (event_type text livre; o 400 do #49 era a fn_detectar_padroes, nao check de event_type); NOT NULL = event_type/entity_type/entity_id(uuid) satisfeitos com literais + NEW.id. ordens_producao_status_check = exatos 8 valores do mapa. ordens_producao.numero existe (text). Nenhuma fn_op_status_transition* previa (so trg_production_completed_shadow p/ finalizado = precedente de naming).
+
+**Validacao (3 provas)**: (1) deterministico: fn_op_transition_is_known 12/12 casos ok, 0 mismatch (legit incl aguard_prog->em_conferencia=known; skips ilegitimos=unknown). (2) catalogo: 2 fns + trigger wired exatos (secdef+search_path confirmados). (3) RUNTIME smoketest (rolled-back via RAISE): forcei aguard_prog->em_acabamento em OP-2026-0012 -> system_events op_status_transition_anomaly before=0 after=1 delta=1 -> trigger DISPARA e grava end-to-end, sem cascade error, tudo rollback. Pollution check pos = 0 anomaly rows leftover. Evita armadilha #18/#24 (fix dormente declarado vitoria).
+
+**Rotacao Sabado/Financeiro (read-only)**: CR (excluido_em IS NULL) = 2 titulos, ambos pago, R$0 aberto, 0 vencido (saudavel; maioria do faturamento e mubisys skip_auto_cr). CP = 3 titulos a_pagar, TODOS vencidos, R$1.322,32 -> watch antigo "R$822 CP vencidas" (#41) CRESCEU p/ R$1.322,32; decisao Junior = pagar fornecedores, nao auto-fix. Sem anomalia estrutural. Financeiro saudavel (corrobora #41).
+
+**Mudancas prod**: 1 migration DDL (2 fns + 1 trigger, reversivel via DROP). 0 deploy Edge, 0 prod-data write (smoketest rolled-back, pollution=0). Commit planning #51 + migration.
+
+**NEXT**: ver ledger #51 (NEXT consolidado).
+
+---
+## Ciclo autonomo #50 - 2026-05-30 00:25 BRT - VERDE explorar/validar (backlog P0 Sabado/Financeiro, ZERO prod-write): DB-012 REFUTADO + DB-013 MAPEADO (prod-breakage evitado)
 
 **Tipo**: explorar + validar (read-only). Consumiu lane P0 do BACKLOG-MODULOS (rules v5.2, driver primario). NOW 00:07->00:25 BRT; #49 as 23:13 (~54min, sem gatilho passivo). Health VERDE: Vercel 200; edge 60min ZERO 5xx (mcp-bridge-worker v9 200, agent-cron-loop v28 200 2.7-3.5s); API 60min ZERO 4xx/5xx (3x400/tick #49 eliminados; system_events 201); branch=main HEAD 1c3df64 (rules v5.2); guardrail HOST LIMPO (tails STATE 3641/ledger 939/log 1772/backlog 74, 2 untracked herdados, bash NAO consultado).
 
