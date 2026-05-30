@@ -1770,3 +1770,25 @@ ZERO prod-write: alterar/desativar regra = decisao negocio Junior (regra legitim
 - Mudancas prod: 1 migration DDL + 4 linhas ai_memory (by-design). 0 deploy Edge.
 - Telegram: enviada (ok) mid=3167
 - Commit: chore(autonomo) ciclo #49 (ver git log -1)
+## 2026-05-30 00:25 (ciclo #50)
+
+**Status**: VERDE
+**Tipo**: explorar + validar (backlog P0 Sabado/Financeiro; read-only, ZERO prod-write)
+**Auto-dialogo (7)**:
+1. #47 re-audit Instalacao; #48 SERVICE_ROLE_KEY smoketest; #49 Memory Layer fix (fonte=calculo).
+2. Sabado=Financeiro (boletos/fluxo/DRE/aging), Edge portal-upload-assinatura v1 + pricing-engine.
+3. Gap util: rules v5.2 (HEAD 1c3df64) elegem BACKLOG-MODULOS driver primario -> consumir lane P0. Peguei DB-012 (area_m2, dinheiro) + DB-013 (validator OP).
+4. Sem conflito IN-PROGRESS/BLOCKED; ambos P0 default-exec.
+5. Obsidian: protocolo Mubisys relevante p/ itens dimensionless; secret leaks Claudete = dominio Junior.
+6. Nao-passivo (#49 ha ~54min, branch main, host limpo, zero 5xx).
+7. Criterio: DB-012 = 0 itens area NULL com dims presentes (ou refutado c/ evidencia); DB-013 = state machine OP mapeado + migration validada vs schema real.
+**Health check**: Vercel 200 | edge 60min ZERO 5xx (mcp-bridge-worker v9 ~1/min 200, agent-cron-loop v28 200 2.7-3.5s) | API 60min ZERO 4xx/5xx (3x400/tick #49 ELIMINADOS; system_events inserts 201) | branch=main HEAD 1c3df64 (rules v5.2) | guardrail HOST LIMPO (tails STATE 3641/ledger 939/log 1772/backlog 74, 2 untracked herdados, bash NAO consultado). NOW 00:07->00:25 BRT.
+**Agents**: 1 (general-purpose adversarial read-only, ~65k tok, 19 tools) - mapeou state machine completo de ordens_producao (funcoes producao + frontend + auditoria).
+**Acoes**:
+- DB-012 (P0 dinheiro) REFUTADO: cols largura_cm/altura_cm/area_m2 numeric NAO-generated + trigger fn_calc_area_m2 BEFORE INSERT OR UPDATE OF largura/altura (area=(w*h)/10000). 5/23 prop + 5/12 ped area NULL MAS 0 com ambas dims presentes; 0 mismatch area<>w*h. Os 10 NULL-area = dimensionless legitimo (Instalacao R$450/Deslocamento R$80/Frete Campinas R$550 mubisys/teste R$100/adesivos preco-fixo R$155-264), todos valor_total OK. Premissa "preco/m2 errado/zero" FALSA. 0 backfill.
+- DB-013 (P0 state) MAPEADO via agent: validator fn_validar_transicao_status so cobre pedidos+propostas; ordens_producao -> ELSE NULL (gap confirmado). Premissa corrigida: status tem CHECK 8 valores (NAO text livre). CASE canonico estava na migration 002:703-735, perdido em reescrita = regressao DB-013. CATCH: audit real tem aguardando_programacao->em_conferencia 3x que o canonico estrito REJEITARIA -> aplicar HOJE quebraria prod. Bug latente: DEFAULT pendente fora do CHECK.
+**Decisao (sem A/B)**: ZERO prod-write. DB-012 refutado (sem acao). DB-013: NAO aplicar validator estrito (quebra prod); shadow toca fn_validar_transicao_status que guarda pedidos/propostas money-state -> staged como trigger ISOLADO [VALIDADO] no NEXT (seguranca>velocidade, principio #1).
+**Resultado**: 2 P0 consumidos com evidencia (DB-012 refutado; DB-013 mapeado + prod-breakage evitado + migration validada staged). #49 Memory Layer saudavel (ai_memory=8, 4 padroes calculo upd 02:08, system_events 201, 0 400).
+**Ledger update**: DB-012 -> DONE refutado; DB-013 -> NEXT [VALIDADO shadow]. #50 DONE.
+**Commits**: fechamento #50 (hash no commit). **Deploys**: nenhum. **Migration**: nenhuma aplicada (1 staged validada).
+**Telegram**: enviada (ok)
