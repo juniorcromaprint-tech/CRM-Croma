@@ -1761,3 +1761,12 @@ ZERO prod-write: alterar/desativar regra = decisao negocio Junior (regra legitim
 - Anti-pattern evitado: NAO declarei break sem runtime (401 refutou); NAO re-grantei anon (re-abre SEC-002 + vaza service JWT); NAO vazei secret (boolean/left3); NAO Cowork Edit cerebros (>250 LOC, HOST .NET UTF8).
 - Commits: planning #48 (cerebros). 0 deploy, 0 migration, 0 prod-write.
 - Telegram: enviada (ok) mid=3165.
+## Ciclo #49 - 2026-05-29 23:05 BRT - VERDE corrigir
+- Tipo: corrigir (1 migration + validacao runtime). 0 agents.
+- Modulo: IA/Memory Layer (Fase 4 CROMA 4.0) - off-rotacao (Sexta=Instalacao re-auditada #47; pivot pro bug latente nos logs).
+- Auto-dialogo (7): (1) #47 re-audit Instalacao, #48 SERVICE_ROLE_KEY smoketest, #46 wrap RLS. (2) Sexta=Instalacao ja re-auditada #47. (3) gap util AGORA: "3x400/tick" rotulado ruido estavel ~10 ciclos sem diagnostico -> investigar. (4) sem conflito IN-PROGRESS/BLOCKED. (5) get_logs api deu o achado novo (fn 400). (6) nao-passivo (#48 ha 50min, branch main, host limpo, zero 5xx). (7) criterio: fn retorna patterns_updated>0 + ai_memory cresce + valores sanos.
+- Root cause (runtime): fn_detectar_padroes_memoria insere fonte=analise_automatica viola ai_memory_fonte_check (23514) na linha 7 -> 400 todo tick -> Memory Layer 0 padroes lifetime.
+- Fix: CREATE OR REPLACE fonte=calculo (migration cycle49, idempotente). Validacao: patterns_updated=4, ai_memory 4->8, padroes sanos (ticket R$649.56/9obs, conversao 43%/7obs, prazo 46d, dia Terca).
+- Mudancas prod: 1 migration DDL + 4 linhas ai_memory (by-design). 0 deploy Edge.
+- Telegram: enviada (ok) mid=3167
+- Commit: chore(autonomo) ciclo #49 (ver git log -1)

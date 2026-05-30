@@ -1,3 +1,20 @@
+## Ciclo autonomo #49 - 2026-05-29 23:05 BRT - VERDE corrigir: MEMORY LAYER (Fase 4) DESTRAVADA - fn_detectar_padroes_memoria inseria fonte=analise_automatica (viola ai_memory_fonte_check) -> 23514 -> 400 em TODO tick do cron por ~10+ ciclos (rotulado "ruido estavel" sem diagnostico). FIX fonte=calculo -> patterns_updated=4, ai_memory 4->8
+
+**Tipo**: corrigir (1 migration DDL CREATE OR REPLACE) + validar runtime. NOW 23:05 BRT (02:05 UTC 30/05); #48 as 22:15 (~50min, sem gatilho passivo). Janela deploy ABERTA. Health VERDE: Vercel 200; edge 60min ZERO 5xx (mcp-bridge-worker v9 ~1/min 200, agent-cron-loop v28 200 3.5-11.6s); branch=main HEAD ddf99ff=#48; guardrail HOST LIMPO (tails STATE 3624/ledger 924/log 1763, 2 untracked herdados, bash NAO consultado).
+
+**Decisao (sem A/B)**: pivot dos perf/sec advisors (exauridos #42-48) pro diagnostico dos "3x400/tick" que ~10 ciclos copiaram como "ruido estavel" SEM nunca dizer o que os 400 eram (anti-pattern auto-imposto). get_logs api revelou rpc/fn_detectar_padroes_memoria 400 + system_events 400 por tick. Memory Layer (Fase 4 CROMA 4.0) = alto valor, default-executavel, janela aberta.
+
+**Root cause (runtime)**: SELECT * FROM fn_detectar_padroes_memoria() -> ERRO 23514 ai_memory_fonte_check na 1a INSERT (linha 7). Constraint aceita SO {observacao,calculo,feedback_humano,ia_inferencia}; a fn inseria fonte=analise_automatica (valor nunca existente) nos 4 INSERTs -> rollback total -> 0 padroes gravados lifetime. tipo OK (client/pricing/operational_pattern permitidos). idx_ai_memory_unique_pattern casa o arbiter ON CONFLICT (sem 42P10/cardinality).
+
+**Fix**: migration fix_fn_detectar_padroes_memoria_fonte_calculo_cycle49 - CREATE OR REPLACE trocando analise_automatica->calculo (valor permitido, semanticamente = padrao calculado de agregado) nos 4 INSERTs. Sem mudar assinatura nem o constraint (nao afrouxar vocabulario). Idempotente.
+
+**Validacao (runtime, nao so success)**: pos-apply fn() -> patterns_updated=4 (1a execucao limpa lifetime); ai_memory 4->8 linhas; 4 padroes sanos: ticket_medio_real R$649.56/conf75/9obs, taxa_conversao_geral 43%/7obs, prazo_pagamento_medio 46d/2obs, dia_mais_produtivo Terca/3obs. Proximo tick cron (~03:00 UTC) retornara 200 no lugar de 400.
+
+**Mudancas prod**: 1 migration DDL (CREATE OR REPLACE fn) + 4 linhas ai_memory populadas (write by-design, upsert idempotente que o cron ja tentava todo tick). 0 deploy Edge. Commit planning #49 + migration.
+
+**NEXT**: diagnosticar o 2o 400/tick (POST /rest/v1/system_events 400 no agent-cron-loop, separado - provavel event_type/payload viola check); confirmar tick 03:00 UTC retorna 200 (evidencia de cron real). Heranca #48: portal-upload fallback (so se rotacionar key); multiple_permissive_policies 392; search_path INVOKER ~58. BLOCKED-Junior: buckets/views/token Telegram. [watch] R$822 CP vencidas; jobs Pendente 18; installation_completed morto (INSTAL-01 PWA).
+
+---
 ## Ciclo autonomo #48 - 2026-05-29 22:15 BRT - VERDE validar: P1 watch SERVICE_ROLE_KEY FECHADO com runtime - portal-upload-assinatura usa SERVICE_ROLE_KEY=JWT no path primario (smoketest HTTP 401 nao 500); fallback anon->RPC quebrado por SEC-002 NUNCA alcancado -> assinatura do portal SAUDAVEL
 
 **Tipo**: validar (read-only + 1 smoketest com token invalido = zero-write). NOW 22:15 BRT (01:15 UTC 30/05); #47 as 21:11 (~53min, sem gatilho passivo). Janela deploy cliente ABERTA (22h-7h). Health VERDE: Vercel 200; edge 60min ZERO 5xx (mcp-bridge-worker v9 ~1/min 200, agent-cron-loop v28 200 7.8-11.6s); branch=main HEAD 21903d9=#47; guardrail HOST LIMPO (tails STATE 3609/ledger 905/log 1751, 4 untracked herdados, bash NAO consultado). 0 agents (1 read source 173 LOC + 3 SQL + 1 smoketest inline).
