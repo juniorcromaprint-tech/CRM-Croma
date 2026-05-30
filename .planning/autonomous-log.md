@@ -1851,3 +1851,22 @@ ZERO prod-write: alterar/desativar regra = decisao negocio Junior (regra legitim
 **Deploys**: nenhum
 **Token usage**: ~90k
 **Telegram**: enviada (ok) mid=3172
+
+## 2026-05-30 03:25 (ciclo #53)
+
+**Status**: 🟢 VERDE
+**Tipo**: explorar + validar (read-only, ZERO prod-write/deploy/migration)
+**Auto-dialogo (7)**: (1) #50 DB-012 refutado+DB-013 mapeado, #51 DB-013 shadow validator aplicado, #52 DB-006 relatorio 53 produtos - todos Sabado/Financeiro+backlog P0. (2) Sabado->Financeiro (boletos/fluxo/DRE/aging), Edge portal-upload-assinatura v1+pricing-engine. (3) Backlog P0 ESGOTADO (DB-012/013/006 fechados #50-52) -> lane P1; INT-006 e o proximo default-exec; validar (mapear+de-risk, NAO deploy de Edge cliente 1294L as 3h) + rotacao Financeiro angulo NOVO (revenue leakage, nunca rodado #41-52). (4) Sem conflito IN-PROGRESS/BLOCKED: prospeccao travada intocada, DB-013 watch 1-semana intocado. (5) Obsidian: token Telegram + SERVICE_ROLE_KEY pendentes Junior (auditoria Claudete 23:55), nada bloqueia. (6) NAO-passivo: #52 ha 51min, branch main, host limpo, 0 5xx, ultimo VERDE. (7) Criterio: INT-006 confirmar/refutar fail-open + localizar secret; Financeiro quantificar leakage CR.
+**Health check**: Vercel 200; API 60min 100% 200 (fn_claim ~1/min); edge 60min mcp-bridge-worker v9 todos 200 ZERO 5xx; branch=main HEAD 9fa69f1=#52; guardrail HOST LIMPO (STATE 3676L/ledger 993L/log 1853L tails coerentes; 2 untracked herdados; bash NAO consultado).
+**Agents disparados**: 1 (general-purpose adversarial, ~42k, read-only) - auditoria INT-006 whatsapp-webhook 1294L.
+**Acoes executadas**:
+- INT-006 (P1 lane, proximo default-exec): VALIDADO. validateSignature (whatsapp-webhook v46, L372-395) tem fail-open L379-381: `if(!appSecret){console.warn(...);return true}` - aceita QUALQUER payload sem assinatura quando WHATSAPP_APP_SECRET ausente. Backlog dizia "L380" (off-by-one; return true real = L381). Deploy==fonte. appSecret = Deno.env WHATSAPP_APP_SECRET com fallback admin_config. DE-RISK: admin_config tem 13 chaves WHATSAPP_* (ACCESS_TOKEN/APP_ID/VERIFY_TOKEN/PHONE_NUMBER_ID/WABA_ID/...) mas NAO tem WHATSAPP_APP_SECRET -> secret provavelmente NAO setado -> fail-open provavelmente ATIVO. Fix = L381 `return true`->`return false` (fail-closed); GET hub.challenge L887-906 NAO usa validateSignature (handshake intacto); Meta legitimo sempre envia x-hub-signature-256. PRE-REQUISITO DURO: confirmar/setar WHATSAPP_APP_SECRET no Edge env ANTES do deploy, senao 403 em 100% do inbound. 1294L = Claude Code handoff. NAO smoketest (POST sem assinatura poluiria/criaria lead).
+- Rotacao Sabado/Financeiro (angulo NOVO - revenue leakage / cobertura de CR): PROVADO 0 leakage. pedidos sem CR: aguardando_aprovacao R$630 skip=false sem_cr=1 (CR so em aprovado=correto); aprovado R$1085.73 + concluido x3 R$3359.98 = skip_auto_cr=TRUE (mubisys); faturado x2 R$242.34 skip=false sem_cr=0 (TEM CR). Invariante: todo pedido nao-mubisys faturavel tem CR. Integridade: 0 saldo_drift CR(2)/CP(3)/comissoes(0). CP R$1.322,32 vencidas (3 titulos) estavel vs #51/#52 = decisao Junior.
+- SEC-011 reality-check: pg_net (public, 28 deps) + pg_trgm (public, 47 deps) - mover quebraria GIN trgm idx + net.http_post de crons/triggers; extension_in_public = INFO-level. DEFER (nao-seguro autonomo).
+**Decisao tomada**: backlog P0 esgotado -> consumir lane P1 pelo proximo default-exec (INT-006). Validei sem deploy porque e Edge cliente 1294L + pre-req (secret) nao confirmado; deploy fail-closed cego 403-aria todo WhatsApp. Encaixei rotacao Financeiro do dia com angulo inedito (revenue leakage) em vez de re-reportar "CP estavel".
+**Resultado**: INT-006 fail-open CONFIRMADO e provavelmente ATIVO (secret ausente do admin_config); fix exato + pre-req especificados; BLOCKED-Junior (setar secret) + Claude Code (deploy). Financeiro: 0 revenue leakage, 0 drift, invariante CR provada. 0 prod-write/deploy/migration.
+**Ledger update**: INT-006 [NAO-VALIDADO]->[VALIDADO, BLOCKED-Junior+Claude Code]; backlog INT-006 anotado; NEXT #53. DONE intacto.
+**Commits**: cerebros #53 (confirmado no remote via host).
+**Deploys**: nenhum.
+**Token usage**: ~145k.
+**Telegram**: enviada (ok)
