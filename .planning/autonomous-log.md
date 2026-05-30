@@ -1893,3 +1893,13 @@ ZERO prod-write: alterar/desativar regra = decisao negocio Junior (regra legitim
 **Token usage**: ~150k.
 
 **Telegram**: a confirmar no envio
+
+---
+## Ciclo autonomo #55 - 2026-05-30 05:08 BRT - VERDE corrigir+validar (DB-006b shadow guard preco-zero-sem-modelo)
+- Auto-dialogo: (1) #52 DB-006 report / #53 INT-006+Financeiro / #54 DB-011+PRICE-001. (2) Sabado=Financeiro (portal-upload-assinatura+pricing-engine) mas auditado 5 ciclos #50-53 -> nao repetir (#54). (3) Gap: lane Orcamento/preco; PRICE-001/002/003+DATA-004 BLOCKED-Junior ou mudam preco -> DB-006b = unico default-exec seguro. (4) Sem conflito IN-PROGRESS. (5) Obsidian: auditoria Claudete secret-leaks = BLOCKED-Junior, fora de escopo ERP. (6) Passivo? Nao (#54 ha ~33min, branch main, 0 5xx, log VERDE). (7) Sucesso: guard aplicado + RUNTIME pos/neg.
+- Health VERDE: Vercel 200; API 60min 100% 200 (fn_claim ~1/min); edge mcp-bridge-worker v9 60min 100% 200 (0.3-2.9s) ZERO 5xx; Edges ACTIVE; branch=main HEAD e66137f=#54; guardrail HOST LIMPO (STATE 3708/ledger 1035/log 1895, 2 untracked herdados, bash NAO consultado).
+- Tarefa: DB-006b guard Mubisys. 1 agent adversarial (~48k) mapeou path zero-price (file:line): Edge ai-gerar-orcamento v29 produto-sem-modelo PULA item; modelo-com-BOM-vazia PERSISTE valor_unitario~0 (L523-543); editor manual normal BLOQUEIA (guard C-01) mas template path ~L690 BYPASSA (PRICE-004 novo, agent-reported NAO-VALIDADO).
+- Migration shadow_guard_orcamento_item_preco_zero_sem_modelo_cycle55 (idempotente, validada vs schema): fn_orcamento_item_preco_zero_shadow SECDEF search_path=public,pg_temp + 2 triggers AFTER em proposta_itens+pedido_itens, WHEN(valor_unitario<=0 AND produto_id NOT NULL), warn-only (EXCEPTION WHEN OTHERS THEN RETURN NEW). Loga system_events orcamento_item_preco_zero_sem_modelo SO p/ produto sem produto_modelos ativo com BOM/preco_fixo.
+- Validacao RUNTIME (3 provas): schema pre-validado; smoketest rolled-back POSITIVO delta=1 + CONTROLE NEGATIVO delta=0 (sem falso-positivo); catalogo 2 triggers + secdef+search_path; pollution=0. DB-013 shadow (#51): 0 anomalias ~3.5h.
+- Mudancas prod: 1 migration DDL (1 fn + 2 triggers, reversivel DROP). 0 deploy Edge, 0 prod-data write. QA report docs/qa-reports/2026-05-30-DB-006b-shadow-guard-preco-zero.
+- Telegram: enviada (ok=true, message_id=3175). Commit cerebros #55 + migration + QA report (push HOST).
