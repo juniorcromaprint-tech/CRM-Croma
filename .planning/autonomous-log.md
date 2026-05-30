@@ -1727,3 +1727,25 @@ ZERO prod-write: alterar/desativar regra = decisao negocio Junior (regra legitim
 **Migration**: optimize_rls_initplan_auth_wrap_cycle46 (78 ALTER POLICY)
 **Deploys**: nenhum
 **Telegram**: enviada (confirmacao no fechamento)
+
+## 2026-05-29 21:15 (ciclo #47)
+
+**Status**: 🟢 VERDE
+**Tipo**: explorar/validar (read-only, ZERO prod-write)
+**Auto-dialogo (7)**: (1) #44 validou 3 fixes seg Junior; #45 lead_quente runtime + SEC-004 search_path; #46 auth_rls_initplan 78 wrap. (2) Sexta=Instalacao (mcp-bridge-worker v9). (3) gap: #42-46 derivaram pra perf/sec advisor DDL e exauriram os de baixo risco; rotacao Sexta sem re-audit desde #27-34; watches install_completed/production_completed/jobs-Pendente/BUG-MCP-01 copiados ha ~20 ciclos SEM reverificacao pos-Fase 1.2 -> verificar runtime (verify-before-assume). (4) sem conflito: itens Instalacao arquiteturais BLOCKED-Junior, mas verificacao de runtime e read-only default-exec. (5) STATE: Fase 1.2 (4195dc7) remediou 1070+PED-2026-0025; confirmar transicao/installation runtime. (6) nao-passivo (#46 ha 53min, branch main, host limpo, 0 5xx). (7) criterio: counts lifetime+ultimas datas de install/prod events, jobs aging, ordens_instalacao, BUG-MCP-01 confirmado/refutado no source DEPLOYADO.
+**Health check**: Vercel 200; edge 60min ZERO 5xx (mcp-bridge-worker v9 ~1/min 200, agent-cron-loop v28 200 7.7-12s); API tick natural 00:00 UTC limpo (fn_claim 200, system_events 201, lead_quente idempotency-GET 200 deduped SEM flood - v28 estavel 10o ciclo); branch=main HEAD 267cfb1=#46; guardrail host: OK (tails STATE 3593/ledger 884/log 1729, 2 untracked herdados, bash NAO consultado).
+**Agents disparados**: 1 (general-purpose read-only adversarial, ~42k tok, 4 tools) revisou source DEPLOYADO mcp-bridge-worker v9 pra confirmar/refutar BUG-MCP-01.
+**Acoes executadas**: 1 query SQL agregada (Instalacao: system_events install/prod/payment 30d+lifetime, jobs by status+aging, ordens_instalacao, pedidos estados, OPs finalizado) + 1 agent + get_telegram_bot_token.
+**Decisao tomada**: rotacao Sexta = re-audit Instalacao read-only (verify-before-assume) ao inves de mais 1 perf-advisor DDL (restantes = multiple_permissive 392 arriscado / search_path INVOKER baixo-valor). ZERO prod-write: itens Instalacao sao BLOCKED-Junior (INSTAL-02 PWA) ou exigem deploy de edge 261 LOC (agent/Claude Code, baixo valor). Valor do ciclo = corrigir 2 watches estagnados + provar Fase 1.2 no runtime.
+**Resultado (4 watches reconciliados com runtime)**:
+- BUG-MCP-01 REFUTADO: source v9 deployado JA encadeia .select().single() no insert ai_responses (L86-95) + checa insErr/!respData (L96). STATE #27 desatualizado vs deploy. Non-conf MENOR: 4 updates ai_requests L59/77/98/105 sem .select() (status fila best-effort, capturam+logam erro); 261 LOC >250 -> agent/Claude Code, baixo valor.
+- Chain Producao->Instalacao DESTRAVADA confirmada no RUNTIME: installation_order_auto_created 4x lifetime, ULTIMO 2026-05-28 17:04 UTC; +1 ordens_instalacao (aguardando_agendamento 05-28); 3 OPs finalizado (05-28 17:11); 1 job Em andamento; prod_transition_error=0 lifetime; pedidos 1070/PED-2026-0025 concluido. Fase 1.2 (4195dc7) funciona end-to-end ate criar ordem.
+- installation_completed STILL morto 24d (ultimo 2026-05-05 02:54): RE-TIPIFICADO - auto-criacao OK; gargalo = conclusao fisica/App Campo (INSTAL-02 PWA), nao chain.
+- jobs Pendente 18 = backlog CONGELADO abril (04-01..04-15), 0 novos desde 04-15 -> NAO empilha (refuta #27).
+- MICRO: 1 ordens_instalacao "agendada" travada desde 04-06 (7+ sem).
+**Anti-pattern evitado**: confirmei BUG-MCP-01 no source DEPLOYADO via agent (nao confiei no STATE #27 estatico) e REFUTEI. NAO declarei chain "destravada" sem evento de runtime (achei installation_order_auto_created 05-28). NAO manufaturei prod-write arriscado num modulo cujos itens abertos sao BLOCKED-Junior/escopo Claude Code. NAO Cowork Edit nos cerebros (>250 LOC, via HOST .NET UTF8).
+**Ledger update**: #47 DONE adicionado; BUG-MCP-01 movido p/ RESOLVIDOS; jobs-Pendente + installation_completed re-tipificados no NEXT.
+**Commits**: planning #47 (cerebros) - confirmado no remote via host.
+**Deploys**: nenhum.
+**Token usage**: ~125k.
+**Telegram**: enviada (ok)
